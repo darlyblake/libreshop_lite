@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LibreShop — Explorer les boutiques</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+}
+
+.search {
+  flex: 0 1 400px;
+  position: relative;
+  margin: 0 20px;
+}
+
+.search input {
+  width: 100%;
+  padding: 12px 48px 12px 20px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search input::placeholder {
+  color: var(--text-muted);
+}
+
+.search i {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-soft);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.home-link {
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  transition: var(--transition);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+}
+
+.home-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== TRENDING BANNER ===== */
+.trending {
+  margin: 30px 30px 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.1), rgba(6, 182, 212, 0.1));
+  border: 1px solid var(--border);
+  padding: 16px 0;
+  position: relative;
+}
+
+.trending::before,
+.trending::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 100px;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.trending::before {
+  left: 0;
+  background: linear-gradient(90deg, #0a0c12, transparent);
+}
+
+.trending::after {
+  right: 0;
+  background: linear-gradient(-90deg, #0a0c12, transparent);
+}
+
+.trending-track {
+  display: flex;
+  gap: 16px;
+  animation: scrollTrend 40s linear infinite;
+  width: max-content;
+  padding: 0 20px;
+}
+
+.trend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  padding: 8px 20px 8px 12px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.trend-item:hover {
+  transform: translateY(-2px) scale(1.02);
+  border-color: var(--accent);
+  background: var(--card-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.trend-item img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+}
+
+.trend-item span {
+  font-weight: 500;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.trend-item i {
+  color: var(--accent2);
+  font-size: 0.8rem;
+}
+
+@keyframes scrollTrend {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ===== CATEGORIES ===== */
+.categories-section {
+  padding: 30px 30px 0;
+}
+
+.categories-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.categories-title h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.categories-title a {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.categories-title a:hover {
+  color: white;
+}
+
+.categories {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--border);
+}
+
+.categories::-webkit-scrollbar {
+  height: 5px;
+}
+
+.categories::-webkit-scrollbar-track {
+  background: var(--border);
+  border-radius: 10px;
+}
+
+.categories::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 10px;
+}
+
+.categories button {
+  border: none;
+  padding: 10px 22px;
+  border-radius: 60px;
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  color: var(--text-soft);
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  transition: var(--transition);
+}
+
+.categories button:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border-color: transparent;
+  transform: translateY(-2px);
+}
+
+.categories button.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border-color: transparent;
+}
+
+/* ===== BOUTIQUES GRID ===== */
+.stores-section {
+  padding: 20px 30px 40px;
+}
+
+.stores-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.stores-header h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.stores-header span {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  background: var(--card);
+  padding: 6px 14px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+}
+
+.stores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 24px;
+}
+
+.store-card {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-lg);
+  padding: 28px 20px 20px;
+  border: 1px solid var(--border);
+  text-align: center;
+  transition: var(--transition);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.store-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.store-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.store-card:hover::before {
+  opacity: 1;
+}
+
+.store-card img {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 16px;
+  border: 3px solid transparent;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  padding: 3px;
+  transition: transform 0.3s;
+}
+
+.store-card:hover img {
+  transform: scale(1.05);
+}
+
+.store-card h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.store-card .category {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.store-card p {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.badge {
+  display: inline-block;
+  padding: 5px 14px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  letter-spacing: 0.3px;
+}
+
+/* ===== LOAD MORE ===== */
+.load-more {
+  text-align: center;
+  margin-top: 40px;
+}
+
+.load-more button {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  padding: 12px 32px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.load-more button:hover {
+  background: var(--card-hover);
+  color: white;
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .search {
+    flex: 1;
+    margin: 0 10px;
+  }
+  
+  .search input {
+    padding: 10px 40px 10px 16px;
+  }
+  
+  .trending {
+    margin: 20px 16px 0;
+  }
+  
+  .categories-section,
+  .stores-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  .stores-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+  }
+  
+  .store-card {
+    padding: 20px 12px;
+  }
+  
+  .store-card img {
+    width: 80px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none;
+  }
+  
+  header {
+    justify-content: space-between;
+  }
+  
+  .trend-item span {
+    font-size: 0.8rem;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="search">
+    <input type="text" placeholder="Rechercher une boutique ou un produit...">
+    <i class="fa fa-search"></i>
+  </div>
+  <a href="./index.html" class="home-link">
+    <i class="fa fa-home"></i>
+  </a>
+</header>
+
+<!-- ===== BOUTIQUES TENDANCE ===== -->
+<div class="trending">
+  <div class="trending-track">
+    <!-- Première série -->
+    <div class="trend-item">
+      <img src="https://picsum.photos/60?1" alt="Tech Store">
+      <span>Tech Store</span>
+      <i class="fa-solid fa-fire-flame-curved" style="color:#f97316;"></i>
+    </div>
+    <div class="trend-item">
+      <img src="https://picsum.photos/60?2" alt="Boutique Elite">
+      <span>Boutique Elite</span>
+      <i class="fa-solid fa-fire-flame-curved" style="color:#f97316;"></i>
+    </div>
+    <div class="trend-item">
+      <img src="https://picsum.photos/60?3" alt="Fashion House">
+      <span>Fashion House</span>
+      <i class="fa-solid fa-fire-flame-curved" style="color:#f97316;"></i>
+    </div>
+    <div class="trend-item">
+      <img src="https://picsum.photos/60?4" alt="Beauty Glow">
+      <span>Beauty Glow</span>
+      <i class="fa-solid fa-fire-flame-curved" style="color:#f97316;"></i>
+    </div>
+    <!-- Duplication pour l'effet infini -->
+    <div class="trend-item">
+      <img src="https://picsum.photos/60?1" alt="Tech Store">
+      <span>Tech Store</span>
+      <i class="fa-solid fa-fire-flame-curved" style="color:#f97316;"></i>
+    </div>
+    <div class="trend-item">
+      <img src="https://picsum.photos/60?2" alt="Boutique Elite">
+      <span>Boutique Elite</span>
+      <i class="fa-solid fa-fire-flame-curved" style="color:#f97316;"></i>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CATÉGORIES ===== -->
+<div class="categories-section">
+  <div class="categories-title">
+    <h2>Parcourir par catégorie</h2>
+    <a href="#">Voir tout <i class="fa-solid fa-arrow-right"></i></a>
+  </div>
+  <div class="categories">
+    <button class="active">Toutes</button>
+    <button>Électronique</button>
+    <button>Mode</button>
+    <button>Beauté</button>
+    <button>Maison</button>
+    <button>Alimentation</button>
+    <button>Sports</button>
+    <button>Livres</button>
+    <button>Jeux</button>
+  </div>
+</div>
+
+<!-- ===== GRILLE DES BOUTIQUES ===== -->
+<section class="stores-section">
+  <div class="stores-header">
+    <h2>Boutiques populaires</h2>
+    <span>24 boutiques</span>
+  </div>
+  
+  <div class="stores-grid">
+    <div class="store-card">
+      <img src="https://picsum.photos/200?5" alt="Tech Store">
+      <h3>Tech Store</h3>
+      <div class="category">Électronique</div>
+      <p>Smartphones, accessoires et innovations</p>
+      <span class="badge">Tendance</span>
+    </div>
+
+    <div class="store-card">
+      <img src="https://picsum.photos/200?6" alt="Boutique Elite">
+      <h3>Boutique Elite</h3>
+      <div class="category">Mode</div>
+      <p>Vêtements premium et accessoires</p>
+    </div>
+
+    <div class="store-card">
+      <img src="https://picsum.photos/200?7" alt="Beauty Glow">
+      <h3>Beauty Glow</h3>
+      <div class="category">Beauté</div>
+      <p>Cosmétiques et soins naturels</p>
+      <span class="badge">Nouveau</span>
+    </div>
+
+    <div class="store-card">
+      <img src="https://picsum.photos/200?8" alt="Maison Pro">
+      <h3>Maison Pro</h3>
+      <div class="category">Maison</div>
+      <p>Équipements & décoration design</p>
+    </div>
+
+    <div class="store-card">
+      <img src="https://picsum.photos/200?9" alt="Food Market">
+      <h3>Food Market</h3>
+      <div class="category">Alimentation</div>
+      <p>Produits frais et locaux</p>
+    </div>
+
+    <div class="store-card">
+      <img src="https://picsum.photos/200?10" alt="Sport Zone">
+      <h3>Sport Zone</h3>
+      <div class="category">Sports</div>
+      <p>Équipements sportifs</p>
+    </div>
+  </div>
+
+  <div class="load-more">
+    <button><i class="fa-solid fa-rotate-right"></i> Charger plus de boutiques</button>
+  </div>
+</section>
+
+</body>
+</html>

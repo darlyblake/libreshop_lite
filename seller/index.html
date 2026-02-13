@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LibreShop — Tableau de bord vendeur</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.8);
+  --card-hover: rgba(28, 32, 42, 0.95);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.seller-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  padding: 6px 16px 6px 12px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+}
+
+.seller-badge i {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.seller-badge span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.seller-badge .plan {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  padding: 2px 8px;
+  border-radius: 60px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.menu-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.menu-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== MENU MOBILE ===== */
+.menu-mobile {
+  display: none;
+  position: absolute;
+  top: 80px;
+  right: 30px;
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-direction: column;
+  width: 240px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 99;
+}
+
+.menu-mobile a {
+  padding: 14px 20px;
+  color: var(--text-soft);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-mobile a i {
+  width: 20px;
+  color: var(--accent);
+}
+
+.menu-mobile a:last-child { border-bottom: none; }
+
+.menu-mobile a:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+  color: white;
+  padding-left: 28px;
+}
+
+.menu-mobile a.logout {
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
+
+.menu-mobile a.logout i {
+  color: var(--danger);
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ===== EN-TÊTE DASHBOARD ===== */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dashboard-header h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  background: linear-gradient(to bottom, #fff, #a5b4fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.date-badge {
+  background: var(--card);
+  padding: 8px 18px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-badge i {
+  color: var(--accent);
+}
+
+/* ===== STATISTIQUES ===== */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.stat-card:hover::before {
+  opacity: 1;
+}
+
+.stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.stat-header h3 {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-header i {
+  font-size: 1.2rem;
+  color: var(--accent);
+  background: rgba(139, 92, 246, 0.15);
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.stat-number {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-trend {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-trend.positive {
+  color: var(--success);
+}
+
+.stat-trend.negative {
+  color: var(--danger);
+}
+
+/* ===== SECTION COMMANDES ===== */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 30px 0 20px;
+}
+
+.section-header h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-header h2 i {
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+.view-all {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: gap 0.2s;
+}
+
+.view-all:hover {
+  gap: 8px;
+  color: white;
+}
+
+.orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.order-card {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.order-card:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+  transform: translateY(-2px);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.customer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.customer-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+  color: white;
+}
+
+.customer-info h4 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.customer-info .order-id {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.order-status {
+  padding: 4px 10px;
+  border-radius: 60px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.order-status.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.order-status.confirmed {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.order-status.shipped {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.order-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 15px 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.order-amount {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.order-items {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.order-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.whatsapp-btn {
+  background: #25D366;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 60px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition);
+  border: none;
+  cursor: pointer;
+}
+
+.whatsapp-btn:hover {
+  background: #20bd5a;
+  transform: scale(1.02);
+}
+
+.status-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  padding: 8px 12px;
+  border-radius: 60px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.status-btn:hover {
+  background: var(--card-hover);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* ===== BOUTON AJOUTER PRODUIT ===== */
+.add-product {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  box-shadow: 0 8px 25px var(--accent-glow);
+  text-decoration: none;
+  transition: var(--transition);
+  z-index: 90;
+}
+
+.add-product:hover {
+  transform: scale(1.1) rotate(90deg);
+  box-shadow: 0 12px 35px rgba(139, 92, 246, 0.5);
+}
+
+/* ===== ACTIVITÉ RÉCENTE ===== */
+.activity-section {
+  margin-top: 40px;
+}
+
+.activity-list {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item:hover {
+  background: var(--card-hover);
+}
+
+.activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-text {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.activity-time {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .container {
+    padding: 20px 16px;
+  }
+  
+  .dashboard-header h1 {
+    font-size: 1.5rem;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .seller-badge span:not(.plan) {
+    display: none;
+  }
+  
+  .menu-mobile {
+    right: 16px;
+    width: 220px;
+  }
+  
+  .add-product {
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .order-card {
+    padding: 15px;
+  }
+  
+  .order-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .whatsapp-btn, .status-btn {
+    justify-content: center;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="seller-badge">
+    <i class="fa-solid fa-store"></i>
+    <span>Ma Boutique</span>
+    <span class="plan">PRO</span>
+  </div>
+  <div class="menu-btn" onclick="toggleMenu()">
+    <i class="fa fa-bars"></i>
+  </div>
+  <div class="menu-mobile" id="mobileMenu">
+    <a href="#"><i class="fa fa-chart-pie"></i> Tableau de bord</a>
+    <a href="#"><i class="fa fa-box"></i> Produits</a>
+    <a href="#"><i class="fa fa-truck"></i> Commandes</a>
+    <a href="#"><i class="fa fa-chart-line"></i> Statistiques</a>
+    <a href="#"><i class="fa fa-store"></i> Ma boutique</a>
+    <a href="#"><i class="fa fa-credit-card"></i> Abonnement</a>
+    <a href="#" class="logout"><i class="fa fa-sign-out-alt"></i> Déconnexion</a>
+  </div>
+</header>
+
+<div class="container">
+  <!-- En-tête du dashboard -->
+  <div class="dashboard-header">
+    <h1>Bon retour, Jean-Marc 👋</h1>
+    <div class="date-badge">
+      <i class="fa-regular fa-calendar"></i>
+      <span>13 Février 2026</span>
+    </div>
+  </div>
+
+  <!-- Statistiques -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-header">
+        <h3>Total commandes</h3>
+        <i class="fa-solid fa-cart-shopping"></i>
+      </div>
+      <div class="stat-number">156</div>
+      <div class="stat-trend positive">
+        <i class="fa-solid fa-arrow-up"></i> +12% ce mois
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-header">
+        <h3>Revenus du mois</h3>
+        <i class="fa-solid fa-money-bill-trend-up"></i>
+      </div>
+      <div class="stat-number">350 000 FCFA</div>
+      <div class="stat-trend positive">
+        <i class="fa-solid fa-arrow-up"></i> +8% vs mois dernier
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-header">
+        <h3>Produits actifs</h3>
+        <i class="fa-solid fa-box"></i>
+      </div>
+      <div class="stat-number">18</div>
+      <div class="stat-trend">
+        Dont 3 en rupture
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-header">
+        <h3>Commandes en attente</h3>
+        <i class="fa-solid fa-clock"></i>
+      </div>
+      <div class="stat-number">5</div>
+      <div class="stat-trend negative">
+        <i class="fa-solid fa-exclamation-circle"></i> À traiter
+      </div>
+    </div>
+  </div>
+
+  <!-- Dernières commandes -->
+  <div class="section-header">
+    <h2><i class="fa-solid fa-truck-fast"></i> Dernières commandes</h2>
+    <a href="#" class="view-all">Voir tout <i class="fa-solid fa-arrow-right"></i></a>
+  </div>
+
+  <div class="orders-grid">
+    <div class="order-card">
+      <div class="order-header">
+        <div class="customer">
+          <div class="customer-avatar">JD</div>
+          <div class="customer-info">
+            <h4>Jean Dupont</h4>
+            <span class="order-id">#CMD-2024-156</span>
+          </div>
+        </div>
+        <span class="order-status pending">En attente</span>
+      </div>
+      <div class="order-details">
+        <span class="order-amount">45 000 FCFA</span>
+        <span class="order-items"><i class="fa-regular fa-clock"></i> Il y a 15 min</span>
+      </div>
+      <div class="order-actions">
+        <a href="#" class="whatsapp-btn"><i class="fa-brands fa-whatsapp"></i> Client</a>
+        <button class="status-btn"><i class="fa-regular fa-circle-check"></i> Traiter</button>
+      </div>
+    </div>
+
+    <div class="order-card">
+      <div class="order-header">
+        <div class="customer">
+          <div class="customer-avatar">MK</div>
+          <div class="customer-info">
+            <h4>Marie Kouassi</h4>
+            <span class="order-id">#CMD-2024-155</span>
+          </div>
+        </div>
+        <span class="order-status confirmed">Confirmée</span>
+      </div>
+      <div class="order-details">
+        <span class="order-amount">120 000 FCFA</span>
+        <span class="order-items"><i class="fa-regular fa-clock"></i> Il y a 2h</span>
+      </div>
+      <div class="order-actions">
+        <a href="#" class="whatsapp-btn"><i class="fa-brands fa-whatsapp"></i> Client</a>
+        <button class="status-btn"><i class="fa-regular fa-paper-plane"></i> Expédier</button>
+      </div>
+    </div>
+
+    <div class="order-card">
+      <div class="order-header">
+        <div class="customer">
+          <div class="customer-avatar">AT</div>
+          <div class="customer-info">
+            <h4>Amadou Touré</h4>
+            <span class="order-id">#CMD-2024-154</span>
+          </div>
+        </div>
+        <span class="order-status shipped">Expédiée</span>
+      </div>
+      <div class="order-details">
+        <span class="order-amount">75 000 FCFA</span>
+        <span class="order-items"><i class="fa-regular fa-clock"></i> Hier</span>
+      </div>
+      <div class="order-actions">
+        <a href="#" class="whatsapp-btn"><i class="fa-brands fa-whatsapp"></i> Client</a>
+        <button class="status-btn"><i class="fa-regular fa-star"></i> Suivi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activité récente -->
+  <div class="activity-section">
+    <div class="section-header">
+      <h2><i class="fa-regular fa-bell"></i> Activité récente</h2>
+      <a href="#" class="view-all">Voir tout</a>
+    </div>
+    <div class="activity-list">
+      <div class="activity-item">
+        <div class="activity-icon"><i class="fa-solid fa-cart-plus"></i></div>
+        <div class="activity-content">
+          <div class="activity-text">Nouvelle commande de Jean Dupont (45 000 FCFA)</div>
+          <div class="activity-time">Il y a 15 minutes</div>
+        </div>
+      </div>
+      <div class="activity-item">
+        <div class="activity-icon"><i class="fa-solid fa-box-open"></i></div>
+        <div class="activity-content">
+          <div class="activity-text">Produit "iPhone 13" ajouté à votre boutique</div>
+          <div class="activity-time">Il y a 2 heures</div>
+        </div>
+      </div>
+      <div class="activity-item">
+        <div class="activity-icon"><i class="fa-solid fa-check-circle"></i></div>
+        <div class="activity-content">
+          <div class="activity-text">Commande #CMD-2024-153 marquée comme livrée</div>
+          <div class="activity-time">Il y a 5 heures</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a href="#" class="add-product">
+  <i class="fa fa-plus"></i>
+</a>
+
+<script>
+function toggleMenu() {
+  const menu = document.getElementById('mobileMenu');
+  if (menu.style.display === 'flex') {
+    menu.style.display = 'none';
+  } else {
+    menu.style.display = 'flex';
+  }
+}
+
+// Fermer le menu en cliquant ailleurs
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('mobileMenu');
+  const menuBtn = document.querySelector('.menu-btn');
+  
+  if (!menuBtn.contains(event.target) && !menu.contains(event.target)) {
+    menu.style.display = 'none';
+  }
+});
+</script>
+
+</body>
+</html>

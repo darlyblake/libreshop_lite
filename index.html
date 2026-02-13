@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LibreShop — Créez votre boutique en ligne</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --accent2: #06b6d4;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 40px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+nav {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+nav a:not(.btn) {
+  color: var(--text-soft);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: var(--transition);
+  position: relative;
+}
+
+nav a:not(.btn):hover {
+  color: white;
+}
+
+nav a:not(.btn)::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 80%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 2px;
+  transition: transform 0.2s ease;
+}
+
+nav a:not(.btn):hover::after {
+  transform: translateX(-50%) scaleX(1);
+}
+
+.btn {
+  padding: 10px 22px;
+  border-radius: 60px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: var(--transition);
+  letter-spacing: -0.2px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  color: white;
+  box-shadow: 0 8px 20px var(--accent-glow);
+  border: none;
+}
+
+.btn-primary:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 28px rgba(139, 92, 246, 0.5);
+}
+
+.btn-outline {
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  color: white;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* ===== HERO ===== */
+.hero {
+  padding: 100px 24px 80px;
+  text-align: center;
+  max-width: 1000px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.hero h1 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -2px;
+  line-height: 1.2;
+  margin-bottom: 24px;
+  background: linear-gradient(to bottom, #fff, #a5b4fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  max-width: 600px;
+  margin: 0 auto 40px;
+}
+
+.hero-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ===== SECTIONS ===== */
+.section {
+  padding: 80px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section h2 {
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  margin-bottom: 60px;
+  position: relative;
+}
+
+.section h2::after {
+  content: '';
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 2px;
+}
+
+/* ===== CARDS ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.card {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  transition: var(--transition);
+  text-align: center;
+  box-shadow: 0 20px 35px -15px rgba(0, 0, 0, 0.3);
+}
+
+.card:hover {
+  background: var(--card-hover);
+  transform: translateY(-8px) scale(1.02);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.card i {
+  font-size: 2.4rem;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.card h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.card p {
+  color: var(--text-soft);
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+/* ===== PRICING ===== */
+.price {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 16px 0 8px;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ===== CTA ===== */
+.cta {
+  text-align: center;
+  padding: 100px 24px;
+  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.15), transparent 70%);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.cta h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 32px;
+  letter-spacing: -1px;
+}
+
+/* ===== FOOTER ===== */
+footer {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+footer a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+footer a:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+/* ===== BADGES / TAGS ===== */
+.tag {
+  display: inline-block;
+  padding: 4px 12px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 60px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    border-radius: 40px;
+    padding: 12px 20px;
+  }
+  
+  nav {
+    gap: 16px;
+  }
+  
+  nav a:not(.btn) {
+    display: none;
+  }
+  
+  .hero h1 {
+    font-size: 2.2rem;
+  }
+  
+  .section h2 {
+    font-size: 1.8rem;
+  }
+  
+  .cta h2 {
+    font-size: 1.8rem;
+  }
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+.card:hover i {
+  animation: float 2s ease infinite;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div class="logo">LibreShop</div>
+  <nav>
+    <a href="#fonctionnement">Fonctionnement</a>
+    <a href="#tarifs">Tarifs</a>
+    <a href="./client/index.html">Explorer</a>
+    <a href="./login.html" class="btn btn-outline">Connexion</a>
+    <a href="./seller/index.html" class="btn btn-primary">Devenir vendeur</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <span class="tag">✨ Marketplace nouvelle génération</span>
+  <h1>Créez votre boutique en ligne.<br>Vendez partout.</h1>
+  <p>La solution tout-en-un pour les commerçants modernes. Vente en ligne et en physique, sans complication.</p>
+  <div class="hero-buttons">
+    <a href="./client/index.html" class="btn btn-primary">Explorer les boutiques</a>
+    <a href="./seller/index.html" class="btn btn-outline">Créer ma boutique →</a>
+  </div>
+</section>
+
+<section class="section" id="fonctionnement">
+  <h2>Comment ça marche</h2>
+  <div class="grid">
+    <div class="card">
+      <i class="fa-solid fa-bag-shopping"></i>
+      <h3>Pour les acheteurs</h3>
+      <p>Parcourez les boutiques, ajoutez au panier et échangez directement via WhatsApp.</p>
+    </div>
+    <div class="card">
+      <i class="fa-solid fa-store"></i>
+      <h3>Pour les vendeurs</h3>
+      <p>Créez votre boutique, gérez vos produits et vos commandes en ligne ou en magasin.</p>
+    </div>
+    <div class="card">
+      <i class="fa-solid fa-handshake"></i>
+      <h3>Une communauté</h3>
+      <p>Rejoignez un écosystème de commerçants et développez votre activité.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2>Fonctionnalités clés</h2>
+  <div class="grid">
+    <div class="card"><i class="fa-solid fa-mobile"></i><h3>Progressive Web App</h3><p>Installable sur mobile comme une application native</p></div>
+    <div class="card"><i class="fa-regular fa-hard-drive"></i><h3>Stockage cloud</h3><p>Images et données hébergées en toute sécurité</p></div>
+    <div class="card"><i class="fa-solid fa-chart-line"></i><h3>Dashboard avancé</h3><p>Statistiques et analyses en temps réel</p></div>
+    <div class="card"><i class="fa-solid fa-cash-register"></i><h3>Vente physique</h3><p>Interface caisse pour votre magasin</p></div>
+  </div>
+</section>
+
+<section class="section" id="tarifs">
+  <h2>Tarifs simples</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Essai</h3>
+      <div class="price">7 jours</div>
+      <p>Accès complet pour tester LibreShop sans engagement</p>
+    </div>
+    <div class="card">
+      <h3>Basic</h3>
+      <div class="price">3 000 FCFA</div>
+      <p>par mois<br>50 produits • QR code • support prioritaire</p>
+    </div>
+    <div class="card">
+      <h3>Pro</h3>
+      <div class="price">5 000 FCFA</div>
+      <p>par mois<br>300 produits • vente physique • stats avancées</p>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <h2>Prêt à développer votre commerce ?</h2>
+  <a href="./seller/index.html" class="btn btn-primary">Créer ma boutique maintenant</a>
+</section>
+
+<footer>
+  © 2026 LibreShop — <a href="./admin/index.html">Administration</a>
+</footer>
+
+</body>
+</html>
