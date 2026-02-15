@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LibreShop - Authentification vendeur</title>
+    
+    <!-- Google Fonts pour Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: linear-gradient(135deg, #0a0c12 0%, #0f1117 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 460px;
+            width: 100%;
+            margin: auto;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .logo i {
+            font-size: 42px;
+            background: linear-gradient(135deg, #6d5cff, #00c2ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .logo span {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6d5cff, #00c2ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: block;
+        }
+
+        .card {
+            background: rgba(22, 26, 34, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 32px 28px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin: 0 0 8px;
+            background: linear-gradient(to right, #fff, #e0e4f0);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        p {
+            color: #9aa4b2;
+            margin: 0 0 20px;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        small {
+            display: block;
+            color: #7f8b9a;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .input-group {
+            position: relative;
+            margin: 12px 0;
+        }
+
+        .input-group i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #4a5568;
+            font-size: 16px;
+            transition: color 0.2s;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 16px 16px 16px 45px;
+            border-radius: 12px;
+            border: 1.5px solid #2a3242;
+            background: #0f1117;
+            color: white;
+            font-size: 15px;
+            font-family: "Inter", sans-serif;
+            transition: all 0.2s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #6d5cff;
+            box-shadow: 0 0 0 3px rgba(109, 92, 255, 0.1);
+            background: #141a24;
+        }
+
+        input:hover, select:hover {
+            border-color: #3e4a5e;
+        }
+
+        input[type="file"] {
+            padding: 12px 16px;
+            background: #0c0f14;
+            cursor: pointer;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: linear-gradient(135deg, #6d5cff, #00c2ff);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            margin-right: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            opacity: 0.9;
+        }
+
+        .file-label {
+            display: block;
+            margin: 16px 0 6px;
+            color: #9aa4b2;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #6d5cff, #00c2ff);
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 8px 20px -5px rgba(109, 92, 255, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px -5px rgba(109, 92, 255, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .link-group {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .link {
+            color: #00c2ff;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+            padding: 8px;
+            border-radius: 8px;
+        }
+
+        .link:hover {
+            color: #6d5cff;
+            background: rgba(109, 92, 255, 0.1);
+            text-decoration: none;
+        }
+
+        .step {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .step.active {
+            display: block;
+            opacity: 1;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .progress {
+            height: 6px;
+            background: #222a36;
+            border-radius: 10px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .bar {
+            height: 100%;
+            width: 0;
+            background: linear-gradient(90deg, #6d5cff, #00c2ff);
+            border-radius: 10px;
+            transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .password-strength {
+            margin-top: 8px;
+            font-size: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .strength-bar {
+            height: 4px;
+            flex: 1;
+            background: #2a3242;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .strength-bar-fill {
+            height: 100%;
+            width: 0;
+            transition: all 0.3s;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                padding: 0;
+            }
+            
+            .card {
+                padding: 24px 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            input, select, button {
+                padding: 14px 14px 14px 40px;
+                font-size: 14px;
+            }
+            
+            button {
+                padding: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <i class="fas fa-store"></i>
+            <span>LibreShop</span>
+        </div>
+        
+        <div class="card">
+            <!-- LOGIN -->
+            <div id="login" class="step active">
+                <h1>Bienvenue !</h1>
+                <p>Accédez à votre espace vendeur</p>
+                <small>Connectez-vous pour gérer votre boutique et vos ventes.</small>
+                
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" placeholder="adresse@email.com" id="loginEmail">
+                </div>
+                
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" placeholder="Mot de passe" id="loginPassword">
+                </div>
+                
+                <button onclick="login()">
+                    <i class="fas fa-sign-in-alt" style="margin-right: 8px;"></i>
+                    Se connecter
+                </button>
+                
+                <div class="link-group">
+                    <div class="link" onclick="go('forgot')">
+                        <i class="fas fa-key" style="margin-right: 6px;"></i>
+                        Mot de passe oublié ?
+                    </div>
+                    <div class="link" onclick="go('register')">
+                        <i class="fas fa-user-plus" style="margin-right: 6px;"></i>
+                        Créer un compte vendeur
+                    </div>
+                </div>
+            </div>
+
+            <!-- FORGOT PASSWORD -->
+            <div id="forgot" class="step">
+                <h1>Récupération</h1>
+                <p>Réinitialisez votre mot de passe</p>
+                <small>Nous enverrons un lien de récupération à votre adresse email.</small>
+                
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" placeholder="votre@email.com">
+                </div>
+                
+                <button onclick="go('login')">
+                    <i class="fas fa-paper-plane" style="margin-right: 8px;"></i>
+                    Envoyer le lien
+                </button>
+                
+                <div class="link-group">
+                    <div class="link" onclick="go('login')">
+                        <i class="fas fa-arrow-left" style="margin-right: 6px;"></i>
+                        Retour à la connexion
+                    </div>
+                </div>
+            </div>
+
+            <!-- REGISTER STEP 1 ACCOUNT -->
+            <div id="register" class="step">
+                <div class="progress">
+                    <div class="bar" style="width:25%"></div>
+                </div>
+                
+                <h1>Créer un compte</h1>
+                <p>Étape 1/4 · Informations de connexion</p>
+                <small>Ces identifiants vous permettront d'accéder à votre espace vendeur.</small>
+                
+                <div class="input-group">
+                    <i class="fas fa-envelope"></i>
+                    <input type="email" placeholder="Email professionnel" id="regEmail">
+                </div>
+                
+                <div class="input-group">
+                    <i class="fas fa-lock"></i>
+                    <input type="password" placeholder="Mot de passe" id="regPassword">
+                </div>
+                
+                <div class="password-strength">
+                    <div class="strength-bar">
+                        <div class="strength-bar-fill" id="strength1" style="width:0%"></div>
+                    </div>
+                    <div class="strength-bar">
+                        <div class="strength-bar-fill" id="strength2" style="width:0%"></div>
+                    </div>
+                    <div class="strength-bar">
+                        <div class="strength-bar-fill" id="strength3" style="width:0%"></div>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <i class="fas fa-check-circle"></i>
+                    <input type="password" placeholder="Confirmer le mot de passe" id="regConfirmPassword">
+                </div>
+                
+                <button onclick="go('vendor')">
+                    Continuer
+                    <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
+                </button>
+                
+                <div class="link-group">
+                    <div class="link" onclick="go('login')">
+                        <i class="fas fa-sign-in-alt" style="margin-right: 6px;"></i>
+                        Déjà un compte ? Se connecter
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2 VENDOR PROFILE -->
+            <div id="vendor" class="step">
+                <div class="progress">
+                    <div class="bar" style="width:50%"></div>
+                </div>
+                
+                <h1>Profil vendeur</h1>
+                <p>Étape 2/4 · Identité commerciale</p>
+                <small>Ces informations seront publiques sur votre profil vendeur.</small>
+                
+                <div class="input-group">
+                    <i class="fas fa-tag"></i>
+                    <input placeholder="Code vendeur unique" id="vendorCode">
+                </div>
+                <small style="margin-top: -8px; color: #6b7280;">Ex: @ma_boutique - 3-20 caractères</small>
+                
+                <div class="input-group">
+                    <i class="fab fa-whatsapp"></i>
+                    <input type="tel" placeholder="Numéro WhatsApp" id="vendorWhatsapp">
+                </div>
+                
+                <button onclick="go('store')">
+                    Continuer
+                    <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
+                </button>
+            </div>
+
+            <!-- STEP 3 CREATE STORE -->
+            <div id="store" class="step">
+                <div class="progress">
+                    <div class="bar" style="width:75%"></div>
+                </div>
+                
+                <h1>Créer la boutique</h1>
+                <p>Étape 3/4 · Présentation</p>
+                <small>Personnalisez l'apparence de votre boutique.</small>
+                
+                <div class="input-group">
+                    <i class="fas fa-store-alt"></i>
+                    <input placeholder="Nom de la boutique" id="storeName">
+                </div>
+                
+                <div class="input-group">
+                    <i class="fas fa-tag"></i>
+                    <select id="storeCategory">
+                        <option>Choisir une catégorie</option>
+                        <option>🛍️ Mode & Accessoires</option>
+                        <option>💻 Électronique</option>
+                        <option>💄 Beauté & Bien-être</option>
+                        <option>🏠 Maison & Décoration</option>
+                        <option>🍎 Alimentation & Boissons</option>
+                        <option>🔧 Services</option>
+                        <option>📚 Livres & Médias</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <i class="fas fa-align-left"></i>
+                    <input placeholder="Description courte (max 160 caractères)" id="storeDescription">
+                </div>
+                
+                <div class="file-label">
+                    <i class="fas fa-image" style="margin-right: 8px;"></i>
+                    Logo de la boutique
+                </div>
+                <input type="file" accept="image/*" id="storeLogo">
+                
+                <div class="file-label" style="margin-top: 16px;">
+                    <i class="fas fa-panorama" style="margin-right: 8px;"></i>
+                    Bannière / Image principale
+                </div>
+                <input type="file" accept="image/*" id="storeBanner">
+                
+                <button onclick="go('finish')">
+                    Continuer
+                    <i class="fas fa-arrow-right" style="margin-left: 8px;"></i>
+                </button>
+            </div>
+
+            <!-- STEP 4 FINISH -->
+            <div id="finish" class="step">
+                <div class="progress">
+                    <div class="bar" style="width:100%"></div>
+                </div>
+                
+                <div style="text-align: center; margin: 20px 0;">
+                    <i class="fas fa-check-circle" style="font-size: 64px; color: #10b981;"></i>
+                </div>
+                
+                <h1 style="text-align: center;">Félicitations ! 🎉</h1>
+                <p style="text-align: center;">Votre boutique est prête</p>
+                <small style="text-align: center;">Vous pouvez maintenant vous connecter et commencer à vendre.</small>
+                
+                <button onclick="go('login')">
+                    <i class="fas fa-sign-in-alt" style="margin-right: 8px;"></i>
+                    Se connecter à ma boutique
+                </button>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 24px; color: #4a5568; font-size: 12px;">
+            © 2025 LibreShop - Plateforme vendeurs
+        </div>
+    </div>
+
+    <script>
+        function go(id) {
+            // Cacher toutes les étapes
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            
+            // Afficher l'étape demandée
+            document.getElementById(id).classList.add('active');
+            
+            // Scroll en haut de la page
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        function login() {
+            // Simulation de connexion - redirige vers le dashboard vendeur
+            window.location.href = 'index.html';
+        }
+        
+        // Simulation de force de mot de passe (à connecter avec un vrai système)
+        const passwordInput = document.getElementById('regPassword');
+        if (passwordInput) {
+            passwordInput.addEventListener('input', function(e) {
+                const password = e.target.value;
+                const strength = calculatePasswordStrength(password);
+                updateStrengthBars(strength);
+            });
+        }
+        
+        function calculatePasswordStrength(password) {
+            if (!password) return 0;
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (password.match(/[A-Z]/)) strength++;
+            if (password.match(/[0-9]/)) strength++;
+            if (password.match(/[^A-Za-z0-9]/)) strength++;
+            return strength;
+        }
+        
+        function updateStrengthBars(strength) {
+            const bars = ['strength1', 'strength2', 'strength3'];
+            const colors = ['#ef4444', '#f59e0b', '#10b981'];
+            
+            bars.forEach((barId, index) => {
+                const bar = document.getElementById(barId);
+                if (bar) {
+                    if (index < strength) {
+                        bar.style.width = '100%';
+                        bar.style.background = colors[strength - 1];
+                    } else {
+                        bar.style.width = '0%';
+                    }
+                }
+            });
+        }
+        
+        // Animation d'entrée
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.style.transition = 'opacity 0.5s ease';
+                    card.style.opacity = '1';
+                }, 100);
+            });
+        });
+    </script>
+</body>
+</html>

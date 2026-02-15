@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ma boutique — LibreShop Vendeur</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.8);
+  --card-hover: rgba(28, 32, 42, 0.95);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.seller-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  padding: 6px 16px 6px 12px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+}
+
+.seller-badge i {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.seller-badge span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.seller-badge .plan {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  padding: 2px 8px;
+  border-radius: 60px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.menu-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.menu-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== MENU MOBILE ===== */
+.menu-mobile {
+  display: none;
+  position: absolute;
+  top: 80px;
+  right: 30px;
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-direction: column;
+  width: 240px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 99;
+}
+
+.menu-mobile a {
+  padding: 14px 20px;
+  color: var(--text-soft);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-mobile a i {
+  width: 20px;
+  color: var(--accent);
+}
+
+.menu-mobile a:last-child { border-bottom: none; }
+
+.menu-mobile a:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+  color: white;
+  padding-left: 28px;
+}
+
+.menu-mobile a.active {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), transparent);
+  color: white;
+}
+
+.menu-mobile a.logout {
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
+
+.menu-mobile a.logout i {
+  color: var(--danger);
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ===== EN-TÊTE ===== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  border: none;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+}
+
+.btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.btn.secondary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.btn.secondary:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ===== BANNER ===== */
+.store-banner {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  margin-bottom: 30px;
+  display: flex;
+  gap: 30px;
+  align-items: center;
+}
+
+.store-logo-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid transparent;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+.store-info {
+  flex: 1;
+}
+
+.store-name {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.verified-badge {
+  color: var(--success);
+}
+
+.store-category {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.store-description {
+  color: var(--text-soft);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.store-stats {
+  display: flex;
+  gap: 24px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.store-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ===== GRID SECTIONS ===== */
+.sections-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 968px) {
+  .sections-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== SECTION ===== */
+.section-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title i {
+  color: var(--accent);
+}
+
+/* ===== FORM ===== */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-soft);
+  margin-bottom: 8px;
+}
+
+.form-input, .form-textarea, .form-select {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.form-input:focus, .form-textarea:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.form-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23ffffff50' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+/* ===== SOCIAL ===== */
+.social-inputs {
+  display: flex;
+  gap: 12px;
+}
+
+.social-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.social-input i {
+  color: var(--text-muted);
+}
+
+.social-input input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.social-input input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ===== HORAIRES ===== */
+.hours-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.hour-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hour-row label {
+  width: 80px;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.hour-row input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.85rem;
+}
+
+.hour-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.sidebar-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-title i {
+  color: var(--accent);
+}
+
+/* Plan Info */
+.plan-info {
+  text-align: center;
+  padding: 20px;
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+}
+
+.plan-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  padding: 4px 12px;
+  border-radius: 60px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.plan-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.plan-price {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent2);
+}
+
+.plan-period {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.plan-features {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.plan-feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.plan-feature i {
+  color: var(--success);
+}
+
+/* Quick Stats */
+.quick-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quick-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+}
+
+.quick-stat-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.quick-stat-value {
+  font-weight: 600;
+}
+
+.quick-stat-value.success {
+  color: var(--success);
+}
+
+.quick-stat-value.warning {
+  color: var(--warning);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .container {
+    padding: 20px 16px;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .store-banner {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .store-stats {
+    justify-content: center;
+  }
+  
+  .store-actions {
+    flex-direction: row;
+    width: 100%;
+  }
+  
+  .store-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .social-inputs {
+    flex-direction: column;
+  }
+  
+  .hours-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .menu-mobile {
+    right: 16px;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="seller-badge">
+    <i class="fa-solid fa-store"></i>
+    <span>Ma Boutique</span>
+    <span class="plan">PRO</span>
+  </div>
+  <div class="menu-btn" onclick="toggleMenu()">
+    <i class="fa fa-bars"></i>
+  </div>
+<div class="menu-mobile" id="mobileMenu">
+    <a href="./index.html"><i class="fa fa-chart-pie"></i> Tableau de bord</a>
+    <a href="./products.html"><i class="fa fa-box"></i> Produits</a>
+    <a href="./orders.html"><i class="fa fa-truck"></i> Commandes</a>
+    <a href="#"><i class="fa fa-chart-line"></i> Statistiques</a>
+    <a href="./store.html" class="active"><i class="fa fa-store"></i> Ma boutique</a>
+    <a href="./collections.html"><i class="fa fa-layer-group"></i> Collections</a>
+    <a href="#"><i class="fa fa-credit-card"></i> Abonnement</a>
+    <a href="#" class="logout"><i class="fa fa-sign-out-alt"></i> Déconnexion</a>
+  </div>
+</header>
+
+<div class="container">
+  <!-- En-tête -->
+  <div class="page-header">
+    <h1 class="page-title">Ma boutique</h1>
+<div class="header-actions">
+      <a href="../client/store.html" target="_blank" class="btn secondary">
+        <i class="fa fa-eye"></i> Voir la boutique
+      </a>
+      <button class="btn primary">
+        <i class="fa fa-save"></i> Enregistrer
+      </button>
+    </div>
+  </div>
+
+  <!-- Banner -->
+  <div class="store-banner">
+    <img src="https://picsum.photos/200?5" alt="Tech Store" class="store-logo-large">
+    <div class="store-info">
+      <h1 class="store-name">
+        Tech Store
+        <i class="fa-solid fa-circle-check verified-badge"></i>
+      </h1>
+      <div class="store-category">Électronique & High-Tech</div>
+      <p class="store-description">
+        Votre destination pour les dernières technologies. Smartphones, ordinateurs, accessoires et gadgets innovants. 
+        Nous proposons les meilleures marques avec une garantie de qualité.
+      </p>
+      <div class="store-stats">
+        <div class="stat-item">
+          <div class="stat-value">48</div>
+          <div class="stat-label">Produits</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">2 145</div>
+          <div class="stat-label">Clients</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">4.8</div>
+          <div class="stat-label">Note</div>
+        </div>
+      </div>
+    </div>
+    <div class="store-actions">
+      <button class="btn secondary">
+        <i class="fa fa-image"></i> Changer le logo
+      </button>
+    </div>
+  </div>
+
+  <!-- Grid -->
+  <div class="sections-grid">
+    <!-- Colonne principale -->
+    <div class="main-column">
+      <!-- Informations -->
+      <div class="section-card">
+        <div class="section-header">
+          <h2 class="section-title">
+            <i class="fa-solid fa-store"></i>
+            Informations de la boutique
+          </h2>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Nom de la boutique</label>
+          <input type="text" class="form-input" value="Tech Store">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-textarea">Votre destination pour les dernières technologies. Smartphones, ordinateurs, accessoires et gadgets innovants.</textarea>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Catégorie principale</label>
+          <select class="form-select">
+            <option>Électronique</option>
+            <option selected>Électronique & High-Tech</option>
+            <option>Mode</option>
+            <option>Beauté</option>
+            <option>Maison</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Mots-clés (séparés par des virgules)</label>
+          <input type="text" class="form-input" value="smartphones, apple, samsung, accessoires, technologie">
+        </div>
+      </div>
+
+      <!-- Contact -->
+      <div class="section-card" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2 class="section-title">
+            <i class="fa-solid fa-address-book"></i>
+            Coordonnées
+          </h2>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" value="contact@techstore.ci">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Téléphone</label>
+          <input type="tel" class="form-input" value="+225 27 22 000 000">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Adresse</label>
+          <textarea class="form-textarea">Abidjan, Cocody
+Boulevard Lagunaire
+Immeuble Tech Plaza</textarea>
+        </div>
+      </div>
+
+      <!-- Réseaux sociaux -->
+      <div class="section-card" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2 class="section-title">
+            <i class="fa-solid fa-share-nodes"></i>
+            Réseaux sociaux
+          </h2>
+        </div>
+        
+        <div class="social-inputs">
+          <div class="social-input">
+            <i class="fa-brands fa-facebook"></i>
+            <input type="text" placeholder="Facebook">
+          </div>
+          <div class="social-input">
+            <i class="fa-brands fa-instagram"></i>
+            <input type="text" placeholder="Instagram">
+          </div>
+        </div>
+        <br>
+        <div class="social-inputs">
+          <div class="social-input">
+            <i class="fa-brands fa-whatsapp"></i>
+            <input type="text" placeholder="WhatsApp" value="+225 07 000 000 00">
+          </div>
+          <div class="social-input">
+            <i class="fa-brands fa-tiktok"></i>
+            <input type="text" placeholder="TikTok">
+          </div>
+        </div>
+      </div>
+
+      <!-- Horaires -->
+      <div class="section-card" style="margin-top: 24px;">
+        <div class="section-header">
+          <h2 class="section-title">
+            <i class="fa-solid fa-clock"></i>
+            Horaires d'ouverture
+          </h2>
+        </div>
+        
+        <div class="hours-grid">
+          <div class="hour-row">
+            <label>Lundi</label>
+            <input type="text" value="08:00 - 20:00">
+          </div>
+          <div class="hour-row">
+            <label>Mardi</label>
+            <input type="text" value="08:00 - 20:00">
+          </div>
+          <div class="hour-row">
+            <label>Mercredi</label>
+            <input type="text" value="08:00 - 20:00">
+          </div>
+          <div class="hour-row">
+            <label>Jeudi</label>
+            <input type="text" value="08:00 - 20:00">
+          </div>
+          <div class="hour-row">
+            <label>Vendredi</label>
+            <input type="text" value="08:00 - 20:00">
+          </div>
+          <div class="hour-row">
+            <label>Samedi</label>
+            <input type="text" value="09:00 - 18:00">
+          </div>
+          <div class="hour-row">
+            <label>Dimanche</label>
+            <input type="text" value="Fermé">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-column">
+      <!-- Abonnement -->
+      <div class="sidebar-card">
+        <h3 class="sidebar-title">
+          <i class="fa-solid fa-crown"></i>
+          Mon abonnement
+        </h3>
+        
+        <div class="plan-info">
+          <span class="plan-badge">ACTIF</span>
+          <div class="plan-name">Plan Pro</div>
+          <div class="plan-price">5 000</div>
+          <div class="plan-period">FCFA / mois</div>
+        </div>
+        
+        <div class="plan-features">
+          <div class="plan-feature">
+            <i class="fa-solid fa-check"></i>
+            Produits illimités
+          </div>
+          <div class="plan-feature">
+            <i class="fa-solid fa-check"></i>
+            Commission réduite
+          </div>
+          <div class="plan-feature">
+            <i class="fa-solid fa-check"></i>
+            Support prioritaire
+          </div>
+          <div class="plan-feature">
+            <i class="fa-solid fa-check"></i>
+            Statistiques avancées
+          </div>
+        </div>
+        
+        <button class="btn secondary" style="width: 100%; justify-content: center;">
+          <i class="fa fa-arrow-up"></i> Passer au plan Premium
+        </button>
+      </div>
+
+      <!-- Statistiques rapides -->
+      <div class="sidebar-card">
+        <h3 class="sidebar-title">
+          <i class="fa-solid fa-chart-line"></i>
+          Ce mois-ci
+        </h3>
+        
+        <div class="quick-stats">
+          <div class="quick-stat">
+            <span class="quick-stat-label">Ventes</span>
+            <span class="quick-stat-value">156</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">Revenus</span>
+            <span class="quick-stat-value success">350 000 FCA</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">Nouveaux clients</span>
+            <span class="quick-stat-value">+28</span>
+          </div>
+          <div class="quick-stat">
+            <span class="quick-stat-label">Note moyenne</span>
+            <span class="quick-stat-value">4.8 ★</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleMenu() {
+  const menu = document.getElementById('mobileMenu');
+  if (menu.style.display === 'flex') {
+    menu.style.display = 'none';
+  } else {
+    menu.style.display = 'flex';
+  }
+}
+
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('mobileMenu');
+  const menuBtn = document.querySelector('.menu-btn');
+  
+  if (!menuBtn.contains(event.target) && !menu.contains(event.target)) {
+    menu.style.display = 'none';
+  }
+});
+</script>
+
+</body>
+</html>
+

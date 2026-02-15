@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — LibreShop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-link {
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.home-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== PAGE TITLE ===== */
+.page-title {
+  padding: 30px 30px 0;
+}
+
+.page-title h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-title h1 i {
+  color: var(--accent);
+}
+
+/* ===== CHECKOUT LAYOUT ===== */
+.checkout-container {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 30px;
+  padding: 30px;
+}
+
+/* ===== STEPS ===== */
+.checkout-steps {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 30px;
+  padding: 0 30px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+}
+
+.step.active {
+  color: var(--accent);
+}
+
+.step.completed {
+  color: var(--success);
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 2px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.step.active .step-number {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.step.completed .step-number {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+}
+
+.step-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.step-divider {
+  width: 40px;
+  height: 2px;
+  background: var(--border);
+}
+
+.step-divider.active {
+  background: var(--accent);
+}
+
+/* ===== FORMS SECTION ===== */
+.checkout-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-section {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.form-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.form-section-header i {
+  font-size: 1.3rem;
+  color: var(--accent);
+}
+
+.form-section-header h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* Form Grid */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.form-input {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-select {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23ffffff50' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Payment Methods */
+.payment-methods {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-method {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.payment-method:hover {
+  border-color: var(--border-hover);
+}
+
+.payment-method.active {
+  border-color: var(--accent);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.payment-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.payment-method.active .payment-radio {
+  border-color: var(--accent);
+}
+
+.payment-method.active .payment-radio::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.payment-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  text-align: center;
+}
+
+.payment-info h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.payment-info p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ===== ORDER SUMMARY ===== */
+.order-summary {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  height: fit-content;
+  position: sticky;
+  top: 100px;
+}
+
+.summary-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-title i {
+  color: var(--accent);
+}
+
+/* Items */
+.summary-items {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 8px;
+}
+
+.summary-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-item-image {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.summary-item-info {
+  flex: 1;
+}
+
+.summary-item-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.summary-item-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.summary-item-price {
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+/* Summary Rows */
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.summary-label {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+}
+
+.summary-value {
+  font-weight: 600;
+}
+
+.summary-total {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px solid var(--border);
+}
+
+.summary-total .summary-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.summary-total .summary-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent2);
+}
+
+/* Checkout Button */
+.checkout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 20px;
+}
+
+.checkout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+/* Security Note */
+.security-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.security-note i {
+  color: var(--success);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 968px) {
+  .checkout-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .order-summary {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .page-title {
+    padding: 20px 16px 0;
+  }
+  
+  .checkout-steps {
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: flex-start;
+  }
+  
+  .step-divider {
+    display: none;
+  }
+  
+  .checkout-container {
+    padding: 20px 16px;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .step-label {
+    display: none;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="header-actions">
+    <a href="./cart.html" class="cart-btn">
+      <i class="fa fa-shopping-cart"></i>
+      <span class="cart-badge">3</span>
+    </a>
+    <a href="./profile.html" class="user-btn">
+      <i class="fa fa-user"></i>
+    </a>
+  </div>
+</header>
+
+<!-- Titre de la page -->
+<div class="page-title">
+  <h1>
+    <i class="fa-solid fa-credit-card"></i>
+    Checkout
+  </h1>
+</div>
+
+<!-- Étapes -->
+<div class="checkout-steps">
+  <div class="step completed">
+    <span class="step-number"><i class="fa fa-check"></i></span>
+    <span class="step-label">Panier</span>
+  </div>
+  <div class="step-divider active"></div>
+  <div class="step active">
+    <span class="step-number">2</span>
+    <span class="step-label">Informations</span>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step">
+    <span class="step-number">3</span>
+    <span class="step-label">Paiement</span>
+  </div>
+  <div class="step-divider"></div>
+  <div class="step">
+    <span class="step-number">4</span>
+    <span class="step-label">Confirmation</span>
+  </div>
+</div>
+
+<!-- Contenu principal -->
+<div class="checkout-container">
+  <!-- Formulaires -->
+  <div class="checkout-forms">
+    <!-- Informations de livraison -->
+    <div class="form-section">
+      <div class="form-section-header">
+        <i class="fa-solid fa-truck-fast"></i>
+        <h2>Informations de livraison</h2>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Prénom *</label>
+          <input type="text" class="form-input" placeholder="Votre prénom">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nom *</label>
+          <input type="text" class="form-input" placeholder="Votre nom">
+        </div>
+        <div class="form-group full-width">
+          <label class="form-label">Adresse *</label>
+          <input type="text" class="form-input" placeholder="Numéro et rue">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ville *</label>
+          <input type="text" class="form-input" placeholder="Votre ville">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quartier *</label>
+          <input type="text" class="form-input" placeholder="Votre quartier">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Téléphone *</label>
+          <input type="tel" class="form-input" placeholder="+225 00 000 000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" class="form-input" placeholder="votre@email.com">
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode de livraison -->
+    <div class="form-section">
+      <div class="form-section-header">
+        <i class="fa-solid fa-box-open"></i>
+        <h2>Mode de livraison</h2>
+      </div>
+      <div class="payment-methods">
+        <div class="payment-method active">
+          <div class="payment-radio"></div>
+          <i class="fa-solid fa-motorcycle payment-icon"></i>
+          <div class="payment-info">
+            <h4>Livraison à domicile</h4>
+            <p>Livré sous 24-48h • Gratuit</p>
+          </div>
+        </div>
+        <div class="payment-method">
+          <div class="payment-radio"></div>
+          <i class="fa-solid fa-shop payment-icon"></i>
+          <div class="payment-info">
+            <h4>Retrait en boutique</h4>
+            <p>Retrait立即 • Gratuit</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode de paiement -->
+    <div class="form-section">
+      <div class="form-section-header">
+        <i class="fa-solid fa-credit-card"></i>
+        <h2>Mode de paiement</h2>
+      </div>
+      <div class="payment-methods">
+        <div class="payment-method active">
+          <div class="payment-radio"></div>
+          <i class="fa-brands fa-mobile payment-icon"></i>
+          <div class="payment-info">
+            <h4>Mobile Money (Moov / MTN)</h4>
+            <p>Paiement sécurisé via mobile</p>
+          </div>
+        </div>
+        <div class="payment-method">
+          <div class="payment-radio"></div>
+          <i class="fa-solid fa-university payment-icon"></i>
+          <div class="payment-info">
+            <h4>Virement bancaire</h4>
+            <p>Virement depuis votre banque</p>
+          </div>
+        </div>
+        <div class="payment-method">
+          <div class="payment-radio"></div>
+          <i class="fa-solid fa-money-bill-wave payment-icon"></i>
+          <div class="payment-info">
+            <h4>Paiement à la livraison</h4>
+            <p>Payez en espèces à la réception</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Récapitulatif -->
+  <div class="order-summary">
+    <h2 class="summary-title">
+      <i class="fa-solid fa-receipt"></i>
+      Récapitulatif
+    </h2>
+    
+    <div class="summary-items">
+      <div class="summary-item">
+        <img src="https://picsum.photos/100?15" alt="iPhone 15 Pro" class="summary-item-image">
+        <div class="summary-item-info">
+          <div class="summary-item-title">iPhone 15 Pro</div>
+          <div class="summary-item-meta">Qty: 1 • Titane Naturel</div>
+        </div>
+        <div class="summary-item-price">850 000</div>
+      </div>
+      <div class="summary-item">
+        <img src="https://picsum.photos/100?18" alt="AirPods Pro 2" class="summary-item-image">
+        <div class="summary-item-info">
+          <div class="summary-item-title">AirPods Pro 2</div>
+          <div class="summary-item-meta">Qty: 2</div>
+        </div>
+        <div class="summary-item-price">370 000</div>
+      </div>
+      <div class="summary-item">
+        <img src="https://picsum.photos/100?26" alt="Coque iPhone" class="summary-item-image">
+        <div class="summary-item-info">
+          <div class="summary-item-title">Coque Premium</div>
+          <div class="summary-item-meta">Qty: 1 • Noir</div>
+        </div>
+        <div class="summary-item-price">15 000</div>
+      </div>
+    </div>
+    
+    <div class="summary-row">
+      <span class="summary-label">Sous-total</span>
+      <span class="summary-value">1 235 000 FCFA</span>
+    </div>
+    
+    <div class="summary-row">
+      <span class="summary-label">Livraison</span>
+      <span class="summary-value" style="color: var(--success);">Gratuit</span>
+    </div>
+    
+    <div class="summary-row">
+      <span class="summary-label">Réduction</span>
+      <span class="summary-value" style="color: var(--danger);">- 0 FCFA</span>
+    </div>
+    
+    <div class="summary-row summary-total">
+      <span class="summary-label">Total</span>
+      <span class="summary-value">1 235 000 FCFA</span>
+    </div>
+
+    <button class="checkout-btn">
+      <i class="fa-solid fa-lock"></i>
+      Confirmer la commande
+    </button>
+
+    <div class="security-note">
+      <i class="fa-solid fa-shield-halved"></i>
+      Paiement sécurisé SSL
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+

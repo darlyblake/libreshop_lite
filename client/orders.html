@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes commandes — LibreShop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.search {
+  flex: 0 1 400px;
+  position: relative;
+  margin: 0 20px;
+}
+
+.search input {
+  width: 100%;
+  padding: 12px 48px 12px 20px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search input::placeholder {
+  color: var(--text-muted);
+}
+
+.search i {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-soft);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-btn {
+  position: relative;
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.cart-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+}
+
+.cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-btn {
+  position: relative;
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.user-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+}
+
+.home-link {
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.home-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== PAGE HEADER ===== */
+.page-header {
+  padding: 30px 30px 0;
+}
+
+.page-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-title h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.page-title h1 i {
+  color: var(--accent);
+}
+
+.order-count {
+  background: var(--card);
+  padding: 6px 14px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+/* ===== TABS ===== */
+.orders-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 20px 30px;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  padding: 10px 24px;
+  border-radius: 60px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.tab-btn:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent;
+  color: white;
+}
+
+/* ===== ORDERS LIST ===== */
+.orders-list {
+  padding: 0 30px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Order Card */
+.order-card {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: var(--transition);
+}
+
+.order-card:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+
+.order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.order-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-id h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.order-id span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.order-status {
+  padding: 6px 14px;
+  border-radius: 60px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.order-status.delivered {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.order-status.shipped {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.order-status.processing {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.order-status.pending {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--info);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.order-content {
+  padding: 20px;
+}
+
+.order-store {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.order-store img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.order-store span {
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+/* Order Items */
+.order-items {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.order-item-image {
+  width: 70px;
+  height: 70px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.order-more {
+  width: 70px;
+  height: 70px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Order Footer */
+.order-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.order-total {
+  display: flex;
+  flex-direction: column;
+}
+
+.order-total-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.order-total-amount {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent2);
+}
+
+.order-date {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.order-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.order-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 60px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.order-btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border: none;
+}
+
+.order-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px var(--accent-glow);
+}
+
+.order-btn.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.order-btn.secondary:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  text-align: center;
+  padding: 80px 30px;
+}
+
+.empty-icon {
+  font-size: 5rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.empty-state h2 {
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.empty-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.empty-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .search {
+    flex: 1;
+    margin: 0 10px;
+  }
+  
+  .page-header {
+    padding: 20px 16px 0;
+  }
+  
+  .page-title h1 {
+    font-size: 1.4rem;
+  }
+  
+  .orders-tabs {
+    padding: 16px;
+  }
+  
+  .orders-list {
+    padding: 0 16px 40px;
+  }
+  
+  .order-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .order-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .order-actions {
+    width: 100%;
+  }
+  
+  .order-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="search">
+    <input type="text" placeholder="Rechercher une boutique ou un produit...">
+    <i class="fa fa-search"></i>
+  </div>
+  <div class="header-actions">
+    <a href="./cart.html" class="cart-btn">
+      <i class="fa fa-shopping-cart"></i>
+      <span class="cart-badge">3</span>
+    </a>
+    <a href="./profile.html" class="user-btn">
+      <i class="fa fa-user"></i>
+    </a>
+  </div>
+</header>
+
+<!-- En-tête de la page -->
+<div class="page-header">
+  <div class="page-header-content">
+    <div class="page-title">
+      <h1><i class="fa-solid fa-box-open"></i> Mes commandes</h1>
+      <span class="order-count">6 commandes</span>
+    </div>
+  </div>
+</div>
+
+<!-- Filtres -->
+<div class="orders-tabs">
+  <button class="tab-btn active">Toutes</button>
+  <button class="tab-btn">En cours</button>
+  <button class="tab-btn">Livrées</button>
+  <button class="tab-btn">Annulées</button>
+</div>
+
+<!-- Liste des commandes -->
+<div class="orders-list">
+  <!-- Commande 1 -->
+  <div class="order-card">
+    <div class="order-header">
+      <div class="order-id">
+        <h3>Commande #CMD-2026-0156</h3>
+        <span>Il y a 2 heures</span>
+      </div>
+      <span class="order-status processing">En traitement</span>
+    </div>
+    <div class="order-content">
+      <div class="order-store">
+        <img src="https://picsum.photos/60?5" alt="Tech Store">
+        <span>Tech Store</span>
+      </div>
+      <div class="order-items">
+        <img src="https://picsum.photos/100?15" alt="iPhone 15 Pro" class="order-item-image">
+        <img src="https://picsum.photos/100?18" alt="AirPods Pro" class="order-item-image">
+        <div class="order-more">+1 article</div>
+      </div>
+      <div class="order-footer">
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-amount">1 220 000 FCFA</span>
+        </div>
+        <div class="order-actions">
+          <button class="order-btn secondary">
+            <i class="fa-solid fa-headset"></i> Contact
+          </button>
+          <button class="order-btn primary">
+            <i class="fa-solid fa-eye"></i> Suivre
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commande 2 -->
+  <div class="order-card">
+    <div class="order-header">
+      <div class="order-id">
+        <h3>Commande #CMD-2026-0148</h3>
+        <span>Il y a 3 jours</span>
+      </div>
+      <span class="order-status shipped">Expédiée</span>
+    </div>
+    <div class="order-content">
+      <div class="order-store">
+        <img src="https://picsum.photos/60?7" alt="Beauty Glow">
+        <span>Beauty Glow</span>
+      </div>
+      <div class="order-items">
+        <img src="https://picsum.photos/100?27" alt="Crème hydratante" class="order-item-image">
+        <img src="https://picsum.photos/100?28" alt="Sérum vitaminé" class="order-item-image">
+      </div>
+      <div class="order-footer">
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-amount">85 000 FCFA</span>
+        </div>
+        <div class="order-actions">
+          <button class="order-btn secondary">
+            <i class="fa-solid fa-headset"></i> Contact
+          </button>
+          <button class="order-btn primary">
+            <i class="fa-solid fa-eye"></i> Suivre
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commande 3 -->
+  <div class="order-card">
+    <div class="order-header">
+      <div class="order-id">
+        <h3>Commande #CMD-2026-0123</h3>
+        <span>Il y a 1 semaine</span>
+      </div>
+      <span class="order-status delivered">Livrée</span>
+    </div>
+    <div class="order-content">
+      <div class="order-store">
+        <img src="https://picsum.photos/60?8" alt="Maison Pro">
+        <span>Maison Pro</span>
+      </div>
+      <div class="order-items">
+        <img src="https://picsum.photos/100?29" alt="Lampe design" class="order-item-image">
+        <img src="https://picsum.photos/100?30" alt="Coussin décoratif" class="order-item-image">
+      </div>
+      <div class="order-footer">
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-amount">120 000 FCFA</span>
+        </div>
+        <div class="order-actions">
+          <button class="order-btn secondary">
+            <i class="fa-solid fa-arrow-left-rotate"></i> Retour
+          </button>
+          <button class="order-btn primary">
+            <i class="fa-solid fa-star"></i> Noter
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commande 4 -->
+  <div class="order-card">
+    <div class="order-header">
+      <div class="order-id">
+        <h3>Commande #CMD-2026-0098</h3>
+        <span>Il y a 2 semaines</span>
+      </div>
+      <span class="order-status delivered">Livrée</span>
+    </div>
+    <div class="order-content">
+      <div class="order-store">
+        <img src="https://picsum.photos/60?5" alt="Tech Store">
+        <span>Tech Store</span>
+      </div>
+      <div class="order-items">
+        <img src="https://picsum.photos/100?31" alt="Samsung Galaxy" class="order-item-image">
+      </div>
+      <div class="order-footer">
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-amount">550 000 FCFA</span>
+        </div>
+        <div class="order-actions">
+          <button class="order-btn secondary">
+            <i class="fa-solid fa-arrow-left-rotate"></i> Retour
+          </button>
+          <button class="order-btn primary">
+            <i class="fa-solid fa-star"></i> Noter
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commande 5 -->
+  <div class="order-card">
+    <div class="order-header">
+      <div class="order-id">
+        <h3>Commande #CMD-2026-0076</h3>
+        <span>Il y a 1 mois</span>
+      </div>
+      <span class="order-status delivered">Livrée</span>
+    </div>
+    <div class="order-content">
+      <div class="order-store">
+        <img src="https://picsum.photos/60?6" alt="Boutique Elite">
+        <span>Boutique Elite</span>
+      </div>
+      <div class="order-items">
+        <img src="https://picsum.photos/100?32" alt="Veste en cuir" class="order-item-image">
+        <img src="https://picsum.photos/100?33" alt="Ceinture" class="order-item-image">
+      </div>
+      <div class="order-footer">
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-amount">180 000 FCFA</span>
+        </div>
+        <div class="order-actions">
+          <button class="order-btn secondary">
+            <i class="fa-solid fa-arrow-left-rotate"></i> Retour
+          </button>
+          <button class="order-btn primary">
+            <i class="fa-solid fa-star"></i> Noter
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commande 6 -->
+  <div class="order-card">
+    <div class="order-header">
+      <div class="order-id">
+        <h3>Commande #CMD-2026-0045</h3>
+        <span>Il y a 2 mois</span>
+      </div>
+      <span class="order-status delivered">Livrée</span>
+    </div>
+    <div class="order-content">
+      <div class="order-store">
+        <img src="https://picsum.photos/60?9" alt="Food Market">
+        <span>Food Market</span>
+      </div>
+      <div class="order-items">
+        <img src="https://picsum.photos/100?34" alt="Panier bio" class="order-item-image">
+        <img src="https://picsum.photos/100?35" alt="Huiles essentielles" class="order-item-image">
+        <div class="order-more">+3 articles</div>
+      </div>
+      <div class="order-footer">
+        <div class="order-total">
+          <span class="order-total-label">Total</span>
+          <span class="order-total-amount">95 000 FCFA</span>
+        </div>
+        <div class="order-actions">
+          <button class="order-btn secondary">
+            <i class="fa-solid fa-arrow-left-rotate"></i> Retour
+          </button>
+          <button class="order-btn primary">
+            <i class="fa-solid fa-star"></i> Noter
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+

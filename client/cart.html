@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon panier — LibreShop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.search {
+  flex: 0 1 400px;
+  position: relative;
+  margin: 0 20px;
+}
+
+.search input {
+  width: 100%;
+  padding: 12px 48px 12px 20px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search input::placeholder {
+  color: var(--text-muted);
+}
+
+.search i {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-soft);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-btn {
+  position: relative;
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.cart-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+}
+
+.cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-link {
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.home-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== PAGE TITLE ===== */
+.page-title {
+  padding: 30px 30px 0;
+}
+
+.page-title h1 {
+  font-size: 1.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-title h1 i {
+  color: var(--accent);
+}
+
+/* ===== CART CONTENT ===== */
+.cart-container {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 30px;
+  padding: 30px;
+}
+
+.cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Cart Item */
+.cart-item {
+  display: flex;
+  gap: 20px;
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: var(--transition);
+}
+
+.cart-item:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+}
+
+.item-image {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.item-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.item-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.item-title:hover {
+  color: var(--accent);
+}
+
+.item-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  padding: 4px;
+}
+
+.item-remove:hover {
+  color: var(--danger);
+}
+
+.item-store {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.item-options {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.item-options span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.item-price {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent2);
+}
+
+/* Quantity */
+.quantity-selector {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 60px;
+}
+
+.quantity-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.quantity-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.quantity-value {
+  width: 40px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* ===== ORDER SUMMARY ===== */
+.order-summary {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  height: fit-content;
+  position: sticky;
+  top: 100px;
+}
+
+.summary-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.summary-title i {
+  color: var(--accent);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-row:last-of-type {
+  border-bottom: none;
+}
+
+.summary-label {
+  color: var(--text-soft);
+  font-size: 0.95rem;
+}
+
+.summary-value {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.summary-total {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px solid var(--border);
+}
+
+.summary-total .summary-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.summary-total .summary-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent2);
+}
+
+.checkout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 20px;
+  text-decoration: none;
+}
+
+.checkout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+.continue-shopping {
+  display: block;
+  text-align: center;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  margin-top: 16px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.continue-shopping:hover {
+  color: var(--accent);
+}
+
+/* Promo Code */
+.promo-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.promo-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-soft);
+}
+
+.promo-form {
+  display: flex;
+  gap: 8px;
+}
+
+.promo-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.promo-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.promo-btn {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--card-hover);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.promo-btn:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ===== EMPTY CART ===== */
+.empty-cart {
+  text-align: center;
+  padding: 80px 30px;
+}
+
+.empty-cart-icon {
+  font-size: 5rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.empty-cart h2 {
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+}
+
+.empty-cart p {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.empty-cart-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.empty-cart-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 968px) {
+  .cart-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .order-summary {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .search {
+    flex: 1;
+    margin: 0 10px;
+  }
+  
+  .page-title {
+    padding: 20px 16px 0;
+  }
+  
+  .page-title h1 {
+    font-size: 1.4rem;
+  }
+  
+  .cart-container {
+    padding: 20px 16px;
+  }
+  
+  .cart-item {
+    flex-direction: column;
+  }
+  
+  .item-image {
+    width: 100%;
+    height: 180px;
+  }
+  
+  .item-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="search">
+    <input type="text" placeholder="Rechercher une boutique ou un produit...">
+    <i class="fa fa-search"></i>
+  </div>
+  <div class="header-actions">
+    <a href="./profile.html" class="user-btn">
+      <i class="fa fa-user"></i>
+    </a>
+  </div>
+</header>
+
+<!-- Titre de la page -->
+<div class="page-title">
+  <h1>
+    <i class="fa-solid fa-shopping-cart"></i>
+    Mon panier (3 articles)
+  </h1>
+</div>
+
+<!-- Contenu du panier -->
+<div class="cart-container">
+  <!-- Articles -->
+  <div class="cart-items">
+    <!-- Article 1 -->
+    <div class="cart-item">
+      <img src="https://picsum.photos/200?15" alt="iPhone 15 Pro" class="item-image">
+      <div class="item-details">
+        <div class="item-header">
+          <a href="./product.html" class="item-title">iPhone 15 Pro - 256Go</a>
+          <button class="item-remove" title="Supprimer"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="item-store">Tech Store</div>
+        <div class="item-options">
+          <span><i class="fa-solid fa-palette"></i> Titane Naturel</span>
+          <span><i class="fa-solid fa-memory"></i> 256 Go</span>
+        </div>
+        <div class="item-footer">
+          <div class="quantity-selector">
+            <button class="quantity-btn"><i class="fa fa-minus"></i></button>
+            <span class="quantity-value">1</span>
+            <button class="quantity-btn"><i class="fa fa-plus"></i></button>
+          </div>
+          <div class="item-price">850 000 FCFA</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Article 2 -->
+    <div class="cart-item">
+      <img src="https://picsum.photos/200?18" alt="AirPods Pro 2" class="item-image">
+      <div class="item-details">
+        <div class="item-header">
+          <a href="./product.html" class="item-title">AirPods Pro 2</a>
+          <button class="item-remove" title="Supprimer"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="item-store">Tech Store</div>
+        <div class="item-options">
+          <span><i class="fa-solid fa-box"></i> Neuf</span>
+        </div>
+        <div class="item-footer">
+          <div class="quantity-selector">
+            <button class="quantity-btn"><i class="fa fa-minus"></i></button>
+            <span class="quantity-value">2</span>
+            <button class="quantity-btn"><i class="fa fa-plus"></i></button>
+          </div>
+          <div class="item-price">370 000 FCFA</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Article 3 -->
+    <div class="cart-item">
+      <img src="https://picsum.photos/200?26" alt="Coque iPhone" class="item-image">
+      <div class="item-details">
+        <div class="item-header">
+          <a href="./product.html" class="item-title">Coque Premium iPhone 15</a>
+          <button class="item-remove" title="Supprimer"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="item-store">Accessoires Pro</div>
+        <div class="item-options">
+          <span><i class="fa-solid fa-palette"></i> Noir</span>
+        </div>
+        <div class="item-footer">
+          <div class="quantity-selector">
+            <button class="quantity-btn"><i class="fa fa-minus"></i></button>
+            <span class="quantity-value">1</span>
+            <button class="quantity-btn"><i class="fa fa-plus"></i></button>
+          </div>
+          <div class="item-price">15 000 FCFA</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Récapitulatif -->
+  <div class="order-summary">
+    <h2 class="summary-title">
+      <i class="fa-solid fa-receipt"></i>
+      Récapitulatif
+    </h2>
+    
+    <div class="summary-row">
+      <span class="summary-label">Sous-total</span>
+      <span class="summary-value">1 235 000 FCFA</span>
+    </div>
+    
+    <div class="summary-row">
+      <span class="summary-label">Livraison</span>
+      <span class="summary-value">0 FCFA</span>
+    </div>
+    
+    <div class="summary-row">
+      <span class="summary-label">Taxes</span>
+      <span class="summary-value">0 FCFA</span>
+    </div>
+    
+    <div class="summary-row summary-total">
+      <span class="summary-label">Total</span>
+      <span class="summary-value">1 235 000 FCFA</span>
+    </div>
+
+<a href="./checkout.html" class="checkout-btn">
+      <i class="fa-solid fa-lock"></i>
+      Passer la commande
+    </a>
+
+    <a href="./index.html" class="continue-shopping">
+      <i class="fa-solid fa-arrow-left"></i>
+      Continuer mes achats
+    </a>
+
+    <!-- Code promo -->
+    <div class="promo-section">
+      <div class="promo-title">Code promo</div>
+      <form class="promo-form">
+        <input type="text" class="promo-input" placeholder="Entrez votre code">
+        <button type="submit" class="promo-btn">Appliquer</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+

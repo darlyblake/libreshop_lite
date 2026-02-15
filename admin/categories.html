@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catégories — LibreShop Admin</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.8);
+  --card-hover: rgba(28, 32, 42, 0.95);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ===== HEADER ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo i {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 1.2rem;
+}
+
+.admin-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  padding: 6px 18px 6px 12px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+}
+
+.admin-badge i {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.admin-badge span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.admin-badge .role {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  padding: 2px 8px;
+  border-radius: 60px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.menu-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.menu-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== MENU MOBILE ===== */
+.menu-mobile {
+  display: none;
+  position: absolute;
+  top: 80px;
+  right: 30px;
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-direction: column;
+  width: 240px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 99;
+}
+
+.menu-mobile a {
+  padding: 14px 20px;
+  color: var(--text-soft);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-mobile a i {
+  width: 20px;
+  color: var(--accent);
+}
+
+.menu-mobile a:last-child { border-bottom: none; }
+
+.menu-mobile a:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+  color: white;
+  padding-left: 28px;
+}
+
+.menu-mobile a.active {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), transparent);
+  color: white;
+}
+
+.menu-mobile a.logout {
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
+
+.menu-mobile a.logout i {
+  color: var(--danger);
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ===== EN-TÊTE ===== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title i {
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  border: none;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+}
+
+.btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+/* ===== CATEGORIES GRID ===== */
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.category-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  transition: var(--transition);
+}
+
+.category-card:hover {
+  border-color: var(--border-hover);
+  background: var(--card-hover);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.category-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.category-icon.electronics {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent);
+}
+
+.category-icon.fashion {
+  background: rgba(236, 72, 153, 0.15);
+  color: #ec4899;
+}
+
+.category-icon.beauty {
+  background: rgba(236, 182, 192, 0.15);
+  color: #f472b6;
+}
+
+.category-icon.home {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.category-icon.food {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.category-icon.sports {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--info);
+}
+
+.category-icon.books {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+.category-icon.games {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.category-info h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.category-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.category-stats {
+  display: flex;
+  gap: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+
+.category-stat {
+  text-align: center;
+}
+
+.category-stat-value {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.category-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.category-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.category-btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.category-btn:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ===== ADD CATEGORY ===== */
+.add-category-card {
+  background: transparent;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 60px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  min-height: 250px;
+}
+
+.add-category-card:hover {
+  border-color: var(--accent);
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.add-category-card i {
+  font-size: 3rem;
+  color: var(--text-muted);
+}
+
+.add-category-card span {
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .container {
+    padding: 20px 16px;
+  }
+  
+  .categories-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .menu-mobile {
+    right: 16px;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">
+    <i class="fa-solid fa-crown"></i>
+    LibreShop Admin
+  </a>
+  <div class="admin-badge">
+    <i class="fa-solid fa-shield-halved"></i>
+    <span>Super Admin</span>
+    <span class="role">ACCÈS TOTAL</span>
+  </div>
+  <div class="menu-btn" onclick="toggleMenu()">
+    <i class="fa fa-bars"></i>
+  </div>
+  <div class="menu-mobile" id="mobileMenu">
+    <a href="./index.html"><i class="fa fa-chart-pie"></i> Tableau de bord</a>
+    <a href="./stores.html"><i class="fa fa-store"></i> Boutiques</a>
+    <a href="./users.html"><i class="fa fa-users"></i> Utilisateurs</a>
+    <a href="./subscriptions.html"><i class="fa fa-credit-card"></i> Abonnements</a>
+    <a href="./categories.html" class="active"><i class="fa fa-tags"></i> Catégories</a>
+    <a href="#"><i class="fa fa-gear"></i> Paramètres</a>
+    <a href="#" class="logout"><i class="fa fa-sign-out-alt"></i> Déconnexion</a>
+  </div>
+</header>
+
+<div class="container">
+  <!-- En-tête -->
+  <div class="page-header">
+    <h1 class="page-title">
+      <i class="fa-solid fa-tags"></i>
+      Catégories
+    </h1>
+    <div class="header-actions">
+      <button class="btn primary">
+        <i class="fa fa-plus"></i> Nouvelle catégorie
+      </button>
+    </div>
+  </div>
+
+  <!-- Grille des catégories -->
+  <div class="categories-grid">
+    <!-- Électronique -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon electronics">
+          <i class="fa-solid fa-mobile-screen"></i>
+        </div>
+        <div class="category-info">
+          <h3>Électronique</h3>
+          <span class="category-count">145 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">1 240</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">12.5k</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.8</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Mode -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon fashion">
+          <i class="fa-solid fa-shirt"></i>
+        </div>
+        <div class="category-info">
+          <h3>Mode</h3>
+          <span class="category-count">98 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">856</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">8.2k</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.6</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Beauté -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon beauty">
+          <i class="fa-solid fa-spa"></i>
+        </div>
+        <div class="category-info">
+          <h3>Beauté</h3>
+          <span class="category-count">67 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">534</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.1k</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.7</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Maison -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon home">
+          <i class="fa-solid fa-couch"></i>
+        </div>
+        <div class="category-info">
+          <h3>Maison</h3>
+          <span class="category-count">45 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">320</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">2.3k</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.5</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Alimentation -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon food">
+          <i class="fa-solid fa-basket-shopping"></i>
+        </div>
+        <div class="category-info">
+          <h3>Alimentation</h3>
+          <span class="category-count">34 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">280</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">3.8k</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.9</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Sports -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon sports">
+          <i class="fa-solid fa-futbol"></i>
+        </div>
+        <div class="category-info">
+          <h3>Sports</h3>
+          <span class="category-count">28 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">195</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">1.6k</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.4</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Livres -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon books">
+          <i class="fa-solid fa-book-open"></i>
+        </div>
+        <div class="category-info">
+          <h3>Livres</h3>
+          <span class="category-count">22 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">156</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">890</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.7</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Jeux -->
+    <div class="category-card">
+      <div class="category-header">
+        <div class="category-icon games">
+          <i class="fa-solid fa-gamepad"></i>
+        </div>
+        <div class="category-info">
+          <h3>Jeux</h3>
+          <span class="category-count">18 boutiques</span>
+        </div>
+      </div>
+      <div class="category-stats">
+        <div class="category-stat">
+          <div class="category-stat-value">124</div>
+          <div class="category-stat-label">Produits</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">720</div>
+          <div class="category-stat-label">Ventes</div>
+        </div>
+        <div class="category-stat">
+          <div class="category-stat-value">4.6</div>
+          <div class="category-stat-label">Note</div>
+        </div>
+      </div>
+      <div class="category-actions">
+        <button class="category-btn"><i class="fa fa-pen"></i> Modifier</button>
+        <button class="category-btn"><i class="fa fa-eye"></i> Voir</button>
+      </div>
+    </div>
+
+    <!-- Ajouter catégorie -->
+    <div class="add-category-card">
+      <i class="fa-solid fa-plus-circle"></i>
+      <span>Ajouter une catégorie</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleMenu() {
+  const menu = document.getElementById('mobileMenu');
+  if (menu.style.display === 'flex') {
+    menu.style.display = 'none';
+  } else {
+    menu.style.display = 'flex';
+  }
+}
+
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('mobileMenu');
+  const menuBtn = document.querySelector('.menu-btn');
+  
+  if (!menuBtn.contains(event.target) && !menu.contains(event.target)) {
+    menu.style.display = 'none';
+  }
+});
+</script>
+
+</body>
+</html>
+

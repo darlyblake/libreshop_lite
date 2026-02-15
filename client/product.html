@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPhone 15 Pro — Tech Store | LibreShop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+
+/* ===== MODAL AJOUTER AU PANIER ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-content {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  max-width: 450px;
+  width: 90%;
+  transform: scale(0.9) translateY(20px);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.modal-overlay.active .modal-content {
+  transform: scale(1) translateY(0);
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.modal-close:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+}
+
+.modal-success-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--success), #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.modal-success-icon i {
+  font-size: 2rem;
+  color: white;
+}
+
+.modal-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.modal-subtitle {
+  text-align: center;
+  color: var(--text-soft);
+  margin-bottom: 24px;
+}
+
+.modal-product {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+}
+
+.modal-product-image {
+  width: 70px;
+  height: 70px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.modal-product-info {
+  flex: 1;
+}
+
+.modal-product-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.modal-product-options {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.modal-product-price {
+  font-weight: 700;
+  color: var(--accent2);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.modal-btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border: none;
+}
+
+.modal-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.modal-btn.secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.modal-btn.secondary:hover {
+  border-color: var(--accent);
+  color: white;
+}
+  text-decoration: none;
+}
+
+.search {
+  flex: 0 1 400px;
+  position: relative;
+  margin: 0 20px;
+}
+
+.search input {
+  width: 100%;
+  padding: 12px 48px 12px 20px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+  font-size: 0.95rem;
+  transition: var(--transition);
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.search input::placeholder {
+  color: var(--text-muted);
+}
+
+.search i {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-soft);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cart-btn {
+  position: relative;
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.cart-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+}
+
+.cart-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-link {
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.home-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== BREADCRUMB ===== */
+.breadcrumb {
+  padding: 24px 30px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.breadcrumb a {
+  color: var(--text-soft);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.breadcrumb a:hover {
+  color: var(--accent);
+}
+
+.breadcrumb i {
+  font-size: 0.7rem;
+}
+
+.breadcrumb span {
+  color: var(--text);
+}
+
+/* ===== PRODUIT PRINCIPAL ===== */
+.product-main {
+  padding: 30px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+
+.product-gallery {
+  position: relative;
+}
+
+.main-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.thumbnails {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.thumbnail {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.thumbnail:hover, .thumbnail.active {
+  border-color: var(--accent);
+}
+
+.product-details {
+  padding-top: 10px;
+}
+
+.store-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  margin-bottom: 12px;
+  transition: var(--transition);
+}
+
+.store-link:hover {
+  color: white;
+}
+
+.store-link img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.product-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+
+.product-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.stars {
+  display: flex;
+  gap: 2px;
+  color: var(--warning);
+}
+
+.rating-count {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.product-price-section {
+  margin-bottom: 24px;
+}
+
+.current-price {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--accent2);
+  margin-bottom: 8px;
+}
+
+.price-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.old-price {
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  text-decoration: line-through;
+}
+
+.discount-badge {
+  background: linear-gradient(135deg, var(--danger), #dc2626);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 60px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ===== OPTIONS DU PRODUIT ===== */
+.product-options {
+  margin-bottom: 24px;
+}
+
+.option-group {
+  margin-bottom: 20px;
+}
+
+.option-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 10px;
+  display: block;
+}
+
+.color-options {
+  display: flex;
+  gap: 10px;
+}
+
+.color-option {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.color-option:hover, .color-option.active {
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.color-option.active::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.storage-options {
+  display: flex;
+  gap: 10px;
+}
+
+.storage-option {
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.storage-option:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+.storage-option.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent;
+  color: white;
+}
+
+/* ===== QUANTITÉ ===== */
+.quantity-section {
+  margin-bottom: 24px;
+}
+
+.quantity-selector {
+  display: inline-flex;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 60px;
+  padding: 4px;
+}
+
+.quantity-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.quantity-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.quantity-value {
+  width: 50px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* ===== ACTIONS ===== */
+.product-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.add-to-cart-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 32px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.add-to-cart-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+.buy-now-btn {
+  padding: 16px 32px;
+  border-radius: 60px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.buy-now-btn:hover {
+  background: var(--card-hover);
+  color: white;
+  border-color: var(--accent);
+}
+
+.wishlist-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wishlist-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ===== INFOS SUPPLÉMENTAIRES ===== */
+.product-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 30px;
+}
+
+.info-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.info-card i {
+  font-size: 1.5rem;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.info-card h4 {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  margin-bottom: 4px;
+}
+
+.info-card p {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* ===== DESCRIPTION ===== */
+.product-description-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 30px;
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title i {
+  color: var(--accent);
+}
+
+.description-text {
+  color: var(--text-soft);
+  line-height: 1.8;
+}
+
+/* ===== CARACTÉRISTIQUES ===== */
+.specs-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.specs-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.spec-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+}
+
+.spec-label {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.spec-value {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 968px) {
+  .product-main {
+    grid-template-columns: 1fr;
+    gap: 30px;
+  }
+  
+  .product-title {
+    font-size: 1.6rem;
+  }
+  
+  .current-price {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .search {
+    flex: 1;
+    margin: 0 10px;
+  }
+  
+  .breadcrumb {
+    padding: 20px 16px 0;
+  }
+  
+  .product-main {
+    padding: 20px 16px;
+  }
+  
+  .thumbnails {
+    gap: 8px;
+  }
+  
+  .thumbnail {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .product-actions {
+    flex-direction: column;
+  }
+  
+  .product-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .specs-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .search {
+    display: none;
+  }
+  
+  .color-options {
+    flex-wrap: wrap;
+  }
+  
+  .storage-options {
+    flex-wrap: wrap;
+  }
+}
+</style>
+</head>
+<body>
+
+
+</body>
+</html>
+
+</body>
+</html>
+
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="search">
+    <input type="text" placeholder="Rechercher une boutique ou un produit...">
+    <i class="fa fa-search"></i>
+  </div>
+  <div class="header-actions">
+    <a href="./cart.html" class="cart-btn">
+      <i class="fa fa-shopping-cart"></i>
+      <span class="cart-badge">3</span>
+    </a>
+    <a href="./profile.html" class="user-btn">
+      <i class="fa fa-user"></i>
+    </a>
+  </div>
+</header>
+
+<!-- Breadcrumb -->
+<div class="breadcrumb">
+  <a href="./index.html">Accueil</a>
+  <i class="fa fa-chevron-right"></i>
+  <a href="./index.html">Boutiques</a>
+  <i class="fa fa-chevron-right"></i>
+  <a href="./store.html">Tech Store</a>
+  <i class="fa fa-chevron-right"></i>
+  <span>iPhone 15 Pro</span>
+</div>
+
+<!-- Produit principal -->
+<div class="product-main">
+  <!-- Galerie -->
+  <div class="product-gallery">
+    <img src="https://picsum.photos/800?15" alt="iPhone 15 Pro" class="main-image">
+    <div class="thumbnails">
+      <img src="https://picsum.photos/200?15" alt="Vue 1" class="thumbnail active">
+      <img src="https://picsum.photos/200?23" alt="Vue 2" class="thumbnail">
+      <img src="https://picsum.photos/200?24" alt="Vue 3" class="thumbnail">
+      <img src="https://picsum.photos/200?25" alt="Vue 4" class="thumbnail">
+    </div>
+  </div>
+  
+  <!-- Détails -->
+  <div class="product-details">
+    <a href="./store.html" class="store-link">
+      <img src="https://picsum.photos/60?5" alt="Tech Store">
+      Tech Store
+    </a>
+    
+    <h1 class="product-title">iPhone 15 Pro - 256Go - Titane Naturel</h1>
+    
+    <div class="product-rating">
+      <div class="stars">
+        <i class="fa-solid fa-star"></i>
+        <i class="fa-solid fa-star"></i>
+        <i class="fa-solid fa-star"></i>
+        <i class="fa-solid fa-star"></i>
+        <i class="fa-solid fa-star-half-stroke"></i>
+      </div>
+      <span class="rating-count">4.8 (128 avis)</span>
+    </div>
+    
+    <div class="product-price-section">
+      <div class="current-price">850 000 FCFA</div>
+      <div class="price-details">
+        <span class="old-price">950 000 FCFA</span>
+        <span class="discount-badge">-10%</span>
+      </div>
+    </div>
+    
+    <!-- Options couleur -->
+    <div class="product-options">
+      <div class="option-group">
+        <span class="option-label">Couleur:</span>
+        <div class="color-options">
+          <div class="color-option active" style="background: #8B8B8B;" title="Titane Naturel"></div>
+          <div class="color-option" style="background: #1C1C1E;" title="Titane Noir"></div>
+          <div class="color-option" style="background: #E8E4DF;" title="Titane Blanc"></div>
+          <div class="color-option" style="background: #3B3B6D;" title="Titane Bleu"></div>
+        </div>
+      </div>
+      
+      <div class="option-group">
+        <span class="option-label">Stockage:</span>
+        <div class="storage-options">
+          <div class="storage-option">128 Go</div>
+          <div class="storage-option active">256 Go</div>
+          <div class="storage-option">512 Go</div>
+          <div class="storage-option">1 To</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Quantité -->
+    <div class="quantity-section">
+      <span class="option-label">Quantité:</span>
+      <div class="quantity-selector">
+        <button class="quantity-btn"><i class="fa fa-minus"></i></a>
+        <span class="quantity-value">1</span>
+        <button class="quantity-btn"><i class="fa fa-plus"></i></a>
+      </div>
+    </div>
+    
+<!-- Actions -->
+    <div class="product-actions">
+      <button class="add-to-cart-btn">
+        <i class="fa fa-shopping-cart"></i>
+        Ajouter au panier
+      </a>
+      <button class="buy-now-btn">Acheter maintenant</a>
+      <button class="wishlist-btn"><i class="fa-regular fa-heart"></i></a>
+    </div>
+    
+    <!-- Infos -->
+    <div class="product-info-grid">
+      <div class="info-card">
+        <i class="fa-solid fa-truck-fast"></i>
+        <h4>Livraison</h4>
+        <p>24-48h</p>
+      </div>
+      <div class="info-card">
+        <i class="fa-solid fa-shield-halved"></i>
+        <h4>Garantie</h4>
+        <p>2 ans</p>
+      </div>
+      <div class="info-card">
+        <i class="fa-solid fa-arrow-left-rotate"></i>
+        <h4>Retour</h4>
+        <p>14 jours</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Description -->
+<div class="product-description-section" style="margin: 0 30px 30px;">
+  <h2 class="section-title">
+    <i class="fa-solid fa-circle-info"></i>
+    Description
+  </h2>
+  <p class="description-text">
+    L'iPhone 15 Pro représente l'évolution la plus significative de la gamme iPhone. 
+    Doté d'une外壳 en titane de qualité aérospatiale, il est à la fois plus léger et plus résistant. 
+    La puce A17 Pro offre des performances graphiques révolutionnaire, permettant de jouer à des jeux console.
+    <br><br>
+    Le système photo dispose d'un appareil principal de 48 MP avec Photonic Engine pour des clichés exceptionnels 
+    en toutes circonstances. Le nouveau bouton Action personnalisable vous permet d'accéder rapidement à vos fonctions préférées.
+    <br><br>
+    • Écran Super Retina XDR 6.1" avec ProMotion<br>
+    • Puce A17 Pro<br>
+    • Système photo 48 MP<br>
+    • Titanium design
+  </p>
+</div>
+
+<!-- Caractéristiques -->
+<div class="specs-section" style="margin: 0 30px 40px;">
+  <h2 class="section-title">
+    <i class="fa-solid fa-list-ul"></i>
+    Caractéristiques techniques
+  </h2>
+  <div class="specs-list">
+    <div class="spec-item">
+      <span class="spec-label">Écran</span>
+      <span class="spec-value">6.1" Super Retina XDR</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Processeur</span>
+      <span class="spec-value">A17 Pro</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Stockage</span>
+      <span class="spec-value">256 Go</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Caméra</span>
+      <span class="spec-value">48 MP + 12 MP + 12 MP</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Batterie</span>
+      <span class="spec-value">3274 mAh</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Charge</span>
+      <span class="spec-value">20W filaire / 15W sans fil</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Connectivité</span>
+      <span class="spec-value">5G / Wi-Fi 6E / Bluetooth 5.3</span>
+    </div>
+    <div class="spec-item">
+      <span class="spec-label">Poids</span>
+      <span class="spec-value">187 g</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Caisse — Vente physique — LibreShop</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<style>
+:root{
+  --bg: #0a0c12; --bg-gradient: linear-gradient(145deg,#0a0c12 0%,#0e1018 100%);
+  --card: rgba(22,25,34,0.85); --border: rgba(255,255,255,0.05);
+  --text:#fff; --text-soft: rgba(255,255,255,0.7);
+  --accent: #8b5cf6; --transition:0.25s;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg-gradient);color:var(--text);min-height:100vh}
+.container{max-width:100%;margin:0;padding:0;height:100vh;display:flex;flex-direction:column}
+.header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:var(--card);border-bottom:1px solid var(--border);flex-shrink:0}
+.header h1{font-size:clamp(1.2rem,3vw,1.8rem)}
+.header a{color:var(--text-soft);text-decoration:none;font-size:clamp(0.8rem,2vw,0.95rem)}
+.pos-wrapper{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1;overflow:hidden}
+.pos-left{background:var(--card);padding:16px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.pos-right{background:var(--card);padding:16px;display:flex;flex-direction:column;overflow:auto}
+.pos-inputs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.pos-inputs input{flex:1;min-width:120px;padding:12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:clamp(0.9rem,2vw,1rem)}
+.btn-pos{padding:12px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:clamp(0.85rem,1.5vw,1rem)}
+.btn-add{background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white}
+.items-list{display:flex;flex-direction:column;gap:10px;flex:1;overflow:auto}
+.item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);min-height:80px}
+.small-btn{padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-soft);cursor:pointer;font-weight:600;font-size:0.9rem}
+.totals{border-top:1px solid var(--border);padding-top:16px;margin-top:auto}
+.total-line{display:flex;justify-content:space-between;margin-bottom:12px;font-size:clamp(0.9rem,2vw,1.05rem)}
+.pay-buttons{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.btn-cash{background:linear-gradient(135deg,#10b981,#059669);color:white;padding:14px;font-size:clamp(0.9rem,2vw,1rem)}
+.btn-card{background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;padding:14px;font-size:clamp(0.9rem,2vw,1rem)}
+.sample-btn{padding:12px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,0.02);color:var(--text);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:10px;font-size:clamp(0.75rem,1.5vw,0.9rem);flex:1;min-width:140px}
+.sample-btn:hover{background:rgba(255,255,255,0.06)}
+.sample-thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.item-img{width:70px;height:70px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.item-details{flex:1;min-width:150px}
+.item-details strong{display:block;margin-bottom:4px;font-size:clamp(0.9rem,2vw,1.05rem)}
+.item-qty{font-size:clamp(0.75rem,1.5vw,0.85rem);color:var(--text-soft)}
+.item-price{text-align:right;font-weight:700;font-size:clamp(0.9rem,2vw,1.1rem);white-space:nowrap}
+.item-controls{display:flex;gap:6px}
+@media(max-width:1024px){.pos-wrapper{grid-template-columns:1fr}}
+@media(max-width:768px){
+  .pos-wrapper{grid-template-columns:1fr;gap:0}
+  .pos-left{border-right:none;border-bottom:1px solid var(--border)}
+  .pos-inputs{flex-direction:column}
+  .pos-inputs input,.btn-add{width:100%}
+  .header h1{font-size:1.3rem}
+}
+</style>
+</head>
+<body>
+  <div class="container">
+  <div class="header">
+    <h1>Caisse — Vente physique</h1>
+    <a href="./index.html">← Retour</a>
+  </div>
+
+  <div class="pos-wrapper">
+    <div class="pos-left">
+      <div class="pos-inputs">
+        <input id="productName" placeholder="Nom du produit" />
+        <input id="productPrice" type="number" placeholder="Prix" min="0" />
+        <button id="addItem" class="btn-pos btn-add">Ajouter</button>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <strong style="display:block;margin-bottom:8px;color:var(--text-soft);font-size:clamp(0.9rem,2vw,1rem)">Produits rapides</strong>
+        <div id="sampleProducts" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+
+      <div style="font-size:clamp(0.9rem,2vw,1rem);margin-bottom:8px"><strong>Articles</strong></div>
+      <div class="items-list" id="itemsList"></div>
+    </div>
+
+    <div class="pos-right">
+      <h3 style="margin-bottom:12px;font-size:clamp(1.1rem,2.5vw,1.3rem)">Détails</h3>
+      <div class="totals">
+        <div class="total-line"><span>Sous-total</span><span id="subtotal">0 FCFA</span></div>
+        <div class="total-line" style="font-weight:700;font-size:clamp(1rem,2.5vw,1.3rem)"><span>Total</span><span id="total">0 FCFA</span></div>
+      </div>
+
+      <div class="pay-buttons">
+        <button id="payCash" class="btn-pos btn-cash"><i class="fa-solid fa-money-bill"></i> Encaisser (Espèces)</button>
+        <button id="payCard" class="btn-pos btn-card"><i class="fa-solid fa-credit-card"></i> Encaisser (Carte)</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <button id="clearBtn" class="small-btn" style="width:100%"><i class="fa-solid fa-trash"></i> Vider la caisse</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const productName = document.getElementById('productName');
+  const productPrice = document.getElementById('productPrice');
+  const addItem = document.getElementById('addItem');
+  const itemsList = document.getElementById('itemsList');
+  const subtotalEl = document.getElementById('subtotal');
+  const totalEl = document.getElementById('total');
+  const payCash = document.getElementById('payCash');
+  const payCard = document.getElementById('payCard');
+  const clearBtn = document.getElementById('clearBtn');
+
+  let items = [];
+  function fmt(n){ return n.toLocaleString('fr-FR') + ' FCFA'; }
+
+  function render(){
+    itemsList.innerHTML = '';
+    let sub = 0;
+    items.forEach((it, idx)=>{
+      const el = document.createElement('div'); el.className='item';
+      const imgHtml = `<img src="${it.img ? it.img : 'https://picsum.photos/seed/' + encodeURIComponent(it.name) + '/80'}" alt="${it.name}" class="item-img"/>`;
+      el.innerHTML = `
+        ${imgHtml}
+        <div class="item-details">
+          <strong>${it.name}</strong>
+          <div class="item-qty">Qté: ${it.qty}</div>
+        </div>
+        <div class="item-price">${fmt(it.price*it.qty)}</div>
+        <div class="item-controls">
+          <button class="small-btn dec" data-i="${idx}">-</button> 
+          <button class="small-btn inc" data-i="${idx}">+</button>
+        </div>
+      `;
+      itemsList.appendChild(el);
+      sub += it.price * it.qty;
+    });
+    subtotalEl.textContent = fmt(sub);
+    totalEl.textContent = fmt(sub);
+
+    itemsList.querySelectorAll('.dec').forEach(b=> b.addEventListener('click', e=>{
+      const i = +e.currentTarget.dataset.i; if(items[i].qty>1) items[i].qty--; else items.splice(i,1); render();
+    }));
+    itemsList.querySelectorAll('.inc').forEach(b=> b.addEventListener('click', e=>{ const i=+e.currentTarget.dataset.i; items[i].qty++; render(); }));
+  }
+
+  // Produits fictifs (quick-add)
+  const sampleProducts = [
+    { name: 'Câble USB-C', price: 2500, img: 'https://picsum.photos/seed/cable/80' },
+    { name: 'Chargeur 20W', price: 7500, img: 'https://picsum.photos/seed/chargeur/80' },
+    { name: 'Coque silicone', price: 4500, img: 'https://picsum.photos/seed/coque/80' },
+    { name: 'Écouteurs', price: 15000, img: 'https://picsum.photos/seed/ecouteurs/80' },
+    { name: 'Batterie externe 10000mAh', price: 22000, img: 'https://picsum.photos/seed/batterie/80' },
+    { name: 'Carte mémoire 128Go', price: 12000, img: 'https://picsum.photos/seed/carte/80' }
+  ];
+
+  const sampleContainer = document.getElementById('sampleProducts');
+  function renderSamples(){
+    sampleContainer.innerHTML = '';
+    sampleProducts.forEach(p=>{
+      const b = document.createElement('button');
+      b.className = 'sample-btn';
+      b.innerHTML = `<img src="${p.img}" alt="${p.name}" class="sample-thumb"/> <span>${p.name} — ${fmt(p.price)}</span>`;
+      b.addEventListener('click', ()=>{
+        const ex = items.find(x=> x.name===p.name && x.price===p.price);
+        if(ex) ex.qty++; else items.push({ name: p.name, price: p.price, qty: 1, img: p.img });
+        render();
+      });
+      sampleContainer.appendChild(b);
+    });
+  }
+  renderSamples();
+
+  addItem.addEventListener('click', ()=>{
+    const name = productName.value.trim();
+    const price = parseFloat(productPrice.value) || 0;
+    if(!name || price<=0){ alert('Entrez un nom et un prix valide'); return; }
+    const ex = items.find(x=> x.name===name && x.price===price);
+    if(ex) ex.qty++; else items.push({name,price,qty:1});
+    productName.value=''; productPrice.value=''; productName.focus(); render();
+  });
+
+  payCash.addEventListener('click', ()=>{
+    if(items.length===0){ alert('Panier vide'); return; }
+    alert('Paiement en espèces enregistré — ' + totalEl.textContent);
+    items=[]; render();
+  });
+  payCard.addEventListener('click', ()=>{
+    if(items.length===0){ alert('Panier vide'); return; }
+    alert('Paiement carte (simulé) — ' + totalEl.textContent);
+    items=[]; render();
+  });
+  clearBtn.addEventListener('click', ()=>{ if(confirm('Vider la caisse ?')){ items=[]; render(); }});
+
+  // keyboard: Enter to add
+  productPrice.addEventListener('keydown', function(e){ if(e.key==='Enter') addItem.click(); });
+  productName.addEventListener('keydown', function(e){ if(e.key==='Enter') productPrice.focus(); });
+
+  render();
+})();
+</script>
+</body>
+</html>

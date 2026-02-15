@@ -615,6 +615,56 @@ header {
     justify-content: center;
   }
 }
+
+/* ===== BOUTON & PANNEAU CAISSE (VENTE PHYSIQUE) ===== */
+.pos-btn {
+  position: fixed;
+  bottom: 110px;
+  right: 30px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.18);
+  text-decoration: none;
+  transition: var(--transition);
+  z-index: 95;
+}
+.pos-btn:hover { transform: scale(1.05); }
+
+.pos-panel {
+  position: fixed;
+  top: 60px;
+  right: 30px;
+  width: 420px;
+  max-width: calc(100% - 40px);
+  height: calc(100% - 120px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+}
+.pos-panel.active { display: flex; }
+.pos-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.pos-items { flex:1; overflow:auto; margin:8px 0; display:flex; flex-direction:column; gap:8px; }
+.pos-item { display:flex; justify-content:space-between; gap:8px; padding:8px; background: rgba(255,255,255,0.02); border-radius:10px; align-items:center; }
+.pos-totals { border-top:1px solid var(--border); padding-top:10px; margin-top:8px; }
+.pos-controls { display:flex; gap:8px; margin-top:10px; }
+.pos-inputs { display:flex; gap:8px; margin-bottom:8px; }
+.pos-inputs input { flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text); }
+.btn-pos { padding:10px 12px; border-radius:10px; border:none; cursor:pointer; font-weight:600; }
+.btn-cash { background: linear-gradient(135deg,#10b981,#059669); color:white; }
+.btn-card { background: linear-gradient(135deg,#06b6d4,#3b82f6); color:white; }
+.btn-clear { background:transparent; border:1px solid var(--border); color:var(--text-soft); }
 </style>
 </head>
 <body>
@@ -629,14 +679,15 @@ header {
   <div class="menu-btn" onclick="toggleMenu()">
     <i class="fa fa-bars"></i>
   </div>
-  <div class="menu-mobile" id="mobileMenu">
-    <a href="#"><i class="fa fa-chart-pie"></i> Tableau de bord</a>
-    <a href="#"><i class="fa fa-box"></i> Produits</a>
-    <a href="#"><i class="fa fa-truck"></i> Commandes</a>
+<div class="menu-mobile" id="mobileMenu">
+    <a href="./index.html"><i class="fa fa-chart-pie"></i> Tableau de bord</a>
+    <a href="./products.html"><i class="fa fa-box"></i> Produits</a>
+    <a href="./orders.html"><i class="fa fa-truck"></i> Commandes</a>
     <a href="#"><i class="fa fa-chart-line"></i> Statistiques</a>
-    <a href="#"><i class="fa fa-store"></i> Ma boutique</a>
+    <a href="./store.html"><i class="fa fa-store"></i> Ma boutique</a>
+    <a href="./collections.html"><i class="fa fa-layer-group"></i> Collections</a>
     <a href="#"><i class="fa fa-credit-card"></i> Abonnement</a>
-    <a href="#" class="logout"><i class="fa fa-sign-out-alt"></i> Déconnexion</a>
+    <a href="./auth.html" class="logout"><i class="fa fa-sign-out-alt"></i> Déconnexion</a>
   </div>
 </header>
 
@@ -697,10 +748,10 @@ header {
     </div>
   </div>
 
-  <!-- Dernières commandes -->
+<!-- Dernières commandes -->
   <div class="section-header">
     <h2><i class="fa-solid fa-truck-fast"></i> Dernières commandes</h2>
-    <a href="#" class="view-all">Voir tout <i class="fa-solid fa-arrow-right"></i></a>
+    <a href="./orders.html" class="view-all">Voir tout <i class="fa-solid fa-arrow-right"></i></a>
   </div>
 
   <div class="orders-grid">
@@ -804,6 +855,11 @@ header {
   <i class="fa fa-plus"></i>
 </a>
 
+<!-- Bouton Vente Physique (ouvre la page caisse) -->
+<a href="./caisse.html" class="pos-btn" title="Vente physique">
+  <i class="fa-solid fa-cash-register"></i>
+</a>
+
 <script>
 function toggleMenu() {
   const menu = document.getElementById('mobileMenu');
@@ -823,6 +879,8 @@ document.addEventListener('click', function(event) {
     menu.style.display = 'none';
   }
 });
+
+
 </script>
 
 </body>

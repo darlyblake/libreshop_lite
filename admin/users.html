@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Utilisateurs — LibreShop Admin</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.8);
+  --card-hover: rgba(28, 32, 42, 0.95);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.7);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ===== HEADER ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo i {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 1.2rem;
+}
+
+.admin-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  padding: 6px 18px 6px 12px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+}
+
+.admin-badge i {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.admin-badge span {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.admin-badge .role {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+  padding: 2px 8px;
+  border-radius: 60px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.menu-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.menu-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== MENU MOBILE ===== */
+.menu-mobile {
+  display: none;
+  position: absolute;
+  top: 80px;
+  right: 30px;
+  background: var(--card);
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-direction: column;
+  width: 240px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  z-index: 99;
+}
+
+.menu-mobile a {
+  padding: 14px 20px;
+  color: var(--text-soft);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.95rem;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menu-mobile a i {
+  width: 20px;
+  color: var(--accent);
+}
+
+.menu-mobile a:last-child { border-bottom: none; }
+
+.menu-mobile a:hover {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), transparent);
+  color: white;
+  padding-left: 28px;
+}
+
+.menu-mobile a.active {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.2), transparent);
+  color: white;
+}
+
+.menu-mobile a.logout {
+  color: var(--danger);
+  border-top: 1px solid var(--border);
+}
+
+.menu-mobile a.logout i {
+  color: var(--danger);
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ===== EN-TÊTE ===== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title i {
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 60px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  border: none;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+}
+
+.btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.btn.secondary {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+}
+
+.btn.secondary:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ===== FILTRES ===== */
+.filters-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 8px 20px;
+  border-radius: 60px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-tab:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+.filter-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent;
+  color: white;
+}
+
+.search-box {
+  position: relative;
+  width: 300px;
+}
+
+.search-box i {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.search-box input {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border-radius: 60px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: white;
+  font-size: 0.9rem;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ===== USERS TABLE ===== */
+.users-table {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 150px;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 150px;
+  gap: 16px;
+  padding: 16px 20px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-row:hover {
+  background: var(--card-hover);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  font-size: 1rem;
+}
+
+.user-details h4 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.user-details span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.user-role {
+  padding: 4px 12px;
+  border-radius: 60px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.user-role.admin {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.user-role.seller {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.user-role.client {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--accent2);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+}
+
+.user-status {
+  padding: 4px 12px;
+  border-radius: 60px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.user-status.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.user-status.inactive {
+  background: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.3);
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.table-actions button {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.table-actions button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* ===== PAGINATION ===== */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.pagination-info {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.pagination-btn:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+.pagination-btn.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-color: transparent;
+  color: white;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 968px) {
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr 1fr 100px;
+  }
+  
+  .table-header > *:nth-child(3),
+  .table-header > *:nth-child(4),
+  .table-row > *:nth-child(3),
+  .table-row > *:nth-child(4) {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .container {
+    padding: 20px 16px;
+  }
+  
+  .filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-box {
+    width: 100%;
+  }
+  
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr 80px;
+  }
+  
+  .table-header > *:nth-child(2),
+  .table-row > *:nth-child(2) {
+    display: none;
+  }
+  
+  .menu-mobile {
+    right: 16px;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">
+    <i class="fa-solid fa-crown"></i>
+    LibreShop Admin
+  </a>
+  <div class="admin-badge">
+    <i class="fa-solid fa-shield-halved"></i>
+    <span>Super Admin</span>
+    <span class="role">ACCÈS TOTAL</span>
+  </div>
+  <div class="menu-btn" onclick="toggleMenu()">
+    <i class="fa fa-bars"></i>
+  </div>
+  <div class="menu-mobile" id="mobileMenu">
+    <a href="./index.html"><i class="fa fa-chart-pie"></i> Tableau de bord</a>
+    <a href="./stores.html"><i class="fa fa-store"></i> Boutiques</a>
+    <a href="./users.html" class="active"><i class="fa fa-users"></i> Utilisateurs</a>
+    <a href="./subscriptions.html"><i class="fa fa-credit-card"></i> Abonnements</a>
+    <a href="./categories.html"><i class="fa fa-tags"></i> Catégories</a>
+    <a href="./settings.html"><i class="fa fa-gear"></i> Paramètres</a>
+    <a href="#" class="logout"><i class="fa fa-sign-out-alt"></i> Déconnexion</a>
+  </div>
+</header>
+
+<div class="container">
+  <!-- En-tête -->
+  <div class="page-header">
+    <h1 class="page-title">
+      <i class="fa-solid fa-users"></i>
+      Utilisateurs
+    </h1>
+    <div class="header-actions">
+      <button class="btn primary">
+        <i class="fa fa-plus"></i> Nouvel utilisateur
+      </button>
+    </div>
+  </div>
+
+  <!-- Filtres -->
+  <div class="filters-bar">
+    <div class="filter-tabs">
+      <button class="filter-tab active">Tous (420)</button>
+      <button class="filter-tab">Vendeurs (85)</button>
+      <button class="filter-tab">Clients (320)</button>
+      <button class="filter-tab">Administrateurs (15)</button>
+      <button class="filter-tab">Inactifs (23)</button>
+    </div>
+    <div class="search-box">
+      <i class="fa fa-search"></i>
+      <input type="text" placeholder="Rechercher un utilisateur...">
+    </div>
+  </div>
+
+  <!-- Tableau des utilisateurs -->
+  <div class="users-table">
+    <div class="table-header">
+      <span>Utilisateur</span>
+      <span>Email</span>
+      <span>Rôle</span>
+      <span>Statut</span>
+      <span>Actions</span>
+    </div>
+
+    <div class="table-row">
+      <div class="user-info">
+        <div class="user-avatar">JD</div>
+        <div class="user-details">
+          <h4>Jean Dupont</h4>
+          <span>Inscrit il y a 3 jours</span>
+        </div>
+      </div>
+      <div>jean.dupont@email.com</div>
+      <div><span class="user-role seller">Vendeur</span></div>
+      <div><span class="user-status active">Actif</span></div>
+      <div class="table-actions">
+        <button title="Voir"><i class="fa fa-eye"></i></button>
+        <button title="Modifier"><i class="fa fa-pen"></i></button>
+        <button title="Supprimer"><i class="fa fa-trash"></i></button>
+      </div>
+    </div>
+
+    <div class="table-row">
+      <div class="user-info">
+        <div class="user-avatar">MK</div>
+        <div class="user-details">
+          <h4>Marie Kouassi</h4>
+          <span>Inscrite il y a 1 semaine</span>
+        </div>
+      </div>
+      <div>marie.k@email.com</div>
+      <div><span class="user-role client">Client</span></div>
+      <div><span class="user-status active">Actif</span></div>
+      <div class="table-actions">
+        <button title="Voir"><i class="fa fa-eye"></i></button>
+        <button title="Modifier"><i class="fa fa-pen"></i></button>
+        <button title="Supprimer"><i class="fa fa-trash"></i></button>
+      </div>
+    </div>
+
+    <div class="table-row">
+      <div class="user-info">
+        <div class="user-avatar">SA</div>
+        <div class="user-details">
+          <h4>Super Admin</h4>
+          <span>Compte système</span>
+        </div>
+      </div>
+      <div>admin@libreshop.com</div>
+      <div><span class="user-role admin">Admin</span></div>
+      <div><span class="user-status active">Actif</span></div>
+      <div class="table-actions">
+        <button title="Voir"><i class="fa fa-eye"></i></button>
+        <button title="Modifier"><i class="fa fa-pen"></i></button>
+      </div>
+    </div>
+
+    <div class="table-row">
+      <div class="user-info">
+        <div class="user-avatar">PM</div>
+        <div class="user-details">
+          <h4>Paul Mbemba</h4>
+          <span>Inscrit il y a 2 semaines</span>
+        </div>
+      </div>
+      <div>paul.m@email.com</div>
+      <div><span class="user-role seller">Vendeur</span></div>
+      <div><span class="user-status active">Actif</span></div>
+      <div class="table-actions">
+        <button title="Voir"><i class="fa fa-eye"></i></button>
+        <button title="Modifier"><i class="fa fa-pen"></i></button>
+        <button title="Supprimer"><i class="fa fa-trash"></i></button>
+      </div>
+    </div>
+
+    <div class="table-row">
+      <div class="user-info">
+        <div class="user-avatar">SK</div>
+        <div class="user-details">
+          <h4>Sophie Konan</h4>
+          <span>Inscrite il y a 1 mois</span>
+        </div>
+      </div>
+      <div>sophie.k@email.com</div>
+      <div><span class="user-role client">Client</span></div>
+      <div><span class="user-status inactive">Inactif</span></div>
+      <div class="table-actions">
+        <button title="Voir"><i class="fa fa-eye"></i></button>
+        <button title="Modifier"><i class="fa fa-pen"></i></button>
+        <button title="Supprimer"><i class="fa fa-trash"></i></button>
+      </div>
+    </div>
+
+    <div class="table-row">
+      <div class="user-info">
+        <div class="user-avatar">AT</div>
+        <div class="user-details">
+          <h4>Amadou Touré</h4>
+          <span>Inscrit il y a 5 jours</span>
+        </div>
+      </div>
+      <div>amadou.t@email.com</div>
+      <div><span class="user-role seller">Vendeur</span></div>
+      <div><span class="user-status active">Actif</span></div>
+      <div class="table-actions">
+        <button title="Voir"><i class="fa fa-eye"></i></button>
+        <button title="Modifier"><i class="fa fa-pen"></i></button>
+        <button title="Supprimer"><i class="fa fa-trash"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <span class="pagination-info">Affichage de 1 à 6 sur 420 utilisateurs</span>
+    <div class="pagination-buttons">
+      <button class="pagination-btn">&laquo; Précédent</button>
+      <button class="pagination-btn active">1</button>
+      <button class="pagination-btn">2</button>
+      <button class="pagination-btn">3</button>
+      <button class="pagination-btn">...</button>
+      <button class="pagination-btn">70</button>
+      <button class="pagination-btn">Suivant &raquo;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleMenu() {
+  const menu = document.getElementById('mobileMenu');
+  if (menu.style.display === 'flex') {
+    menu.style.display = 'none';
+  } else {
+    menu.style.display = 'flex';
+  }
+}
+
+document.addEventListener('click', function(event) {
+  const menu = document.getElementById('mobileMenu');
+  const menuBtn = document.querySelector('.menu-btn');
+  
+  if (!menuBtn.contains(event.target) && !menu.contains(event.target)) {
+    menu.style.display = 'none';
+  }
+});
+</script>
+
+</body>
+</html>
+

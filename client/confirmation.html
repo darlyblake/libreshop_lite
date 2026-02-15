@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commande confirmée — LibreShop</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
+<style>
+:root {
+  --bg: #0a0c12;
+  --bg-gradient: linear-gradient(145deg, #0a0c12 0%, #0e1018 100%);
+  --card: rgba(22, 25, 34, 0.7);
+  --card-hover: rgba(28, 32, 42, 0.9);
+  --accent: #8b5cf6;
+  --accent2: #06b6d4;
+  --accent-glow: rgba(139, 92, 246, 0.2);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --text: #ffffff;
+  --text-soft: rgba(255, 255, 255, 0.65);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --transition: 0.3s cubic-bezier(0.2, 0, 0, 1);
+  --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-gradient);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER MODERNE ===== */
+header {
+  position: sticky;
+  top: 20px;
+  margin: 20px 30px 0;
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.3rem;
+  background: linear-gradient(135deg, #fff, #cbd5e1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.5px;
+  text-decoration: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-link {
+  color: var(--text-soft);
+  font-size: 1.3rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.home-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+/* ===== SUCCESS SECTION ===== */
+.success-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 60px 30px;
+  text-align: center;
+}
+
+.success-icon {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--success), #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 30px;
+  animation: scaleIn 0.5s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes scaleIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.success-icon i {
+  font-size: 3rem;
+  color: white;
+}
+
+.success-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  animation: fadeInUp 0.5s 0.2s both;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.success-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-soft);
+  margin-bottom: 30px;
+  line-height: 1.6;
+  animation: fadeInUp 0.5s 0.3s both;
+}
+
+/* ===== ORDER DETAILS CARD ===== */
+.order-details {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  margin-bottom: 30px;
+  text-align: left;
+  animation: fadeInUp 0.5s 0.4s both;
+}
+
+.order-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.order-number {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-number-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.order-number-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.order-status {
+  padding: 8px 16px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 60px;
+  color: var(--success);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.order-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.order-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-info-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.order-info-value {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.order-total-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.order-total-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.order-total-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent2);
+}
+
+/* ===== ORDER ITEMS ===== */
+.order-items-section {
+  background: var(--card);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 30px;
+  margin-bottom: 30px;
+  text-align: left;
+  animation: fadeInUp 0.5s 0.5s both;
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title i {
+  color: var(--accent);
+}
+
+.order-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.order-item:last-child {
+  border-bottom: none;
+}
+
+.order-item-image {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.order-item-info {
+  flex: 1;
+}
+
+.order-item-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.order-item-meta {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.order-item-price {
+  font-weight: 600;
+  color: var(--accent2);
+}
+
+/* ===== ACTIONS ===== */
+.actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fadeInUp 0.5s 0.6s both;
+}
+
+.primary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 32px;
+  border-radius: 60px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  font-weight: 700;
+  font-size: 1rem;
+  text-decoration: none;
+  transition: var(--transition);
+  border: none;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--accent-glow);
+}
+
+.secondary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 60px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.secondary-btn:hover {
+  border-color: var(--accent);
+  color: white;
+}
+
+/* ===== HELP SECTION ===== */
+.help-section {
+  margin-top: 40px;
+  padding: 24px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: var(--radius-lg);
+  animation: fadeInUp 0.5s 0.7s both;
+}
+
+.help-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-title i {
+  color: var(--accent);
+}
+
+.help-text {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    margin: 16px;
+    padding: 10px 16px;
+  }
+  
+  .success-container {
+    padding: 40px 16px;
+  }
+  
+  .success-icon {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .success-icon i {
+    font-size: 2.5rem;
+  }
+  
+  .success-title {
+    font-size: 1.6rem;
+  }
+  
+  .order-details,
+  .order-items-section {
+    padding: 20px;
+  }
+  
+  .order-info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .order-detail-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .actions-section {
+    gap: 10px;
+  }
+  
+  .primary-btn,
+  .secondary-btn {
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="./index.html" class="logo">LibreShop</a>
+  <div class="header-actions">
+    <a href="./index.html" class="home-link">
+      <i class="fa fa-home"></i>
+    </a>
+  </div>
+</header>
+
+<!-- Success Message -->
+<div class="success-container">
+  <div class="success-icon">
+    <i class="fa-solid fa-check"></i>
+  </div>
+  
+  <h1 class="success-title">Merci pour votre commande !</h1>
+  <p class="success-subtitle">
+    Votre commande a été enregistrée avec succès. Nous vous enverrons un email de confirmation avec les détails de votre commande.
+  </p>
+
+  <!-- Order Details -->
+  <div class="order-details">
+    <div class="order-detail-header">
+      <div class="order-number">
+        <span class="order-number-label">Numéro de commande</span>
+        <span class="order-number-value">#CMD-2026-0156</span>
+      </div>
+      <span class="order-status">Confirmée</span>
+    </div>
+    
+    <div class="order-info-grid">
+      <div class="order-info-item">
+        <span class="order-info-label">Date de commande</span>
+        <span class="order-info-value">15 Janvier 2026</span>
+      </div>
+      <div class="order-info-item">
+        <span class="order-info-label">Mode de paiement</span>
+        <span class="order-info-value">Mobile Money</span>
+      </div>
+      <div class="order-info-item">
+        <span class="order-info-label">Mode de livraison</span>
+        <span class="order-info-value">Livraison à domicile</span>
+      </div>
+      <div class="order-info-item">
+        <span class="order-info-label">Livraison estimée</span>
+        <span class="order-info-value">17-18 Janvier 2026</span>
+      </div>
+    </div>
+    
+    <div class="order-total-section">
+      <span class="order-total-label">Total payé</span>
+      <span class="order-total-value">1 235 000 FCFA</span>
+    </div>
+  </div>
+
+  <!-- Order Items -->
+  <div class="order-items-section">
+    <h2 class="section-title">
+      <i class="fa-solid fa-box-open"></i>
+      Articles commandés
+    </h2>
+    
+    <div class="order-item">
+      <img src="https://picsum.photos/100?15" alt="iPhone 15 Pro" class="order-item-image">
+      <div class="order-item-info">
+        <div class="order-item-title">iPhone 15 Pro - 256Go</div>
+        <div class="order-item-meta">Quantité: 1 • Titane Naturel</div>
+        <div class="order-item-price">850 000 FCFA</div>
+      </div>
+    </div>
+    
+    <div class="order-item">
+      <img src="https://picsum.photos/100?18" alt="AirPods Pro 2" class="order-item-image">
+      <div class="order-item-info">
+        <div class="order-item-title">AirPods Pro 2</div>
+        <div class="order-item-meta">Quantité: 2</div>
+        <div class="order-item-price">370 000 FCFA</div>
+      </div>
+    </div>
+    
+    <div class="order-item">
+      <img src="https://picsum.photos/100?26" alt="Coque iPhone" class="order-item-image">
+      <div class="order-item-info">
+        <div class="order-item-title">Coque Premium iPhone 15</div>
+        <div class="order-item-meta">Quantité: 1 • Noir</div>
+        <div class="order-item-price">15 000 FCFA</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions-section">
+    <a href="./orders.html" class="primary-btn">
+      <i class="fa-solid fa-box-open"></i>
+      Voir ma commande
+    </a>
+    <a href="./index.html" class="secondary-btn">
+      <i class="fa-solid fa-shopping-bag"></i>
+      Continuer mes achats
+    </a>
+  </div>
+
+  <!-- Help Section -->
+  <div class="help-section">
+    <div class="help-title">
+      <i class="fa-solid fa-headset"></i>
+      Besoin d'aide ?
+    </div>
+    <p class="help-text">
+      Vous avez des questions sur votre commande ? Notre service client est disponible 7j/7 pour vous accompagner.
+      <br>Contactez-nous au +225 07 123 456 78 ou via WhatsApp.
+    </p>
+  </div>
+</div>
+
+</body>
+</html>
