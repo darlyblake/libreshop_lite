@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "LibreShop",
+    "slug": "LibreShop",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0c12"
+    },
+    "scheme": "libreshop",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.libreshop.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0c12"
+      },
+      "package": "com.libreshop.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": {
+            "scheme": "https",
+            "host": "*.libreshop.app"
+          },
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "libreshop"
+          },
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE",
+        "INTERNET",
+        "NETWORK_ACCESS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "meta": {
+        "themeColor": "#8b5cf6"
+      },
+      "bundler": "webpack"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "LibreShop a besoin d'acceder a votre camera pour prendre des photos de produits"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LibreShop a besoin d'acceder a vos photos pour selectionner des images de produits",
+          "cameraPermission": "LibreShop a besoin d'acceder a votre camera pour prendre des photos"
+        }
+      ],
+      "expo-font"
+    ]
+  }
+}

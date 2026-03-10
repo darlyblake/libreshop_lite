@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr" translate="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="LibreShop - Platform de e-commerce"
+    />
+    <meta name="google" content="notranslate" />
+    <title>LibreShop</title>
+    <style>
+      /* Block Google Translate elements and overlays */
+      .goog-te-banner-frame,
+      .goog-te-gadget,
+      .goog-te-gadget-simple,
+      .goog-top-panel,
+      .skiptranslate,
+      .goog-te-tooltip,
+      .goog-te-button {
+        display: none !important;
+        visibility: hidden !important;
+      }
+      
+      html {
+        top: 0 !important;
+      }
+      
+      body {
+        top: 0 !important;
+        position: static !important;
+      }
+      
+      #root {
+        position: relative;
+        z-index: 1;
+      }
+    </style>
+  </head>
+  <body translate="no" data-notranslate>
+    <noscript>Vous avez besoin d'activer JavaScript pour exécuter cette application.</noscript>
+    <div id="root"></div>
+    <script>
+      // Prevent external libraries from interfering with React DOM
+      (function() {
+        'use strict';
+        
+        // Disable Google Translate API
+        window.google = window.google || {};
+        window.google.translate = { TranslateElement: null };
+        
+        // Prevent DOM mutations from external sources
+        const originalInsertBefore = Element.prototype.insertBefore;
+        const originalAppendChild = Element.prototype.appendChild;
+        const originalRemoveChild = Element.prototype.removeChild;
+        
+        window.__isReactRendering = false;
+        
+        // Store original methods for React usage
+        Element.prototype._originalInsertBefore = originalInsertBefore;
+        Element.prototype._originalAppendChild = originalAppendChild;
+        Element.prototype._originalRemoveChild = originalRemoveChild;
+        
+        // Initialize root element protection
+        document.addEventListener('DOMContentLoaded', () => {
+          const root = document.getElementById('root');
+          if (root) {
+            root.setAttribute('translate', 'no');
+            root.setAttribute('data-notranslate', 'true');
+            // Mark root as protected
+            root.__protected = true;
+          }
+        }, { once: true });
+        
+        // Block translate event from Google Translate
+        window.addEventListener('beforetranslate', (e) => {
+          e.preventDefault();
+          return false;
+        });
+      })();
+    </script>
+  </body>
+</html>
