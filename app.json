@@ -56,7 +56,13 @@
       "meta": {
         "themeColor": "#8b5cf6"
       },
-      "bundler": "webpack"
+      "bundler": "webpack",
+      "output": "dist",
+      "build": {
+        "babel": {
+          "include": ["node_modules/react-native-web"]
+        }
+      }
     },
     "plugins": [
       [
