@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
