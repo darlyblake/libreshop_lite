@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,14 @@ export const ClientHomeScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [selectedCollection, setSelectedCollection] = useState<string>('Toutes');
+  
+  // Calculer le nombre de colonnes et la largeur des cartes dynamiquement
+  const numProductColumns = isDesktop ? 4 : isTablet ? 3 : 2;
+  const responsiveProductCardWidth = useMemo(() => {
+    const totalHorizontalPadding = SPACING.xl * 2; // paddingHorizontal des deux côtés
+    const totalGap = SPACING.md * (numProductColumns - 1); // gap entre colonnes
+    return (width - totalHorizontalPadding - totalGap) / numProductColumns;
+  }, [width, numProductColumns]);
   
   // Real data states
   const [stores, setStores] = useState<Store[]>([]);
@@ -219,7 +227,7 @@ export const ClientHomeScreen: React.FC = () => {
   );
 
   const renderProductCard = ({ item }: { item: Product }) => (
-    <View style={styles.productCardWrapper}>
+    <View style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
       <ProductCard
         name={item.name}
         price={item.price}
@@ -231,8 +239,6 @@ export const ClientHomeScreen: React.FC = () => {
 
   // Calcul des dimensions responsive
   const storeCardWidth = isDesktop ? 220 : isTablet ? 200 : 180;
-  // Use same dimensions as ClientAllProductsScreen for consistency
-  const productCardWidth = (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -490,7 +496,7 @@ export const ClientHomeScreen: React.FC = () => {
                 data={products}
                 renderItem={renderProductCard}
                 keyExtractor={(item) => item.id}
-                numColumns={2}
+                numColumns={numProductColumns}
                 scrollEnabled={false}
                 columnWrapperStyle={styles.productsGrid}
                 contentContainerStyle={styles.productsList}
@@ -791,7 +797,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   productCardWrapper: {
-    width: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2,
+    // Largeur calculée dynamiquement dans renderProductCard
   },
   
   // Promo Banner
