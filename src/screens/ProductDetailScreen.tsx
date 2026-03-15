@@ -1081,6 +1081,11 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontWeight: '700',
   },
+  likeSection: {
+    marginVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'flex-start',
+  },
   chatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
