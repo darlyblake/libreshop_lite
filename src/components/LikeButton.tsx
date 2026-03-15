@@ -72,30 +72,40 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={handleLike}
-      disabled={loading || !userId}
-      activeOpacity={0.7}
-    >
-      <Ionicons
-        name={liked ? 'heart' : 'heart-outline'}
-        size={size}
-        color={liked ? COLORS.danger : COLORS.textSecondary}
-      />
-      {showCount && (
-        <Text style={[styles.count, { color: liked ? COLORS.danger : COLORS.textSecondary }]}>
-          {likeCount}
-        </Text>
-      )}
-    </TouchableOpacity>
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleLike}
+        disabled={loading || !userId}
+        activeOpacity={0.7}
+      >
+        <Ionicons
+          name={liked ? 'heart' : 'heart-outline'}
+          size={size}
+          color={liked ? COLORS.danger : COLORS.textSecondary}
+        />
+        {showCount && (
+          <Text style={[styles.count, { color: liked ? COLORS.danger : COLORS.textSecondary }]}>
+            {likeCount}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
+    justifyContent: 'flex-start',
+    minHeight: 40,
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: SPACING.xs,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
   },
   count: {
     fontSize: 12,
