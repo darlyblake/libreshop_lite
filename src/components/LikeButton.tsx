@@ -210,10 +210,13 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
     runOnJS(triggerHaptic)(newLiked ? 'success' : 'light');
 
     try {
+      console.log('Toggling like for product', productId, 'user', effectiveUserId);
       const result = await productLikesService.toggleLike(effectiveUserId, productId);
+      console.log('Like toggle result:', result);
       
       // Vérifier que le résultat correspond à l'optimistic update
       if (result !== newLiked) {
+        console.log('Incohérence détectée, recharging like data');
         // Incohérence, recharger les données
         await loadLikeData();
       } else {
@@ -235,7 +238,7 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
       
       Alert.alert(
         'Erreur',
-        'Impossible d\'effectuer cette action. Veuillez réessayer.'
+        `Impossible d'effectuer cette action: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
       );
     } finally {
       setLoading(false);
@@ -269,13 +272,13 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   const getIconColor = (): string => {
     if (disabled) return COLORS.textMuted;
     if (liked) return COLORS.danger;
-    return COLORS.textSecondary;
+    return COLORS.white;
   };
 
   const getTextColor = (): string => {
     if (disabled) return COLORS.textMuted;
     if (liked) return COLORS.danger;
-    return COLORS.textSecondary;
+    return COLORS.white;
   };
 
   if (error) {
