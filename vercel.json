@@ -1,5 +1,4 @@
 {
-{
   "buildCommand": "expo export:web",
   "outputDirectory": "web-build",
   "installCommand": "npm install",
@@ -27,4 +26,3 @@
     }
   ]
 }
->>>>>>> b4a0e57 (feat: PWA configuration - add manifest, service worker, and Vercel routes)
