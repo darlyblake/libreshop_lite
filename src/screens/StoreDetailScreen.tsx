@@ -18,8 +18,9 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ExpoLinking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { ProductCard } from '../components';
+import { ProductCard, FollowButton } from '../components';
 import { collectionService, productService, storeFollowerService, storeService, storeStatsService } from '../lib/supabase';
+import { shopFollowService } from '../lib/shopFollowService';
 import { useAuthStore } from '../store';
 
 const { width } = Dimensions.get('window');
@@ -436,10 +437,13 @@ export const StoreDetailScreen: React.FC = () => {
             </View>
 
             <View style={styles.actions}>
-              <TouchableOpacity style={styles.primaryButton} onPress={handleToggleFollow} disabled={followBusy}>
-                <Ionicons name={isFollowing ? 'checkmark' : 'add'} size={20} color={COLORS.white} />
-                <Text style={styles.primaryButtonText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
-              </TouchableOpacity>
+              {user?.id && store?.id && (
+                <FollowButton
+                  userId={String(user.id)}
+                  storeId={String(store.id)}
+                  storeName={String(store.name || 'Boutique')}
+                />
+              )}
               <TouchableOpacity style={styles.secondaryButton} onPress={handleWhatsAppContact}>
                 <Ionicons name="logo-whatsapp" size={20} color={COLORS.textSoft} />
                 <Text style={styles.secondaryButtonText}>Contacter</Text>

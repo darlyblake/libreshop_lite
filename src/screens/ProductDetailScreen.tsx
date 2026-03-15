@@ -26,6 +26,7 @@ import { useResponsive } from '../utils/responsive';
 import { useCartStore } from '../store';
 import { useAuthStore } from '../store';
 import { wishlistService } from '../lib/wishlistService';
+import { LikeButton } from '../components';
 import {
   productService,
   reviewService,
@@ -598,22 +599,14 @@ export const ProductDetailScreen: React.FC = () => {
                 </TouchableOpacity>
 
                 <View style={styles.likeSection}>
-                  <TouchableOpacity
-                    style={[styles.likeBtn, isFavorite && styles.likeBtnLiked]}
-                    onPress={toggleFavorite}
-                    disabled={loadingFavorite}
-                    activeOpacity={0.85}
-                  >
-                    {loadingFavorite ? (
-                      <ActivityIndicator size="small" color="#b91c1c" />
-                    ) : (
-                      <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={18} color={isFavorite ? '#e11d48' : '#b91c1c'} />
-                    )}
-                    <Text style={styles.likeBtnText}>
-                      {loadingFavorite ? 'Chargement...' : (isFavorite ? 'Aimé' : "J'aime")}
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={styles.likeCountText}>personnes aiment ce produit</Text>
+                  {user?.id && productId && (
+                    <LikeButton 
+                      userId={String(user.id)} 
+                      productId={String(productId)}
+                      showCount={true}
+                      size={24}
+                    />
+                  )}
                 </View>
 
                 <View style={styles.descriptionSection}>
