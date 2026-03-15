@@ -28,6 +28,12 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
   }, [userId, productId]);
 
   const loadLikeData = async () => {
+    if (!userId || !productId) {
+      setLiked(false);
+      setLikeCount(0);
+      return;
+    }
+
     try {
       const [hasLiked, count] = await Promise.all([
         productLikesService.hasLiked(userId, productId),
@@ -41,6 +47,11 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
   };
 
   const handleLike = async () => {
+    if (!userId || !productId) {
+      console.warn('User not connected or product not found');
+      return;
+    }
+
     if (loading) return;
 
     setLoading(true);
@@ -64,7 +75,7 @@ export const LikeButton: React.FC<LikeButtonProps> = ({
     <TouchableOpacity
       style={styles.container}
       onPress={handleLike}
-      disabled={loading}
+      disabled={loading || !userId}
       activeOpacity={0.7}
     >
       <Ionicons

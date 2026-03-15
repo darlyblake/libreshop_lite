@@ -599,14 +599,12 @@ export const ProductDetailScreen: React.FC = () => {
                 </TouchableOpacity>
 
                 <View style={styles.likeSection}>
-                  {user?.id && productId && (
-                    <LikeButton 
-                      userId={String(user.id)} 
-                      productId={String(productId)}
-                      showCount={true}
-                      size={24}
-                    />
-                  )}
+                  <LikeButton 
+                    userId={user?.id ? String(user.id) : ''} 
+                    productId={String(productId || '')}
+                    showCount={true}
+                    size={24}
+                  />
                 </View>
 
                 <View style={styles.descriptionSection}>

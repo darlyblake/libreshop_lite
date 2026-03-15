@@ -437,13 +437,11 @@ export const StoreDetailScreen: React.FC = () => {
             </View>
 
             <View style={styles.actions}>
-              {user?.id && store?.id && (
-                <FollowButton
-                  userId={String(user.id)}
-                  storeId={String(store.id)}
-                  storeName={String(store.name || 'Boutique')}
-                />
-              )}
+              <FollowButton
+                userId={user?.id ? String(user.id) : ''}
+                storeId={store?.id ? String(store.id) : ''}
+                storeName={String(store?.name || 'Boutique')}
+              />
               <TouchableOpacity style={styles.secondaryButton} onPress={handleWhatsAppContact}>
                 <Ionicons name="logo-whatsapp" size={20} color={COLORS.textSoft} />
                 <Text style={styles.secondaryButtonText}>Contacter</Text>

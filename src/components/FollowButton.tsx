@@ -28,6 +28,12 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
   }, [userId, storeId]);
 
   const loadFollowData = async () => {
+    if (!userId || !storeId) {
+      setFollowing(false);
+      setFollowerCount(0);
+      return;
+    }
+
     try {
       const [isFollowing, count] = await Promise.all([
         shopFollowService.isFollowing(userId, storeId),
@@ -41,6 +47,11 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
   };
 
   const handleFollow = async () => {
+    if (!userId || !storeId) {
+      console.warn('User not connected or store not found');
+      return;
+    }
+
     if (loading) return;
 
     setLoading(true);
@@ -76,6 +87,7 @@ export const FollowButton: React.FC<FollowButtonProps> = ({
         style,
       ]}
       onPress={handleFollow}
+      disabled={!userId || !storeId}
       activeOpacity={0.7}
     >
       <Ionicons
