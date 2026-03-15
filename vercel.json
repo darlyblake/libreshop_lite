@@ -1,8 +1,30 @@
 {
-  "buildCommand": "npx expo export -p web",
-  "outputDirectory": "dist",
+{
+  "buildCommand": "expo export:web",
+  "outputDirectory": "web-build",
+  "installCommand": "npm install",
   "routes": [
-    { "handle": "filesystem" },
-    { "src": "/.*", "dest": "/index.html" }
+    {
+      "src": "/service-worker.js",
+      "dest": "/service-worker.js",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json",
+      "headers": {
+        "Content-Type": "application/manifest+json"
+      }
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }
+>>>>>>> b4a0e57 (feat: PWA configuration - add manifest, service worker, and Vercel routes)

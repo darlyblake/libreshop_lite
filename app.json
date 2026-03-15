@@ -57,13 +57,14 @@
         "themeColor": "#8b5cf6"
       },
       "bundler": "webpack",
-      "output": "dist",
+      "output": "web-build",
       "build": {
         "babel": {
           "include": ["node_modules/react-native-web"]
         }
       }
     },
+    "platforms": ["android", "ios", "web"],
     "plugins": [
       [
         "expo-camera",
