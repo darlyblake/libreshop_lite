@@ -600,10 +600,11 @@ export const ProductDetailScreen: React.FC = () => {
 
                 <View style={styles.likeSection}>
                   <LikeButton 
-                    userId={user?.id ? String(user.id) : ''} 
                     productId={String(productId || '')}
+                    userId={user?.id ? String(user.id) : undefined}
                     showCount={true}
-                    size={24}
+                    size="large"
+                    showLabel={false}
                   />
                 </View>
 
