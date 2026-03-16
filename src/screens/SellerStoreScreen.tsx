@@ -97,19 +97,20 @@ export const SellerStoreScreen: React.FC = () => {
   );
 
   const storePublicUrl = useMemo(() => {
-    if (!store?.slug) return null;
+    if (!store?.slug) {
+      console.log('storePublicUrl: store or slug missing', { store: store?.id, slug: store?.slug });
+      return null;
+    }
     
     // Use environment variable for web base URL (production URL)
     // This prevents hardcoding localhost in production
     const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    const url = webBaseUrl
+      ? `${webBaseUrl}/store/${store.slug}`
+      : Linking.createURL(`/store/${store.slug}`);
     
-    if (webBaseUrl) {
-      // Production: use the configured web domain
-      return `${webBaseUrl}/store/${store.slug}`;
-    } else {
-      // Fallback: use deep link for development/testing
-      return Linking.createURL(`/store/${store.slug}`);
-    }
+    console.log('storePublicUrl generated:', { url, webBaseUrl, slug: store.slug });
+    return url;
   }, [store?.slug]);
 
   const loadStore = useCallback(async () => {
@@ -118,10 +119,13 @@ export const SellerStoreScreen: React.FC = () => {
       setLoading(true);
       const s = (await storeService.getByUser(user.id)) as Store | null;
       if (!s?.id) {
+        console.log('loadStore: No store found');
         setStore(null);
         setStoreData({});
         return;
       }
+
+      console.log('loadStore: Store loaded', { id: s.id, name: s.name, slug: s.slug });
 
       const [products, orders] = await Promise.all([
         productService.getByStoreAll(s.id).catch(() => []),
@@ -232,20 +236,33 @@ export const SellerStoreScreen: React.FC = () => {
 
   const handleShareStore = async () => {
     if (!storePublicUrl) {
-      Alert.alert('Partager', 'Lien boutique indisponible');
+      console.warn('handleShareStore: storePublicUrl is null/undefined', { 
+        storeId: store?.id, 
+        storeSlug: store?.slug,
+        storeName: store?.name,
+        storePublicUrl 
+      });
+      Alert.alert('Partager', 'Lien boutique indisponible. Veuillez recharger la page.');
       return;
     }
 
     try {
       await Share.share({ message: storePublicUrl });
     } catch (e: any) {
+      console.error('Share error:', e);
       Alert.alert('Erreur', e?.message || 'Impossible de partager');
     }
   };
 
   const handleShowQrLink = () => {
     if (!storePublicUrl) {
-      Alert.alert('QR Code', 'Lien boutique indisponible');
+      console.warn('handleShowQrLink: storePublicUrl is null/undefined', { 
+        storeId: store?.id,
+        storeSlug: store?.slug,
+        storeName: store?.name,
+        storePublicUrl 
+      });
+      Alert.alert('QR Code', 'Lien boutique indisponible. Veuillez recharger la page.');
       return;
     }
     Alert.alert('Lien boutique', storePublicUrl, [
