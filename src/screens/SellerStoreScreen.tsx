@@ -103,8 +103,14 @@ export const SellerStoreScreen: React.FC = () => {
     }
     
     // Use environment variable for web base URL (production URL)
-    // This prevents hardcoding localhost in production
-    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    // On web, fallback to window.location.origin if env var is not set
+    let webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    
+    // Fallback for web: use current origin if no env var is set
+    if (!webBaseUrl && Platform.OS === 'web' && typeof window !== 'undefined') {
+      webBaseUrl = window.location.origin.replace(/\/+$/, '');
+    }
+    
     const url = webBaseUrl
       ? `${webBaseUrl}/store/${store.slug}`
       : Linking.createURL(`/store/${store.slug}`);
@@ -247,10 +253,29 @@ export const SellerStoreScreen: React.FC = () => {
     }
 
     try {
-      await Share.share({ message: storePublicUrl });
+      // Check if Share API is supported (not available on all browsers)
+      if (Platform.OS === 'web' || !Share || !Share.share) {
+        // Fallback for web or when Share is not available
+        // Copy to clipboard and show a message
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          await navigator.clipboard.writeText(storePublicUrl);
+          Alert.alert('Succès', `Lien copié:\n${storePublicUrl}`);
+        } else {
+          // Final fallback: just show the URL
+          Alert.alert('Lien boutique', storePublicUrl, [
+            { text: 'Fermer', style: 'cancel' },
+          ]);
+        }
+      } else {
+        // Use native Share API on mobile platforms
+        await Share.share({ message: storePublicUrl });
+      }
     } catch (e: any) {
       console.error('Share error:', e);
-      Alert.alert('Erreur', e?.message || 'Impossible de partager');
+      // Fallback if anything fails
+      Alert.alert('Lien boutique', storePublicUrl, [
+        { text: 'Fermer', style: 'cancel' },
+      ]);
     }
   };
 

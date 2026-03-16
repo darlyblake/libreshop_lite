@@ -10,6 +10,7 @@
 // EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // WARN: Replace these with your real Supabase project credentials!
 // The current project appears to be unavailable (404 error).
@@ -136,8 +137,22 @@ export const FONT_SIZE = {
   title: 40,
 };
 
+// Helper: Get shadow styles appropriate for current platform
+// On web, filters out deprecated React Native shadow props and keeps only boxShadow
+// On native, keeps all shadow properties for better appearance
+const getPlatformShadow = (shadowObj: any) => {
+  if (Platform.OS === 'web') {
+    // Web: keep only boxShadow (CSS), filter out React Native properties
+    return {
+      boxShadow: shadowObj.boxShadow,
+    };
+  }
+  // Native: keep all shadow properties
+  return shadowObj;
+};
+
 // Simple cross-platform shadow presets used across the app
-export const SHADOWS = {
+const SHADOWS_BASE = {
   small: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -165,6 +180,13 @@ export const SHADOWS = {
     // CSS box-shadow for web compatibility
     boxShadow: '0 8px 16px rgba(0, 0, 0, 0.12)',
   },
+};
+
+// Export platform-specific shadows
+export const SHADOWS = {
+  small: getPlatformShadow(SHADOWS_BASE.small),
+  medium: getPlatformShadow(SHADOWS_BASE.medium),
+  large: getPlatformShadow(SHADOWS_BASE.large),
 };
 
 export default {
