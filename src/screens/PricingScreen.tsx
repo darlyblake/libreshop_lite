@@ -10,7 +10,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { Button } from '../components';
@@ -62,12 +62,17 @@ const FAQ = [
 
 export const PricingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { user } = useAuthStore();
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [plans, setPlans] = useState<PricingPlan[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [hasUsedTrial, setHasUsedTrial] = useState(false);
   const [expiredMessage, setExpiredMessage] = useState<string>('');
+
+  // Check if we're here due to expired subscription
+  const isFromExpiredStore = route.params?.fromExpiredStore === true;
+  const expiredStoreName = route.params?.storeName as string | undefined;
 
   const loadPlans = async () => {
     try {
@@ -152,7 +157,33 @@ export const PricingScreen: React.FC = () => {
 
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          {hasUsedTrial && (
+          {isFromExpiredStore && (
+            <View style={[styles.expiredBanner, { 
+              backgroundColor: COLORS.danger + '20',
+              borderLeftColor: COLORS.danger,
+              borderLeftWidth: 4,
+              padding: SPACING.lg,
+              marginBottom: SPACING.lg,
+              borderRadius: RADIUS.lg,
+              marginHorizontal: SPACING.lg,
+            }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md }}>
+                <Ionicons name="warning" size={24} color={COLORS.danger} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: COLORS.danger, fontWeight: '600', marginBottom: SPACING.xs }}>
+                    Abonnement expiré
+                  </Text>
+                  <Text style={{ color: COLORS.textSoft, fontSize: FONT_SIZE.sm, marginBottom: SPACING.xs }}>
+                    {expiredStoreName ? `Votre boutique "${expiredStoreName}" n'est plus accessible.` : 'Votre abonnement a expiré.'}
+                  </Text>
+                  <Text style={{ color: COLORS.textSoft, fontSize: FONT_SIZE.sm }}>
+                    Renouvelez votre abonnement ci-dessous pour accéder au tableau de bord et à votre boutique.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+          {hasUsedTrial && !isFromExpiredStore && (
             <View style={[styles.expiredBanner, { 
               backgroundColor: COLORS.info + '20',
               borderLeftColor: COLORS.info,

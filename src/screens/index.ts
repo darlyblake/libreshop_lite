@@ -1,6 +1,7 @@
 export { LandingScreen } from './LandingScreen';
 export { SellerAuthScreen } from './SellerAuthScreen';
 export { SellerEmailConfirmScreen } from './SellerEmailConfirmScreen';
+export { SubscriptionExpiredScreen } from './SubscriptionExpiredScreen';
 export { ClientHomeScreen } from './ClientHomeScreen';
 export { ClientSearchScreen } from './ClientSearchScreen';
 export { ClientAllStoresScreen } from './ClientAllStoresScreen';

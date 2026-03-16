@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, Platform, StatusBar, ScrollView, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, useWindowDimensions, Platform, StatusBar, AppState, AppStateStatus } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -8,68 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
-import { 
-  LandingScreen, 
-  SellerAuthScreen, 
-  ClientHomeScreen, 
-  ClientSearchScreen,
-  ClientAllStoresScreen,
-  ClientAllProductsScreen,
-  SellerDashboardScreen,
-  StoreDetailScreen,
-  ProductDetailScreen,
-  CartScreen,
-  CheckoutScreen,
-  PaymentScreen,
-  ConfirmationScreen,
-  WishlistScreen,
-  SellerProductsScreen,
-  SellerOrdersScreen,
-  SellerStoreScreen,
-  SellerCaisseScreen,
-  SellerAddProductScreen,
-  SellerEditProductScreen,
-  SellerAddStoreScreen,
-  SellerOrderDetailScreen,
-  FeaturesScreen,
-  PricingScreen,
-  SellerCollectionScreen,
-  SellerClientsScreen,
-  SellerEditCollectionScreen,
-  SellerCollectionProductsScreen,
-  ClientDetailScreen,
-  ClientOrdersScreen,
-  ClientOrderDetailScreen,
-  ClientEditScreen,
-  ClientProfileScreen,
-  AdminDashboardScreen,
-  AdminSettingsScreen,
-  AdminUsersScreen,
-  AdminStoresScreen,
-  AdminCategoriesScreen,
-  AdminSubscriptionsScreen,
-  AdminPaymentsScreen,
-  AdminAdministratorsScreen,
-  AdminFeaturedScreen,
-  AdminReportsScreen,
-  AdminAnalyticsScreen,
-  AdminProfileScreen,
-  AdminActivityScreen,
-  AdminRevenueDetailsScreen,
-  AdminNotificationsScreen,
-  AdminSendNotificationScreen,
-  AdminAPKUpdatesScreen,
-  AdminCountriesScreen,
-  AdminCitiesScreen,
-  AdminBannersScreen,
-  AdminBannerFormScreen,
-  NotificationsScreen,
-  SellerProductActionsScreen,
-  SellerSaleScreen,
-  SellerRestockScreen,
-  SellerEmailConfirmScreen,
-} from '../screens';
-import { RootStackParamList, ClientTabParamList, SellerTabParamList } from './types';
+// Imports optimisés
+import * as Screens from '../screens';
+import { RootStackParamList, ClientTabParamList, SellerTabParamList, UserRole, NotificationPayload } from './types';
 import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
 import { useAuthStore } from '../store';
 import { sessionStorage } from '../lib/storage';
@@ -80,7 +21,13 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const ClientTab = createBottomTabNavigator<ClientTabParamList>();
 const SellerTab = createBottomTabNavigator<SellerTabParamList>();
 
-// Deep linking configuration - platform-specific for web
+// Types
+interface NotificationSound {
+  sound: Audio.Sound;
+  unload: () => Promise<void>;
+}
+
+// Configuration des liens profonds
 const linking = {
   prefixes: Platform.OS === 'web' 
     ? ['https://', 'http://'] 
@@ -95,35 +42,14 @@ const linking = {
   },
 };
 
-// Placeholder screen
-const PlaceholderScreen: React.FC = () => {
-  const { width } = useWindowDimensions();
-  
-  return (
-    <View style={[placeholderStyles.container, { paddingHorizontal: SPACING.xl * (width > 600 ? 2 : 1) }]}>
-      <Ionicons name="construct-outline" size={width > 600 ? 80 : 50} color={COLORS.textSoft} />
-      <Text style={[placeholderStyles.text, { fontSize: width > 600 ? FONT_SIZE.lg : FONT_SIZE.md }]}>
-        Bientôt disponible
-      </Text>
-    </View>
-  );
-};
+// Écran de chargement
+const LoadingScreen: React.FC = () => (
+  <View style={styles.loadingContainer}>
+    <Ionicons name="cart-outline" size={50} color={COLORS.accent} />
+  </View>
+);
 
-const placeholderStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.md,
-  },
-  text: {
-    color: COLORS.textSoft,
-    textAlign: 'center',
-  },
-});
-
-// Hook pour la gestion responsive (UNIQUEMENT pour le style, pas pour le contenu)
+// Hook personnalisé pour la gestion responsive
 const useResponsiveTabBar = () => {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -135,43 +61,132 @@ const useResponsiveTabBar = () => {
     bottomPadding: Platform.OS === 'ios' ? (isLandscape ? 10 : 25) : 15,
     iconSize: isSmallPhone ? 20 : 24,
     labelSize: isSmallPhone ? 9 : 11,
-    showLabels: width > 350, // Cacher les labels seulement sur très petits écrans
+    showLabels: width > 350,
   };
 };
 
-// Client Tab Navigator - TOUS LES ÉCRANS DISPONIBLES SUR MOBILE
-const ClientTabs: React.FC = () => {
+// Hook personnalisé pour les notifications sonores
+const useNotificationSound = () => {
+  const playNotificationSound = useCallback(async (): Promise<void> => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        {
+          uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
+        },
+        { shouldPlay: true }
+      );
+
+      // Nettoyage automatique après 5 secondes
+      const timeoutId = setTimeout(() => {
+        sound.unloadAsync().catch(() => {});
+      }, 5000);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status?.didJustFinish) {
+          clearTimeout(timeoutId);
+          sound.unloadAsync().catch(() => {});
+        }
+      });
+    } catch (soundError) {
+      // Fallback haptique
+      if (Platform.OS !== 'web') {
+        try {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (hapticError) {
+          console.warn('Failed to play notification feedback', { soundError, hapticError });
+        }
+      }
+    }
+  }, []);
+
+  return { playNotificationSound };
+};
+
+// Hook personnalisé pour la vérification d'abonnement
+const useSubscriptionCheck = () => {
+  const checkSubscription = useCallback(async (userId: string): Promise<boolean> => {
+    const TIMEOUT_MS = 15000;
+    
+    const performCheck = async (): Promise<boolean> => {
+      try {
+        if (!userId || !supabase) {
+          console.error('Missing userId or supabase client');
+          return true;
+        }
+
+        // Vérification du store
+        const { data: store, error: storeError } = await supabase
+          .from('stores')
+          .select('id, subscription_end, subscription_status, name')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (storeError) {
+          console.error('Store query error:', storeError);
+          return true;
+        }
+
+        if (!store) {
+          return false; // Nouveau vendeur
+        }
+
+        // Vérification du statut
+        if (store.subscription_status === 'expired' || store.subscription_status === 'cancelled') {
+          return true;
+        }
+
+        // Vérification de la date
+        if (store.subscription_end) {
+          const isExpired = new Date(store.subscription_end) < new Date();
+          if (isExpired) return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error('Subscription check error:', error);
+        return true;
+      }
+    };
+
+    return Promise.race([
+      performCheck(),
+      new Promise<boolean>((resolve) => 
+        setTimeout(() => resolve(true), TIMEOUT_MS)
+      ),
+    ]);
+  }, []);
+
+  return { checkSubscription };
+};
+
+// Navigation Client
+const ClientTabs: React.FC = React.memo(() => {
   const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels } = useResponsiveTabBar();
+
+  const getIconName = (routeName: string, focused: boolean): keyof typeof Ionicons.glyphMap => {
+    const icons: Record<string, [string, string]> = {
+      ClientHome: ['home', 'home-outline'],
+      ClientOrders: ['receipt', 'receipt-outline'],
+      ClientSearch: ['search', 'search-outline'],
+      Wishlist: ['heart', 'heart-outline'],
+      ClientProfile: ['person', 'person-outline'],
+      Cart: ['cart', 'cart-outline'],
+    };
+    
+    const [focusedIcon, outlineIcon] = icons[routeName] || ['home', 'home-outline'];
+    return focused ? focusedIcon as keyof typeof Ionicons.glyphMap : outlineIcon as keyof typeof Ionicons.glyphMap;
+  };
 
   return (
     <ClientTab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-          switch (route.name) {
-            case 'ClientHome':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'ClientOrders':
-              iconName = focused ? 'receipt' : 'receipt-outline';
-              break;
-            case 'ClientSearch':
-              iconName = focused ? 'search' : 'search-outline';
-              break;
-            case 'Wishlist':
-              iconName = focused ? 'heart' : 'heart-outline';
-              break;
-            case 'ClientProfile':
-              iconName = focused ? 'person' : 'person-outline';
-              break;
-            case 'Cart':
-              iconName = focused ? 'cart' : 'cart-outline';
-              break;
-            default:
-              iconName = 'home';
-          }
-          return <Ionicons name={iconName} size={iconSize} color={color} />;
-        },
+        tabBarIcon: ({ focused, color }) => (
+          <Ionicons 
+            name={getIconName(route.name, focused)} 
+            size={iconSize} 
+            color={color} 
+          />
+        ),
         tabBarActiveTintColor: COLORS.accent,
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
@@ -182,180 +197,15 @@ const ClientTabs: React.FC = () => {
           paddingBottom: bottomPadding,
           paddingTop: 5,
           elevation: 8,
-          ...(Platform.OS === 'web'
-            ? { boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)' }
-            : {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 8,
-              }),
-        },
-        tabBarLabelStyle: {
-          fontSize: labelSize,
-          fontWeight: '500',
-          marginTop: 2,
-          display: showLabels ? 'flex' : 'none', // Cacher les labels si pas assez de place
-        },
-        tabBarItemStyle: {
-          paddingVertical: 5,
-        },
-        headerShown: false,
-      })}
-    >
-      <ClientTab.Screen 
-        name="ClientHome" 
-        component={ClientHomeScreen} 
-        options={{ title: 'Accueil' }} 
-      />
-      <ClientTab.Screen 
-        name="ClientOrders" 
-        component={ClientOrdersScreen} 
-        options={{ title: 'Mes Commandes' }} 
-      />
-      <ClientTab.Screen 
-        name="ClientSearch" 
-        component={ClientSearchScreen} 
-        options={{ title: 'Recherche' }} 
-      />
-      <ClientTab.Screen 
-        name="Wishlist" 
-        component={WishlistScreen} 
-        options={{ title: 'Favoris' }} 
-      />
-      <ClientTab.Screen 
-        name="ClientProfile" 
-        component={ClientProfileScreen} 
-        options={{ title: 'Profil' }} 
-      />
-      <ClientTab.Screen 
-        name="Cart" 
-        component={CartScreen} 
-        options={{ title: 'Panier' }} 
-      />
-    </ClientTab.Navigator>
-  );
-};
-
-// Seller Tab Navigator - TOUS LES ÉCRANS DISPONIBLES SUR MOBILE
-const SellerTabs: React.FC = () => {
-  const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels, isLandscape } = useResponsiveTabBar();
-
-  // Sur mobile en paysage, on utilise un ScrollView horizontal pour la tab bar
-  if (isLandscape && Platform.OS === 'ios') {
-    return (
-      <SellerTab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color }) => {
-            let iconName: keyof typeof Ionicons.glyphMap;
-            switch (route.name) {
-              case 'SellerDashboard':
-                iconName = focused ? 'grid' : 'grid-outline';
-                break;
-              case 'SellerProducts':
-                iconName = focused ? 'cube' : 'cube-outline';
-                break;
-              case 'SellerOrders':
-                iconName = focused ? 'receipt' : 'receipt-outline';
-                break;
-              case 'SellerCollection':
-                iconName = focused ? 'folder' : 'folder-outline';
-                break;
-              case 'SellerClients':
-                iconName = focused ? 'people' : 'people-outline';
-                break;
-              case 'SellerStore':
-                iconName = focused ? 'storefront' : 'storefront-outline';
-                break;
-              default:
-                iconName = 'home';
-            }
-            return <Ionicons name={iconName} size={iconSize} color={color} />;
-          },
-          tabBarActiveTintColor: COLORS.accent,
-          tabBarInactiveTintColor: COLORS.textMuted,
-          tabBarStyle: {
-            backgroundColor: COLORS.bg,
-            borderTopColor: COLORS.border,
-            borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 5,
-            paddingTop: 5,
-          },
-          tabBarLabelStyle: {
-            fontSize: 9,
-            fontWeight: '500',
-            marginTop: 2,
-          },
-          tabBarItemStyle: {
-            paddingVertical: 5,
-            width: 'auto', // Permettre le défilement horizontal
-            minWidth: 70,
-          },
-          tabBarScrollEnabled: true, // Activer le défilement horizontal
-          headerShown: false,
-        })}
-      >
-        <SellerTab.Screen name="SellerDashboard" component={SellerDashboardScreen} options={{ title: 'Dashboard' }} />
-        <SellerTab.Screen name="SellerProducts" component={SellerProductsScreen} options={{ title: 'Produits' }} />
-        <SellerTab.Screen name="SellerOrders" component={SellerOrdersScreen} options={{ title: 'Commandes' }} />
-        <SellerTab.Screen name="SellerCollection" component={SellerCollectionScreen} options={{ title: 'Collections' }} />
-        <SellerTab.Screen name="SellerClients" component={SellerClientsScreen} options={{ title: 'Clients' }} />
-        <SellerTab.Screen name="SellerStore" component={SellerStoreScreen} options={{ title: 'Boutique' }} />
-      </SellerTab.Navigator>
-    );
-  }
-
-  // Version normale pour portrait et Android
-  return (
-    <SellerTab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-          switch (route.name) {
-            case 'SellerDashboard':
-              iconName = focused ? 'grid' : 'grid-outline';
-              break;
-            case 'SellerProducts':
-              iconName = focused ? 'cube' : 'cube-outline';
-              break;
-            case 'SellerOrders':
-              iconName = focused ? 'receipt' : 'receipt-outline';
-              break;
-            case 'SellerCollection':
-              iconName = focused ? 'folder' : 'folder-outline';
-              break;
-            case 'SellerClients':
-              iconName = focused ? 'people' : 'people-outline';
-              break;
-            case 'SellerStore':
-              iconName = focused ? 'storefront' : 'storefront-outline';
-              break;
-            default:
-              iconName = 'home';
-          }
-          return <Ionicons name={iconName} size={iconSize} color={color} />;
-        },
-        tabBarActiveTintColor: COLORS.accent,
-        tabBarInactiveTintColor: COLORS.textMuted,
-        tabBarStyle: {
-          backgroundColor: COLORS.bg,
-          borderTopColor: COLORS.border,
-          borderTopWidth: 1,
-          height: tabBarHeight,
-          paddingBottom: bottomPadding,
-          paddingTop: 5,
-          elevation: 8,
-          ...(Platform.OS === 'web'
-            ? { boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)' }
-            : {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 8,
-              }),
+          ...Platform.select({
+            web: { boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)' },
+            default: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+            },
+          }),
         },
         tabBarLabelStyle: {
           fontSize: labelSize,
@@ -363,44 +213,120 @@ const SellerTabs: React.FC = () => {
           marginTop: 2,
           display: showLabels ? 'flex' : 'none',
         },
-        tabBarItemStyle: {
-          paddingVertical: 5,
-        },
+        tabBarItemStyle: { paddingVertical: 5 },
         headerShown: false,
       })}
     >
-      <SellerTab.Screen name="SellerDashboard" component={SellerDashboardScreen} options={{ title: 'Dashboard' }} />
-      <SellerTab.Screen name="SellerProducts" component={SellerProductsScreen} options={{ title: 'Produits' }} />
-      <SellerTab.Screen name="SellerOrders" component={SellerOrdersScreen} options={{ title: 'Commandes' }} />
-      <SellerTab.Screen name="SellerCollection" component={SellerCollectionScreen} options={{ title: 'Collections' }} />
-      <SellerTab.Screen name="SellerClients" component={SellerClientsScreen} options={{ title: 'Clients' }} />
-      <SellerTab.Screen name="SellerStore" component={SellerStoreScreen} options={{ title: 'Boutique' }} />
+      <ClientTab.Screen name="ClientHome" component={Screens.ClientHomeScreen} options={{ title: 'Accueil' }} />
+      <ClientTab.Screen name="ClientOrders" component={Screens.ClientOrdersScreen} options={{ title: 'Commandes' }} />
+      <ClientTab.Screen name="ClientSearch" component={Screens.ClientSearchScreen} options={{ title: 'Recherche' }} />
+      <ClientTab.Screen name="Wishlist" component={Screens.WishlistScreen} options={{ title: 'Favoris' }} />
+      <ClientTab.Screen name="ClientProfile" component={Screens.ClientProfileScreen} options={{ title: 'Profil' }} />
+      <ClientTab.Screen name="Cart" component={Screens.CartScreen} options={{ title: 'Panier' }} />
+    </ClientTab.Navigator>
+  );
+});
+
+// Navigation Vendeur
+const SellerTabs: React.FC = React.memo(() => {
+  const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels, isLandscape } = useResponsiveTabBar();
+
+  const getIconName = (routeName: string, focused: boolean): keyof typeof Ionicons.glyphMap => {
+    const icons: Record<string, [string, string]> = {
+      SellerDashboard: ['grid', 'grid-outline'],
+      SellerProducts: ['cube', 'cube-outline'],
+      SellerOrders: ['receipt', 'receipt-outline'],
+      SellerCollection: ['folder', 'folder-outline'],
+      SellerClients: ['people', 'people-outline'],
+      SellerStore: ['storefront', 'storefront-outline'],
+    };
+    
+    const [focusedIcon, outlineIcon] = icons[routeName] || ['home', 'home-outline'];
+    return focused ? focusedIcon as keyof typeof Ionicons.glyphMap : outlineIcon as keyof typeof Ionicons.glyphMap;
+  };
+
+  const isLandscapeIOS = isLandscape && Platform.OS === 'ios';
+
+  return (
+    <SellerTab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color }) => (
+          <Ionicons 
+            name={getIconName(route.name, focused)} 
+            size={iconSize} 
+            color={color} 
+          />
+        ),
+        tabBarActiveTintColor: COLORS.accent,
+        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarStyle: {
+          backgroundColor: COLORS.bg,
+          borderTopColor: COLORS.border,
+          borderTopWidth: 1,
+          height: isLandscapeIOS ? 60 : tabBarHeight,
+          paddingBottom: isLandscapeIOS ? 5 : bottomPadding,
+          paddingTop: 5,
+          ...(!isLandscapeIOS && {
+            elevation: 8,
+            ...Platform.select({
+              web: { boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)' },
+              default: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: -2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+              },
+            }),
+          }),
+        },
+        tabBarLabelStyle: {
+          fontSize: isLandscapeIOS ? 9 : labelSize,
+          fontWeight: '500',
+          marginTop: 2,
+          display: isLandscapeIOS ? 'flex' : (showLabels ? 'flex' : 'none'),
+        },
+        tabBarItemStyle: isLandscapeIOS ? {
+          paddingVertical: 5,
+          width: 'auto',
+          minWidth: 70,
+        } : { paddingVertical: 5 },
+        tabBarScrollEnabled: isLandscapeIOS,
+        headerShown: false,
+      })}
+    >
+      <SellerTab.Screen name="SellerDashboard" component={Screens.SellerDashboardScreen} options={{ title: 'Dashboard' }} />
+      <SellerTab.Screen name="SellerProducts" component={Screens.SellerProductsScreen} options={{ title: 'Produits' }} />
+      <SellerTab.Screen name="SellerOrders" component={Screens.SellerOrdersScreen} options={{ title: 'Commandes' }} />
+      <SellerTab.Screen name="SellerCollection" component={Screens.SellerCollectionScreen} options={{ title: 'Collections' }} />
+      <SellerTab.Screen name="SellerClients" component={Screens.SellerClientsScreen} options={{ title: 'Clients' }} />
+      <SellerTab.Screen name="SellerStore" component={Screens.SellerStoreScreen} options={{ title: 'Boutique' }} />
     </SellerTab.Navigator>
   );
-};
+});
 
-// Main App Navigator
+// Navigateur principal
 export const AppNavigator: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
-  const [initialRoute, setInitialRoute] = useState<'Landing' | 'SellerAuth' | 'ClientTabs' | 'SellerTabs' | 'AdminDashboard'>('Landing');
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Landing');
+  const appState = useRef(AppState.currentState);
 
-  // `useAuthStore` may briefly be undefined if the store module isn't yet
-  // fully evaluated (rare but seen during HMR malformed state). call it
-  // defensively and fall back to no-op functions.
-  const auth = useAuthStore ? useAuthStore() : {
+  // Auth store avec fallback sécurisé
+  const authStore = useAuthStore();
+  const { user, setUser, setSession, isLoading, setLoading } = authStore || {
     user: null,
     setUser: () => {},
     setSession: () => {},
     isLoading: false,
     setLoading: () => {},
   };
-  const { user, setUser, setSession, isLoading, setLoading } = auth;
 
-  const addNotification = useNotificationStore((s) => s.addNotification);
+  const addNotification = useNotificationStore((state) => state.addNotification);
+  const { playNotificationSound } = useNotificationSound();
+  const { checkSubscription } = useSubscriptionCheck();
 
+  // Gestion des notifications en temps réel
   useEffect(() => {
-    if (!supabase) return;
-    if (!user?.id) return;
+    if (!supabase?.channel || !user?.id) return;
 
     const channel = supabase
       .channel(`notifications:${user.id}`)
@@ -412,166 +338,142 @@ export const AppNavigator: React.FC = () => {
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        async (payload: any) => {
+        async (payload: NotificationPayload) => {
           try {
-            if (payload?.new) {
+            if (payload.new) {
               addNotification(payload.new);
+              await playNotificationSound();
             }
-          } catch (e) {
-            console.warn('failed to add notification to store', e);
-          }
-
-          // Play sound (best effort) + haptics fallback
-          try {
-            // Essayer de jouer le son par URL
-            const { sound } = await Audio.Sound.createAsync(
-              {
-                uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
-              },
-              { shouldPlay: true }
-            );
-            sound.setOnPlaybackStatusUpdate((status) => {
-              const s: any = status;
-              if (s?.didJustFinish) {
-                sound.unloadAsync().catch(() => {});
-              }
-            });
-          } catch (soundError) {
-            // Fallback: jouer une vibration/haptic
-            try {
-              if (Platform.OS !== 'web') {
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              }
-            } catch (hapticError) {
-              console.warn('Failed to play sound or haptic', { soundError, hapticError });
-            }
+          } catch (error) {
+            console.warn('Notification handling error:', error);
           }
         }
       )
       .subscribe();
 
     return () => {
-      try {
-        supabase.removeChannel(channel);
-      } catch {}
+      supabase.removeChannel(channel).catch(() => {});
     };
-  }, [user?.id, addNotification]);
+  }, [user?.id, addNotification, playNotificationSound]);
 
+  // Gestion de l'état de l'application
   useEffect(() => {
-    const restore = async () => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // Rafraîchir les données si nécessaire
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  // Restauration de session
+  useEffect(() => {
+    const restoreSession = async () => {
       setLoading(true);
       try {
-        // Source of truth: Supabase session (JWT). sessionStorage is only a local hint.
-        if (supabase) {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            const res = await authService.getCurrentUser();
-            if (res) {
-              setUser(res as any);
-              setSession(data.session);
-              const role = (res as any)?.user_metadata?.role || (res as any)?.app_metadata?.role;
-              if (role) {
-                await sessionStorage.saveUserRole(String(role));
-              }
-              switch (role) {
-                case 'seller':
-                  try {
-                    await storeService.getByUser((res as any).id);
-                    setInitialRoute('SellerTabs');
-                  } catch {
-                    setInitialRoute('SellerAddStore');
-                  }
-                  break;
-                case 'admin':
-                  setInitialRoute('AdminDashboard');
-                  break;
-                case 'client':
-                  setInitialRoute('ClientTabs');
-                  break;
-                default:
-                  // Guest/anonymous session: treat as client.
-                  setInitialRoute('ClientTabs');
-              }
-              return;
+        if (!supabase?.auth) {
+          setInitialRoute('Landing');
+          return;
+        }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const userData = await authService.getCurrentUser();
+          if (userData) {
+            setUser(userData);
+            setSession(session);
+            
+            const role = (userData as any)?.user_metadata?.role || (userData as any)?.app_metadata?.role;
+            
+            if (role) {
+              await sessionStorage.saveUserRole(String(role));
             }
+
+            // Déterminer la route initiale
+            const route = await getInitialRouteForRole(role as UserRole, userData.id);
+            setInitialRoute(route);
+            return;
           }
         }
 
-        // Fallback: legacy local session (may exist without Supabase JWT)
-        // IMPORTANT: on ne doit pas router vers des écrans protégés (Admin/Seller/Client)
-        // si aucune session Supabase n'existe. Sinon on arrive en rôle anon et RLS bloque.
-        const localSession = await sessionStorage.getSession();
-        const localRole = await sessionStorage.getUserRole();
-        if (localSession && localRole) {
-          setSession(localSession);
-        }
-
-        // Sans session Supabase: permettre la navigation (explorer) sans compte.
-        // La commande/paiement doivent exiger une connexion explicite.
+        // Pas de session active
         setInitialRoute('ClientTabs');
-      } catch (err) {
-        console.warn('failed to restore session', err);
+      } catch (error) {
+        console.error('Session restoration error:', error);
         setInitialRoute('Landing');
       } finally {
         setLoading(false);
         setIsReady(true);
       }
     };
-    restore();
+
+    restoreSession();
   }, []);
 
+  // Écoute des changements d'authentification
   useEffect(() => {
-    if (!supabase) return;
-    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        if (!session) {
-          setUser(null as any);
-          setSession(null as any);
-          setInitialRoute('Landing');
-          return;
+    if (!supabase?.auth) return;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        try {
+          if (!session?.user) {
+            setUser(null);
+            setSession(null);
+            setInitialRoute('Landing');
+            return;
+          }
+
+          setUser(session.user);
+          setSession(session);
+
+          const role = (session.user as any)?.user_metadata?.role || 
+                      (session.user as any)?.app_metadata?.role;
+
+          const route = await getInitialRouteForRole(role as UserRole, session.user.id);
+          setInitialRoute(route);
+        } catch (error) {
+          console.error('Auth state change error:', error);
         }
-
-        const role =
-          (session.user as any)?.user_metadata?.role ||
-          (session.user as any)?.app_metadata?.role;
-
-        setUser(session.user as any);
-        setSession(session as any);
-
-        switch (role) {
-          case 'seller':
-            setInitialRoute('SellerTabs');
-            break;
-          case 'admin':
-            setInitialRoute('AdminDashboard');
-            break;
-          case 'client':
-          default:
-            // Guest/anonymous session is treated as client.
-            setInitialRoute('ClientTabs');
-        }
-      } catch (e) {
-        console.warn('onAuthStateChange handler failed', e);
       }
-    });
+    );
 
-    return () => {
-      data.subscription.unsubscribe();
-    };
-  }, [setSession, setUser]);
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Helper pour déterminer la route initiale
+  const getInitialRouteForRole = async (role: UserRole, userId: string): Promise<keyof RootStackParamList> => {
+    switch (role) {
+      case 'seller': {
+        try {
+          const isExpired = await checkSubscription(userId);
+          if (isExpired) return 'SubscriptionExpired';
+          
+          const hasStore = await storeService.getByUser(userId).catch(() => null);
+          return hasStore ? 'SellerTabs' : 'SellerAddStore';
+        } catch {
+          return 'SubscriptionExpired';
+        }
+      }
+      case 'admin':
+        return 'AdminDashboard';
+      case 'client':
+      default:
+        return 'ClientTabs';
+    }
+  };
 
   if (!isReady || isLoading) {
-    return (
-      <View style={loadingStyles.container}>
-        <Ionicons name="cart-outline" size={50} color={COLORS.accent} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   return (
     <NavigationContainer linking={linking}>
-      <StatusBar 
-        barStyle="dark-content" 
+      <StatusBar
+        barStyle="dark-content"
         backgroundColor={COLORS.bg}
         translucent={Platform.OS === 'android'}
       />
@@ -583,76 +485,77 @@ export const AppNavigator: React.FC = () => {
           animation: 'slide_from_right',
         }}
       >
-        <Stack.Screen name="Landing" component={LandingScreen} />
-        <Stack.Screen name="SellerAuth" component={SellerAuthScreen} />
-        <Stack.Screen name="SellerEmailConfirm" component={SellerEmailConfirmScreen} />
-        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
+        {/* Routes publiques */}
+        <Stack.Screen name="Landing" component={Screens.LandingScreen} />
+        <Stack.Screen name="SellerAuth" component={Screens.SellerAuthScreen} />
+        <Stack.Screen name="SellerEmailConfirm" component={Screens.SellerEmailConfirmScreen} />
+        <Stack.Screen name="SubscriptionExpired" component={Screens.SubscriptionExpiredScreen} />
+        
+        {/* Routes principales */}
         <Stack.Screen name="ClientTabs" component={ClientTabs} />
         <Stack.Screen name="SellerTabs" component={SellerTabs} />
+        <Stack.Screen name="AdminDashboard" component={Screens.AdminDashboardScreen} />
         
-        {/* seller/client detail/edit routes */}
-        <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
-        <Stack.Screen name="ClientOrders" component={ClientOrdersScreen} />
-        <Stack.Screen name="ClientOrderDetail" component={ClientOrderDetailScreen} />
-        <Stack.Screen name="ClientEdit" component={ClientEditScreen} />
-
-        {/* Admin Stack Screens */}
-        <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
-        <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
-        <Stack.Screen name="AdminStores" component={AdminStoresScreen} />
-        <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />
-        <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionsScreen} />
-        <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
-        <Stack.Screen name="AdminAdministrators" component={AdminAdministratorsScreen} />
-        <Stack.Screen name="AdminFeatured" component={AdminFeaturedScreen} />
-        <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
-        <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
-        <Stack.Screen name="AdminProfile" component={AdminProfileScreen} />
-        <Stack.Screen name="AdminActivity" component={AdminActivityScreen} />
-        <Stack.Screen name="AdminRevenueDetails" component={AdminRevenueDetailsScreen} />
-        <Stack.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
-        <Stack.Screen name="AdminSendNotification" component={AdminSendNotificationScreen} />
-        <Stack.Screen name="AdminAPKUpdates" component={AdminAPKUpdatesScreen} />
-        <Stack.Screen name="AdminCountries" component={AdminCountriesScreen} />
-        <Stack.Screen name="AdminCities" component={AdminCitiesScreen} />
-        <Stack.Screen name="AdminBanners" component={AdminBannersScreen} />
-        <Stack.Screen name="AdminBannerForm" component={AdminBannerFormScreen} />
-
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        {/* Routes clients */}
+        <Stack.Screen name="ClientDetail" component={Screens.ClientDetailScreen} />
+        <Stack.Screen name="ClientOrders" component={Screens.ClientOrdersScreen} />
+        <Stack.Screen name="ClientOrderDetail" component={Screens.ClientOrderDetailScreen} />
+        <Stack.Screen name="ClientEdit" component={Screens.ClientEditScreen} />
+        <Stack.Screen name="ClientAllStores" component={Screens.ClientAllStoresScreen} />
+        <Stack.Screen name="ClientAllProducts" component={Screens.ClientAllProductsScreen} />
+        <Stack.Screen name="StoreDetail" component={Screens.StoreDetailScreen} />
+        <Stack.Screen name="ProductDetail" component={Screens.ProductDetailScreen} />
+        <Stack.Screen name="Cart" component={Screens.CartScreen} />
+        <Stack.Screen name="Checkout" component={Screens.CheckoutScreen} />
+        <Stack.Screen name="Payment" component={Screens.PaymentScreen} />
+        <Stack.Screen name="Confirmation" component={Screens.ConfirmationScreen} />
+        <Stack.Screen name="Wishlist" component={Screens.WishlistScreen} />
+        <Stack.Screen name="Notifications" component={Screens.NotificationsScreen} />
         
-        {/* Client Stack Screens */}
-        <Stack.Screen name="ClientAllStores" component={ClientAllStoresScreen} />
-        <Stack.Screen name="ClientAllProducts" component={ClientAllProductsScreen} />
-        <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
-        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-        <Stack.Screen name="Cart" component={CartScreen} />
-        <Stack.Screen name="Checkout" component={CheckoutScreen} />
-        <Stack.Screen name="Payment" component={PaymentScreen} />
-        <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
-        <Stack.Screen name="Wishlist" component={WishlistScreen} />
+        {/* Routes vendeurs */}
+        <Stack.Screen name="SellerAddStore" component={Screens.SellerAddStoreScreen} />
+        <Stack.Screen name="SellerCaisse" component={Screens.SellerCaisseScreen} />
+        <Stack.Screen name="SellerAddProduct" component={Screens.SellerAddProductScreen} />
+        <Stack.Screen name="SellerEditProduct" component={Screens.SellerEditProductScreen} />
+        <Stack.Screen name="SellerEditCollection" component={Screens.SellerEditCollectionScreen} />
+        <Stack.Screen name="SellerCollectionProducts" component={Screens.SellerCollectionProductsScreen} />
+        <Stack.Screen name="SellerOrderDetail" component={Screens.SellerOrderDetailScreen} />
+        <Stack.Screen name="SellerProductActions" component={Screens.SellerProductActionsScreen} />
+        <Stack.Screen name="SellerSale" component={Screens.SellerSaleScreen} />
+        <Stack.Screen name="SellerRestock" component={Screens.SellerRestockScreen} />
         
-        {/* Seller Stack Screens */}
-        <Stack.Screen name="SellerCaisse" component={SellerCaisseScreen} />
-        <Stack.Screen name="SellerAddProduct" component={SellerAddProductScreen} />
-        <Stack.Screen name="SellerEditProduct" component={SellerEditProductScreen} />
-        <Stack.Screen name="SellerAddStore" component={SellerAddStoreScreen} />
-        <Stack.Screen name="SellerEditCollection" component={SellerEditCollectionScreen} />
-        <Stack.Screen name="SellerCollectionProducts" component={SellerCollectionProductsScreen} />
-        <Stack.Screen name="SellerOrderDetail" component={SellerOrderDetailScreen} />
-        <Stack.Screen name="SellerProductActions" component={SellerProductActionsScreen} />
-        <Stack.Screen name="SellerSale" component={SellerSaleScreen} />
-        <Stack.Screen name="SellerRestock" component={SellerRestockScreen} />
+        {/* Routes admin */}
+        <Stack.Screen name="AdminSettings" component={Screens.AdminSettingsScreen} />
+        <Stack.Screen name="AdminUsers" component={Screens.AdminUsersScreen} />
+        <Stack.Screen name="AdminStores" component={Screens.AdminStoresScreen} />
+        <Stack.Screen name="AdminCategories" component={Screens.AdminCategoriesScreen} />
+        <Stack.Screen name="AdminSubscriptions" component={Screens.AdminSubscriptionsScreen} />
+        <Stack.Screen name="AdminPayments" component={Screens.AdminPaymentsScreen} />
+        <Stack.Screen name="AdminAdministrators" component={Screens.AdminAdministratorsScreen} />
+        <Stack.Screen name="AdminFeatured" component={Screens.AdminFeaturedScreen} />
+        <Stack.Screen name="AdminReports" component={Screens.AdminReportsScreen} />
+        <Stack.Screen name="AdminAnalytics" component={Screens.AdminAnalyticsScreen} />
+        <Stack.Screen name="AdminProfile" component={Screens.AdminProfileScreen} />
+        <Stack.Screen name="AdminActivity" component={Screens.AdminActivityScreen} />
+        <Stack.Screen name="AdminRevenueDetails" component={Screens.AdminRevenueDetailsScreen} />
+        <Stack.Screen name="AdminNotifications" component={Screens.AdminNotificationsScreen} />
+        <Stack.Screen name="AdminSendNotification" component={Screens.AdminSendNotificationScreen} />
+        <Stack.Screen name="AdminAPKUpdates" component={Screens.AdminAPKUpdatesScreen} />
+        <Stack.Screen name="AdminCountries" component={Screens.AdminCountriesScreen} />
+        <Stack.Screen name="AdminCities" component={Screens.AdminCitiesScreen} />
+        <Stack.Screen name="AdminBanners" component={Screens.AdminBannersScreen} />
+        <Stack.Screen name="AdminBannerForm" component={Screens.AdminBannerFormScreen} />
         
-        {/* Info Screens */}
-        <Stack.Screen name="Features" component={FeaturesScreen} />
-        <Stack.Screen name="Pricing" component={PricingScreen} />
+        {/* Routes info */}
+        <Stack.Screen name="Features" component={Screens.FeaturesScreen} />
+        <Stack.Screen name="Pricing" component={Screens.PricingScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
 
-const loadingStyles = StyleSheet.create({
-  container: {
+const styles = StyleSheet.create({
+  loadingContainer: {
     flex: 1,
     backgroundColor: COLORS.bg,
     alignItems: 'center',

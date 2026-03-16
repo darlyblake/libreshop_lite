@@ -634,6 +634,13 @@ export const storeService = {
       .neq('subscription_status', 'expired');
     if (error) throw error;
   },
+
+  // Check if store has active subscription (not expired and visible)
+  isSubscriptionActive(store: Store | null): boolean {
+    if (!store) return false;
+    // Subscription is active if: visible=true AND subscription_status != 'expired'
+    return store.visible !== false && store.subscription_status !== 'expired';
+  },
 };
 
 export const storeStatsService = {

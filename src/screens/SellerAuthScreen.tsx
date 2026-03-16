@@ -177,7 +177,20 @@ export const SellerAuthScreen: React.FC = () => {
               if (!store) {
                 throw new Error('STORE_NOT_FOUND');
               }
-              navigation.replace('SellerTabs');
+              
+              // Check if subscription is active (not expired and visible)
+              if (!storeService.isSubscriptionActive(store)) {
+                // Subscription expired or not visible → redirect to pricing
+                console.warn('Seller subscription expired or not active', { 
+                  storeId: store.id, 
+                  subscriptionStatus: store.subscription_status,
+                  visible: store.visible 
+                });
+                // Pass store info to PricingScreen so it shows renewal message
+                navigation.replace('Pricing', { fromExpiredStore: true, storeName: store.name });
+              } else {
+                navigation.replace('SellerTabs');
+              }
             } catch {
               navigation.replace('SellerAddStore');
             }

@@ -133,6 +133,27 @@ export const SellerStoreScreen: React.FC = () => {
 
       console.log('loadStore: Store loaded', { id: s.id, name: s.name, slug: s.slug });
 
+      // Check subscription status - if expired or not visible, user should not access dashboard
+      if (!storeService.isSubscriptionActive(s)) {
+        console.warn('Store subscription inactive - redirecting to Pricing', {
+          storeId: s.id,
+          subscriptionStatus: s.subscription_status,
+          visible: s.visible,
+        });
+        Alert.alert(
+          'Abonnement expiré',
+          `Votre abonnement pour "${s.name}" a expiré. Vous devez le renouveler pour accéder au tableau de bord.`,
+          [
+            {
+              text: 'Renouveler',
+              onPress: () => navigation.replace('Pricing', { fromExpiredStore: true, storeName: s.name }),
+            },
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+
       const [products, orders] = await Promise.all([
         productService.getByStoreAll(s.id).catch(() => []),
         orderService.getByStore(s.id).catch(() => []),
