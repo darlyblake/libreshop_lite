@@ -67,6 +67,7 @@ import {
   SellerProductActionsScreen,
   SellerSaleScreen,
   SellerRestockScreen,
+  SellerEmailConfirmScreen,
 } from '../screens';
 import { RootStackParamList, ClientTabParamList, SellerTabParamList } from './types';
 import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
@@ -84,6 +85,7 @@ const linking = {
   config: {
     screens: {
       Landing: '',
+      SellerEmailConfirm: 'auth/confirm',
       StoreDetail: 'store/:slug',
       ProductDetail: 'product/:productId',
     },
@@ -580,6 +582,7 @@ export const AppNavigator: React.FC = () => {
       >
         <Stack.Screen name="Landing" component={LandingScreen} />
         <Stack.Screen name="SellerAuth" component={SellerAuthScreen} />
+        <Stack.Screen name="SellerEmailConfirm" component={SellerEmailConfirmScreen} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
         <Stack.Screen name="ClientTabs" component={ClientTabs} />
         <Stack.Screen name="SellerTabs" component={SellerTabs} />

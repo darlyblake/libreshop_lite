@@ -4,6 +4,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 export type RootStackParamList = {
   Landing: undefined;
   SellerAuth: undefined;
+  SellerEmailConfirm: { token?: string; type?: string; email?: string };
   AdminDashboard: undefined;
   AdminSettings: undefined;
   AdminUsers: undefined;

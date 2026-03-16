@@ -230,11 +230,20 @@ export interface HomeBanner {
 export const authService = {
   async signUp(email: string, password: string, fullName: string, role: UserRole = 'client') {
     const client = useSupabase();
+    
+    // Determine redirect URL for email confirmation
+    // Use web base URL if available (production), otherwise fallback
+    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    const emailRedirectTo = webBaseUrl 
+      ? `${webBaseUrl}/auth/confirm`
+      : 'http://localhost:3000';  // Fallback for development
+    
     const { data, error } = await client.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName, role },
+        emailRedirectTo,  // Tell Supabase where to redirect after confirmation
       },
     });
     if (error) throw error;
@@ -296,9 +305,20 @@ export const authService = {
 
   async resendSignupConfirmation(email: string) {
     const client = useSupabase();
+    
+    // Determine redirect URL for email confirmation
+    // Use web base URL if available (production), otherwise fallback
+    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    const emailRedirectTo = webBaseUrl 
+      ? `${webBaseUrl}/auth/confirm`
+      : 'http://localhost:3000';  // Fallback for development
+    
     const { data, error } = await client.auth.resend({
       type: 'signup',
       email,
+      options: {
+        emailRedirectTo,  // Tell Supabase where to redirect after confirmation
+      },
     });
     if (error) throw error;
     return data;
