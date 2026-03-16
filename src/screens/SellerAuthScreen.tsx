@@ -24,6 +24,7 @@ export const SellerAuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [emailSentTo, setEmailSentTo] = useState(''); // État pour afficher l'écran de confirmation
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -199,13 +200,9 @@ export const SellerAuthScreen: React.FC = () => {
         // If email confirmation is enabled in Supabase, signUp returns no session
         // until the user clicks the confirmation link.
         if (!res.session) {
-          Alert.alert(
-            '📧 Vérifiez votre email',
-            `Étapes à suivre:\n\n1️⃣  Ouvrez votre email (${formData.email})\n\n2️⃣  Cliquez sur le lien de confirmation\n\n3️⃣  Revenez ici et appuyez sur "Se connecter"\n\n4️⃣  Entrez vos identifiants\n\n5️⃣  Créez votre boutique\n\nℹ️  Si vous ne volez pas l'email, vérifiez les spams!`,
-            [
-              { text: 'OK, j\'ai compris', style: 'default' }
-            ]
-          );
+          setEmailSentTo(normalizedEmail);
+          setLoading(false);
+          isSubmittingRef.current = false;
           return;
         }
 
@@ -399,10 +396,135 @@ export const SellerAuthScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
+      {/* Écran de confirmation d'email après inscription */}
+      {emailSentTo ? (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => {
+                setEmailSentTo('');
+                setFormData({ email: '', password: '', confirmPassword: '', fullName: '' });
+              }}
+            >
+              <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.emailConfirmContainer}>
+            {/* Checkmark icon */}
+            <View style={styles.checkmarkCircle}>
+              <Text style={styles.checkmark}>✓</Text>
+            </View>
+
+            {/* Title */}
+            <Text style={styles.emailConfirmTitle}>Email envoyé avec succès!</Text>
+
+            {/* Email display */}
+            <View style={styles.emailBox}>
+              <Text style={styles.emailLabel}>Email de confirmation envoyé à:</Text>
+              <Text style={styles.emailAddress}>{emailSentTo}</Text>
+            </View>
+
+            {/* Steps */}
+            <View style={styles.stepsContainer}>
+              <Text style={styles.stepsTitle}>📋 Étapes à suivre:</Text>
+              
+              <View style={styles.step}>
+                <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Ouvrez votre email</Text>
+                  <Text style={styles.stepDescription}>Consultez votre boîte mail pour le message de confirmation</Text>
+                </View>
+              </View>
+
+              <View style={styles.step}>
+                <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Cliquez sur le lien</Text>
+                  <Text style={styles.stepDescription}>Appuyez sur "Confirmer mon adresse email" dans le message</Text>
+                </View>
+              </View>
+
+              <View style={styles.step}>
+                <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Revenez ici</Text>
+                  <Text style={styles.stepDescription}>Après la confirmation, vous serez redirigé automatiquement</Text>
+                </View>
+              </View>
+
+              <View style={styles.step}>
+                <View style={styles.stepNumber}><Text style={styles.stepNumberText}>4</Text></View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Connectez-vous</Text>
+                  <Text style={styles.stepDescription}>Entrez vos identifiants pour accéder à votre compte</Text>
+                </View>
+              </View>
+
+              <View style={styles.step}>
+                <View style={styles.stepNumber}><Text style={styles.stepNumberText}>5</Text></View>
+                <View style={styles.stepContent}>
+                  <Text style={styles.stepTitle}>Créez votre boutique</Text>
+                  <Text style={styles.stepDescription}>Complétez les infos de votre boutique et lancez-vous!</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Warning */}
+            <View style={styles.warningBox}>
+              <Ionicons name="alert-circle" size={20} color={COLORS.warning} />
+              <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                <Text style={styles.warningText}>Si vous ne recevez pas l'email, vérifiez votre dossier <Text style={{fontWeight: '700'}}>Spams</Text>.</Text>
+              </View>
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              <Button
+                title="J'ai confirmé mon email"
+                onPress={() => {
+                  setEmailSentTo('');
+                  setIsLogin(true);
+                  setFormData({ ...formData, password: '', confirmPassword: '', fullName: '' });
+                }}
+                loading={false}
+              />
+              
+              <TouchableOpacity
+                style={styles.resendButton}
+                onPress={async () => {
+                  try {
+                    setLoading(true);
+                    await authService.resendSignupConfirmation(emailSentTo);
+                    Alert.alert(
+                      '✅ Email renvoyé',
+                      'Un nouvel email de confirmation vient d\'être envoyé. Vérifiez votre boîte mail.'
+                    );
+                  } catch (e: any) {
+                    Alert.alert(
+                      '❌ Erreur',
+                      `Impossible de renvoyer l'email: ${e?.message || 'Erreur inconnue'}`
+                    );
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+              >
+                <Text style={styles.resendButtonText}>
+                  {loading ? 'Envoi en cours...' : 'Renvoyer l\'email'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      ) : (
+        /* Écran normal d'authentification */
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
@@ -552,6 +674,7 @@ export const SellerAuthScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      )}
     </View>
   );
 };
@@ -649,5 +772,126 @@ const styles = StyleSheet.create({
   socialButton: {
     flexDirection: 'row-reverse',
   },
+  // Email confirmation screen styles
+  emailConfirmContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.xxxl,
+  },
+  checkmarkCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.success + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.xxxl,
+  },
+  checkmark: {
+    fontSize: 60,
+    fontWeight: '800',
+    color: COLORS.success,
+  },
+  emailConfirmTitle: {
+    fontSize: FONT_SIZE.xxl,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.lg,
+    textAlign: 'center',
+  },
+  emailBox: {
+    backgroundColor: COLORS.accent + '15',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.xxxl,
+    width: '100%',
+    alignItems: 'center',
+  },
+  emailLabel: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  emailAddress: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  stepsContainer: {
+    width: '100%',
+    marginBottom: SPACING.xxxl,
+  },
+  stepsTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.lg,
+  },
+  step: {
+    flexDirection: 'row',
+    marginBottom: SPACING.lg,
+    alignItems: 'flex-start',
+  },
+  stepNumber: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+    marginTop: 2,
+  },
+  stepNumberText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: FONT_SIZE.md,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  stepDescription: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    lineHeight: 18,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.warning + '20',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.xxxl,
+    alignItems: 'flex-start',
+  },
+  warningText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.warning,
+    lineHeight: 18,
+  },
+  buttonContainer: {
+    gap: SPACING.md,
+  },
+  resendButton: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    opacity: 0.7,
+  },
+  resendButtonText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
 });
+
 
