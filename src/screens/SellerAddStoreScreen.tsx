@@ -599,8 +599,14 @@ export const SellerAddStoreScreen: React.FC = () => {
 
   const renderStep1 = () => (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {/* Guide Header */}
+      <View style={styles.guideHeader}>
+        <Text style={styles.guideTitle}>Étape 1 sur 3: Configuration de base</Text>
+        <Text style={styles.guideSubtitle}>Remplissez les informations de votre boutique</Text>
+      </View>
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Logo et bannière</Text>
+        <Text style={styles.sectionTitle}>📸 Logo et bannière</Text>
         <View style={styles.imagesContainer}>
           <TouchableOpacity
             style={styles.logoPicker}
@@ -792,8 +798,14 @@ export const SellerAddStoreScreen: React.FC = () => {
 
   const renderStep2 = () => (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {/* Guide Header */}
+      <View style={styles.guideHeader}>
+        <Text style={styles.guideTitle}>Étape 2 sur 3: Coordonnées et localisation</Text>
+        <Text style={styles.guideSubtitle}>Vos clients pourront vous contacter avec ces informations</Text>
+      </View>
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Coordonnées</Text>
+        <Text style={styles.sectionTitle}>📧 Coordonnées</Text>
 
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
@@ -994,8 +1006,14 @@ export const SellerAddStoreScreen: React.FC = () => {
 
   const renderStep3 = () => (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      {/* Guide Header */}
+      <View style={styles.guideHeader}>
+        <Text style={styles.guideTitle}>Étape 3 sur 3: Présence en ligne</Text>
+        <Text style={styles.guideSubtitle}>Reliez vos réseaux sociaux (optionnel)</Text>
+      </View>
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Réseaux sociaux (optionnel)</Text>
+        <Text style={styles.sectionTitle}>🌐 Réseaux sociaux (optionnel)</Text>
         <View style={styles.socialInput}>
           <View style={[styles.socialIcon, { backgroundColor: '#1877f2' }]}>
             <Ionicons name="logo-facebook" size={20} color="white" />
@@ -1712,6 +1730,26 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSoft,
     lineHeight: 20,
+  },
+  guideHeader: {
+    backgroundColor: COLORS.accent + '15',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    marginBottom: SPACING.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.accent,
+  },
+  guideTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.accent,
+    marginBottom: SPACING.xs,
+  },
+  guideSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    lineHeight: 18,
   },
 });
 

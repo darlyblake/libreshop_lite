@@ -200,8 +200,11 @@ export const SellerAuthScreen: React.FC = () => {
         // until the user clicks the confirmation link.
         if (!res.session) {
           Alert.alert(
-            'Confirmez votre email',
-            "Votre compte vendeur a été créé, mais il doit être confirmé par email avant de continuer. Ouvrez votre boîte mail et cliquez sur le lien de confirmation, puis reconnectez-vous."
+            '📧 Vérifiez votre email',
+            `Étapes à suivre:\n\n1️⃣  Ouvrez votre email (${formData.email})\n\n2️⃣  Cliquez sur le lien de confirmation\n\n3️⃣  Revenez ici et appuyez sur "Se connecter"\n\n4️⃣  Entrez vos identifiants\n\n5️⃣  Créez votre boutique\n\nℹ️  Si vous ne volez pas l'email, vérifiez les spams!`,
+            [
+              { text: 'OK, j\'ai compris', style: 'default' }
+            ]
           );
           return;
         }
