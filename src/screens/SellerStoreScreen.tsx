@@ -97,7 +97,18 @@ export const SellerStoreScreen: React.FC = () => {
 
   const storePublicUrl = useMemo(() => {
     if (!store?.slug) return null;
-    return `http://localhost:8082/store/${store.slug}`;
+    
+    // Use environment variable for web base URL (production URL)
+    // This prevents hardcoding localhost in production
+    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    
+    if (webBaseUrl) {
+      // Production: use the configured web domain
+      return `${webBaseUrl}/store/${store.slug}`;
+    } else {
+      // Fallback: use deep link for development/testing
+      return Linking.createURL(`/store/${store.slug}`);
+    }
   }, [store?.slug]);
 
   const loadStore = useCallback(async () => {

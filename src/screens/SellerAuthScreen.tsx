@@ -125,7 +125,10 @@ export const SellerAuthScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     // Prevent double submission
-    if (loading || isSubmittingRef.current) return;
+    if (loading || isSubmittingRef.current) {
+      console.warn('handleSubmit called while already loading/submitting');
+      return;
+    }
 
     // Rate limiting check
     if (isRateLimited) {
@@ -147,9 +150,11 @@ export const SellerAuthScreen: React.FC = () => {
     }
 
     // Mark as submitting immediately to prevent race conditions
+    // IMPORTANT: Set ref BEFORE state update to block subsequent clicks immediately
     isSubmittingRef.current = true;
     setLoading(true);
     setError('');
+    console.log('handleSubmit: marking as submitting, loading=', loading, 'ref=', isSubmittingRef.current);
 
     try {
       if (isLogin) {

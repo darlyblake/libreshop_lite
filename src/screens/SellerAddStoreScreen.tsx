@@ -454,6 +454,12 @@ export const SellerAddStoreScreen: React.FC = () => {
       return;
     }
 
+    // Prevent double submission
+    if (isSubmitting) {
+      console.warn('handleSubmit: Store creation already in progress');
+      return;
+    }
+
     if (!validateStep(1) || !validateStep(2)) {
       return;
     }
@@ -520,20 +526,34 @@ export const SellerAddStoreScreen: React.FC = () => {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
+      // Clear draft immediately after success
+      await storeCreationDraftStorage.clear(user.id);
+
+      // Auto-redirect instead of showing alert
+      // This prevents users from staying on the page and creating duplicate stores
+      console.log('Store created successfully, redirecting to SellerTabs');
+      
+      // Use setTimeout to ensure state updates are processed
+      setTimeout(() => {
+        navigation.replace('SellerTabs' as never);
+      }, 500);
+      
+      // Show success message to the user
       Alert.alert(
         'Succès 🎉',
         storeUrl
-          ? `Votre boutique a été créée et un essai de 7 jours a démarré.\n\nURL: ${storeUrl}`
-          : 'Votre boutique a été créée et un essai de 7 jours a démarré. Profitez-en !',
+          ? `Boutique créée!\nURL: ${storeUrl}\n\nUn essai de 7 jours a été activé.`
+          : 'Votre boutique a été créée avec un essai de 7 jours!',
         [
           {
-            text: 'Voir mon tableau de bord',
-            onPress: () => navigation.replace('SellerTabs' as never),
+            text: 'Continuer',
+            onPress: () => {
+              // Redirect happens automatically above
+              // This just closes the alert
+            },
           },
         ]
       );
-
-      await storeCreationDraftStorage.clear(user.id);
     } catch (error) {
       console.error('Error creating store:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
