@@ -655,6 +655,19 @@ export const SellerAddStoreScreen: React.FC = () => {
           )}
         </View>
 
+        {/* Store URL Preview */}
+        {formData.slug && (
+          <View style={styles.urlPreviewBox}>
+            <Ionicons name="globe-outline" size={18} color={COLORS.accent} />
+            <View style={{ flex: 1, marginLeft: SPACING.md }}>
+              <Text style={styles.urlPreviewLabel}>Votre boutique sera accessible à:</Text>
+              <Text style={styles.urlPreviewLink}>
+                libreshop.vercel.app/store/{formData.slug}
+              </Text>
+            </View>
+          </View>
+        )}
+
         <View style={styles.inputContainer}>
           <Ionicons name="link-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
           <TextInput
@@ -1381,6 +1394,27 @@ const styles = StyleSheet.create({
   charCount: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
+  },
+  urlPreviewBox: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.accent + '15',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.accent,
+  },
+  urlPreviewLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
+  },
+  urlPreviewLink: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.accent,
+    lineHeight: 20,
   },
   textAreaContainer: {
     alignItems: 'flex-start',
