@@ -17,17 +17,29 @@ export const SellerEmailConfirmScreen: React.FC = () => {
   const [message, setMessage] = useState('Vérification de votre email...');
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
 
   useEffect(() => {
+    // Log for debugging
+    console.log('SellerEmailConfirmScreen mounted');
+    console.log('Route params:', route.params);
+    
+    // Extract from URL query params as fallback for web
+    const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    const tokenFromUrl = urlParams.get('token_hash') || urlParams.get('token');
+    const typeFromUrl = urlParams.get('type');
+    
+    setDebugInfo(`Token: ${tokenFromUrl}, Type: ${typeFromUrl}`);
+    
     const confirmEmail = async () => {
       try {
-        // Extract token and type from URL parameters
-        const token = route.params?.token || '';
-        const type = route.params?.type || 'signup';
+        // Extract token and type from URL parameters - check both route params and URL params
+        const token = route.params?.token || route.params?.token_hash || tokenFromUrl || '';
+        const type = (route.params?.type || typeFromUrl || 'signup') as 'signup' | 'recovery';
         const email = route.params?.email || '';
 
         if (!token) {
-          setMessage('❌ Jeton invalide. Veuillez utiliser le lien envoyé par email.');
+          setMessage('❌ Jeton invalide. Veuillez utiliser le lien envoyé par email.\n\n' + debugInfo);
           setLoading(false);
           return;
         }
@@ -88,6 +100,7 @@ export const SellerEmailConfirmScreen: React.FC = () => {
           <>
             <ActivityIndicator size="large" color={COLORS.accent} />
             <Text style={styles.message}>{message}</Text>
+            {debugInfo && <Text style={[styles.message, {fontSize: FONT_SIZE.sm, color: COLORS.textMuted}]}>{debugInfo}</Text>}
           </>
         ) : success ? (
           <>
