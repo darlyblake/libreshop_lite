@@ -80,8 +80,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const ClientTab = createBottomTabNavigator<ClientTabParamList>();
 const SellerTab = createBottomTabNavigator<SellerTabParamList>();
 
+// Deep linking configuration - platform-specific for web
 const linking = {
-  prefixes: [Linking.createURL('/')],
+  prefixes: Platform.OS === 'web' 
+    ? ['https://', 'http://'] 
+    : [Linking.createURL('/')],
   config: {
     screens: {
       Landing: '',
