@@ -557,7 +557,8 @@ export const ClientHomeScreen: React.FC = () => {
                   keyExtractor={(item) => item.id}
                   numColumns={numProductColumns}
                   key={numProductColumns}
-                  scrollEnabled={false}
+                  scrollEnabled={true}
+                  nestedScrollEnabled={true}
                   columnWrapperStyle={styles.productsGrid}
                   contentContainerStyle={styles.productsList}
                 />
