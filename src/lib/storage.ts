@@ -15,7 +15,7 @@ export const sessionStorage = {
       const session = { userId, email, timestamp: Date.now() };
       await AsyncStorage.setItem(STORAGE_KEYS.USER_SESSION, JSON.stringify(session));
     } catch (error) {
-      console.error('Error saving session:', error);
+      errorHandler.handleDatabaseError(error, 'Error saving session:');
     }
   },
 
@@ -27,7 +27,7 @@ export const sessionStorage = {
       }
       return null;
     } catch (error) {
-      console.error('Error getting session:', error);
+      errorHandler.handleDatabaseError(error, 'Error getting session:');
       return null;
     }
   },
@@ -37,7 +37,7 @@ export const sessionStorage = {
       await AsyncStorage.removeItem(STORAGE_KEYS.USER_SESSION);
       await AsyncStorage.removeItem(STORAGE_KEYS.USER_ROLE);
     } catch (error) {
-      console.error('Error clearing session:', error);
+      errorHandler.handleDatabaseError(error, 'Error clearing session:');
     }
   },
 
@@ -45,7 +45,7 @@ export const sessionStorage = {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.USER_ROLE, role);
     } catch (error) {
-      console.error('Error saving user role:', error);
+      errorHandler.handleDatabaseError(error, 'Error saving user role:');
     }
   },
 
@@ -53,7 +53,7 @@ export const sessionStorage = {
     try {
       return await AsyncStorage.getItem(STORAGE_KEYS.USER_ROLE);
     } catch (error) {
-      console.error('Error getting user role:', error);
+      errorHandler.handleDatabaseError(error, 'Error getting user role:');
       return null;
     }
   },
@@ -65,7 +65,7 @@ export const onboardingStorage = {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, JSON.stringify(completed));
     } catch (error) {
-      console.error('Error saving onboarding status:', error);
+      errorHandler.handleDatabaseError(error, 'Error saving onboarding status:');
     }
   },
 
@@ -74,7 +74,7 @@ export const onboardingStorage = {
       const value = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
       return value ? JSON.parse(value) : false;
     } catch (error) {
-      console.error('Error getting onboarding status:', error);
+      errorHandler.handleDatabaseError(error, 'Error getting onboarding status:');
       return false;
     }
   },
@@ -100,7 +100,7 @@ export const storeCreationDraftStorage = {
       const value: StoreCreationDraft = { ...draft, updatedAt: Date.now() };
       await AsyncStorage.setItem(this.key(userId), JSON.stringify(value));
     } catch (error) {
-      console.error('Error saving store creation draft:', error);
+      errorHandler.handleDatabaseError(error, 'Error saving store creation draft:');
     }
   },
 
@@ -109,7 +109,7 @@ export const storeCreationDraftStorage = {
       const raw = await AsyncStorage.getItem(this.key(userId));
       return raw ? (JSON.parse(raw) as StoreCreationDraft) : null;
     } catch (error) {
-      console.error('Error getting store creation draft:', error);
+      errorHandler.handleDatabaseError(error, 'Error getting store creation draft:');
       return null;
     }
   },
@@ -118,7 +118,7 @@ export const storeCreationDraftStorage = {
     try {
       await AsyncStorage.removeItem(this.key(userId));
     } catch (error) {
-      console.error('Error clearing store creation draft:', error);
+      errorHandler.handleDatabaseError(error, 'Error clearing store creation draft:');
     }
   },
 };
@@ -129,7 +129,7 @@ export const themeStorage = {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.THEME_MODE, mode);
     } catch (error) {
-      console.error('Error saving theme mode:', error);
+      errorHandler.handleDatabaseError(error, 'Error saving theme mode:');
     }
   },
 
@@ -138,7 +138,7 @@ export const themeStorage = {
       const mode = await AsyncStorage.getItem(STORAGE_KEYS.THEME_MODE);
       return (mode as 'light' | 'dark' | 'system') || 'dark';
     } catch (error) {
-      console.error('Error getting theme mode:', error);
+      errorHandler.handleDatabaseError(error, 'Error getting theme mode:');
       return 'dark';
     }
   },
@@ -150,7 +150,7 @@ export const genericStorage = {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      console.error(`Error saving ${key}:`, error);
+      errorHandler.handle(`Error saving ${key}:`, error, 'UnknownContext');
     }
   },
 
@@ -159,7 +159,7 @@ export const genericStorage = {
       const value = await AsyncStorage.getItem(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
-      console.error(`Error getting ${key}:`, error);
+      errorHandler.handle(`Error getting ${key}:`, error, 'UnknownContext');
       return null;
     }
   },
@@ -168,7 +168,7 @@ export const genericStorage = {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      console.error(`Error removing ${key}:`, error);
+      errorHandler.handle(`Error removing ${key}:`, error, 'UnknownContext');
     }
   },
 
@@ -176,7 +176,7 @@ export const genericStorage = {
     try {
       await AsyncStorage.clear();
     } catch (error) {
-      console.error('Error clearing storage:', error);
+      errorHandler.handleDatabaseError(error, 'Error clearing storage:');
     }
   },
 };

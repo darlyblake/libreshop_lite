@@ -7,7 +7,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface HeaderProps {
   title?: string;
@@ -24,9 +24,20 @@ export const Header: React.FC<HeaderProps> = ({
   rightAction,
   transparent = false,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <View style={[styles.container, transparent && styles.transparent]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar 
+        barStyle={theme.name === 'light' ? 'dark-content' : 'light-content'} 
+        backgroundColor={transparent ? 'transparent' : COLORS.bg} 
+      />
       <View style={styles.content}>
         {showBack ? (
           <TouchableOpacity style={styles.backButton} onPress={onBack}>
@@ -52,9 +63,21 @@ export const Header: React.FC<HeaderProps> = ({
 
 // Custom Header for Landing Page
 export const LandingHeader: React.FC = () => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+
   return (
     <View style={styles.landingContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar 
+        barStyle={theme.name === 'light' ? 'dark-content' : 'light-content'} 
+        backgroundColor="transparent" 
+        translucent 
+      />
       <View style={styles.landingContent}>
         <Text style={styles.logo}>LibreShop</Text>
         <View style={styles.landingNav}>
@@ -73,7 +96,12 @@ export const LandingHeader: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     backgroundColor: COLORS.bg,
     paddingTop: SPACING.xl,
@@ -141,4 +169,5 @@ const styles = StyleSheet.create({
     color: COLORS.textSoft,
   },
 });
+};
 

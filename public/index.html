@@ -2,21 +2,63 @@
 <html lang="fr" translate="no">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5, user-scalable=yes" />
     <meta name="theme-color" content="#8b5cf6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LibreShop" />
-    <meta
-      name="description"
-      content="LibreShop - Marketplace décentralisée africaine"
-    />
-    <meta name="google" content="notranslate" />
+    <meta name="application-name" content="LibreShop" />
+    <meta name="msapplication-TileColor" content="#8b5cf6" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+    
+    <!-- Icons -->
     <link rel="icon" href="/favicon.ico" type="image/x-icon" />
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
-    <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
-    <title>LibreShop</title>
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+    
+    <!-- SEO and Social -->
+    <meta
+      name="description"
+      content="LibreShop - Marketplace décentralisée africaine. Achetez local, soutenez les commerçants de votre région."
+    />
+    <meta name="keywords" content="marketplace, afrique, commerce, local, shopping, libreshop" />
+    <meta name="author" content="LibreShop" />
+    <meta name="robots" content="index, follow" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="LibreShop - Marketplace Africaine" />
+    <meta property="og:description" content="Plateforme de commerce électronique décentralisée pour l'Afrique" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:url" content="/" />
+    <meta property="og:locale" content="fr_FR" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LibreShop - Marketplace Africaine" />
+    <meta name="twitter:description" content="Plateforme de commerce électronique décentralisée pour l'Afrique" />
+    <meta name="twitter:image" content="/icon-512.png" />
+    
+    <!-- Security -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    
+    <!-- Performance -->
+    <link rel="preconnect" href="https://gdjqzhbfibrsdiwvfhvp.supabase.co" />
+    <link rel="dns-prefetch" href="https://gdjqzhbfibrsdiwvfhvp.supabase.co" />
+    
+    <!-- Prevent Google Translate -->
+    <meta name="google" content="notranslate" />
+    
+    <title>LibreShop - Marketplace Africaine</title>
+    
     <style>
       /* Block Google Translate elements and overlays */
       .goog-te-banner-frame,
@@ -30,24 +72,111 @@
         visibility: hidden !important;
       }
       
+      /* Prevent body scroll issues */
       html {
         top: 0 !important;
+        height: 100%;
       }
       
       body {
         top: 0 !important;
         position: static !important;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
       }
       
       #root {
         position: relative;
         z-index: 1;
+        height: 100%;
+      }
+      
+      /* Loading animation */
+      .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: #0a0c12;
+        color: #8b5cf6;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      }
+      
+      .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(139, 92, 246, 0.2);
+        border-top: 4px solid #8b5cf6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      /* PWA install prompt styles */
+      .pwa-install-banner {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        z-index: 1000;
+        display: none;
       }
     </style>
   </head>
   <body translate="no" data-notranslate>
-    <noscript>Vous avez besoin d'activer JavaScript pour exécuter cette application.</noscript>
+    <noscript>
+      <div class="loading-container">
+        <div>
+          <div class="loading-spinner"></div>
+          <h2>JavaScript requis</h2>
+          <p>Vous avez besoin d'activer JavaScript pour utiliser LibreShop.</p>
+        </div>
+      </div>
+    </noscript>
+    
+    <!-- Loading fallback -->
+    <div id="loading-fallback" class="loading-container" style="display: none;">
+      <div>
+        <div class="loading-spinner"></div>
+        <h2>Chargement...</h2>
+        <p>Préparation de LibreShop...</p>
+      </div>
+    </div>
+    
+    <!-- Main app container -->
     <div id="root"></div>
+    
+    <!-- PWA Install Banner (fallback) -->
+    <div id="pwa-install-banner" class="pwa-install-banner">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="width: 48px; height: 48px; background: #8b5cf6; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+          <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; margin-bottom: 4px;">Installer LibreShop</div>
+          <div style="font-size: 14px; color: #666;">Accédez rapidement à l'application</div>
+        </div>
+        <button id="pwa-install-btn" style="background: #8b5cf6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+          Installer
+        </button>
+        <button id="pwa-dismiss-btn" style="background: transparent; color: #666; border: none; padding: 8px; cursor: pointer;">
+          ✕
+        </button>
+      </div>
+    </div>
+    
     <script>
       // Prevent external libraries from interfering with React DOM
       (function() {
@@ -75,7 +204,6 @@
           if (root) {
             root.setAttribute('translate', 'no');
             root.setAttribute('data-notranslate', 'true');
-            // Mark root as protected
             root.__protected = true;
           }
         }, { once: true });
@@ -85,17 +213,96 @@
           e.preventDefault();
           return false;
         });
+        
+        // Show loading fallback if React doesn't load within 5 seconds
+        setTimeout(() => {
+          const root = document.getElementById('root');
+          if (root && root.children.length === 0) {
+            document.getElementById('loading-fallback').style.display = 'flex';
+          }
+        }, 5000);
       })();
       
-      // Register Service Worker for PWA
+      // Enhanced Service Worker Registration for PWA
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/service-worker.js')
           .then(registration => {
-            console.log('Service Worker registered:', registration);
+            console.log('Service Worker registered successfully:', registration.scope);
+            
+            // Check for updates
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // New version available
+                    if (confirm('Une nouvelle version de LibreShop est disponible. Voulez-vous mettre à jour ?')) {
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                      window.location.reload();
+                    }
+                  }
+                });
+              }
+            });
           })
           .catch(err => {
             console.log('Service Worker registration failed:', err);
           });
+        
+        // Handle service worker messages
+        navigator.serviceWorker.addEventListener('message', event => {
+          if (event.data && event.data.type === 'CACHE_UPDATED') {
+            console.log('Cache updated:', event.data.url);
+          }
+        });
+      }
+      
+      // PWA Install Banner Fallback
+      let deferredPrompt = null;
+      const installBanner = document.getElementById('pwa-install-banner');
+      const installBtn = document.getElementById('pwa-install-btn');
+      const dismissBtn = document.getElementById('pwa-dismiss-btn');
+      
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        
+        // Don't show banner if React PWA component is available
+        if (!window.ReactNativeWebView) {
+          installBanner.style.display = 'block';
+        }
+      });
+      
+      installBtn?.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          
+          if (outcome === 'accepted') {
+            console.log('PWA installation accepted');
+          }
+          
+          deferredPrompt = null;
+          installBanner.style.display = 'none';
+        }
+      });
+      
+      dismissBtn?.addEventListener('click', () => {
+        installBanner.style.display = 'none';
+        localStorage.setItem('pwa-install-dismissed', 'true');
+      });
+      
+      // Check if already installed
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        console.log('App is running in standalone mode');
+      }
+      
+      // Performance monitoring
+      if ('performance' in window) {
+        window.addEventListener('load', () => {
+          const perfData = performance.getEntriesByType('navigation')[0];
+          console.log('Page load time:', perfData.loadEventEnd - perfData.loadEventStart, 'ms');
+        });
       }
     </script>
   </body>

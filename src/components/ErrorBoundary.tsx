@@ -1,10 +1,12 @@
 import React, { ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, SPACING } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { reloadPage } from '../utils/platformUtils';
 
 interface Props {
   children: ReactNode;
+  styles?: any;
 }
 
 interface State {
@@ -12,7 +14,7 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<Props, State> {
+class ErrorBoundaryInner extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -23,11 +25,12 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    errorHandler.handle(error, 'ErrorBoundary', ErrorCategory.SYSTEM, ErrorSeverity.CRITICAL, { errorInfo });
   }
 
   render() {
     if (this.state.hasError) {
+      const { styles } = this.props;
       return (
         <View style={styles.container}>
           <View style={styles.content}>
@@ -53,7 +56,19 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 }
 
-const styles = StyleSheet.create({
+export const ErrorBoundary: React.FC<{children: ReactNode}> = ({ children }) => {
+  const themeContext = useTheme();
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+  
+  return <ErrorBoundaryInner styles={styles}>{children}</ErrorBoundaryInner>;
+};
+
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -68,7 +83,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: COLORS.text,
     marginBottom: SPACING.md,
     textAlign: 'center',
   },
@@ -94,8 +109,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
   },
 });
+};

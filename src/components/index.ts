@@ -20,4 +20,5 @@ export { DatePickerInput } from './DatePickerInput';
 export { SkeletonLoader, ProductCardSkeleton, OrderCardSkeleton, ClientCardSkeleton, StatCardSkeleton } from './SkeletonLoader';
 export { LikeButton } from './LikeButton';
 export { FollowButton } from './FollowButton';
+export { PWAInstallButton } from './PWAInstallButton';
 

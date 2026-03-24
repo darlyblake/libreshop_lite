@@ -14,11 +14,13 @@ import * as Linking from 'expo-linking';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Button, Input } from '../components';
 import { authService, storeService, supabase } from '../lib/supabase';
 import { userService } from '../lib/userService';
 import { sessionStorage } from '../lib/storage';
 import { useAuthStore } from '../store';
+import { settingsService } from '../lib/settingsService';
 
 export const SellerAuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -33,6 +35,20 @@ export const SellerAuthScreen: React.FC = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [requireEmailConfirmation, setRequireEmailConfirmation] = useState(true);
+
+  // Charger les paramètres au montage
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const val = await settingsService.getSetting('requireEmailConfirmation', true);
+        setRequireEmailConfirmation(val);
+      } catch (e) {
+        console.error('Error loading requireEmailConfirmation setting:', e);
+      }
+    };
+    loadSettings();
+  }, []);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -50,10 +66,11 @@ export const SellerAuthScreen: React.FC = () => {
     }
     
     if (!isLogin) {
-      if (formData.password !== formData.confirmPassword) {
+      // Comparer les mots de passe avec trim() pour éviter les erreurs d'espaces invisibles
+      if (formData.password.trim() !== formData.confirmPassword.trim()) {
         newErrors.confirmPassword = 'Les mots de passe ne correspondent pas';
       }
-      if (!formData.fullName) {
+      if (!formData.fullName.trim()) {
         newErrors.fullName = 'Nom complet requis';
       }
     }
@@ -87,7 +104,7 @@ export const SellerAuthScreen: React.FC = () => {
           }
         }
       } catch (e) {
-        console.warn('Error checking rate limit countdown:', e);
+        errorHandler.handle(e, 'Error checking rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       }
     };
     checkStoredCountdown();
@@ -111,13 +128,13 @@ export const SellerAuthScreen: React.FC = () => {
       // Store countdown timestamp for persistence
       const timestamp = Date.now() + (countdown - 1) * 1000;
       AsyncStorage.setItem('@libreshop_auth_rate_limit', timestamp.toString()).catch(e =>
-        console.warn('Error storing rate limit countdown:', e)
+        errorHandler.handle(e, 'Error storing rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW)
       );
     } else if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
       AsyncStorage.removeItem('@libreshop_auth_rate_limit').catch(e =>
-        console.warn('Error removing rate limit countdown:', e)
+        errorHandler.handle(e, 'Error removing rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW)
       );
     }
   }, [countdown]);
@@ -127,7 +144,7 @@ export const SellerAuthScreen: React.FC = () => {
   const handleSubmit = async () => {
     // Prevent double submission
     if (loading || isSubmittingRef.current) {
-      console.warn('handleSubmit called while already loading/submitting');
+      errorHandler.handle('handleSubmit called while already loading/submitting', 'UnknownContext', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       return;
     }
 
@@ -155,7 +172,7 @@ export const SellerAuthScreen: React.FC = () => {
     isSubmittingRef.current = true;
     setLoading(true);
     setError('');
-    console.log('handleSubmit: marking as submitting, loading=', loading, 'ref=', isSubmittingRef.current);
+    // handleSubmit: marking as submitting, loading=: loading, 'ref=', isSubmittingRef.current;
 
     try {
       if (isLogin) {
@@ -177,17 +194,15 @@ export const SellerAuthScreen: React.FC = () => {
               if (!store) {
                 throw new Error('STORE_NOT_FOUND');
               }
-              
               // Check if subscription is active (not expired and visible)
               if (!storeService.isSubscriptionActive(store)) {
-                // Subscription expired or not visible → redirect to pricing
-                console.warn('Seller subscription expired or not active', { 
+                // Subscription expired or not visible → redirect to SubscriptionExpired
+                errorHandler.handle(new Error('Seller subscription expired or not active'), 'SellerAuth', ErrorCategory.AUTHENTICATION, ErrorSeverity.HIGH, { 
                   storeId: store.id, 
                   subscriptionStatus: store.subscription_status,
                   visible: store.visible 
                 });
-                // Pass store info to PricingScreen so it shows renewal message
-                navigation.replace('Pricing', { fromExpiredStore: true, storeName: store.name });
+                navigation.replace('SubscriptionExpired', { storeName: store.name });
               } else {
                 navigation.replace('SellerTabs');
               }
@@ -213,7 +228,25 @@ export const SellerAuthScreen: React.FC = () => {
         // If email confirmation is enabled in Supabase, signUp returns no session
         // until the user clicks the confirmation link.
         if (!res.session) {
-          setEmailSentTo(normalizedEmail);
+          if (requireEmailConfirmation) {
+            setEmailSentTo(normalizedEmail);
+          } else {
+            // Si la confirmation n'est pas "exigée" dans l'UI (même si Supabase l'attend)
+            // On demande à l'utilisateur de se connecter directement
+            Alert.alert(
+              'Compte créé',
+              'Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.',
+              [
+                {
+                  text: 'Se connecter',
+                  onPress: () => {
+                    setIsLogin(true);
+                    setFormData({ ...formData, password: '', confirmPassword: '', fullName: '' });
+                  }
+                }
+              ]
+            );
+          }
           setLoading(false);
           isSubmittingRef.current = false;
           return;
@@ -227,13 +260,13 @@ export const SellerAuthScreen: React.FC = () => {
           try {
             await userService.getOrCreateProfile(user.id);
           } catch (e) {
-            console.warn('could not create seller profile row', e);
+            errorHandler.handle(e, 'could not create seller profile row', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           }
           navigation.replace('SellerAddStore');
         }
       }
     } catch (err: any) {
-      console.error('auth error', err);
+      errorHandler.handleDatabaseError(err, 'auth error');
       
       // Messages d'erreur plus clairs selon le type d'erreur
       if (err.message?.includes('Failed to fetch') || err.message?.includes('ERR_NAME_NOT_RESOLVED')) {
@@ -341,7 +374,7 @@ export const SellerAuthScreen: React.FC = () => {
       // The OAuth flow will redirect through the browser
       Alert.alert('Redirection', 'Vous allez être redirigé vers Google pour vous connecter.');
     } catch (err: any) {
-      console.error('Google auth error:', err);
+      errorHandler.handleDatabaseError(err, 'Google auth error:');
       Alert.alert(
         'Erreur Google',
         err?.message || 'Impossible de se connecter avec Google. Essayer avec email/mot de passe.'
@@ -363,7 +396,7 @@ export const SellerAuthScreen: React.FC = () => {
           const { data: { user }, error } = await supabase!.auth.getUser();
           
           if (error) {
-            console.warn('Error getting user after OAuth:', error);
+            errorHandler.handle(error, 'Error getting user after OAuth:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
             return;
           }
 
@@ -385,7 +418,13 @@ export const SellerAuthScreen: React.FC = () => {
                 if (!store) {
                   throw new Error('STORE_NOT_FOUND');
                 }
-                navigation.replace('SellerTabs');
+                
+                // Check if subscription is active
+                if (!storeService.isSubscriptionActive(store)) {
+                  navigation.replace('SubscriptionExpired', { storeName: store.name });
+                } else {
+                  navigation.replace('SellerTabs');
+                }
               } catch {
                 navigation.replace('SellerAddStore');
               }
@@ -396,7 +435,7 @@ export const SellerAuthScreen: React.FC = () => {
             }
           }
         } catch (err) {
-          console.error('Error handling OAuth redirect:', err);
+          errorHandler.handleDatabaseError(err, 'Error handling OAuth redirect:');
           setError('❌ Erreur lors du traitement de la connexion Google');
         }
       }
@@ -488,7 +527,7 @@ export const SellerAuthScreen: React.FC = () => {
             <View style={styles.warningBox}>
               <Ionicons name="alert-circle" size={20} color={COLORS.warning} />
               <View style={{ flex: 1, marginLeft: SPACING.md }}>
-                <Text style={styles.warningText}>Si vous ne recevez pas l'email, vérifiez votre dossier <Text style={{fontWeight: '700'}}>Spams</Text>.</Text>
+                <Text style={styles.warningText}>Si vous ne recevez pas l'email, vérifiez votre dossier <Text style={{fontWeight: '700'}}>Spams.</Text></Text>
               </View>
             </View>
 

@@ -12,6 +12,7 @@ export { ProductDetailScreen } from './ProductDetailScreen';
 export { CartScreen } from './CartScreen';
 export { CheckoutScreen } from './CheckoutScreen';
 export { PaymentScreen } from './PaymentScreen';
+export { BulkPaymentScreen } from './BulkPaymentScreen';
 export { ConfirmationScreen } from './ConfirmationScreen';
 export { ClientOrdersScreen } from './ClientOrdersScreen';
 export { ClientOrderDetailScreen } from './ClientOrderDetailScreen';
@@ -57,5 +58,6 @@ export { AdminCountriesScreen } from './AdminCountriesScreen';
 export { AdminCitiesScreen } from './AdminCitiesScreen';
 export { AdminBannersScreen } from './AdminBannersScreen';
 export { AdminBannerFormScreen } from './AdminBannerFormScreen';
+export { SellerChangePlanScreen } from './SellerChangePlanScreen';
 
 export { NotificationsScreen } from './NotificationsScreen';

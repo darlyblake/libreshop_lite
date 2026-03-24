@@ -22,7 +22,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { StoreCard, ProductCard } from '../components';
+import { PWAInstallButton } from '../components/PWAInstallButton';
+import { SortTabs } from '../components/SortTabs';
 import { useResponsive } from '../utils/responsive';
 import {
   storeService,
@@ -37,6 +40,7 @@ import {
 import { useCartStore } from '../store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MAX_CONTENT_WIDTH = 1200;
 
 const normalizeHexColor = (value?: string | null) => {
   if (!value) return undefined;
@@ -47,8 +51,9 @@ const normalizeHexColor = (value?: string | null) => {
 
 export const ClientHomeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  /* sort tabs now use shared component SortTabs */
   const insets = useSafeAreaInsets();
-  const { width, isMobile, isTablet, isDesktop } = useResponsive();
+  const { width, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
   const { items } = useCartStore();
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
@@ -56,12 +61,14 @@ export const ClientHomeScreen: React.FC = () => {
   const [selectedCollection, setSelectedCollection] = useState<string>('Toutes');
   
   // Calculer le nombre de colonnes et la largeur des cartes dynamiquement
-  const numProductColumns = isDesktop ? 4 : isTablet ? 3 : 2;
+  const numProductColumns = isLargeDesktop ? 6 : isDesktop ? 4 : isTablet ? 3 : 2;
+  const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
+
   const responsiveProductCardWidth = useMemo(() => {
     const totalHorizontalPadding = SPACING.xl * 2; // paddingHorizontal des deux côtés
     const totalGap = SPACING.md * (numProductColumns - 1); // gap entre colonnes
-    return (width - totalHorizontalPadding - totalGap) / numProductColumns;
-  }, [width, numProductColumns]);
+    return (contentWidth - totalHorizontalPadding - totalGap) / numProductColumns;
+  }, [contentWidth, numProductColumns]);
   
   // Real data states
   const [stores, setStores] = useState<Store[]>([]);
@@ -72,6 +79,10 @@ export const ClientHomeScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [carouselBanners, setCarouselBanners] = useState<HomeBanner[]>([]);
   const [promoBanners, setPromoBanners] = useState<HomeBanner[]>([]);
+  const [productPage, setProductPage] = useState(0);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
+  const [productSort, setProductSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('popular');
 
   // Auto-play carousel
   useEffect(() => {
@@ -86,7 +97,22 @@ export const ClientHomeScreen: React.FC = () => {
   // Extract unique categories from collections
   const extractCategoriesFromCollections = (collectionsList: Collection[]) => {
     const uniqueCategories = Array.from(new Set(collectionsList.map(collection => collection.category).filter(Boolean)));
-    return ['Toutes', ...uniqueCategories];
+    if (uniqueCategories.length > 0) return ['Toutes', ...uniqueCategories];
+
+    // Fallback: derive categories from loaded products and sort by popularity (count)
+    const prodCats = products
+      .map(p => (p as any)?.category)
+      .filter(Boolean)
+      .reduce((acc: Record<string, number>, c: string) => {
+        acc[c] = (acc[c] || 0) + 1;
+        return acc;
+      }, {});
+
+    const sorted = Object.entries(prodCats)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat]) => cat);
+
+    return ['Toutes', ...sorted];
   };
 
   // Filter stores by selected category
@@ -114,9 +140,11 @@ export const ClientHomeScreen: React.FC = () => {
         setCollections(allCollections);
       }
       
-      // Load featured products (active, limit 8)
-      const productsData = await productService.search('');
-      setProducts((productsData || []).slice(0, 8));
+      // Load featured products (Initial page) using selected sort
+      const productsData = await productService.getAll(0, 8, productSort as any);
+      setProducts(productsData || []);
+      setHasMoreProducts((productsData?.length || 0) >= 8);
+      setProductPage(0);
 
       try {
         const [carousel, promo] = await Promise.all([
@@ -126,12 +154,12 @@ export const ClientHomeScreen: React.FC = () => {
         setCarouselBanners(carousel || []);
         setPromoBanners(promo || []);
       } catch (bannerErr) {
-        console.warn('ClientHomeScreen banners unavailable', bannerErr);
+        errorHandler.handle(bannerErr, 'ClientHomeScreen banners unavailable', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         setCarouselBanners([]);
         setPromoBanners([]);
       }
     } catch (e) {
-      console.error('ClientHomeScreen loadData error', e);
+      errorHandler.handleDatabaseError(e, 'ClientHomeScreen loadData error');
       setError('Impossible de charger les données');
       Alert.alert('Erreur', 'Impossible de charger les données. Veuillez réessayer.');
     } finally {
@@ -143,6 +171,28 @@ export const ClientHomeScreen: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleLoadMoreProducts = async () => {
+    if (loadingMoreProducts || !hasMoreProducts) return;
+    
+    try {
+      setLoadingMoreProducts(true);
+      const nextPage = productPage + 1;
+      const newProducts = await productService.getAll(nextPage, 8, productSort as any);
+      
+      if (newProducts && newProducts.length > 0) {
+        setProducts(prev => [...prev, ...newProducts]);
+        setProductPage(nextPage);
+        setHasMoreProducts(newProducts.length === 8);
+      } else {
+        setHasMoreProducts(false);
+      }
+    } catch (e) {
+      console.error('Error loading more products:', e);
+    } finally {
+      setLoadingMoreProducts(false);
+    }
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -226,14 +276,18 @@ export const ClientHomeScreen: React.FC = () => {
     />
   );
 
-  const renderProductCard = ({ item }: { item: Product }) => (
+  const renderProductCard = ({ item }: { item: any }) => (
     <View style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
       <ProductCard
         name={item.name}
         price={item.price}
+        comparePrice={item.compare_price}
         imageUrl={item.images?.[0]}
         onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
       />
+      <Text style={styles.storeNameLabel} numberOfLines={1}>
+        {item.stores?.name || 'Boutique'}
+      </Text>
     </View>
   );
 
@@ -243,8 +297,9 @@ export const ClientHomeScreen: React.FC = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
-      
-      <ScrollView 
+       <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -255,276 +310,297 @@ export const ClientHomeScreen: React.FC = () => {
           />
         }
       >
-        {/* Header */}
-        <LinearGradient
-          colors={[COLORS.accent, COLORS.accentDark || COLORS.accent]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>libreshop</Text>
-              <Text style={styles.logoSlogan}>Achetez local, vivez mieux</Text>
-            </View>
-            <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.iconButton}>
-                <Ionicons name="heart-outline" size={22} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => navigation.navigate('Cart')}
-              >
-                <Ionicons name="cart-outline" size={22} color="white" />
-                {items.length > 0 && (
-                  <View style={styles.cartBadge}>
-                    <Text style={styles.cartBadgeText}>{items.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Search Bar */}
-          <TouchableOpacity 
-            style={styles.searchBar}
-            onPress={() => navigation.navigate('ClientSearch')}
-            activeOpacity={0.7}
+        <View style={styles.maxWidthContainer}>
+          <LinearGradient
+            colors={[COLORS.accent, COLORS.accentDark || COLORS.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}
           >
-            <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
-            <Text style={styles.searchPlaceholder}>Rechercher un produit, une boutique...</Text>
-          </TouchableOpacity>
-        </LinearGradient>
-
-        {/* Loading/Error State */}
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.accent} />
-            <Text style={styles.loadingText}>Chargement des meilleures offres...</Text>
-          </View>
-        )}
-
-        {error && !loading && (
-          <View style={styles.errorContainer}>
-            <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
-            <Text style={styles.errorTitle}>Oups !</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
-              <Text style={styles.retryButtonText}>Réessayer</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Content only when not loading */}
-        {!loading && !error && (
-          <>
-            {/* Banner Carousel */}
-            {carouselBanners.length > 0 ? (
-              <View style={styles.bannerSection}>
-                <Animated.FlatList
-                  ref={flatListRef}
-                  data={carouselBanners}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                    { useNativeDriver: Platform.OS !== 'web' }
+            <View style={styles.headerContent}>
+              <View style={styles.logoContainer}>
+                <Text style={styles.logoText}>libreshop</Text>
+                <Text style={styles.logoSlogan}>Achetez local, vivez mieux</Text>
+              </View>
+              <View style={styles.headerActions}>
+                <TouchableOpacity style={styles.iconButton}>
+                  <Ionicons name="heart-outline" size={22} color="white" />
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.iconButton}
+                  onPress={() => navigation.navigate('Cart')}
+                >
+                  <Ionicons name="cart-outline" size={22} color="white" />
+                  {items.length > 0 && (
+                    <View style={styles.cartBadge}>
+                      <Text style={styles.cartBadgeText}>{items.length}</Text>
+                    </View>
                   )}
-                  onMomentumScrollEnd={(event) => {
-                    const index = Math.round(event.nativeEvent.contentOffset.x / (SCREEN_WIDTH - SPACING.xl * 2));
-                    setCurrentBannerIndex(index);
-                  }}
-                  renderItem={renderBannerItem}
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Search Bar */}
+            <TouchableOpacity 
+              style={styles.searchBar}
+              onPress={() => navigation.navigate('ClientSearch')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
+              <Text style={styles.searchPlaceholder}>Rechercher un produit, une boutique...</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* Loading/Error State */}
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.accent} />
+              <Text style={styles.loadingText}>Chargement des meilleures offres...</Text>
+            </View>
+          )}
+
+          {error && !loading && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
+              <Text style={styles.errorTitle}>Oups !</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
+                <Text style={styles.retryButtonText}>Réessayer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!loading && !error && (
+            <>
+              {/* Banner Carousel */}
+              {carouselBanners.length > 0 ? (
+                <View style={styles.bannerSection}>
+                  <Animated.FlatList
+                    ref={flatListRef}
+                    data={carouselBanners}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onScroll={Animated.event(
+                      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                      { useNativeDriver: Platform.OS !== 'web' }
+                    )}
+                    onMomentumScrollEnd={(event) => {
+                      const index = Math.round(event.nativeEvent.contentOffset.x / (SCREEN_WIDTH - SPACING.xl * 2));
+                      setCurrentBannerIndex(index);
+                    }}
+                    renderItem={renderBannerItem}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={styles.bannerList}
+                    snapToInterval={SCREEN_WIDTH - SPACING.xl * 2}
+                    decelerationRate="fast"
+                  />
+
+                  {/* Pagination Dots */}
+                  <View style={styles.paginationContainer}>
+                    {carouselBanners.map((_, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        onPress={() => {
+                          flatListRef.current?.scrollToIndex({ index, animated: true });
+                          setCurrentBannerIndex(index);
+                        }}
+                      >
+                        <View style={[
+                          styles.paginationDot,
+                          currentBannerIndex === index && styles.paginationDotActive,
+                        ]} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Quick Actions */}
+              <View style={styles.quickActions}>
+                <TouchableOpacity style={styles.quickAction}>
+                  <LinearGradient
+                    colors={[COLORS.accent + '20', COLORS.accent + '05']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Ionicons name="flash" size={24} color={COLORS.accent} />
+                  </LinearGradient>
+                  <Text style={styles.quickActionText}>Flash deals</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAction}>
+                  <LinearGradient
+                    colors={[COLORS.success + '20', COLORS.success + '05']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Ionicons name="gift" size={24} color={COLORS.success} />
+                  </LinearGradient>
+                  <Text style={styles.quickActionText}>Bons plans</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAction}>
+                  <LinearGradient
+                    colors={[COLORS.warning + '20', COLORS.warning + '05']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Ionicons name="star" size={24} color={COLORS.warning} />
+                  </LinearGradient>
+                  <Text style={styles.quickActionText}>Nouveautés</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickAction}>
+                  <LinearGradient
+                    colors={[COLORS.info + '20', COLORS.info + '05']}
+                    style={styles.quickActionIcon}
+                  >
+                    <Ionicons name="heart" size={24} color={COLORS.info} />
+                  </LinearGradient>
+                  <Text style={styles.quickActionText}>Favoris</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Categories */}
+              <View style={styles.categoriesSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Catégories populaires</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
+                    <Text style={styles.seeAll}>Voir tout</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoriesList}
+                >
+                  {extractCategoriesFromCollections(collections).map(renderCategoryChip)}
+                </ScrollView>
+              </View>
+
+              {/* Featured Stores */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                    <Text style={styles.sectionTitle}>Boutiques vérifiées</Text>
+                    <Text style={styles.sectionSubtitle}>Le meilleur du commerce local</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
+                    <Text style={styles.seeAll}>Tout voir</Text>
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={filteredStores}
+                  renderItem={renderStoreCard}
                   keyExtractor={(item) => item.id}
-                  contentContainerStyle={styles.bannerList}
-                  snapToInterval={SCREEN_WIDTH - SPACING.xl * 2}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.storesList}
+                  snapToInterval={storeCardWidth + SPACING.md}
                   decelerationRate="fast"
                 />
-
-                {/* Pagination Dots */}
-                <View style={styles.paginationContainer}>
-                  {carouselBanners.map((_, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      onPress={() => {
-                        flatListRef.current?.scrollToIndex({ index, animated: true });
-                        setCurrentBannerIndex(index);
-                      }}
-                    >
-                      <View style={[
-                        styles.paginationDot,
-                        currentBannerIndex === index && styles.paginationDotActive,
-                      ]} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
               </View>
-            ) : null}
 
-            {/* Quick Actions */}
-            <View style={styles.quickActions}>
-              <TouchableOpacity style={styles.quickAction}>
-                <LinearGradient
-                  colors={[COLORS.accent + '20', COLORS.accent + '05']}
-                  style={styles.quickActionIcon}
+              {promoBanners.length > 0 ? (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => handleBannerPress(promoBanners[0])}
+                  style={styles.promoSection}
                 >
-                  <Ionicons name="flash" size={24} color={COLORS.accent} />
-                </LinearGradient>
-                <Text style={styles.quickActionText}>Flash deals</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.quickAction}>
-                <LinearGradient
-                  colors={[COLORS.success + '20', COLORS.success + '05']}
-                  style={styles.quickActionIcon}
-                >
-                  <Ionicons name="gift" size={24} color={COLORS.success} />
-                </LinearGradient>
-                <Text style={styles.quickActionText}>Bons plans</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.quickAction}>
-                <LinearGradient
-                  colors={[COLORS.warning + '20', COLORS.warning + '05']}
-                  style={styles.quickActionIcon}
-                >
-                  <Ionicons name="star" size={24} color={COLORS.warning} />
-                </LinearGradient>
-                <Text style={styles.quickActionText}>Nouveautés</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.quickAction}>
-                <LinearGradient
-                  colors={[COLORS.info + '20', COLORS.info + '05']}
-                  style={styles.quickActionIcon}
-                >
-                  <Ionicons name="heart" size={24} color={COLORS.info} />
-                </LinearGradient>
-                <Text style={styles.quickActionText}>Favoris</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Categories */}
-            <View style={styles.categoriesSection}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Catégories populaires</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
-                  <Text style={styles.seeAll}>Voir tout</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesList}
-              >
-                {extractCategoriesFromCollections(collections).map(renderCategoryChip)}
-              </ScrollView>
-            </View>
-
-            {/* Trending Stores */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>Boutiques en vedette</Text>
-                  <Text style={styles.sectionSubtitle}>
-                    {filteredStores.length} boutiques {selectedCollection !== 'Toutes' && `dans ${selectedCollection}`}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
-                  <Text style={styles.seeAll}>Voir tout</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <FlatList
-                horizontal
-                data={filteredStores}
-                renderItem={renderStoreCard}
-                keyExtractor={(item) => item.id}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.storesList}
-                snapToInterval={storeCardWidth + SPACING.md}
-                decelerationRate="fast"
-              />
-            </View>
-
-            {promoBanners.length > 0 ? (
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => handleBannerPress(promoBanners[0])}
-              >
-                <LinearGradient
-                  colors={[
-                    normalizeHexColor(promoBanners[0].color) || '#FF6B6B',
-                    '#FF8E8E',
-                  ]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.promoBanner}
-                >
-                  <View style={styles.promoContent}>
-                    <Text style={styles.promoTitle}>{promoBanners[0].title}</Text>
-                    {promoBanners[0].subtitle ? (
-                      <Text style={styles.promoSubtitle}>{promoBanners[0].subtitle}</Text>
-                    ) : null}
-                    <View style={styles.promoButton}>
-                      <Text style={styles.promoButtonText}>Je profite</Text>
-                      <Ionicons name="arrow-forward" size={18} color="white" />
+                  <LinearGradient
+                    colors={[
+                      normalizeHexColor(promoBanners[0].color) || COLORS.danger,
+                      COLORS.dangerGradient[1],
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.promoBanner}
+                  >
+                    <View style={styles.promoContent}>
+                      <Text style={styles.promoTitle}>{promoBanners[0].title}</Text>
+                      {promoBanners[0].subtitle ? (
+                        <Text style={styles.promoSubtitle}>{promoBanners[0].subtitle}</Text>
+                      ) : null}
+                      <View style={styles.promoButton}>
+                        <Text style={styles.promoButtonText}>Je profite</Text>
+                        <Ionicons name="arrow-forward" size={18} color="white" />
+                      </View>
                     </View>
-                  </View>
-                  {promoBanners[0].image_url ? (
-                    <Image source={{ uri: promoBanners[0].image_url }} style={styles.promoImage} />
-                  ) : null}
-                </LinearGradient>
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Featured Products */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>Produits populaires</Text>
-                  <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
-                </View>
-                <TouchableOpacity onPress={() => navigation.navigate('ClientAllProducts')}>
-                  <Text style={styles.seeAll}>Voir tout</Text>
+                    {promoBanners[0].image_url ? (
+                      <Image source={{ uri: promoBanners[0].image_url }} style={styles.promoImage} />
+                    ) : null}
+                  </LinearGradient>
                 </TouchableOpacity>
+              ) : null}
+
+              {/* Featured Products */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <View>
+                      <Text style={styles.sectionTitle}>Produits</Text>
+                      <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => navigation.navigate('ClientAllProducts')}>
+                    <Text style={styles.seeAll}>Voir tout</Text>
+                  </TouchableOpacity>
+                </View>
+                  {/* Sort tabs */}
+                  <SortTabs
+                    options={[
+                      { id: 'popular', label: 'Populaires' },
+                      { id: 'ranked', label: 'Tendance' },
+                      { id: 'newest', label: 'Nouveaux' },
+                      { id: 'sales', label: 'Top ventes' },
+                    ]}
+                    selected={productSort}
+                    onSelect={(id) => { setProductSort(id as any); loadData(); }}
+                  />
+
+                <FlatList
+                  data={products}
+                  renderItem={renderProductCard}
+                  keyExtractor={(item) => item.id}
+                  numColumns={numProductColumns}
+                  key={numProductColumns}
+                  scrollEnabled={false}
+                  columnWrapperStyle={styles.productsGrid}
+                  contentContainerStyle={styles.productsList}
+                />
               </View>
-              
-              <FlatList
-                data={products}
-                renderItem={renderProductCard}
-                keyExtractor={(item) => item.id}
-                numColumns={numProductColumns}
-                scrollEnabled={false}
-                columnWrapperStyle={styles.productsGrid}
-                contentContainerStyle={styles.productsList}
-              />
-            </View>
 
-            {/* Newsletter */}
-            <BlurView intensity={80} tint="light" style={styles.newsletterSection}>
-              <Text style={styles.newsletterTitle}>Ne manquez aucune offre</Text>
-              <Text style={styles.newsletterText}>
-                Inscrivez-vous à notre newsletter et recevez -10% sur votre première commande
-              </Text>
-              <TouchableOpacity style={styles.newsletterButton}>
-                <Text style={styles.newsletterButtonText}>S'inscrire</Text>
-                <Ionicons name="mail-outline" size={18} color="white" />
-              </TouchableOpacity>
-            </BlurView>
+              {/* Newsletter */}
+              <BlurView intensity={80} tint="light" style={styles.newsletterSection}>
+                <Text style={styles.newsletterTitle}>Ne manquez aucune offre</Text>
+                <Text style={styles.newsletterText}>
+                  Inscrivez-vous à notre newsletter et recevez -10% sur votre première commande
+                </Text>
+                <TouchableOpacity style={styles.newsletterButton}>
+                  <Text style={styles.newsletterButtonText}>S'inscrire</Text>
+                  <Ionicons name="mail-outline" size={18} color="white" />
+                </TouchableOpacity>
+              </BlurView>
 
-            {/* Load More */}
-            <View style={styles.loadMoreContainer}>
-              <TouchableOpacity style={styles.loadMoreButton}>
-                <Ionicons name="refresh" size={16} color={COLORS.accent} />
-                <Text style={styles.loadMoreText}>Charger plus de produits</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+              {/* Load More */}
+              {hasMoreProducts && (
+                <View style={styles.loadMoreContainer}>
+                  <TouchableOpacity 
+                    style={styles.loadMoreButton}
+                    onPress={handleLoadMoreProducts}
+                    disabled={loadingMoreProducts}
+                  >
+                    {loadingMoreProducts ? (
+                      <ActivityIndicator size="small" color={COLORS.accent} />
+                    ) : (
+                      <>
+                        <Ionicons name="refresh" size={16} color={COLORS.accent} />
+                        <Text style={styles.loadMoreText}>Charger plus de produits</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          )}
+        </View>
       </ScrollView>
+      
+      {/* PWA Install Button - Only on Web */}
+      {Platform.OS === 'web' && <PWAInstallButton />}
     </View>
   );
 };
@@ -533,6 +609,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    backgroundColor: COLORS.bg,
+  },
+  maxWidthContainer: {
+    maxWidth: MAX_CONTENT_WIDTH,
+    width: '100%',
+    alignSelf: 'center',
+    flex: 1,
   },
   header: {
     paddingHorizontal: SPACING.xl,
@@ -553,7 +639,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '800',
-    color: 'white',
+    color: COLORS.text,
     letterSpacing: 0.5,
   },
   logoSlogan: {
@@ -584,17 +670,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: COLORS.border,
   },
   cartBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: 'white',
+    color: COLORS.text,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
@@ -623,10 +709,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0px 4px 8px rgba(0,0,0,0.2)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.2,
-          shadowRadius: 8,
+          boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.2)',
           elevation: 5,
         }),
   },
@@ -651,14 +734,12 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '800',
-    color: 'white',
+    color: COLORS.text,
     marginBottom: 4,
     ...(Platform.OS === 'web'
       ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
       : {
-          textShadowColor: 'rgba(0,0,0,0.3)',
-          textShadowOffset: { width: 0, height: 1 },
-          textShadowRadius: 2,
+          textShadow: '0px 1px 2px rgba(0,0,0,0.3)',
         }),
   },
   bannerSubtitle: {
@@ -668,9 +749,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
       : {
-          textShadowColor: 'rgba(0,0,0,0.3)',
-          textShadowOffset: { width: 0, height: 1 },
-          textShadowRadius: 2,
+          textShadow: '0px 1px 2px rgba(0,0,0,0.3)',
         }),
   },
   bannerButton: {
@@ -686,7 +765,7 @@ const styles = StyleSheet.create({
   bannerButtonText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: 'white',
+    color: COLORS.text,
   },
   paginationContainer: {
     flexDirection: 'row',
@@ -778,7 +857,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSoft,
   },
   categoryChipTextActive: {
-    color: 'white',
+    color: COLORS.text,
   },
   
   // Sections
@@ -794,10 +873,17 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   productsGrid: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: SPACING.md,
   },
   productCardWrapper: {
-    // Largeur calculée dynamiquement dans renderProductCard
+    marginBottom: SPACING.lg,
+  },
+  storeNameLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 4,
+    paddingHorizontal: 2,
   },
   
   // Promo Banner
@@ -817,7 +903,7 @@ const styles = StyleSheet.create({
   promoTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '800',
-    color: 'white',
+    color: COLORS.text,
     marginBottom: 4,
   },
   promoSubtitle: {
@@ -838,7 +924,7 @@ const styles = StyleSheet.create({
   promoButtonText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: 'white',
+    color: COLORS.text,
   },
   promoImage: {
     width: 120,
@@ -880,7 +966,7 @@ const styles = StyleSheet.create({
   newsletterButtonText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: 'white',
+    color: COLORS.text,
   },
   
   // Load More
@@ -943,7 +1029,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   retryButtonText: {
-    color: 'white',
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },

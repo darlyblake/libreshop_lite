@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { supabase } from '../lib/supabase';
 
 export const SellerEmailConfirmScreen: React.FC = () => {
@@ -21,8 +22,8 @@ export const SellerEmailConfirmScreen: React.FC = () => {
 
   useEffect(() => {
     // Log for debugging
-    console.log('SellerEmailConfirmScreen mounted');
-    console.log('Route params:', route.params);
+    // Log: 'SellerEmailConfirmScreen mounted';
+    // Route params:: route.params;
     
     // Extract from URL query params as fallback for web
     const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
@@ -44,7 +45,7 @@ export const SellerEmailConfirmScreen: React.FC = () => {
           return;
         }
 
-        console.log('Confirming email with token:', type, token);
+        // Confirming email with token:: type, token;
 
         // Verify the token with Supabase
         const { data, error } = await supabase.auth.verifyOtp({
@@ -53,7 +54,7 @@ export const SellerEmailConfirmScreen: React.FC = () => {
         });
 
         if (error) {
-          console.error('Email confirmation error:', error);
+          errorHandler.handleDatabaseError(error, 'Email confirmation error:');
           setMessage(`❌ Erreur: ${error.message}`);
           setSuccess(false);
           setLoading(false);
@@ -83,7 +84,7 @@ export const SellerEmailConfirmScreen: React.FC = () => {
           }, 1000);
         }
       } catch (err: any) {
-        console.error('Unexpected error during email confirmation:', err);
+        errorHandler.handleDatabaseError(err, 'Unexpected error during email confirmation:');
         setMessage(`❌ Erreur inattendue: ${err.message}`);
         setSuccess(false);
         setLoading(false);

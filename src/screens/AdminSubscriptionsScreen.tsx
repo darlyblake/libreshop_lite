@@ -16,6 +16,7 @@ import { planService, supabase } from '../lib/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { showAlert, showConfirm } from '../utils/platformUtils';
@@ -83,7 +84,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
           }))
         );
       } catch (err) {
-        console.error('fetch plans', err);
+        errorHandler.handleDatabaseError(err, 'fetch plans');
       }
     };
     load();
@@ -162,17 +163,16 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       if (supabase) {
         const { data } = await supabase.auth.getSession();
         if (!data.session) {
-          console.warn('[plans] No Supabase session (anon). INSERT/UPDATE may be blocked by RLS.');
+          errorHandler.handle(new Error('[plans] No Supabase session (anon). INSERT/UPDATE may be blocked by RLS.'), 'AdminSubscriptions', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         } else {
           const sUser: any = data.session.user;
           const email = sUser?.email;
           const uid = sUser?.id;
           const role = sUser?.user_metadata?.role || sUser?.app_metadata?.role;
-          console.log('[plans] Supabase session OK', { uid, email, role });
         }
       }
     } catch (e) {
-      console.warn('[plans] Unable to read auth session', e);
+      errorHandler.handle(e, '[plans] Unable to read auth session', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
     }
 
     const featuresArr = newFeatures
@@ -194,7 +194,6 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         features: featuresArr,
       };
       try {
-        console.log('[plans] update payload', { id: updated.id, name: updated.name });
         const res = await planService.update(updated.id, {
           name: updated.name,
           price: updated.price,
@@ -206,7 +205,6 @@ export const AdminSubscriptionsScreen: React.FC = () => {
           has_online_store: updated.hasOnlineStore,
           features: updated.features,
         });
-        console.log('[plans] updated', res);
 
         setSubscriptions(prev =>
           prev.map(s =>
@@ -227,7 +225,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
           Alert.alert('Abonnement modifié', `${updated.name} a été mis à jour.`);
         }
       } catch (e) {
-        console.error('update plan', e);
+        errorHandler.handleDatabaseError(e, 'update plan');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           showAlert('❌ Impossible de mettre à jour le plan');
         } else {
@@ -265,10 +263,8 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         has_online_store: newSub.hasOnlineStore,
         features: newSub.features,
       };
-      console.log('[plans] create payload', payload);
       Alert.alert('Création', 'Envoi du plan à Supabase...');
       const created = await planService.create(payload);
-      console.log('[plans] created', created);
       setSubscriptions([ { ...newSub, id: created.id, createdAt: created.created_at || '' }, ...subscriptions ]);
       closeAddModal();
       setNewName('');
@@ -282,7 +278,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       setNewTrialDays('');
       Alert.alert('Abonnement ajouté', `${newSub.name} a été créé.`);
     } catch (e) {
-      console.error('create plan', e);
+      errorHandler.handleDatabaseError(e, 'create plan');
       if ((e as any)?.code === '42501') {
         Alert.alert(
           'Accès refusé (RLS)',
@@ -311,7 +307,6 @@ export const AdminSubscriptionsScreen: React.FC = () => {
 
 
   const handleSubscriptionAction = async (subscription: Subscription, action: 'edit' | 'toggle' | 'delete' | 'stats') => {
-    console.log('[plans] action', { action, id: subscription.id, name: subscription.name });
     switch (action) {
       case 'edit':
         // Ouvrir le modal en mode édition sans passer par openAddModal()
@@ -338,7 +333,6 @@ export const AdminSubscriptionsScreen: React.FC = () => {
           (async () => {
             try {
               const newStatus = subscription.status === 'active' ? 'inactive' : 'active';
-              console.log('[plans] toggle status', { id: subscription.id, from: subscription.status, to: newStatus });
               const updated = await planService.update(subscription.id, { status: newStatus });
               setSubscriptions(prev =>
                 prev.map(s =>
@@ -348,7 +342,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 )
               );
             } catch (e) {
-              console.error('toggle plan', e);
+              errorHandler.handleDatabaseError(e, 'toggle plan');
               showAlert('❌ Impossible de modifier le statut');
             }
           })();
@@ -367,7 +361,6 @@ export const AdminSubscriptionsScreen: React.FC = () => {
               onPress: async () => {
                 try {
                   const newStatus = subscription.status === 'active' ? 'inactive' : 'active';
-                  console.log('[plans] toggle status', { id: subscription.id, from: subscription.status, to: newStatus });
                   const updated = await planService.update(subscription.id, { status: newStatus });
                   setSubscriptions(prev =>
                     prev.map(s =>
@@ -377,7 +370,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                     )
                   );
                 } catch (e) {
-                  console.error('toggle plan', e);
+                  errorHandler.handleDatabaseError(e, 'toggle plan');
                   Alert.alert('Erreur', 'Impossible de modifier le statut');
                 }
               },
@@ -398,11 +391,10 @@ export const AdminSubscriptionsScreen: React.FC = () => {
 
           (async () => {
             try {
-              console.log('[plans] delete', { id: subscription.id });
               await planService.delete(subscription.id);
               setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
             } catch (e) {
-              console.error('delete plan', e);
+              errorHandler.handleDatabaseError(e, 'delete plan');
               showAlert('❌ Impossible de supprimer le plan');
             }
           })();
@@ -417,11 +409,10 @@ export const AdminSubscriptionsScreen: React.FC = () => {
             { text: 'Annuler', style: 'cancel' },
             { text: 'Supprimer', style: 'destructive', onPress: async () => {
                 try {
-                  console.log('[plans] delete', { id: subscription.id });
                   await planService.delete(subscription.id);
                   setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
                 } catch (e) {
-                  console.error('delete plan', e);
+                  errorHandler.handleDatabaseError(e, 'delete plan');
                   Alert.alert('Erreur', 'Impossible de supprimer le plan');
                 }
               } },
@@ -552,7 +543,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                   <Text style={styles.modalActionText}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.modalActionButton, { backgroundColor: COLORS.accent }]} onPress={submitSubscription}>
-                  <Text style={[styles.modalActionText, { color: COLORS.white }]}>{editingSubscription ? 'Mettre à jour' : 'Créer'}</Text>
+                  <Text style={[styles.modalActionText, { color: COLORS.text }]}>{editingSubscription ? 'Mettre à jour' : 'Créer'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -729,7 +720,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 <Ionicons 
                   name={subscription.status === 'active' ? 'pause' : 'play'} 
                   size={18} 
-                  color={COLORS.white} 
+                  color={COLORS.text} 
                 />
               </TouchableOpacity>
             </View>
@@ -818,7 +809,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterTextActive: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,

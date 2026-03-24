@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Notification } from '../store/notificationStore';
-import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface NotificationItemProps {
   notification: Notification;
@@ -13,6 +13,14 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onPress,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   const getIcon = (type: Notification['type']): keyof typeof Ionicons.glyphMap => {
     switch (type) {
       case 'order':
@@ -90,7 +98,12 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -139,4 +152,5 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
   },
 });
+};
 

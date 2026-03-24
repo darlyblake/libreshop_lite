@@ -30,14 +30,20 @@
             "scheme": "https",
             "host": "*.libreshop.app"
           },
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "VIEW",
           "data": {
             "scheme": "libreshop"
           },
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "permissions": [
@@ -60,11 +66,17 @@
       "output": "web-build",
       "build": {
         "babel": {
-          "include": ["node_modules/react-native-web"]
+          "include": [
+            "node_modules/react-native-web"
+          ]
         }
       }
     },
-    "platforms": ["android", "ios", "web"],
+    "platforms": [
+      "android",
+      "ios",
+      "web"
+    ],
     "plugins": [
       [
         "expo-camera",
@@ -79,7 +91,16 @@
           "cameraPermission": "LibreShop a besoin d'acceder a votre camera pour prendre des photos"
         }
       ],
-      "expo-font"
-    ]
+      "expo-font",
+      "expo-notifications",
+      "expo-audio",
+      "expo-dev-client"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e0619ca5-a33d-47e5-8d50-d9f398504712"
+      }
+    },
+    "owner": "fredblake"
   }
 }

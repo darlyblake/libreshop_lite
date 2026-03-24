@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useResponsive } from '../utils/responsive';
 
 // Mock clients data
@@ -80,7 +81,9 @@ export const ClientCollectionScreen: React.FC = () => {
       'Voulez-vous activer/désactiver ce client ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: () => console.log('Toggle client:', id) }
+        { text: 'Confirmer', onPress: () => {
+            // Toggle client status
+          }}
       ]
     );
   };
@@ -110,7 +113,7 @@ export const ClientCollectionScreen: React.FC = () => {
           <Ionicons 
             name={client.isActive ? 'checkmark' : 'close'} 
             size={16} 
-            color={COLORS.white} 
+            color={COLORS.text} 
           />
         </TouchableOpacity>
       </View>
@@ -165,7 +168,7 @@ export const ClientCollectionScreen: React.FC = () => {
           style={styles.addButton}
           onPress={() => setShowAddModal(true)}
         >
-          <Ionicons name="add" size={24} color={COLORS.white} />
+          <Ionicons name="add" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -409,7 +412,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   clientDetails: {
     flex: 1,
@@ -559,7 +562,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accent,
   },
   confirmButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
 });

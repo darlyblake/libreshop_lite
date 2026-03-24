@@ -67,13 +67,55 @@ export const notificationService = {
   },
 
   async create(notification: Partial<Notification>): Promise<Notification> {
-    const { data, error } = await supabase!
+    const { error } = await supabase!
       .from('notifications')
-      .insert(notification)
-      .select('*')
-      .single();
+      .insert(notification);
     if (error) throw error;
-    return data;
+
+    // Tentative d'envoi de notification push en arrière-plan
+    if (notification.user_id) {
+      this.sendPushNotification(notification.user_id, {
+        title: notification.title || 'Nouvelle notification',
+        body: notification.body || '',
+        data: notification.data,
+      }).catch(console.error);
+    }
+
+    return notification as Notification;
+  },
+
+  // Service interne pour envoyer au serveur Expo
+  async sendPushNotification(userId: string, pushData: { title: string, body: string, data?: any }) {
+    try {
+      // Récupérer le token du destinataire
+      const { data: user, error } = await supabase!
+        .from('users')
+        .select('expo_push_token')
+        .eq('id', userId)
+        .single();
+      
+      if (error || !user?.expo_push_token) return;
+
+      const message = {
+        to: user.expo_push_token,
+        sound: 'default',
+        title: pushData.title,
+        body: pushData.body,
+        data: pushData.data,
+      };
+
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(message),
+      });
+    } catch (e) {
+      console.error('Error sending push notification:', e);
+    }
   },
 
   // Create notification for multiple users
@@ -89,6 +131,15 @@ export const notificationService = {
       .from('notifications')
       .insert(notifications);
     if (error) throw error;
+
+    // Push notifications pour tout le monde
+    userIds.forEach(uid => {
+        this.sendPushNotification(uid, {
+            title: notification.title,
+            body: notification.body,
+            data: notification.data
+        }).catch(() => {});
+    });
   },
 };
 

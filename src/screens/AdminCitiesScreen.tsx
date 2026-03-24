@@ -169,7 +169,7 @@ export const AdminCitiesScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Villes</Text>
         <TouchableOpacity style={styles.addButton} onPress={openCreate}>
-          <Ionicons name="add" size={22} color={COLORS.white} />
+          <Ionicons name="add" size={22} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -260,7 +260,7 @@ export const AdminCitiesScreen: React.FC = () => {
                 <Text style={styles.modalBtnText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={save}>
-                <Text style={[styles.modalBtnText, { color: COLORS.white }]}>Enregistrer</Text>
+                <Text style={[styles.modalBtnText, { color: COLORS.text }]}>Enregistrer</Text>
               </TouchableOpacity>
             </View>
           </View>

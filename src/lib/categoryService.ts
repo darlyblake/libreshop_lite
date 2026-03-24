@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Category } from './supabase';
 
 // Category Service
@@ -76,7 +77,7 @@ export const categoryService = {
       .single();
     
     if (error) {
-      console.log('INSERT ERROR:', error);
+      // INSERT ERROR:: error;
       throw error;
     }
     return data;
@@ -96,7 +97,7 @@ export const categoryService = {
       .single();
     
     if (error) {
-      console.log('UPDATE ERROR:', error);
+      // UPDATE ERROR:: error;
       throw error;
     }
     return data;

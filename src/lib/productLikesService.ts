@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { notificationService } from './notificationService';
 
 export interface ProductLike {
@@ -13,8 +14,19 @@ export const productLikesService = {
   async getLikesCount(productId: string): Promise<number> {
     const { data, error } = await supabase!
       .from('product_likes')
-      .select('id', { count: 'exact' })
+      .select('id')
       .eq('product_id', productId);
+    
+    if (error) throw error;
+    return data?.length || 0;
+  },
+
+  // Récupérer le nombre total de likes pour tous les produits d'une boutique
+  async getStoreLikesCount(storeId: string): Promise<number> {
+    const { data, error } = await supabase!
+      .from('product_likes')
+      .select('id, products!inner(store_id)')
+      .eq('products.store_id', storeId);
     
     if (error) throw error;
     return data?.length || 0;
@@ -27,22 +39,32 @@ export const productLikesService = {
       .select('id')
       .eq('user_id', userId)
       .eq('product_id', productId)
-      .single();
+      .maybeSingle();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error) throw error;
     return !!data;
   },
 
   // Ajouter un like + notifier le vendeur
   async addLike(userId: string, productId: string): Promise<ProductLike> {
+    if (!userId || !productId) return {} as any;
+
     try {
+      // Vérifier si un like existe déjà pour éviter l'erreur 409 Conflict dans la console réseau
+      const existingLike = await this.hasLiked(userId, productId);
+      if (existingLike) {
+        return { user_id: userId, product_id: productId } as ProductLike;
+      }
+
       const { data, error } = await supabase!
         .from('product_likes')
-        .insert({ user_id: userId, product_id: productId })
+        .upsert({ user_id: userId, product_id: productId }, { onConflict: 'user_id,product_id', ignoreDuplicates: true })
         .select()
         .single();
       
-      if (error) throw error;
+      if (error && error.code !== '23505' && error?.status !== 409) throw error;
+      
+      const likeData = data || { user_id: userId, product_id: productId } as ProductLike;
 
       // Récupérer les infos du produit et du vendeur
       const { data: product, error: productError } = await supabase!
@@ -53,30 +75,23 @@ export const productLikesService = {
 
       if (!productError && product) {
         // Notifier le vendeur
-        const { data: seller } = await supabase!
-          .from('users')
-          .select('id')
-          .eq('id', product.user_id)
-          .single();
-
-        if (seller) {
-          await notificationService.create({
-            user_id: seller.id,
-            title: '❤️ Nouveau like sur votre produit',
-            body: `Quelqu'un a aimé votre produit "${product.name}"`,
-            type: 'system',
-            read: false,
-            data: {
-              productId: productId,
-              likedBy: userId,
-            },
-          });
-        }
+        await notificationService.create({
+          user_id: product.user_id,
+          title: '❤️ Nouveau like sur votre produit',
+          body: `Quelqu'un a aimé votre produit "${product.name}"`,
+          type: 'system',
+          read: false,
+          data: {
+            productId: productId,
+            likedBy: userId,
+          },
+        });
       }
 
-      return data;
-    } catch (error) {
-      console.error('Error adding like:', error);
+      return likeData;
+    } catch (error: any) {
+      if (error?.code === '23505' || error?.status === 409) return { user_id: userId, product_id: productId } as any;
+      errorHandler.handleDatabaseError(error, 'Error adding like:');
       throw error;
     }
   },

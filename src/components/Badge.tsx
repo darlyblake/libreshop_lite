@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useThemeContext } from '../context/ThemeContext';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'accent';
+type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 type BadgeSize = 'small' | 'medium' | 'large';
 
 interface BadgeProps {
@@ -14,40 +14,40 @@ interface BadgeProps {
   style?: ViewStyle;
 }
 
-const getVariantStyles = (variant: BadgeVariant) => {
+const getVariantStyles = (variant: BadgeVariant, theme: any) => {
   switch (variant) {
     case 'success':
-      return { bg: COLORS.success + '20', text: COLORS.success };
+      return { bg: theme.getColor.success + '20', text: theme.getColor.success };
     case 'warning':
-      return { bg: COLORS.warning + '20', text: COLORS.warning };
-    case 'danger':
-      return { bg: COLORS.danger + '20', text: COLORS.danger };
-    case 'accent':
-      return { bg: COLORS.accent + '20', text: COLORS.accent };
+      return { bg: theme.getColor.warning + '20', text: theme.getColor.warning };
+    case 'error':
+      return { bg: theme.getColor.error + '20', text: theme.getColor.error };
+    case 'info':
+      return { bg: theme.getColor.info + '20', text: theme.getColor.info };
     default:
-      return { bg: COLORS.textMuted + '20', text: COLORS.textMuted };
+      return { bg: theme.getColor.textTertiary + '20', text: theme.getColor.textTertiary };
   }
 };
 
-const getSizeStyles = (size: BadgeSize) => {
+const getSizeStyles = (size: BadgeSize, theme: any) => {
   switch (size) {
     case 'small':
       return { 
-        padding: SPACING.xs,
+        padding: theme.spacing.xs,
         iconSize: 12,
-        fontSize: FONT_SIZE.xs,
+        fontSize: theme.fontSize.xs,
       };
     case 'large':
       return { 
-        padding: SPACING.md,
+        padding: theme.spacing.md,
         iconSize: 20,
-        fontSize: FONT_SIZE.md,
+        fontSize: theme.fontSize.md,
       };
     default:
       return { 
-        padding: SPACING.sm,
+        padding: theme.spacing.sm,
         iconSize: 16,
-        fontSize: FONT_SIZE.sm,
+        fontSize: theme.fontSize.sm,
       };
   }
 };
@@ -59,8 +59,9 @@ export const Badge: React.FC<BadgeProps> = ({
   icon,
   style,
 }) => {
-  const variantStyles = getVariantStyles(variant);
-  const sizeStyles = getSizeStyles(size);
+  const { theme } = useThemeContext();
+  const variantStyles = getVariantStyles(variant, theme);
+  const sizeStyles = getSizeStyles(size, theme);
 
   return (
     <View style={[
@@ -97,10 +98,10 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: RADIUS.full,
+    borderRadius: 9999, // full radius
   },
   icon: {
-    marginRight: SPACING.xs,
+    marginRight: 4,
   },
   text: {
     fontWeight: '600',

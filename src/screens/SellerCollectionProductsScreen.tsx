@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -42,7 +43,7 @@ export const SellerCollectionProductsScreen: React.FC = () => {
         productCount: filtered.length,
       });
     } catch (e) {
-      console.error('load collection products', e);
+      errorHandler.handleDatabaseError(e, 'load collection products');
       Alert.alert('Erreur', 'Impossible de charger les produits de la collection');
     } finally {
       setLoading(false);
@@ -84,7 +85,7 @@ export const SellerCollectionProductsScreen: React.FC = () => {
               setSelectedProducts([]);
               Alert.alert('Succès', `${selectedProducts.length} produit(s) ${action === 'delete' ? 'supprimé(s)' : action === 'activate' ? 'activé(s)' : 'désactivé(s)'} avec succès`);
             } catch (e) {
-              console.error('bulk action', e);
+              errorHandler.handleDatabaseError(e, 'bulk action');
               Alert.alert('Erreur', "Impossible d'exécuter l'action");
             } finally {
               setLoading(false);
@@ -112,7 +113,7 @@ export const SellerCollectionProductsScreen: React.FC = () => {
             styles.checkbox,
             isSelected && styles.checkboxSelected
           ]}>
-            {isSelected && <Ionicons name="checkmark" size={12} color={COLORS.white} />}
+            {isSelected && <Ionicons name="checkmark" size={12} color={COLORS.text} />}
           </View>
         </TouchableOpacity>
         
@@ -192,21 +193,21 @@ export const SellerCollectionProductsScreen: React.FC = () => {
               style={[styles.actionButton, styles.activateButton]}
               onPress={() => handleBulkAction('activate')}
             >
-              <Ionicons name="checkmark" size={16} color={COLORS.white} />
+              <Ionicons name="checkmark" size={16} color={COLORS.text} />
               <Text style={styles.actionButtonText}>Activer</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.deactivateButton]}
               onPress={() => handleBulkAction('deactivate')}
             >
-              <Ionicons name="pause" size={16} color={COLORS.white} />
+              <Ionicons name="pause" size={16} color={COLORS.text} />
               <Text style={styles.actionButtonText}>Désactiver</Text>
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.actionButton, styles.deleteButton]}
               onPress={() => handleBulkAction('delete')}
             >
-              <Ionicons name="trash" size={16} color={COLORS.white} />
+              <Ionicons name="trash" size={16} color={COLORS.text} />
               <Text style={styles.actionButtonText}>Supprimer</Text>
             </TouchableOpacity>
           </View>
@@ -324,7 +325,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '500',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   productsList: {
     paddingHorizontal: SPACING.lg,

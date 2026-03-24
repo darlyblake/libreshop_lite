@@ -30,7 +30,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
       const items = await wishlistService.getByUser(userId);
       set({ items, isLoading: false });
     } catch (error) {
-      console.error('Error loading wishlist:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading wishlist:');
       set({ isLoading: false });
     }
   },
@@ -40,7 +40,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
       const item = await wishlistService.add(userId, productId);
       get().addItem(item);
     } catch (error) {
-      console.error('Error adding to wishlist:', error);
+      errorHandler.handleDatabaseError(error, 'Error adding to wishlist:');
     }
   },
 
@@ -49,7 +49,7 @@ export const useWishlistStore = create<WishlistState>((set, get) => ({
       await wishlistService.remove(userId, productId);
       get().removeItem(productId);
     } catch (error) {
-      console.error('Error removing from wishlist:', error);
+      errorHandler.handleDatabaseError(error, 'Error removing from wishlist:');
     }
   },
 

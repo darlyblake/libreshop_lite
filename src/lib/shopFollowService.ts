@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { notificationService } from './notificationService';
 
 export interface ShopFollow {
@@ -12,7 +13,7 @@ export const shopFollowService = {
   // Récupérer le nombre de followers d'une boutique
   async getFollowersCount(storeId: string): Promise<number> {
     const { data, error } = await supabase!
-      .from('shop_follows')
+      .from('store_followers')
       .select('id', { count: 'exact' })
       .eq('store_id', storeId);
     
@@ -23,28 +24,42 @@ export const shopFollowService = {
   // Vérifier si un utilisateur suit une boutique
   async isFollowing(userId: string, storeId: string): Promise<boolean> {
     const { data, error } = await supabase!
-      .from('shop_follows')
+      .from('store_followers')
       .select('id')
       .eq('user_id', userId)
       .eq('store_id', storeId)
-      .single();
+      .maybeSingle();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error) throw error;
     return !!data;
   },
 
   // Ajouter un follow + notifier le vendeur
   async addFollow(userId: string, storeId: string): Promise<ShopFollow> {
+    if (!userId || !storeId || storeId === 'undefined') {
+      console.warn('[shopFollowService] Tentative de follow avec des IDs invalides:', { userId, storeId });
+      return {} as any;
+    }
+
     try {
+      // Vérifier si un follow existe déjà pour éviter l'erreur 409 Conflict dans la console réseau
+      const existingFollowing = await this.isFollowing(userId, storeId);
+      if (existingFollowing) {
+        return { user_id: userId, store_id: storeId } as ShopFollow;
+      }
+
       const { data, error } = await supabase!
-        .from('shop_follows')
-        .insert({ user_id: userId, store_id: storeId })
+        .from('store_followers')
+        .upsert({ user_id: userId, store_id: storeId }, { onConflict: 'user_id,store_id', ignoreDuplicates: true })
         .select()
         .single();
       
-      if (error) throw error;
+      // Si ignoreDuplicates est vrai, data peut être null si le record existe déjà
+      if (error && error.code !== '23505') throw error;
+      
+      const followData = data || { user_id: userId, store_id: storeId } as ShopFollow;
 
-      // Récupérer les infos de la boutique et du vendeur
+      // Récupérer les infos de la boutique et du vendeur pour la notification
       const { data: store, error: storeError } = await supabase!
         .from('stores')
         .select('id, name, user_id')
@@ -66,9 +81,11 @@ export const shopFollowService = {
         });
       }
 
-      return data;
-    } catch (error) {
-      console.error('Error adding follow:', error);
+      return followData;
+    } catch (error: any) {
+      // Double sécurité pour le code 23505 (Conflict)
+      if (error?.code === '23505') return { user_id: userId, store_id: storeId } as any;
+      errorHandler.handleDatabaseError(error, 'Error adding follow:');
       throw error;
     }
   },
@@ -76,7 +93,7 @@ export const shopFollowService = {
   // Supprimer un follow
   async removeFollow(userId: string, storeId: string): Promise<void> {
     const { error } = await supabase!
-      .from('shop_follows')
+      .from('store_followers')
       .delete()
       .eq('user_id', userId)
       .eq('store_id', storeId);
@@ -87,7 +104,7 @@ export const shopFollowService = {
   // Récupérer toutes les boutiques suivies par un utilisateur
   async getUserFollowedStores(userId: string): Promise<string[]> {
     const { data, error } = await supabase!
-      .from('shop_follows')
+      .from('store_followers')
       .select('store_id')
       .eq('user_id', userId);
     
@@ -98,7 +115,7 @@ export const shopFollowService = {
   // Récupérer tous les followers d'une boutique
   async getStoreFollowers(storeId: string): Promise<ShopFollow[]> {
     const { data, error } = await supabase!
-      .from('shop_follows')
+      .from('store_followers')
       .select('*')
       .eq('store_id', storeId);
     

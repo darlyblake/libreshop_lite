@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,19 +8,25 @@ import {
   Image,
   StatusBar,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
 import { orderService } from '../lib/supabase';
 import { wishlistService } from '../lib/wishlistService';
+import { useTheme } from '../hooks/useTheme';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 const MENU_ITEMS = [
   { icon: 'person-outline', label: 'Informations personnelles', screen: '' },
   { icon: 'location-outline', label: 'Adresses enregistrées', screen: '' },
   { icon: 'heart-outline', label: 'Mes favoris', screen: 'Wishlist' },
   { icon: 'receipt-outline', label: 'Mes Commandes', screen: 'ClientOrders' },
+  { icon: 'sync-outline', label: 'Restaurer mon historique', action: 'restore' },
   { icon: 'notifications-outline', label: 'Notifications', screen: '' },
   { icon: 'shield-checkmark-outline', label: 'Sécurité', screen: '' },
   { icon: 'help-circle-outline', label: 'Aide et support', screen: '' },
@@ -29,10 +35,19 @@ const MENU_ITEMS = [
 export const ClientProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
+  const { getColor, spacing, radius, fontSize, isDark } = useTheme();
+  
   const [ordersCount, setOrdersCount] = useState(0);
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [addressesCount, setAddressesCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // States for Restore History
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restoreStep, setRestoreStep] = useState(1); // 1: phone, 2: otp
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
   // Charger les vraies données de l'utilisateur
   useEffect(() => {
@@ -43,25 +58,20 @@ export const ClientProfileScreen: React.FC = () => {
       }
 
       try {
-        // Charger le nombre de commandes
         const orders = await orderService.getByUser(String(user.id));
         setOrdersCount(Array.isArray(orders) ? orders.length : 0);
 
-        // Charger le nombre de favoris depuis le service wishlist avec gestion d'erreur
         try {
           const favorites = await wishlistService.getByUser(String(user.id));
           setFavoritesCount(favorites.length);
         } catch (wishlistError: any) {
-          console.warn('Wishlist table not found:', wishlistError);
-          // Si la table n'existe pas, afficher 0 favoris
+          errorHandler.handle(wishlistError instanceof Error ? wishlistError : new Error(String(wishlistError)), 'Wishlist table not found:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           setFavoritesCount(0);
         }
 
-        // TODO: Charger le nombre d'adresses depuis un service addresses
-        // const addresses = await addressService.getByUser(String(user.id));
         setAddressesCount(2); // Temporaire
       } catch (error) {
-        console.warn('Error loading user data:', error);
+        errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error loading user data:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
         setLoading(false);
       }
@@ -82,8 +92,8 @@ export const ClientProfileScreen: React.FC = () => {
   };
 
   const getUserInitials = () => {
-    if (user?.user_metadata?.name) {
-      return user.user_metadata.name
+    if (user?.full_name) {
+      return user.full_name
         .split(' ')
         .map((word: string) => word[0])
         .join('')
@@ -102,34 +112,274 @@ export const ClientProfileScreen: React.FC = () => {
     });
   };
 
+  const handleSendOtp = async () => {
+    if (!phoneNumber.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer votre numéro de téléphone.');
+      return;
+    }
+    setVerifying(true);
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { error } = await supabase!.auth.signInWithOtp({
+        phone: phoneNumber,
+      });
+      
+      if (error) throw error;
+      setRestoreStep(2);
+    } catch (error: any) {
+      errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Send OTP Error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+      Alert.alert('Erreur', 'Impossible d\'envoyer le code. Vérifiez le format (ex: +229XXXXXXXX).');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) return;
+    setVerifying(true);
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { error } = await supabase!.auth.verifyOtp({
+        phone: phoneNumber,
+        token: otpCode,
+        type: 'sms',
+      });
+
+      if (error) throw error;
+
+      Alert.alert('Succès', 'Votre historique a été restauré avec succès !');
+      setShowRestoreModal(false);
+      setRestoreStep(1);
+      setOtpCode('');
+      // User will be auto-logged in by Supabase Auth listener in AppNavigator
+    } catch (error: any) {
+      errorHandler.handle(error, 'Verify OTP Error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+      Alert.alert('Erreur', 'Code invalide ou expiré.');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleMenuPress = (item: any) => {
+    if (item.action === 'restore') {
+      setShowRestoreModal(true);
+    } else if (item.screen) {
+      navigation.navigate(item.screen);
+    }
+  };
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: getColor.bg,
+    },
+    header: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.xxl,
+      paddingBottom: spacing.lg,
+    },
+    headerTitle: {
+      fontSize: fontSize.xxl,
+      fontWeight: '700',
+      color: getColor.text,
+    },
+    profileCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.xl,
+      backgroundColor: getColor.card,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: getColor.border,
+    },
+    avatar: {
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      borderWidth: 3,
+      borderColor: getColor.accent,
+    },
+    profileInfo: {
+      flex: 1,
+      marginLeft: spacing.md,
+    },
+    userName: {
+      fontSize: fontSize.lg,
+      fontWeight: '700',
+      color: getColor.text,
+    },
+    userEmail: {
+      fontSize: fontSize.sm,
+      color: getColor.textSoft,
+    },
+    userPhone: {
+      fontSize: fontSize.sm,
+      color: getColor.textMuted,
+      marginBottom: spacing.xs,
+    },
+    joinDate: {
+      fontSize: fontSize.xs,
+      color: getColor.accent,
+      fontStyle: 'italic',
+    },
+    avatarPlaceholder: {
+      backgroundColor: getColor.accent + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitials: {
+      fontSize: fontSize.xl,
+      fontWeight: '700',
+      color: getColor.accent,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.md,
+    },
+    editButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: getColor.accent + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.lg,
+      backgroundColor: getColor.card,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: getColor.border,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: fontSize.xxl,
+      fontWeight: '700',
+      color: getColor.text,
+    },
+    statLabel: {
+      fontSize: fontSize.xs,
+      color: getColor.textMuted,
+      marginTop: 4,
+    },
+    statDivider: {
+      width: 1,
+      backgroundColor: getColor.border,
+    },
+    menuContainer: {
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.xl,
+      backgroundColor: getColor.card,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: getColor.border,
+      overflow: 'hidden',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: getColor.border,
+    },
+    menuIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: getColor.accent + '15',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    menuLabel: {
+      flex: 1,
+      fontSize: fontSize.md,
+      color: getColor.text,
+    },
+    themeToggleItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: getColor.border,
+    },
+    logoutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      marginHorizontal: spacing.xl,
+      marginTop: spacing.xl,
+      backgroundColor: getColor.error + '15',
+      padding: spacing.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: getColor.error + '30',
+    },
+    logoutText: {
+      fontSize: fontSize.md,
+      fontWeight: '600',
+      color: getColor.error,
+    },
+    appInfo: {
+      alignItems: 'center',
+      paddingVertical: spacing.xxxl,
+    },
+    logoText: {
+      fontSize: fontSize.xxl,
+      fontWeight: '800',
+      color: getColor.accent,
+      letterSpacing: 0.5,
+      marginBottom: spacing.md,
+    },
+    appVersion: {
+      fontSize: fontSize.sm,
+      color: getColor.textMuted,
+      marginTop: 4,
+    },
+    appDate: {
+      fontSize: fontSize.xs,
+      color: getColor.textMuted,
+      marginTop: 8,
+    },
+  }), [getColor, spacing, radius, fontSize, isDark]);
+
   const renderMenuItem = (item: any, index: number) => (
     <TouchableOpacity 
       key={index} 
       style={styles.menuItem}
-      onPress={() => item.screen && navigation.navigate(item.screen)}
+      onPress={() => handleMenuPress(item)}
     >
       <View style={styles.menuIcon}>
-        <Ionicons name={item.icon as any} size={22} color={COLORS.accent} />
+        <Ionicons name={item.icon as any} size={22} color={getColor.accent} />
       </View>
       <Text style={styles.menuLabel}>{item.label}</Text>
-      <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+      <Ionicons name="chevron-forward" size={20} color={getColor.textMuted} />
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={getColor.bg} />
       
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mon profil</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile Card */}
         <View style={styles.profileCard}>
-          {user?.user_metadata?.avatar_url ? (
-            <Image source={{ uri: user.user_metadata.avatar_url }} style={styles.avatar} />
+          {user?.avatar_url ? (
+            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Text style={styles.avatarInitials}>{getUserInitials()}</Text>
@@ -137,26 +387,25 @@ export const ClientProfileScreen: React.FC = () => {
           )}
           <View style={styles.profileInfo}>
             <Text style={styles.userName}>
-              {user?.user_metadata?.name || 'Utilisateur'}
+              {user?.full_name || 'Utilisateur'}
             </Text>
             <Text style={styles.userEmail}>{user?.email || 'Email non disponible'}</Text>
             <Text style={styles.userPhone}>
-              {user?.user_metadata?.phone || user?.phone || 'Téléphone non renseigné'}
+              {user?.whatsapp_number || user?.phone || 'Téléphone non renseigné'}
             </Text>
             <Text style={styles.joinDate}>
               Membre depuis {user?.created_at ? formatDate(user.created_at) : 'Date inconnue'}
             </Text>
           </View>
           <TouchableOpacity style={styles.editButton}>
-            <Ionicons name="pencil" size={18} color={COLORS.accent} />
+            <Ionicons name="pencil" size={18} color={getColor.accent} />
           </TouchableOpacity>
         </View>
 
-        {/* Stats */}
         <View style={styles.statsContainer}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator color={COLORS.accent} size="small" />
+              <ActivityIndicator color={getColor.accent} size="small" />
             </View>
           ) : (
             <>
@@ -181,208 +430,152 @@ export const ClientProfileScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Menu */}
         <View style={styles.menuContainer}>
           {MENU_ITEMS.map(renderMenuItem)}
+          
+          <View style={styles.themeToggleItem}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={styles.menuIcon}>
+                <Ionicons name="color-palette-outline" size={22} color={getColor.accent} />
+              </View>
+              <Text style={styles.menuLabel}>Thème de l'application</Text>
+            </View>
+            <ThemeToggle />
+          </View>
         </View>
 
-        {/* Logout */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={22} color={COLORS.danger} />
+          <Ionicons name="log-out-outline" size={22} color={getColor.error} />
           <Text style={styles.logoutText}>Déconnexion</Text>
         </TouchableOpacity>
-
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <Text style={[styles.logoText, { alignSelf: 'center' }]}>libreshop</Text>
-          <Text style={styles.appVersion}>Version 1.0.0</Text>
-          <Text style={styles.appDate}>© 2026 LibreShop</Text>
-        </View>
       </ScrollView>
+
+      {/* Restore History Modal */}
+      <Modal
+        visible={showRestoreModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRestoreModal(false)}
+      >
+        <View style={modalStyles.overlay}>
+          <View style={[modalStyles.content, { backgroundColor: getColor.card }]}>
+            <View style={modalStyles.header}>
+              <Text style={[modalStyles.title, { color: getColor.text }]}>
+                {restoreStep === 1 ? 'Restaurer mon historique' : 'Vérification'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowRestoreModal(false)}>
+                <Ionicons name="close" size={24} color={getColor.text} />
+              </TouchableOpacity>
+            </View>
+
+            {restoreStep === 1 ? (
+              <View>
+                <Text style={[modalStyles.description, { color: getColor.textSoft }]}>
+                  Entrez votre numéro de téléphone pour récupérer vos favoris et vos commandes passées.
+                </Text>
+                <TextInput
+                  style={[modalStyles.input, { borderColor: getColor.border, color: getColor.text }]}
+                  placeholder="+229 XX XX XX XX"
+                  placeholderTextColor={getColor.textMuted}
+                  keyboardType="phone-pad"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[modalStyles.button, { backgroundColor: getColor.accent }]}
+                  onPress={handleSendOtp}
+                  disabled={verifying}
+                >
+                  {verifying ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={modalStyles.buttonText}>Recevoir le code</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <Text style={[modalStyles.description, { color: getColor.textSoft }]}>
+                  Entrez le code envoyé au {phoneNumber}
+                </Text>
+                <TextInput
+                  style={[modalStyles.input, { borderColor: getColor.border, color: getColor.text, textAlign: 'center', letterSpacing: 5 }]}
+                  placeholder="000000"
+                  placeholderTextColor={getColor.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[modalStyles.button, { backgroundColor: getColor.accent }]}
+                  onPress={handleVerifyOtp}
+                  disabled={verifying || otpCode.length < 6}
+                >
+                  {verifying ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={modalStyles.buttonText}>Vérifier le code</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setRestoreStep(1)} style={{ marginTop: spacing.md }}>
+                  <Text style={{ color: getColor.accent, textAlign: 'center' }}>Changer de numéro</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
+const modalStyles = StyleSheet.create({
+  overlay: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  content: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
   },
   header: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.lg,
-  },
-  headerTitle: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  profileCard: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: SPACING.xl,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginBottom: 20,
   },
-  avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 3,
-    borderColor: COLORS.accent,
-  },
-  profileInfo: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  userName: {
-    fontSize: FONT_SIZE.lg,
+  title: {
+    fontSize: 18,
     fontWeight: '700',
-    color: COLORS.text,
   },
-  userEmail: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
+  description: {
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
   },
-  userPhone: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
-    marginBottom: SPACING.xs,
-  },
-  joinDate: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.accent,
-    fontStyle: 'italic',
-  },
-  avatarPlaceholder: {
-    backgroundColor: COLORS.accent + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitials: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.accent,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-  },
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.accent + '20',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    marginHorizontal: SPACING.xl,
-    marginTop: SPACING.lg,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
+  input: {
+    height: 50,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    marginBottom: 20,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  statLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    marginTop: 4,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.border,
-  },
-  menuContainer: {
-    marginHorizontal: SPACING.xl,
-    marginTop: SPACING.xl,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.accent + '15',
-    alignItems: 'center',
+  button: {
+    height: 50,
+    borderRadius: 10,
     justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  menuLabel: {
-    flex: 1,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-  },
-  logoutButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    marginHorizontal: SPACING.xl,
-    marginTop: SPACING.xl,
-    backgroundColor: COLORS.danger + '15',
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.danger + '30',
   },
-  logoutText: {
-    fontSize: FONT_SIZE.md,
+  buttonText: {
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: '600',
-    color: COLORS.danger,
-  },
-  appInfo: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xxxl,
-  },
-  logoText: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '800',
-    color: COLORS.accent,
-    letterSpacing: 0.5,
-    marginBottom: SPACING.md,
-  },
-  appName: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.textSoft,
-  },
-  appVersion: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
-    marginTop: 4,
-  },
-  appDate: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    marginTop: 8,
   },
 });
-

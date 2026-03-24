@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { Button } from './Button';
 
 interface EmptyStateProps {
@@ -21,6 +21,14 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onAction,
   style,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.iconContainer}>
@@ -39,7 +47,12 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -66,4 +79,5 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
 });
+};
 

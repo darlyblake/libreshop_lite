@@ -378,7 +378,7 @@ export const AdminStoresScreen: React.FC = () => {
               selectedStores.includes(item.id) && styles.selectedOverlayActive
             ]}>
               {selectedStores.includes(item.id) && (
-                <Ionicons name="checkmark-circle" size={32} color={COLORS.white} />
+                <Ionicons name="checkmark-circle" size={32} color={COLORS.text} />
               )}
             </View>
           )}
@@ -442,7 +442,7 @@ export const AdminStoresScreen: React.FC = () => {
               selectedStores.includes(item.id) && styles.selectionIndicatorActive
             ]}>
               {selectedStores.includes(item.id) && (
-                <Ionicons name="checkmark" size={20} color={COLORS.white} />
+                <Ionicons name="checkmark" size={20} color={COLORS.text} />
               )}
             </View>
           )}
@@ -524,7 +524,7 @@ export const AdminStoresScreen: React.FC = () => {
             selectedStores.includes(item.id) && styles.tableCheckboxActive
           ]}>
             {selectedStores.includes(item.id) && (
-              <Ionicons name="checkmark" size={14} color={COLORS.white} />
+              <Ionicons name="checkmark" size={14} color={COLORS.text} />
             )}
           </View>
         )}
@@ -634,10 +634,10 @@ export const AdminStoresScreen: React.FC = () => {
                 return (
                   <TouchableOpacity
                     key={f.id}
-                    style={[styles.statusChip, active && { backgroundColor: f.color || '#6366f1' }]}
+                    style={[styles.statusChip, active && { backgroundColor: f.color || 'COLORS.categoryColors[5]' }]}
                     onPress={() => setSelectedStatus(f.id)}
                   >
-                    <Text style={[styles.statusChipText, active && { color: 'white' }]}>
+                    <Text style={[styles.statusChipText, active && { color: COLORS.text }]}>
                       {f.label} {count > 0 && `(${count})`}
                     </Text>
                   </TouchableOpacity>
@@ -686,7 +686,7 @@ export const AdminStoresScreen: React.FC = () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setTimeout(() => setRefreshing(false), 1500);
               }}
-              colors={[COLORS.accent || '#6366f1']}
+              colors={[COLORS.accent || 'COLORS.categoryColors[5]']}
             />
           }
         >
@@ -758,7 +758,7 @@ export const AdminStoresScreen: React.FC = () => {
                 <Ionicons name="trash" size={24} color={COLORS.danger} />
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.fabBtn, { backgroundColor: '#ef4444' }]}
+                style={[styles.fabBtn, { backgroundColor: 'COLORS.danger' }]}
                 onPress={() => {
                   setSelectionMode(false);
                   setSelectedStores([]);
@@ -1015,11 +1015,11 @@ export const AdminStoresScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: 'COLORS.card' },
   header: { overflow: 'hidden', borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   headerGradient: { flex: 1, paddingTop: Platform.OS === 'ios' ? 50 : 60, paddingHorizontal: 20, paddingBottom: 16 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  headerTitle: { fontSize: 30, fontWeight: '800', color: 'white', letterSpacing: -0.8 },
+  headerTitle: { fontSize: 30, fontWeight: '800', color: COLORS.text, letterSpacing: -0.8 },
   statusChipsContainer: { paddingVertical: 8 },
   statusChip: {
     paddingHorizontal: 18,
@@ -1030,37 +1030,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  statusChipText: { color: 'white', fontSize: 15, fontWeight: '600' },
-  searchSection: { padding: 16, backgroundColor: '#f8fafc' },
+  statusChipText: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+  searchSection: { padding: 16, backgroundColor: 'COLORS.card' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
+    borderColor: 'COLORS.border',
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.07)',
     elevation: 3,
   },
-  searchInput: { flex: 1, fontSize: 16, color: '#1e293b', marginLeft: 8 },
-  activeFilterText: { marginTop: 10, fontSize: 13, color: '#64748b', fontStyle: 'italic' },
+  searchInput: { flex: 1, fontSize: 16, color: COLORS.textSoft, marginLeft: 8 },
+  activeFilterText: { marginTop: 10, fontSize: 13, color: 'COLORS.textMuted', fontStyle: 'italic' },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', padding: 12 },
   gridItem: { width: '50%', paddingHorizontal: 6, marginBottom: 16 },
   gridCard: {
     borderRadius: 20,
     padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
+    borderColor: 'COLORS.borderLight',
+    boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.08)',
     elevation: 4,
   },
   selectionOverlay: {
@@ -1075,26 +1069,23 @@ const styles = StyleSheet.create({
   gridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 },
   gridName: { fontSize: 18, fontWeight: '700', color: '#1e293b', flex: 1, marginRight: 8 },
   gridBadges: { flexDirection: 'row', gap: 8 },
-  gridOwner: { fontSize: 14, color: '#64748b', marginBottom: 12 },
+  gridOwner: { fontSize: 14, color: 'COLORS.textMuted', marginBottom: 12 },
   gridStats: { flexDirection: 'row', gap: 24, marginBottom: 12 },
   gridStat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   gridStatValue: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
-  gridStatLabel: { fontSize: 12, color: '#94a3b8' },
-  gridFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: '#f1f5f9', paddingTop: 12 },
-  gridCategory: { fontSize: 14, color: '#6366f1', fontWeight: '600' },
-  gridCity: { fontSize: 13, color: '#64748b' },
+  gridStatLabel: { fontSize: 12, color: 'COLORS.textMuted' },
+  gridFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: 'COLORS.borderLight', paddingTop: 12 },
+  gridCategory: { fontSize: 14, color: 'COLORS.categoryColors[5]', fontWeight: '600' },
+  gridCity: { fontSize: 13, color: 'COLORS.textMuted' },
   listContainer: { padding: 16 },
   listCard: {
     borderRadius: 20,
     padding: 16,
     marginBottom: 16,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
+    borderColor: 'COLORS.borderLight',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.07)',
     elevation: 3,
   },
   selectionIndicator: {
@@ -1106,7 +1097,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#cbd5e1',
     borderWidth: 3,
-    borderColor: 'white',
+    borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
@@ -1117,19 +1108,19 @@ const styles = StyleSheet.create({
   listInfo: { flex: 1 },
   listNameRow: { flexDirection: 'row', alignItems: 'center' },
   listName: { fontSize: 19, fontWeight: '700', color: '#1e293b' },
-  listOwner: { fontSize: 15, color: '#64748b', marginTop: 2 },
-  listMetrics: { flexDirection: 'row', backgroundColor: '#f8fafc', borderRadius: 16, padding: 12, marginBottom: 16 },
+  listOwner: { fontSize: 15, color: 'COLORS.textMuted', marginTop: 2 },
+  listMetrics: { flexDirection: 'row', backgroundColor: 'COLORS.card', borderRadius: 16, padding: 12, marginBottom: 16 },
   metricItem: { flex: 1, alignItems: 'center' },
   metricValue: { fontSize: 17, fontWeight: '700', color: '#1e293b', marginTop: 4 },
-  metricLabel: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  metricDivider: { width: 1, backgroundColor: '#e2e8f0' },
+  metricLabel: { fontSize: 12, color: 'COLORS.textMuted', marginTop: 2 },
+  metricDivider: { width: 1, backgroundColor: 'COLORS.border' },
   listActions: { flexDirection: 'row', gap: 12 },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: 'COLORS.borderLight',
     paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
@@ -1147,13 +1138,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
+    boxShadow: '0px 8px 16px rgba(0, 0, 0, 0.35)',
     elevation: 12,
   },
-  floatingCount: { color: 'white', fontSize: 16, fontWeight: '700' },
+  floatingCount: { color: COLORS.text, fontSize: 16, fontWeight: '700' },
   floatingActions: { flexDirection: 'row', gap: 16 },
   fabBtn: {
     width: 48,
@@ -1163,7 +1151,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: 'white', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: height * 0.9 },
+  modalContent: { backgroundColor: COLORS.card, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: height * 0.9 },
   // ======== TABLE VIEW STYLES ========
   tableContainer: {
     paddingHorizontal: 0,
@@ -1174,7 +1162,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#f0f4f8',
     borderBottomWidth: 2,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: 'COLORS.border',
     alignItems: 'center',
   },
   tableHeaderText: {
@@ -1208,11 +1196,11 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: 'white',
+    borderBottomColor: 'COLORS.border',
+    backgroundColor: COLORS.card,
   },
   tableRowAlt: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'COLORS.card',
   },
   tableRowContent: {
     flexDirection: 'row',
@@ -1262,7 +1250,7 @@ const styles = StyleSheet.create({
   },
   tableStoreOwner: {
     fontSize: 12,
-    color: '#64748b',
+    color: 'COLORS.textMuted',
     marginTop: 2,
   },
   tableColViews: {
@@ -1307,7 +1295,7 @@ const styles = StyleSheet.create({
   },
   tableLabel: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: 'COLORS.textMuted',
     marginTop: 2,
   },
   tableRatingValue: {
@@ -1341,7 +1329,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: 'COLORS.border',
   },
   modalTitle: {
     fontSize: 24,
@@ -1383,7 +1371,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'COLORS.card',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1397,7 +1385,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'COLORS.borderLight',
   },
   modalSectionTitle: {
     fontSize: 16,
@@ -1411,14 +1399,14 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f8fafc',
+    borderBottomColor: 'COLORS.card',
   },
   modalInfoContent: {
     flex: 1,
   },
   modalInfoLabel: {
     fontSize: 12,
-    color: '#64748b',
+    color: 'COLORS.textMuted',
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -1431,12 +1419,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f8fafc',
+    borderTopColor: 'COLORS.card',
   },
   modalDescTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#64748b',
+    color: 'COLORS.textMuted',
     marginBottom: 8,
   },
   modalDescText: {
@@ -1451,12 +1439,12 @@ const styles = StyleSheet.create({
   },
   modalStatCard: {
     width: '48%',
-    backgroundColor: '#f8fafc',
+    backgroundColor: 'COLORS.card',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#f1f5f9',
+    borderColor: 'COLORS.borderLight',
   },
   modalStatIconBox: {
     width: 48,
@@ -1475,7 +1463,7 @@ const styles = StyleSheet.create({
   },
   modalStatLabel: {
     fontSize: 12,
-    color: '#64748b',
+    color: 'COLORS.textMuted',
     fontWeight: '600',
   },
   modalPerformanceItem: {

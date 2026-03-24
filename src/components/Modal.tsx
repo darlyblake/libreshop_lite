@@ -9,7 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface ModalProps {
   visible: boolean;
@@ -26,6 +26,14 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   style,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <RNModal
       visible={visible}
@@ -52,7 +60,12 @@ export const Modal: React.FC<ModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -89,4 +102,5 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
   },
 });
+};
 

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, Store, Product, Order, OrderItem, authService } from '../lib/supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 
 // Auth Store
 interface AuthState {
@@ -26,7 +27,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Clear Supabase session
       await authService.signOut();
     } catch (error) {
-      console.warn('Error signing out from Supabase:', error);
+      errorHandler.handle(error, 'Error signing out from Supabase:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
     }
     
     // Clear store state
@@ -73,16 +74,16 @@ export const useCartStore = create<CartState>()(
         const { items, storeId } = get();
         const productStoreId = (product as any)?.store_id as string | undefined;
 
-        // Enforce "cart per store" rule: if cart already belongs to another store,
-        // reset it and start a new cart for the new store.
-        if (items.length > 0 && storeId && productStoreId && storeId !== productStoreId) {
-          set({ items: [{ product, quantity }], storeId: productStoreId });
-          return;
-        }
-
         // If cart is empty, lock cart storeId to the product store_id when available.
         if (items.length === 0 && productStoreId) {
           set({ storeId: productStoreId });
+        }
+
+        // If cart already belongs to a different store, allow multi-store carts
+        // by setting storeId to null to indicate a mixed cart rather than
+        // resetting the previous items (preserve user expectation of multiple stores).
+        if (items.length > 0 && storeId && productStoreId && storeId !== productStoreId) {
+          set({ storeId: null });
         }
 
         const existingItem = items.find((item) => item.product.id === product.id);
@@ -100,7 +101,14 @@ export const useCartStore = create<CartState>()(
       },
       removeItem: (productId) => {
         const next = get().items.filter((item) => item.product.id !== productId);
-        set({ items: next, storeId: next.length > 0 ? get().storeId : null });
+        // Recompute storeId: if all remaining items belong to same store, set it; otherwise null
+        let nextStoreId: string | null = null;
+        if (next.length > 0) {
+          const ids = next.map((i) => (i.product as any)?.store_id).filter(Boolean) as string[];
+          const unique = Array.from(new Set(ids));
+          nextStoreId = unique.length === 1 ? unique[0] : null;
+        }
+        set({ items: next, storeId: nextStoreId });
       },
       updateQuantity: (productId, quantity) => {
         if (quantity <= 0) {

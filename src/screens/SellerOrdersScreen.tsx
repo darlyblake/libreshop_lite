@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   TextInput,
   RefreshControl,
   Platform,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -160,8 +162,8 @@ export const SellerOrdersScreen: React.FC = () => {
             }))
           : [];
 
-        const customerName = String(o?.users?.full_name || '').trim();
-        const customerPhone = String(o?.users?.phone || o?.customer_phone || '').trim();
+        const customerName = String(o?.customer_name || o?.users?.full_name || '').trim();
+        const customerPhone = String(o?.customer_phone || o?.users?.phone || '').trim();
 
         return {
           id: String(o.id),
@@ -179,7 +181,7 @@ export const SellerOrdersScreen: React.FC = () => {
 
       setOrders(mapped);
     } catch (e: any) {
-      console.error('load orders', e);
+      errorHandler.handleDatabaseError(e, 'load orders');
       const rawMsg = String(e?.message || '');
       const isRls =
         rawMsg.toLowerCase().includes('permission denied') ||
@@ -238,7 +240,7 @@ export const SellerOrdersScreen: React.FC = () => {
     });
 
     return filtered;
-  }, [selectedFilter, searchQuery, sortBy, sortOrder]);
+  }, [orders, selectedFilter, searchQuery, sortBy, sortOrder]);
 
   const stats = useMemo(() => ({
     total: orders.reduce((sum, order) => sum + order.total, 0),
@@ -268,9 +270,17 @@ export const SellerOrdersScreen: React.FC = () => {
     );
   };
 
-  const handleContactCustomer = (phone: string) => {
-    // Logique pour contacter le client (WhatsApp, téléphone)
-    Alert.alert('Contacter', `Appeler le ${phone}`);
+  const handleContactCustomer = (phone: string, customer: string, total: number) => {
+    const formattedPhone = phone.replace(/[^0-9+]/g, '');
+    const message = `Bonjour ${customer}, concernant votre commande de ${total.toLocaleString()} FCFA sur LibreShop.`;
+    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    
+    Linking.canOpenURL(url).then(supported => {
+      if (supported) Linking.openURL(url);
+      else Alert.alert('Contacter', `Appeler le ${phone}`);
+    }).catch(() => {
+      Alert.alert('Contacter', `Appeler le ${phone}`);
+    });
   };
 
   // Export toutes les commandes en PDF
@@ -393,7 +403,7 @@ export const SellerOrdersScreen: React.FC = () => {
               </Text>
               <TouchableOpacity 
                 style={styles.phoneRow}
-                onPress={() => handleContactCustomer(order.phone)}
+                onPress={() => handleContactCustomer(order.phone, order.customer, order.total)}
               >
                 <Ionicons name="logo-whatsapp" size={fontSize.sm} color={COLORS.success} />
                 <Text style={[styles.phoneText, { fontSize: fontSize.sm }]}>
@@ -481,7 +491,7 @@ export const SellerOrdersScreen: React.FC = () => {
                 end={{ x: 1, y: 0 }}
                 style={styles.confirmGradient}
               />
-              <Ionicons name="checkmark" size={fontSize.md} color={COLORS.white} />
+              <Ionicons name="checkmark" size={fontSize.md} color={COLORS.text} />
               <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>
                 Confirmer
               </Text>
@@ -610,7 +620,7 @@ export const SellerOrdersScreen: React.FC = () => {
       fontWeight: '500',
     },
     filterTextActive: {
-      color: COLORS.white,
+      color: COLORS.text,
     },
     filterCount: {
       fontSize: fontSize.xs,
@@ -618,7 +628,7 @@ export const SellerOrdersScreen: React.FC = () => {
       marginLeft: 4,
     },
     filterCountActive: {
-      color: COLORS.white + 'CC',
+      color: COLORS.text + 'CC',
     },
     sortBar: {
       flexDirection: 'row',
@@ -837,7 +847,7 @@ export const SellerOrdersScreen: React.FC = () => {
       bottom: 0,
     },
     confirmButtonText: {
-      color: COLORS.white,
+      color: COLORS.text,
       fontWeight: '500',
     },
     shippedButton: {
@@ -884,7 +894,7 @@ export const SellerOrdersScreen: React.FC = () => {
       borderRadius: RADIUS.lg,
     },
     emptyStateButtonText: {
-      color: COLORS.white,
+      color: COLORS.text,
       fontWeight: '600',
     },
   });
@@ -937,7 +947,7 @@ export const SellerOrdersScreen: React.FC = () => {
               style={styles.headerButton}
               onPress={() => navigation.navigate('SellerCaisse')}
             >
-              <Ionicons name="add" size={fontSize.lg} color={COLORS.white} />
+              <Ionicons name="add" size={fontSize.lg} color={COLORS.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -981,7 +991,7 @@ export const SellerOrdersScreen: React.FC = () => {
               <Ionicons 
                 name={filter.icon as any} 
                 size={fontSize.sm} 
-                color={selectedFilter === filter.id ? COLORS.white : COLORS.textMuted} 
+                color={selectedFilter === filter.id ? COLORS.text : COLORS.textMuted} 
               />
               <Text style={[
                 styles.filterText,

@@ -18,6 +18,7 @@ import { cloudinaryService } from '../lib/cloudinaryService';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
 
 interface FormData {
@@ -58,6 +59,41 @@ export const SellerAddProductScreen: React.FC = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const [showNewCollection, setShowNewCollection] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+
+  const handleCreateCollection = async () => {
+    if (!newCollectionName.trim() || !storeId) return;
+    try {
+      setIsLoading(true);
+      const newCol = await collectionService.create({ store_id: storeId, name: newCollectionName.trim(), is_active: true } as any);
+      setCollections(prev => [...prev, newCol as Collection]);
+      setCollectionId(newCol.id);
+      setShowNewCollection(false);
+      setNewCollectionName('');
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de créer la collection');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const moveImage = (index: number, direction: -1 | 1) => {
+    setImages(prev => {
+      const newImages = [...prev];
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= newImages.length) return newImages;
+      const temp = newImages[index];
+      newImages[index] = newImages[targetIndex];
+      newImages[targetIndex] = temp;
+      return newImages;
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   useEffect(() => {
     const loadStoreAndCollections = async () => {
       if (!user?.id) return;
@@ -77,7 +113,7 @@ export const SellerAddProductScreen: React.FC = () => {
           setCollectionId(firstActive.id);
         }
       } catch (e) {
-        console.error('loadStoreAndCollections', e);
+        errorHandler.handleDatabaseError(e, 'loadStoreAndCollections');
       }
     };
     loadStoreAndCollections();
@@ -114,7 +150,7 @@ export const SellerAddProductScreen: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaTypeOptions.Images],
+        mediaTypes: ['images'],
         quality: 0.8,
         allowsEditing: true,
       });
@@ -124,7 +160,7 @@ export const SellerAddProductScreen: React.FC = () => {
       if (!uri) return;
       setImages((prev) => [...prev, uri].slice(0, 5));
     } catch (e) {
-      console.warn('pickImages error', e);
+      errorHandler.handle(e, 'pickImages error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       Alert.alert('Erreur', "Impossible d'ajouter l'image");
     }
   };
@@ -176,7 +212,7 @@ export const SellerAddProductScreen: React.FC = () => {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      console.error('Error creating product:', error);
+      errorHandler.handleDatabaseError(error, 'Error creating product:');
       Alert.alert('Erreur', 'Impossible de créer le produit');
     } finally {
       setIsLoading(false);
@@ -190,12 +226,34 @@ export const SellerAddProductScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Informations générales</Text>
 
-        <TouchableOpacity onPress={pickCollection} style={styles.collectionSelect} activeOpacity={0.8}>
-          <Text style={styles.collectionSelectLabel}>Collection *</Text>
-          <Text style={styles.collectionSelectValue}>
-            {collections?.find((c) => c.id === collectionId)?.name || 'Sélectionner une collection'}
-          </Text>
-        </TouchableOpacity>
+        {showNewCollection ? (
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACING.md, alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}>
+              <Input 
+                label="Nouvelle collection"
+                placeholder="Ex: Nouveautés" 
+                value={newCollectionName} 
+                onChangeText={setNewCollectionName} 
+              />
+            </View>
+            <Button title="Créer" onPress={handleCreateCollection} style={{ marginBottom: 16 }} />
+            <TouchableOpacity onPress={() => setShowNewCollection(false)} style={{ marginBottom: 24, marginHorizontal: 8 }}>
+              <Ionicons name="close" size={24} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+            <TouchableOpacity onPress={pickCollection} style={[styles.collectionSelect, { flex: 1, marginBottom: 0 }]} activeOpacity={0.8}>
+              <Text style={styles.collectionSelectLabel}>Collection *</Text>
+              <Text style={styles.collectionSelectValue}>
+                {collections?.find((c) => c.id === collectionId)?.name || 'Sélectionner une collection'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowNewCollection(true)} style={{ marginLeft: 8, padding: 12, backgroundColor: COLORS.accent + '15', borderRadius: RADIUS.md }}>
+              <Ionicons name="add" size={24} color={COLORS.accent} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <Input
           label="Nom du produit"
@@ -312,11 +370,50 @@ export const SellerAddProductScreen: React.FC = () => {
           <Text style={styles.imagePickerText}>Ajouter des images</Text>
         </TouchableOpacity>
         {!!images.length && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            {images.map((uri, idx) => (
-              <Image key={String(idx)} source={{ uri }} style={{ width: 64, height: 64, borderRadius: 8 }} />
-            ))}
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 16, paddingBottom: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 16, paddingHorizontal: 4 }}>
+              {images.map((uri, idx) => (
+                <View key={String(idx)} style={{ position: 'relative', paddingBottom: 12 }}>
+                  <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border }} />
+                  <View style={{ 
+                    position: 'absolute', 
+                    bottom: 0, 
+                    alignSelf: 'center', 
+                    flexDirection: 'row', 
+                    backgroundColor: COLORS.card, 
+                    borderRadius: 12, 
+                    elevation: 4, 
+                    paddingHorizontal: 6, 
+                    paddingVertical: 4,
+                    ...Platform.select({
+                      web: { boxShadow: '0 2px 4px rgba(0,0,0,0.25)' },
+                      default: {
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 3.84,
+                      }
+                    })
+                  }}>
+                    <TouchableOpacity onPress={() => moveImage(idx, -1)} disabled={idx === 0}>
+                      <Ionicons name="chevron-back" size={18} color={idx === 0 ? COLORS.textMuted : COLORS.accent} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => removeImage(idx)} style={{ marginHorizontal: 8 }}>
+                      <Ionicons name="trash" size={18} color={COLORS.danger} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => moveImage(idx, 1)} disabled={idx === images.length - 1}>
+                      <Ionicons name="chevron-forward" size={18} color={idx === images.length - 1 ? COLORS.textMuted : COLORS.accent} />
+                    </TouchableOpacity>
+                  </View>
+                  {idx === 0 && (
+                    <View style={{ position: 'absolute', top: 4, left: 4, backgroundColor: COLORS.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                       <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>Principal</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         )}
       </View>
 

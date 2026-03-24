@@ -21,6 +21,7 @@ import { Input } from '../components/Input';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { Product } from '../lib/supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 
 interface FormData {
   name: string;
@@ -84,7 +85,7 @@ export const SellerEditProductScreen: React.FC = () => {
       });
       setImages(product.images || []);
     } catch (error) {
-      console.error('Error loading product:', error);
+      errorHandler.handleDatabaseError(error as Error, 'ProductLoad');
       Alert.alert('Erreur', 'Impossible de charger le produit');
     } finally {
       setIsFetching(false);
@@ -104,7 +105,7 @@ export const SellerEditProductScreen: React.FC = () => {
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsMultipleSelection: true,
         quality: 0.8,
       });
@@ -116,7 +117,7 @@ export const SellerEditProductScreen: React.FC = () => {
         updateField('images', updatedImages);
       }
     } catch (error) {
-      console.error('Error picking images:', error);
+      errorHandler.handle(error as Error, 'ImagePicker', ErrorCategory.USER_INPUT, ErrorSeverity.MEDIUM);
       Alert.alert('Erreur', 'Impossible de sélectionner les images');
     }
   };
@@ -136,7 +137,7 @@ export const SellerEditProductScreen: React.FC = () => {
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.8,
       });
 
@@ -146,7 +147,7 @@ export const SellerEditProductScreen: React.FC = () => {
         updateField('images', updatedImages);
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
+      errorHandler.handle(error as Error, 'CameraCapture', ErrorCategory.USER_INPUT, ErrorSeverity.MEDIUM);
       Alert.alert('Erreur', 'Impossible de prendre la photo');
     }
   };
@@ -183,7 +184,7 @@ export const SellerEditProductScreen: React.FC = () => {
             uploadedImages[index] = uploadedUrl;
           }
         } catch (error) {
-          console.error('Error uploading image:', error);
+          errorHandler.handleNetworkError(error as Error, 'ImageUpload');
         }
       }
 
@@ -204,7 +205,7 @@ export const SellerEditProductScreen: React.FC = () => {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
-      console.error('Error updating product:', error);
+      errorHandler.handleDatabaseError(error as Error, 'ProductUpdate');
       Alert.alert('Erreur', 'Impossible de mettre à jour le produit');
     } finally {
       setIsLoading(false);
@@ -490,7 +491,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 2,
   },

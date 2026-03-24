@@ -127,7 +127,7 @@ export const AdminFeaturedScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Mise en avant</Text>
         <TouchableOpacity style={styles.addButton} onPress={() => openModal()}>
-          <Ionicons name="add" size={24} color={COLORS.white} />
+          <Ionicons name="add" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -195,7 +195,7 @@ export const AdminFeaturedScreen: React.FC = () => {
                     style={[styles.typeOption, types.includes(t as any) && styles.typeOptionSelected]}
                     onPress={() => toggleType(t as any)}
                   >
-                    <Text style={[styles.typeOptionText, types.includes(t as any) && { color: COLORS.white }]}> 
+                    <Text style={[styles.typeOptionText, types.includes(t as any) && { color: COLORS.text }]}> 
                       {t === 'main' ? 'Bannière principale' : t === 'promo' ? 'Promotion spéciale' : 'Boutique sponsorisée'}
                     </Text>
                   </TouchableOpacity>
@@ -275,5 +275,5 @@ const styles = StyleSheet.create({
   activeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md, justifyContent: 'space-between' },
   activeLabel: { fontSize: FONT_SIZE.sm, color: COLORS.text },
   saveButton: { backgroundColor: COLORS.accent, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center' },
-  saveButtonText: { color: COLORS.white, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  saveButtonText: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '700' },
 });

@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Order, OrderStatus } from '../lib/supabase';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface OrderCardProps {
   order: Order;
@@ -68,6 +68,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   onPress,
   style,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <TouchableOpacity
       style={[styles.container, style]}
@@ -120,7 +128,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.xl,
@@ -181,4 +194,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+};
 

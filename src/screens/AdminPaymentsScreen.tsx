@@ -16,9 +16,10 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
-import { supabase } from '../lib/supabase';
+import { planService, storeService, supabase, type Plan } from '../lib/supabase';
 
 interface StorePayment {
   id: string;
@@ -30,6 +31,7 @@ interface StorePayment {
   paymentDate: string;
   nextBillingDate: string;
   subscriptionActive: boolean;
+  subscriptionEnd?: string;
   cashierActive: boolean;
   onlineStoreActive: boolean;
   productsLimit: number;
@@ -45,6 +47,7 @@ export const AdminPaymentsScreen: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
 
   const [stores, setStores] = useState<StorePayment[]>([]);
 
@@ -52,17 +55,22 @@ export const AdminPaymentsScreen: React.FC = () => {
     if (!supabase) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('stores')
-        .select(
-          'id,name,product_limit,subscription_plan,subscription_price,subscription_status,cashier_active,online_store_active,billing_status,last_payment_date,next_billing_date,users:users!stores_user_id_fkey(full_name)'
-        )
-        .order('created_at', { ascending: false });
+      const [storesRes, plansRes] = await Promise.all([
+        supabase
+          .from('stores')
+          .select(
+            'id,name,product_limit,subscription_plan,subscription_price,subscription_status,subscription_end,cashier_active,online_store_active,billing_status,last_payment_date,next_billing_date,users:users!stores_user_id_fkey(full_name)'
+          )
+          .order('created_at', { ascending: false }),
+        planService.getAll()
+      ]);
 
-      if (error) throw error;
+      if (storesRes.error) throw storesRes.error;
+      
+      setAvailablePlans(plansRes.filter(p => p.status !== 'inactive'));
 
       setStores(
-        (data || []).map((s: any) => ({
+        (storesRes.data || []).map((s: any) => ({
           id: String(s.id),
           storeName: String(s.name || ''),
           ownerName: String(s.users?.full_name || ''),
@@ -70,8 +78,9 @@ export const AdminPaymentsScreen: React.FC = () => {
           subscriptionPrice: Number(s.subscription_price || 0),
           paymentStatus: (s.billing_status || 'pending') as any,
           paymentDate: s.last_payment_date ? String(s.last_payment_date) : '-',
-          nextBillingDate: s.next_billing_date ? String(s.next_billing_date) : '-',
-          subscriptionActive: String(s.subscription_status || '') === 'active' || String(s.subscription_status || '') === 'trial',
+          nextBillingDate: (s.next_billing_date || s.subscription_end) ? String(s.next_billing_date || s.subscription_end) : '-',
+          subscriptionActive: String(s.subscription_status || '').toLowerCase() === 'active' || String(s.subscription_status || '').toLowerCase() === 'trial',
+          subscriptionEnd: s.subscription_end ? String(s.subscription_end) : undefined,
           cashierActive: Boolean(s.cashier_active ?? true),
           onlineStoreActive: Boolean(s.online_store_active ?? true),
           productsLimit: Number(s.product_limit || 0),
@@ -79,7 +88,7 @@ export const AdminPaymentsScreen: React.FC = () => {
         }))
       );
     } catch (e) {
-      console.error('load payments stores', e);
+      errorHandler.handleDatabaseError(e, 'load payments stores');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de charger les paiements');
       } else {
@@ -131,6 +140,46 @@ export const AdminPaymentsScreen: React.FC = () => {
     }
   };
 
+  const getProratedPrice = (store: any, newPlanPrice: number) => {
+    try {
+      // If store is trial or active with 0 price, no credit
+      if (!store.subscriptionActive || !store.subscriptionPrice || store.subscriptionPrice <= 0) {
+        return newPlanPrice;
+      }
+
+      // If they haven't paid for the current plan (unless it's a trial), no credit
+      if (store.paymentStatus !== 'paid' && String(store.currentSubscription).toLowerCase() !== 'trial') {
+        return newPlanPrice;
+      }
+
+      const now = new Date();
+      // Ensure date is valid
+      const endDateValue = store.nextBillingDate || store.subscriptionEnd;
+      if (!endDateValue || endDateValue === '-') return newPlanPrice;
+
+      const endDate = new Date(endDateValue);
+      if (isNaN(endDate.getTime()) || endDate <= now) return newPlanPrice;
+
+      const remainingMs = endDate.getTime() - now.getTime();
+      const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+      
+      const currentPrice = Number(store.subscriptionPrice);
+      if (isNaN(currentPrice) || currentPrice <= 0) return newPlanPrice;
+
+      const credit = Math.floor((currentPrice / 30) * remainingDays);
+      const finalPrice = Math.max(0, newPlanPrice - credit);
+      
+      if (__DEV__) {
+        console.log(`[Prorata] Store: ${store.storeName}, Remaining Days: ${remainingDays}, Credit: ${credit}, Final: ${finalPrice}`);
+      }
+      
+      return isNaN(finalPrice) ? newPlanPrice : finalPrice;
+    } catch (e) {
+      console.error('Prorata error:', e);
+      return newPlanPrice;
+    }
+  };
+
   const toggleFeature = async (storeId: string, feature: 'cashier' | 'online' | 'subscription') => {
     if (!supabase) return;
 
@@ -172,7 +221,7 @@ export const AdminPaymentsScreen: React.FC = () => {
         )
       );
     } catch (e) {
-      console.error('toggle feature', e);
+      errorHandler.handleDatabaseError(e, 'toggle feature');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de modifier la fonctionnalité');
       } else {
@@ -181,50 +230,47 @@ export const AdminPaymentsScreen: React.FC = () => {
     }
   };
 
-  const upgradeSubscription = async (storeId: string, newSub: string, newPrice: number, productsLimit: number) => {
+  const upgradeSubscription = async (storeId: string, planId: string) => {
     if (!supabase) return;
     try {
-      const { data, error } = await supabase
-        .from('stores')
-        .update({
-          subscription_plan: newSub,
-          subscription_price: newPrice,
-          product_limit: productsLimit,
-          billing_status: 'pending',
-        })
-        .eq('id', storeId)
-        .select('id,subscription_plan,subscription_price,product_limit,billing_status')
-        .single();
-
-      if (error) throw error;
+      setLoading(true);
+      const updatedStore = await storeService.upgradeSubscription(storeId, planId);
 
       setStores(prev =>
         prev.map(s =>
           s.id === storeId
             ? {
                 ...s,
-                currentSubscription: (data as any)?.subscription_plan || newSub,
-                subscriptionPrice: Number((data as any)?.subscription_price || newPrice),
-                productsLimit: Number((data as any)?.product_limit || productsLimit),
-                paymentStatus: ((data as any)?.billing_status || 'pending') as any,
+                currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
+                subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
+                productsLimit: Number(updatedStore.product_limit || s.productsLimit),
+                paymentStatus: (updatedStore.billing_status || 'paid') as any,
+                paymentDate: updatedStore.last_payment_date || s.paymentDate,
+                nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
+                subscriptionActive: 
+                  String(updatedStore.subscription_status).toLowerCase() === 'active' || 
+                  String(updatedStore.subscription_status).toLowerCase() === 'trial',
               }
             : s
         )
       );
 
+      const planName = updatedStore.subscription_plan || 'Nouveau plan';
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert(`✅ Offre changée en ${newSub}`);
+        window.alert(`✅ Offre changée en ${planName}`);
       } else {
-        Alert.alert('Upgrade effectué', `Offre changée en ${newSub}`);
+        Alert.alert('Upgrade effectué', `Offre changée en ${planName}`);
       }
       setShowUpgradeModal(false);
     } catch (e) {
-      console.error('upgrade subscription', e);
+      errorHandler.handleDatabaseError(e, 'upgrade subscription');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de changer l\'offre');
       } else {
         Alert.alert('Erreur', "Impossible de changer l'offre");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -234,9 +280,13 @@ export const AdminPaymentsScreen: React.FC = () => {
       const today = new Date().toISOString().slice(0, 10);
       const { data, error } = await supabase
         .from('stores')
-        .update({ billing_status: 'paid', last_payment_date: today })
+        .update({ 
+          billing_status: 'paid', 
+          last_payment_date: today,
+          subscription_status: 'active' 
+        })
         .eq('id', storeId)
-        .select('id,billing_status,last_payment_date')
+        .select('id,billing_status,last_payment_date,subscription_status')
         .single();
       if (error) throw error;
       setStores(prev =>
@@ -246,6 +296,9 @@ export const AdminPaymentsScreen: React.FC = () => {
                 ...s,
                 paymentStatus: ((data as any)?.billing_status || 'paid') as any,
                 paymentDate: (data as any)?.last_payment_date ? String((data as any).last_payment_date) : s.paymentDate,
+                subscriptionActive: 
+                  String((data as any)?.subscription_status).toLowerCase() === 'active' || 
+                  String((data as any)?.subscription_status).toLowerCase() === 'trial',
               }
             : s
         )
@@ -256,7 +309,7 @@ export const AdminPaymentsScreen: React.FC = () => {
         Alert.alert('Paiement validé', 'Le paiement a été marqué comme reçu');
       }
     } catch (e) {
-      console.error('mark payment paid', e);
+      errorHandler.handleDatabaseError(e, 'mark payment paid');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de valider le paiement');
       } else {
@@ -265,11 +318,6 @@ export const AdminPaymentsScreen: React.FC = () => {
     }
   };
 
-  const subscriptionOptions = [
-    { name: 'Starter', price: 9990, productsLimit: 50 },
-    { name: 'Professional', price: 19990, productsLimit: 200 },
-    { name: 'Enterprise', price: 49990, productsLimit: 9999 },
-  ];
 
   return (
     <View style={styles.container}>
@@ -278,7 +326,7 @@ export const AdminPaymentsScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gestion des Paiements</Text>
         <TouchableOpacity style={styles.exportButton}>
-          <Ionicons name="download-outline" size={20} color={COLORS.white} />
+          <Ionicons name="download-outline" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -542,22 +590,38 @@ export const AdminPaymentsScreen: React.FC = () => {
               </View>
 
               <ScrollView style={styles.modalBody}>
-                {subscriptionOptions.map(sub => (
+                {availablePlans.map(sub => (
                   <TouchableOpacity
-                    key={sub.name}
+                    key={sub.id}
                     style={[
                       styles.subscriptionOption,
                       selectedStore.currentSubscription === sub.name && styles.subscriptionOptionSelected,
                     ]}
-                    onPress={() => upgradeSubscription(selectedStore.id, sub.name, sub.price, sub.productsLimit)}
+                    onPress={() => upgradeSubscription(selectedStore.id, sub.id)}
                   >
                     <View>
                       <Text style={styles.optionName}>{sub.name}</Text>
-                      <Text style={styles.optionDetails}>{sub.productsLimit} produits max</Text>
+                      <Text style={styles.optionDetails}>
+                        {sub.product_limit ? `${sub.product_limit} produits max` : 'Produits illimités'}
+                      </Text>
                     </View>
-                    <Text style={styles.optionPrice}>{sub.price.toLocaleString()} FCFA</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.optionPrice}>
+                        {sub.price === 0 ? 'GRATUIT' : `${sub.price.toLocaleString()} FCFA`}
+                      </Text>
+                      {selectedStore.subscriptionActive && sub.price > 0 && (
+                        <Text style={{ color: COLORS.success, fontSize: 10, fontWeight: '600' }}>
+                          Prorata: {getProratedPrice(selectedStore, sub.price).toLocaleString()} FCFA
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 ))}
+                {availablePlans.length === 0 && (
+                  <Text style={{ textAlign: 'center', color: COLORS.textMuted, padding: SPACING.xl }}>
+                    Aucun plan disponible
+                  </Text>
+                )}
               </ScrollView>
             </View>
           </View>
@@ -636,7 +700,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterTextActive: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
   statsContainer: {
     flexDirection: 'row',

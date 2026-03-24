@@ -13,7 +13,8 @@ import {
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE, SHADOWS } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
+import { SHADOWS } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 
 export interface UserData {
@@ -35,6 +36,14 @@ const AddUserModal: React.FC<Props> = ({
   onSubmit,
   initialData,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+
   const { isDesktop } = useResponsive();
   const [form, setForm] = useState<UserData>(
     initialData || { name: '', phone: '', email: '' }
@@ -162,77 +171,84 @@ const AddUserModal: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  container: {
-    width: '90%',
-    maxHeight: '90%',
-  },
-  content: {
-    padding: SPACING.lg,
-    borderRadius: RADIUS.xl,
-    elevation: 10, // Android
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
-    // removed deprecated shadow* props; boxShadow handles web
-  },
-  title: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
-  },
-  inputGroup: {
-    marginBottom: SPACING.md,
-  },
-  label: {
-    color: COLORS.textMuted,
-    marginBottom: 4,
-  },
-  required: {
-    color: COLORS.danger,
-  },
-  input: {
-    backgroundColor: COLORS.card,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    color: COLORS.text,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SPACING.sm,
-    marginTop: SPACING.lg,
-  },
-  button: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  cancelText: {
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  submitButton: {
-    backgroundColor: COLORS.accent,
-  },
-  submitText: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-});
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    container: {
+      width: '90%',
+      maxHeight: '90%',
+    },
+    content: {
+      padding: SPACING.lg,
+      borderRadius: RADIUS.xl,
+      elevation: 10, // Android
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+      // removed deprecated shadow* props; boxShadow handles web
+    },
+    title: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '700',
+      color: COLORS.text,
+      marginBottom: SPACING.lg,
+      textAlign: 'center',
+    },
+    inputGroup: {
+      marginBottom: SPACING.md,
+    },
+    label: {
+      color: COLORS.textMuted,
+      marginBottom: 4,
+    },
+    required: {
+      color: COLORS.danger,
+    },
+    input: {
+      backgroundColor: COLORS.card,
+      padding: SPACING.md,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      color: COLORS.text,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: SPACING.sm,
+      marginTop: SPACING.lg,
+    },
+    button: {
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+      borderRadius: RADIUS.md,
+      minWidth: 100,
+      alignItems: 'center',
+    },
+    cancelButton: {
+      backgroundColor: COLORS.card,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    cancelText: {
+      color: COLORS.text,
+      fontWeight: '500',
+    },
+    submitButton: {
+      backgroundColor: COLORS.accent,
+    },
+    submitText: {
+      color: COLORS.text,
+      fontWeight: '600',
+    },
+  });
+};
 
 export default AddUserModal;

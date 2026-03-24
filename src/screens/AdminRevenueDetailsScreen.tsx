@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   backText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
 });

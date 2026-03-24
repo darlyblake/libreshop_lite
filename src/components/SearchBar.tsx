@@ -7,7 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface SearchBarProps {
   value: string;
@@ -28,6 +28,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   style,
   autoFocus = false,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   const [isFocused, setIsFocused] = useState(false);
 
   const handleClear = () => {
@@ -64,7 +72,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -81,11 +94,12 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: COLORS.textSoft, // Utiliser textSoft pour le contraste sur fond card
     paddingVertical: 0,
   },
   clearButton: {
     padding: SPACING.xs,
   },
 });
+};
 

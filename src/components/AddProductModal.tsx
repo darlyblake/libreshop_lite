@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 
 interface CollectionOption {
   id: string;
@@ -48,6 +49,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   collections,
   title = 'Ajouter un produit',
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   const initialCollectionId = collections && collections.length > 0 ? collections[0]!.id : '';
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
   const [collectionSearch, setCollectionSearch] = useState('');
@@ -124,7 +133,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           quality: 0.7,
           allowsEditing: true,
         });
@@ -143,7 +152,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           });
         }
       } catch (e) {
-        console.warn('ImagePicker error', e);
+        errorHandler.handle(e, 'ImagePicker error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         Alert.alert('Erreur', "Impossible d'ajouter l'image");
       }
     })();
@@ -314,7 +323,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                       style={styles.removeImageButton}
                       onPress={() => handleRemoveImage(index)}
                     >
-                      <Ionicons name="close" size={16} color={COLORS.white} />
+                      <Ionicons name="close" size={16} color={COLORS.text} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -438,7 +447,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: COLORS.bg + 'E6',
@@ -655,7 +669,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
   },
   pickerConfirmText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },
@@ -743,8 +757,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
   },
   confirmButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },
 });
+};

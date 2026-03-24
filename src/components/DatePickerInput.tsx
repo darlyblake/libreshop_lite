@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface DatePickerInputProps {
   label?: string;
@@ -28,6 +28,14 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
   placeholder = 'Sélectionner une date',
   error,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+
   const [showPicker, setShowPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(
@@ -80,8 +88,8 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
-        {label && <Text style={styles.label}>{label}</Text>}
-        <View style={[styles.inputContainer, error && styles.inputError]}>
+        {label ? <Text style={styles.label}>{label}</Text> : null}
+        <View style={[styles.inputContainer, error ? styles.inputError : undefined]}>
           <Ionicons name="calendar-outline" size={20} color={COLORS.accent} style={styles.inputIcon} />
           <TextInput
             style={styles.input}
@@ -90,13 +98,13 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
             value={value}
             onChangeText={handleManualInput}
           />
-          {value && (
+          {value ? (
             <TouchableOpacity onPress={() => onChange('')}>
               <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
     );
   }
@@ -104,21 +112,21 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
   // Mobile version
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label ? <Text style={styles.label}>{label}</Text> : null}
       
       <TouchableOpacity
-        style={[styles.inputContainer, error && styles.inputError]}
+        style={[styles.inputContainer, error ? styles.inputError : undefined]}
         onPress={() => setShowPicker(true)}
         activeOpacity={0.7}
       >
         <Ionicons name="calendar-outline" size={20} color={COLORS.accent} style={styles.inputIcon} />
-        <Text style={[styles.inputText, !value && styles.placeholderText]}>
+        <Text style={[styles.inputText, !value ? styles.placeholderText : undefined]}>
           {value ? formatDateForDisplay(value) : placeholder}
         </Text>
         <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
       </TouchableOpacity>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {/* Custom Modal Picker */}
       <Modal
@@ -214,7 +222,12 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
   },
@@ -227,7 +240,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -268,13 +281,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     padding: SPACING.lg,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
         shadowOffset: { width: 0, height: -2 },
         shadowOpacity: 0.1,
         shadowRadius: 8,
@@ -310,7 +323,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   modalInput: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bg,
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
@@ -365,7 +378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
   },
   modalCancelText: {
     fontSize: FONT_SIZE.md,
@@ -382,6 +395,7 @@ const styles = StyleSheet.create({
   modalConfirmText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
 });
+};

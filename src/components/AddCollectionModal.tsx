@@ -16,19 +16,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useThemeContext } from '../context/ThemeContext';
 import { useResponsive } from '../utils/useResponsive';
 
 const { width, height } = Dimensions.get('window');
 
 // Catégories avec couleurs et icônes
-const CATEGORIES = [
-  { id: '1', name: 'Électronique', icon: 'laptop-outline', color: '#3b82f6', count: 24 },
-  { id: '2', name: 'Mode', icon: 'shirt-outline', color: '#ec4899', count: 18 },
-  { id: '3', name: 'Maison', icon: 'home-outline', color: '#10b981', count: 15 },
+const getCategories = (theme: any) => [
+  { id: '1', name: 'Électronique', icon: 'laptop-outline', color: theme.getColor.info, count: 24 },
+  { id: '2', name: 'Mode', icon: 'shirt-outline', color: theme.getColor.accent, count: 18 },
+  { id: '3', name: 'Maison', icon: 'home-outline', color: theme.getColor.success, count: 15 },
   { id: '4', name: 'Beauté', icon: 'heart-outline', color: '#f43f5e', count: 12 },
-  { id: '5', name: 'Sport', icon: 'basketball-outline', color: '#f97316', count: 9 },
-  { id: '6', name: 'Livres', icon: 'book-outline', color: '#8b5cf6', count: 7 },
+  { id: '5', name: 'Sport', icon: 'basketball-outline', color: theme.getColor.warning, count: 9 },
+  { id: '6', name: 'Livres', icon: 'book-outline', color: theme.getColor.primary, count: 7 },
 ];
 
 // Icônes organisées par catégories
@@ -74,24 +74,28 @@ interface AddCollectionModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (data: NewCollectionData) => void;
+  onEdit: (data: NewCollectionData) => void;
   editData?: NewCollectionData; // Pour le mode édition
   categories?: { id: string; name: string; icon?: keyof typeof Ionicons.glyphMap; color?: string; count?: number }[];
 }
 
-const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
+export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
   visible,
   onClose,
   onAdd,
+  onEdit,
   editData,
-  categories,
+  categories = [],
 }) => {
-  const { component, isDesktop } = useResponsive();
+  const theme = useThemeContext();
+  const styles = React.useMemo(() => getStyles(theme), [theme]);
+  const { isTablet, isDesktop } = useResponsive();
   const [form, setForm] = useState<NewCollectionData>({
     parentCategoryId: '',
     name: '',
     description: '',
     icon: 'folder-outline' as any,
-    coverColor: COLORS.accent,
+    coverColor: theme.getColor.primary,
     isActive: true,
     priority: 'medium',
     tags: [],
@@ -138,7 +142,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
       name: '',
       description: '',
       icon: 'folder-outline' as any,
-      coverColor: COLORS.accent,
+      coverColor: theme.getColor.primary,
       isActive: true,
       priority: 'medium',
       tags: [],
@@ -216,16 +220,16 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
   };
 
   const getStepColor = (step: number) => {
-    if (step < currentStep) return COLORS.success;
-    if (step === currentStep) return COLORS.accent;
-    return COLORS.textMuted;
+    if (step < currentStep) return theme.getColor.success;
+    if (step === currentStep) return theme.getColor.primary;
+    return theme.getColor.textTertiary;
   };
 
   // Filtrage des icônes
-  const filteredIcons = ICON_CATEGORIES.flatMap(cat => cat.icons)
+  const filteredIcons = Array.from(new Set(ICON_CATEGORIES.flatMap(cat => cat.icons)))
     .filter(icon => icon.toLowerCase().includes(searchIcon.toLowerCase()));
 
-  const availableCategories = (categories && categories.length > 0 ? categories : CATEGORIES) as typeof CATEGORIES;
+  const availableCategories = (categories && categories.length > 0 ? categories : getCategories(theme)) as ReturnType<typeof getCategories>;
 
   // libellé de sous-titre suivant l'étape (évite plusieurs enfants Text)
   const subtitle = currentStep === 1
@@ -264,7 +268,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
           ]}
         >
           <LinearGradient
-            colors={[COLORS.card, COLORS.bg]}
+            colors={[theme.getColor.card, theme.getColor.background]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.modalContent, { maxWidth: isDesktop ? 700 : 450 }]}
@@ -289,7 +293,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                     {step < 3 && (
                       <View style={[
                         styles.stepLine,
-                        { backgroundColor: step < currentStep ? COLORS.success : COLORS.border }
+                        { backgroundColor: step < currentStep ? theme.getColor.success : theme.getColor.border }
                       ]} />
                     )}
                   </View>
@@ -304,7 +308,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
             >
               {/* Étape 1: Catégorie parente */}
               {currentStep === 1 && (
-                <Animated.View entering={fadeAnim}>
+                <Animated.View>
                   <Text style={styles.sectionTitle}>Sélectionnez une catégorie</Text>
                   
                   <View style={styles.categoriesGrid}>
@@ -315,10 +319,10 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                           styles.categoryCard,
                           form.parentCategoryId === cat.id && styles.categoryCardSelected,
                           (() => {
-                            const catColor = (cat as any).color || COLORS.accent;
+                            const catColor = (cat as any).color || theme.getColor.primary;
                             return {
                               backgroundColor: catColor + '15',
-                              borderColor: form.parentCategoryId === cat.id ? catColor : COLORS.border,
+                              borderColor: form.parentCategoryId === cat.id ? catColor : theme.getColor.border,
                             };
                           })(),
                         ]}
@@ -330,17 +334,17 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                       <View
                         style={[
                           styles.categoryIcon,
-                          { backgroundColor: (cat as any).color || COLORS.accent },
+                          { backgroundColor: (cat as any).color || theme.getColor.primary },
                         ]}
                       >
-                        <Ionicons name={(cat as any).icon || ('folder-outline' as any)} size={24} color={COLORS.white} />
+                        <Ionicons name={(cat as any).icon || ('folder-outline' as any)} size={24} color={theme.getColor.text} />
                       </View>
                       <Text style={styles.categoryName}>{cat.name}</Text>
                       {(cat as any).count !== undefined ? (
                         <Text style={styles.categoryCount}>{(cat as any).count} collections</Text>
                       ) : null}
                       {form.parentCategoryId === cat.id && (
-                        <View style={[styles.categoryCheck, { backgroundColor: (cat as any).color || COLORS.accent }]}> 
+                        <View style={[styles.categoryCheck, { backgroundColor: (cat as any).color || theme.getColor.primary }]}> 
                           <Ionicons name="checkmark" size={12} color="white" />
                         </View>
                       )}
@@ -358,11 +362,11 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                       Nom de la collection <Text style={styles.required}>*</Text>
                     </Text>
                     <View style={styles.inputContainer}>
-                      <Ionicons name="folder-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
+                      <Ionicons name="folder-outline" size={20} color={theme.getColor.textTertiary} style={styles.inputIcon} />
                       <TextInput
                         style={styles.input}
                         placeholder="Ex: Nouveautés Été 2024"
-                        placeholderTextColor={COLORS.textMuted}
+                        placeholderTextColor={theme.getColor.textTertiary}
                         value={form.name}
                         onChangeText={(text) => setForm({ ...form, name: text })}
                         maxLength={50}
@@ -379,7 +383,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                       <TextInput
                         style={[styles.input, styles.textArea]}
                         placeholder="Décrivez le contenu de cette collection..."
-                        placeholderTextColor={COLORS.textMuted}
+                        placeholderTextColor={theme.getColor.textTertiary}
                         value={form.description}
                         onChangeText={(text) => setForm({ ...form, description: text })}
                         multiline
@@ -398,8 +402,8 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                           style={[
                             styles.priorityOption,
                             form.priority === priority && styles.priorityOptionSelected,
-                            { borderColor: priority === 'high' ? COLORS.danger : 
-                                         priority === 'medium' ? COLORS.warning : COLORS.info }
+                            { borderColor: priority === 'high' ? theme.getColor.error : 
+                                         priority === 'medium' ? theme.getColor.warning : theme.getColor.info }
                           ]}
                           onPress={() => setForm({ ...form, priority: priority as any })}
                         >
@@ -408,8 +412,8 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                                  priority === 'medium' ? 'time' : 'arrow-down'} 
                             size={16} 
                             color={form.priority === priority ? 'white' : 
-                                   priority === 'high' ? COLORS.danger : 
-                                   priority === 'medium' ? COLORS.warning : COLORS.info} 
+                                   priority === 'high' ? theme.getColor.error : 
+                                   priority === 'medium' ? theme.getColor.warning : theme.getColor.info} 
                           />
                           <Text style={[
                             styles.priorityText,
@@ -435,7 +439,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                       <TextInput
                         style={styles.tagInput}
                         placeholder="Ajouter un tag..."
-                        placeholderTextColor={COLORS.textMuted}
+                        placeholderTextColor={theme.getColor.textTertiary}
                         value={tagInput}
                         onChangeText={setTagInput}
                         onSubmitEditing={addTag}
@@ -454,7 +458,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                           <View key={index} style={styles.tag}>
                             <Text style={styles.tagText}>{tag}</Text>
                             <TouchableOpacity onPress={() => removeTag(tag)}>
-                              <Ionicons name="close" size={14} color={COLORS.textMuted} />
+                              <Ionicons name="close" size={14} color={theme.getColor.textTertiary} />
                             </TouchableOpacity>
                           </View>
                         ))}
@@ -468,11 +472,11 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                     
                     {/* Barre de recherche d'icônes */}
                     <View style={styles.searchContainer}>
-                      <Ionicons name="search" size={18} color={COLORS.textMuted} />
+                      <Ionicons name="search" size={18} color={theme.getColor.textTertiary} />
                       <TextInput
                         style={styles.searchInput}
                         placeholder="Rechercher une icône..."
-                        placeholderTextColor={COLORS.textMuted}
+                        placeholderTextColor={theme.getColor.textTertiary}
                         value={searchIcon}
                         onChangeText={setSearchIcon}
                       />
@@ -525,7 +529,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                             <Ionicons
                               name={icon as any}
                               size={24}
-                              color={form.icon === icon ? COLORS.white : COLORS.text}
+                              color={form.icon === icon ? theme.getColor.text : theme.getColor.text}
                             />
                           </TouchableOpacity>
                         ))}
@@ -537,9 +541,9 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Couleur de couverture</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {[COLORS.accent, '#3b82f6', '#ec4899', '#10b981', '#f97316', '#8b5cf6', '#ef4444', '#f59e0b'].map(color => (
+                      {[theme.getColor.primary, theme.getColor.info, theme.getColor.accent, theme.getColor.success, theme.getColor.warning, theme.getColor.error, '#7c3aed', '#db2777'].map((color, index) => (
                         <TouchableOpacity
-                          key={color}
+                          key={`${color}-${index}`}
                           style={[
                             styles.colorOption,
                             { backgroundColor: color },
@@ -585,7 +589,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
                 >
-                  <Ionicons name="arrow-back" size={18} color={COLORS.text} />
+                  <Ionicons name="arrow-back" size={18} color={theme.getColor.text} />
                   <Text style={styles.backButtonText}>Retour</Text>
                 </TouchableOpacity>
               )}
@@ -609,7 +613,7 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
 
             {/* Bouton fermer */}
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-              <Ionicons name="close" size={24} color={COLORS.textMuted} />
+              <Ionicons name="close" size={24} color={theme.getColor.textTertiary} />
             </TouchableOpacity>
           </LinearGradient>
         </Animated.View>
@@ -618,21 +622,21 @@ const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: theme.spacing.lg,
   },
   modalContainer: {
     width: '100%',
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
+    backgroundColor: theme.getColor.card,
+    borderRadius: theme.radius.xl,
     width: '100%',
     overflow: 'hidden',
     position: 'relative',
@@ -644,19 +648,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.lg,
+    padding: theme.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: theme.getColor.border,
   },
   modalTitle: {
-    fontSize: FONT_SIZE.lg,
+    fontSize: theme.fontSize.lg,
     fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 4,
+    color: theme.getColor.text,
+    marginBottom: theme.spacing.md,
   },
   modalSubtitle: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    fontSize: theme.fontSize.xs,
+    color: theme.getColor.textMuted,
   },
   stepIndicator: {
     flexDirection: 'row',
@@ -669,34 +673,34 @@ const styles = StyleSheet.create({
   stepLine: {
     width: 30,
     height: 2,
-    marginHorizontal: 4,
+    marginHorizontal: theme.spacing.sm,
   },
   modalBody: {
-    padding: SPACING.lg,
+    padding: theme.spacing.lg,
     maxHeight: height * 0.6,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.md,
+    fontSize: theme.fontSize.md,
     fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.md,
+    color: theme.getColor.text,
+    marginBottom: theme.spacing.md,
   },
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.sm,
+    gap: theme.spacing.sm,
   },
   categoryCard: {
     width: '48%',
-    backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
+    backgroundColor: theme.getColor.bg,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
     borderWidth: 2,
     position: 'relative',
-    marginBottom: SPACING.sm,
+    marginBottom: theme.spacing.sm,
   },
   categoryCardSelected: {
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.getColor.card,
   },
   categoryIcon: {
     width: 48,
@@ -704,22 +708,22 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: theme.spacing.sm,
   },
   categoryName: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: theme.fontSize.sm,
     fontWeight: '600',
-    color: COLORS.text,
+    color: theme.getColor.text,
     marginBottom: 2,
   },
   categoryCount: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    fontSize: theme.fontSize.xs,
+    color: theme.getColor.textMuted,
   },
   categoryCheck: {
     position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
+    top: theme.spacing.sm,
+    right: theme.spacing.sm,
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -727,38 +731,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   inputGroup: {
-    marginBottom: SPACING.lg,
+    marginBottom: theme.spacing.lg,
   },
   inputLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: theme.fontSize.sm,
     fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
+    color: theme.getColor.text,
+    marginBottom: theme.spacing.xs,
   },
   required: {
-    color: COLORS.danger,
+    color: theme.getColor.danger,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.md,
+    backgroundColor: theme.getColor.bg,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: SPACING.md,
+    borderColor: theme.getColor.border,
+    paddingHorizontal: theme.spacing.md,
   },
   inputIcon: {
-    marginRight: SPACING.sm,
+    marginRight: theme.spacing.sm,
   },
   input: {
     flex: 1,
-    paddingVertical: SPACING.md,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    paddingVertical: theme.spacing.md,
+    fontSize: theme.fontSize.md,
+    color: theme.getColor.text,
   },
   charCount: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    fontSize: theme.fontSize.xs,
+    color: theme.getColor.textMuted,
   },
   textAreaContainer: {
     alignItems: 'flex-start',
@@ -767,116 +771,116 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
-    paddingTop: SPACING.md,
+    paddingTop: theme.spacing.md,
   },
   priorityContainer: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: theme.spacing.sm,
   },
   priorityOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
-    gap: SPACING.xs,
-    backgroundColor: COLORS.bg,
+    gap: theme.spacing.xs,
+    backgroundColor: theme.getColor.background,
   },
   priorityOptionSelected: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: theme.getColor.primary,
   },
   priorityText: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: theme.fontSize.xs,
     fontWeight: '500',
   },
   priorityTextSelected: {
-    color: COLORS.white,
+    color: theme.getColor.text,
   },
   tagInputContainer: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: theme.spacing.sm,
   },
   tagInput: {
     flex: 1,
-    backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.md,
-    padding: SPACING.sm,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    backgroundColor: theme.getColor.background,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.sm,
+    fontSize: theme.fontSize.sm,
+    color: theme.getColor.text,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: theme.getColor.border,
   },
   addTagButton: {
     width: 44,
     height: 44,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.accent,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.getColor.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.sm,
-    marginTop: SPACING.sm,
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.bg,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
+    backgroundColor: theme.getColor.background,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: SPACING.xs,
+    borderColor: theme.getColor.border,
+    gap: theme.spacing.xs,
   },
   tagText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.text,
+    fontSize: theme.fontSize.xs,
+    color: theme.getColor.text,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    backgroundColor: theme.getColor.background,
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: theme.getColor.border,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: SPACING.sm,
-    marginLeft: SPACING.sm,
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    paddingVertical: theme.spacing.sm,
+    marginLeft: theme.spacing.sm,
+    fontSize: theme.fontSize.sm,
+    color: theme.getColor.text,
   },
   iconCategories: {
     flexGrow: 0,
-    marginBottom: SPACING.sm,
+    marginBottom: theme.spacing.sm,
   },
   iconCategoryChip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.bg,
-    marginRight: SPACING.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.getColor.background,
+    marginRight: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: theme.getColor.border,
   },
   iconCategoryChipSelected: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: theme.getColor.primary,
+    borderColor: theme.getColor.accent,
   },
   iconCategoryText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    fontSize: theme.fontSize.xs,
+    color: theme.getColor.textTertiary,
   },
   iconCategoryTextSelected: {
-    color: COLORS.white,
+    color: theme.getColor.text,
   },
   iconSelector: {
     maxHeight: 200,
@@ -884,45 +888,45 @@ const styles = StyleSheet.create({
   iconGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.sm,
+    gap: theme.spacing.sm,
   },
   iconOption: {
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor: COLORS.bg,
+    backgroundColor: theme.getColor.background,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: theme.getColor.border,
   },
   iconOptionSelected: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: theme.getColor.primary,
+    borderColor: theme.getColor.accent,
   },
   colorOption: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    marginRight: SPACING.sm,
+    marginRight: theme.spacing.sm,
     borderWidth: 2,
     borderColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },
   colorOptionSelected: {
-    borderColor: COLORS.white,
+    borderColor: theme.getColor.text,
   },
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: SPACING.sm,
+    marginTop: theme.spacing.sm,
   },
   switchLabel: {
-    fontSize: FONT_SIZE.sm,
+    fontSize: theme.fontSize.sm,
     fontWeight: '500',
-    color: COLORS.text,
+    color: theme.getColor.text,
   },
   switch: {
     width: 44,
@@ -931,63 +935,63 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   switchActive: {
-    backgroundColor: COLORS.success,
+    backgroundColor: theme.getColor.success,
   },
   switchInactive: {
-    backgroundColor: COLORS.border,
+    backgroundColor: theme.getColor.border,
   },
   switchThumb: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'white',
+    backgroundColor: theme.getColor.card,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    padding: SPACING.lg,
+    gap: theme.spacing.sm,
+    padding: theme.spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: theme.getColor.border,
   },
   modalButton: {
     flex: 1,
     flexDirection: 'row',
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.xs,
+    gap: theme.spacing.xs,
   },
   backButton: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: theme.getColor.background,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: theme.getColor.border,
   },
   backButtonText: {
-    color: COLORS.text,
+    color: theme.getColor.text,
     fontWeight: '500',
-    fontSize: FONT_SIZE.sm,
+    fontSize: theme.fontSize.sm,
   },
   nextButton: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: theme.getColor.primary,
   },
   nextButtonText: {
-    color: COLORS.white,
+    color: theme.getColor.text,
     fontWeight: '600',
-    fontSize: FONT_SIZE.sm,
+    fontSize: theme.fontSize.sm,
   },
   confirmButton: {
-    backgroundColor: COLORS.success,
+    backgroundColor: theme.getColor.success,
   },
   confirmButtonText: {
-    color: COLORS.white,
+    color: theme.getColor.text,
     fontWeight: '600',
-    fontSize: FONT_SIZE.sm,
+    fontSize: theme.fontSize.sm,
   },
   closeButton: {
     position: 'absolute',
-    top: SPACING.lg,
-    right: SPACING.lg,
+    top: theme.spacing.lg,
+    right: theme.spacing.lg,
     zIndex: 10,
   },
 });

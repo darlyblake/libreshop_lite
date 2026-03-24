@@ -6,8 +6,44 @@ import * as Linking from 'expo-linking';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation';
-import { Dimensions, View } from 'react-native';
+import { Dimensions, View, LogBox, Platform } from 'react-native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { ThemeProvider } from './src/components/ThemeProvider';
+
+// Configuration des notifications (uniquement sur mobile)
+if (Platform.OS !== 'web') {
+  try {
+    const Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (e) {
+    console.warn('Notifications not available:', e);
+  }
+}
+
+LogBox.ignoreLogs([
+  '"shadow*" style props are deprecated',
+  'props.pointerEvents is deprecated',
+]);
+
+if (Platform.OS === 'web') {
+  const originalWarn = console.warn;
+  console.warn = (...args) => {
+    const msg = args[0];
+    if (
+      typeof msg === 'string' &&
+      (msg.includes('pointerEvents is deprecated') || msg.includes('PushTokenManager'))
+    ) {
+      return;
+    }
+    originalWarn(...args);
+  };
+}
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,9 +83,11 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <View style={{ flex: 1, width, height }}>
-        <AppNavigator />
-      </View>
+      <ThemeProvider>
+        <View style={{ flex: 1, width, height }}>
+          <AppNavigator />
+        </View>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

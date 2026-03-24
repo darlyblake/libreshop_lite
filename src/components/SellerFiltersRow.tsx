@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 export type SellerFilterItem = {
   id: string;
@@ -24,6 +24,14 @@ export const SellerFiltersRow: React.FC<Props> = ({
   counts,
   isMobile,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <ScrollView
       horizontal
@@ -47,14 +55,14 @@ export const SellerFiltersRow: React.FC<Props> = ({
             <Ionicons
               name={filter.icon as any}
               size={24}
-              color={selectedId === filter.id ? COLORS.white : COLORS.accent}
+              color={selectedId === filter.id ? COLORS.text : COLORS.accent}
             />
           </View>
           <View>
             <Text
               style={[
                 styles.statValue,
-                { color: selectedId === filter.id ? COLORS.white : COLORS.text },
+                { color: selectedId === filter.id ? COLORS.text : COLORS.text },
               ]}
             >
               {counts ? counts[filter.id] || 0 : 0}
@@ -65,7 +73,7 @@ export const SellerFiltersRow: React.FC<Props> = ({
                 {
                   color:
                     selectedId === filter.id
-                      ? COLORS.white + 'CC'
+                      ? COLORS.text + 'CC'
                       : COLORS.textSoft,
                 },
               ]}
@@ -79,7 +87,12 @@ export const SellerFiltersRow: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   filtersScrollView: {
     maxHeight: 100,
     minHeight: 80,
@@ -123,3 +136,4 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
   },
 });
+};

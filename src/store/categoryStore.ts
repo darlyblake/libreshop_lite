@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Category } from '../lib/supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { categoryService } from '../lib/categoryService';
 
 interface CategoryState {
@@ -27,7 +28,7 @@ export const useCategoryStore = create<CategoryState>((set) => ({
       const categories = await categoryService.getAll();
       set({ categories, isLoading: false });
     } catch (error) {
-      console.error('Error loading categories:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading categories:');
       set({ isLoading: false });
     }
   },
@@ -37,7 +38,7 @@ export const useCategoryStore = create<CategoryState>((set) => ({
       const subcategories = await categoryService.getByParent(parentId);
       return subcategories;
     } catch (error) {
-      console.error('Error loading subcategories:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading subcategories:');
       return [];
     }
   },

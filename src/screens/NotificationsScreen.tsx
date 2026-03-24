@@ -7,6 +7,7 @@ import {
   StyleSheet,
   RefreshControl,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,6 +18,7 @@ import { useAuthStore, useStoreStore } from '../store';
 import { NotificationItem } from '../components/NotificationItem';
 import { EmptyState } from '../components/EmptyState';
 import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -36,7 +38,7 @@ export const NotificationsScreen: React.FC = () => {
   } = useNotificationStore();
 
   const visibleNotifications = useMemo(
-    () => notifications.filter((n) => !n.read),
+    () => notifications,
     [notifications]
   );
 
@@ -46,7 +48,7 @@ export const NotificationsScreen: React.FC = () => {
       const data = await notificationService.getByUser(user.id);
       setNotifications(data);
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      errorHandler.handleDatabaseError(error as Error, 'Error loading notifications:');
     }
   }, [user, setNotifications]);
 
@@ -60,7 +62,7 @@ export const NotificationsScreen: React.FC = () => {
         await notificationService.markAsRead(notification.id);
         markAsRead(notification.id);
       } catch (e) {
-        console.error('mark notification as read', e);
+        errorHandler.handleDatabaseError(e as Error, 'mark notification as read');
       }
     }
 
@@ -100,31 +102,44 @@ export const NotificationsScreen: React.FC = () => {
       await notificationService.markAllAsRead(user.id);
       markAllAsRead();
     } catch (e) {
-      console.error('mark all as read', e);
+      errorHandler.handleDatabaseError(e as Error, 'mark all as read');
     }
   }, [user, markAllAsRead]);
 
-  const handleClearAll = useCallback(() => {
+  const handleClearAll = useCallback(async () => {
     if (!user) return;
-    Alert.alert(
-      'Effacer',
-      'Supprimer toutes les notifications ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Effacer',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await notificationService.deleteAllByUser(user.id);
-              clearAll();
-            } catch (e) {
-              console.error('clear notifications', e);
-            }
+    
+    // Sur le Web, Alert.alert avec boutons personnalisés peut être capricieux. On utilise window.confirm.
+    if (Platform.OS === 'web') {
+      if (window.confirm('Supprimer toutes les notifications ?')) {
+        try {
+          await notificationService.deleteAllByUser(user.id);
+          clearAll();
+        } catch (e) {
+          errorHandler.handleDatabaseError(e as Error, 'clear notifications');
+        }
+      }
+    } else {
+      Alert.alert(
+        'Effacer',
+        'Supprimer toutes les notifications ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Effacer',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await notificationService.deleteAllByUser(user.id);
+                clearAll();
+              } catch (e) {
+                errorHandler.handleDatabaseError(e as Error, 'clear notifications');
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    }
   }, [user, clearAll]);
 
   const onRefresh = useCallback(() => {

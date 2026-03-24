@@ -11,6 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { Ionicons } from '@expo/vector-icons';
 import { notificationService } from '../lib/notificationService';
@@ -105,7 +106,7 @@ export const AdminNotificationsScreen: React.FC = () => {
   const onRefresh = () => {
     setRefreshing(true);
     loadNotifications()
-      .catch((e) => console.error('refresh notifications', e))
+      .catch((e) => errorHandler.handleDatabaseError(e, 'refresh notifications'))
       .finally(() => setRefreshing(false));
   };
 
@@ -114,7 +115,7 @@ export const AdminNotificationsScreen: React.FC = () => {
       await notificationService.markAsRead(id);
       setNotifications((prev) => prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif)));
     } catch (e) {
-      console.error('mark notification as read', e);
+      errorHandler.handleDatabaseError(e, 'mark notification as read');
     }
   };
 
@@ -123,7 +124,7 @@ export const AdminNotificationsScreen: React.FC = () => {
       await Promise.all(notifications.map((n) => notificationService.delete(n.id)));
       setNotifications([]);
     } catch (e) {
-      console.error('clear notifications', e);
+      errorHandler.handleDatabaseError(e, 'clear notifications');
     }
   };
 
@@ -135,7 +136,7 @@ export const AdminNotificationsScreen: React.FC = () => {
       await notificationService.markAllAsRead(userId);
       setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })));
     } catch (e) {
-      console.error('mark all as read', e);
+      errorHandler.handleDatabaseError(e, 'mark all as read');
     }
   };
 

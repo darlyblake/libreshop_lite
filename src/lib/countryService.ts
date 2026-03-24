@@ -10,7 +10,10 @@ export interface Country {
 export const countryService = {
   async getAll(): Promise<Country[]> {
     if (!supabase) throw new Error('Supabase not initialized');
-    const { data, error } = await supabase.from('countries').select('*').order('name', { ascending: true });
+    const { data, error } = await supabase
+      .from('countries')
+      .select('*')
+      .order('name', { ascending: true });
     if (error) throw error;
     return (data || []) as Country[];
   },

@@ -16,8 +16,10 @@ import Animated, {
   useSharedValue,
   runOnJS,
 } from 'react-native-reanimated';
-import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { productLikesService } from '../lib/productLikesService';
+import { authService } from '../lib/supabase';
 import { useAuthStore } from '../store';
 
 interface LikeButtonProps {
@@ -42,7 +44,7 @@ type SizeConfig = {
   gap: number;
 };
 
-const SIZE_CONFIG: Record<'small' | 'medium' | 'large', SizeConfig> = {
+const getSizeConfig = (SPACING: any): Record<'small' | 'medium' | 'large', SizeConfig> => ({
   small: {
     icon: 16,
     text: 11,
@@ -61,7 +63,7 @@ const SIZE_CONFIG: Record<'small' | 'medium' | 'large', SizeConfig> = {
     padding: SPACING.sm,
     gap: SPACING.sm,
   },
-};
+});
 
 export const LikeButton: React.FC<LikeButtonProps> = memo(({
   productId,
@@ -80,6 +82,11 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   const { user } = useAuthStore();
   const effectiveUserId = propUserId || user?.id;
 
+  const themeContext = useTheme();
+  const { theme, getColor: COLORS, spacing: SPACING } = themeContext;
+  
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
@@ -90,7 +97,7 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   const heartScale = useSharedValue(1);
   const opacity = useSharedValue(1);
 
-  const sizeConfig = SIZE_CONFIG[size];
+  const sizeConfig = React.useMemo(() => getSizeConfig(SPACING)[size], [SPACING, size]);
 
   // Charger les données initiales
   useEffect(() => {
@@ -112,8 +119,8 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
       setLiked(hasLiked);
       setLikeCount(count);
       setError(null);
-    } catch (error) {
-      console.error('Error loading like data:', error);
+    } catch (error: any) {
+      errorHandler.handleDatabaseError(error, 'Error loading like data:');
       setError('Erreur de chargement');
     }
   };
@@ -176,15 +183,17 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
 
   const handleLike = useCallback(async (): Promise<void> => {
     if (!effectiveUserId) {
-      Alert.alert(
-        'Connexion requise',
-        'Vous devez être connecté pour aimer ce produit',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => console.log('Navigate to login') }
-        ]
-      );
-      return;
+      try {
+        const { data: { session } } = await authService.signInAnonymously();
+        if (!session?.user) throw new Error('Auth failed');
+        // Let the next render cycle handle the like with the new ID
+        // or we could execute it directly here, but simple is better.
+        Alert.alert('Presque fini', 'Votre identité anonyme a été créée. Réessayez d\'aimer ce produit !');
+        return;
+      } catch (err) {
+        Alert.alert('Action impossible', 'Veuillez vérifier votre connexion internet.');
+        return;
+      }
     }
 
     if (loading || disabled) return;
@@ -210,13 +219,13 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
     runOnJS(triggerHaptic)(newLiked ? 'success' : 'light');
 
     try {
-      console.log('Toggling like for product', productId, 'user', effectiveUserId);
+      // Toggling like for product: productId, 'user', effectiveUserId;
       const result = await productLikesService.toggleLike(effectiveUserId, productId);
-      console.log('Like toggle result:', result);
+      // Like toggle result:: result;
       
       // Vérifier que le résultat correspond à l'optimistic update
       if (result !== newLiked) {
-        console.log('Incohérence détectée, recharging like data');
+        // Log: 'Incohérence détectée, recharging like data';
         // Incohérence, recharger les données
         await loadLikeData();
       } else {
@@ -226,8 +235,8 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
       }
       
       onLikeChange?.(result, newCount);
-    } catch (error) {
-      console.error('Error toggling like:', error);
+    } catch (error: any) {
+      errorHandler.handleDatabaseError(error, 'Error toggling like:');
       
       // Rollback en cas d'erreur
       setLiked(previousLiked);
@@ -272,13 +281,13 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   const getIconColor = (): string => {
     if (disabled) return COLORS.textMuted;
     if (liked) return COLORS.danger;
-    return COLORS.white;
+    return COLORS.text;
   };
 
   const getTextColor = (): string => {
     if (disabled) return COLORS.textMuted;
     if (liked) return COLORS.danger;
-    return COLORS.white;
+    return COLORS.text;
   };
 
   if (error) {
@@ -349,45 +358,48 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   );
 });
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: SPACING.xs,
-  },
-  buttonOutline: {
-    borderWidth: 1,
-    borderRadius: SPACING.md,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-  },
-  buttonRounded: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-  },
-  count: {
-    fontWeight: '600',
-    marginLeft: SPACING.xs,
-  },
-  label: {
-    fontWeight: '500',
-    marginLeft: SPACING.xs,
-  },
-  loader: {
-    marginLeft: SPACING.xs,
-  },
-  errorContainer: {
-    padding: SPACING.xs,
-  },
-});
+const getStyles = (theme: any) => {
+  const SPACING = theme.spacing;
+  return StyleSheet.create({
+    container: {
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+    },
+    button: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: SPACING.xs,
+      paddingHorizontal: SPACING.sm,
+      borderRadius: SPACING.xs,
+    },
+    buttonOutline: {
+      borderWidth: 1,
+      borderRadius: SPACING.md,
+      paddingVertical: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+    },
+    buttonRounded: {
+      borderWidth: 1,
+      borderRadius: 20,
+      paddingVertical: SPACING.xs,
+      paddingHorizontal: SPACING.md,
+    },
+    count: {
+      fontWeight: '600',
+      marginLeft: SPACING.xs,
+    },
+    label: {
+      fontWeight: '500',
+      marginLeft: SPACING.xs,
+    },
+    loader: {
+      marginLeft: SPACING.xs,
+    },
+    errorContainer: {
+      padding: SPACING.xs,
+    },
+  });
+};
 
 LikeButton.displayName = 'LikeButton';
 

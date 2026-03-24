@@ -34,6 +34,11 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# Sécurité: Ne jamais commiter les clés secrètes
+.env.production
+.env.staging
 
 # typescript
 *.tsbuildinfo

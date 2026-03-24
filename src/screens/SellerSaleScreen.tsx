@@ -14,6 +14,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { productService, Product } from '../lib/supabase';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -56,7 +57,7 @@ export const SellerSaleScreen: React.FC = () => {
           setSaleEndDate((data as any).sale_end_date || '');
         }
       } catch (e) {
-        console.error('load product', e);
+        errorHandler.handleDatabaseError(e, 'load product');
         Alert.alert('Erreur', 'Impossible de charger le produit');
         navigation.goBack();
       } finally {
@@ -114,7 +115,7 @@ export const SellerSaleScreen: React.FC = () => {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (e) {
-      console.error('save sale', e);
+      errorHandler.handleDatabaseError(e, 'save sale');
       Alert.alert('Erreur', 'Impossible de sauvegarder la solde');
     } finally {
       setSaving(false);
@@ -147,7 +148,7 @@ export const SellerSaleScreen: React.FC = () => {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Solde / Réduction</Text>
@@ -314,11 +315,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   headerSubtitle: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.white,
+    color: COLORS.text,
     opacity: 0.8,
   },
   scrollContent: {

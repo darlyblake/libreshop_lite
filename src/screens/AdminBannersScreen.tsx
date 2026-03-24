@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 import { homeBannerService, HomeBanner } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -40,7 +41,7 @@ export const AdminBannersScreen: React.FC = () => {
       const data = await homeBannerService.getAll();
       setBanners(data || []);
     } catch (error) {
-      console.error('Error loading banners:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading banners:');
       Alert.alert('Erreur', 'Impossible de charger les bannières');
     } finally {
       setLoading(false);
@@ -64,7 +65,7 @@ export const AdminBannersScreen: React.FC = () => {
       setBannerToDelete(null);
       Alert.alert('Succès', 'Bannière supprimée avec succès');
     } catch (error) {
-      console.error('Error deleting banner:', error);
+      errorHandler.handleDatabaseError(error, 'Error deleting banner:');
       Alert.alert('Erreur', 'Impossible de supprimer la bannière');
     } finally {
       setDeleting(false);
@@ -80,7 +81,7 @@ export const AdminBannersScreen: React.FC = () => {
         b.id === banner.id ? { ...b, is_active: !b.is_active } : b
       ));
     } catch (error) {
-      console.error('Error toggling banner status:', error);
+      errorHandler.handleDatabaseError(error, 'Error toggling banner status:');
       Alert.alert('Erreur', 'Impossible de modifier le statut de la bannière');
     }
   }, []);
@@ -317,7 +318,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   addButtonText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     marginLeft: SPACING.xs,
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   filterChipTextActive: {
-    color: 'white',
+    color: COLORS.text,
   },
   listContainer: {
     padding: SPACING.lg,
@@ -376,7 +377,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   placementText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
   },
@@ -507,6 +508,6 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: 'white',
+    color: COLORS.text,
   },
 });

@@ -22,16 +22,15 @@ module.exports = async function (env, argv) {
         ? { preset }
         : {};
 
-  config.stats = {
-    ...statsObj,
-    warningsFilter: [
-      ...((statsObj && typeof statsObj === 'object' && Array.isArray(statsObj.warningsFilter))
-        ? statsObj.warningsFilter
-        : []),
-      /react-native-worklets[\s\S]*require\.getModules\(\)/,
-      /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
-    ],
-  };
+  // Webpack v6+ deprecates `stats.warningsFilter` in favor of `ignoreWarnings`.
+  config.stats = { ...statsObj };
+  config.ignoreWarnings = [
+    ...((statsObj && typeof statsObj === 'object' && Array.isArray(statsObj.warningsFilter))
+      ? statsObj.warningsFilter
+      : []),
+    /react-native-worklets[\s\S]*require\.getModules\(\)/,
+    /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
+  ];
 
   return config;
 };

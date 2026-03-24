@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -111,7 +112,7 @@ export const SellerClientsScreen: React.FC = () => {
 
       setClients(Array.from(map.values()));
     } catch (e: any) {
-      console.warn('load clients failed', e);
+      errorHandler.handle(e, 'load clients failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       const rawMsg = String(e?.message || '');
       const isRls =
         rawMsg.toLowerCase().includes('permission denied') ||
@@ -165,7 +166,9 @@ export const SellerClientsScreen: React.FC = () => {
       'Voulez-vous activer/désactiver ce client ?',
       [
         { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', onPress: () => console.log('Toggle client:', id) },
+        { text: 'Confirmer', onPress: () => {
+            // Toggle client status
+          }}
       ]
     );
   };
@@ -229,7 +232,7 @@ export const SellerClientsScreen: React.FC = () => {
               <Ionicons
                 name={item.isActive ? 'checkmark' : 'close'}
                 size={16}
-                color={COLORS.white}
+                color={COLORS.text}
               />
             </TouchableOpacity>
           </View>
@@ -326,7 +329,7 @@ export const SellerClientsScreen: React.FC = () => {
           style={styles.addButton}
           onPress={() => setShowAddModal(true)}
         >
-          <Ionicons name="add" size={24} color={COLORS.white} />
+          <Ionicons name="add" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -562,7 +565,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
 
   clientDetails: {

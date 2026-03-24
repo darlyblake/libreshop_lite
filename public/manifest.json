@@ -1,26 +1,38 @@
 {
   "name": "LibreShop - Marketplace Africaine",
   "short_name": "LibreShop",
-  "description": "Plateforme de commerce électronique décentralisée",
-  "start_url": "/",
+  "description": "Plateforme de commerce électronique décentralisée pour l'Afrique",
+  "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0a0c12",
   "theme_color": "#8b5cf6",
-  "categories": ["shopping", "business"],
+  "lang": "fr",
+  "dir": "ltr",
+  "categories": ["shopping", "business", "lifestyle"],
+  "prefer_related_applications": false,
   "screenshots": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
+      "src": "/screenshot-mobile-1.png",
+      "sizes": "390x844",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Accueil LibreShop - Découvrez les boutiques locales"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
+      "src": "/screenshot-mobile-2.png", 
+      "sizes": "390x844",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "narrow",
+      "label": "Recherche de produits - Trouvez ce dont vous avez besoin"
+    },
+    {
+      "src": "/screenshot-desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Interface desktop - Expérience complète"
     }
   ],
   "icons": [
@@ -31,8 +43,44 @@
       "purpose": "any"
     },
     {
+      "src": "/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-96.png", 
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-128.png",
+      "sizes": "128x128", 
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/icon-192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-384.png",
+      "sizes": "384x384",
       "type": "image/png",
       "purpose": "any"
     },
@@ -59,24 +107,48 @@
     {
       "name": "Parcourir les boutiques",
       "short_name": "Boutiques",
-      "description": "Découvrir les boutiques disponibles",
-      "url": "/shops?utm_source=pwa_shortcut",
+      "description": "Découvrir les boutiques disponibles près de chez vous",
+      "url": "/ClientTabs/ClientAllStores?utm_source=pwa_shortcut",
       "icons": [
         {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
+          "src": "/shortcut-stores.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Rechercher des produits",
+      "short_name": "Recherche",
+      "description": "Trouver des produits rapidement",
+      "url": "/ClientTabs/ClientSearch?utm_source=pwa_shortcut",
+      "icons": [
+        {
+          "src": "/shortcut-search.png",
+          "sizes": "96x96"
         }
       ]
     },
     {
       "name": "Mes commandes",
       "short_name": "Commandes",
-      "description": "Voir mes commandes",
-      "url": "/orders?utm_source=pwa_shortcut",
+      "description": "Suivre mes commandes en cours",
+      "url": "/ClientTabs/ClientOrders?utm_source=pwa_shortcut",
       "icons": [
         {
-          "src": "/icon-192.png",
-          "sizes": "192x192"
+          "src": "/shortcut-orders.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Panier",
+      "short_name": "Panier",
+      "description": "Voir mon panier d'achats",
+      "url": "/ClientTabs/Cart?utm_source=pwa_shortcut",
+      "icons": [
+        {
+          "src": "/shortcut-cart.png",
+          "sizes": "96x96"
         }
       ]
     }

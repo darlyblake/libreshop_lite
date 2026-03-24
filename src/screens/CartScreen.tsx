@@ -9,42 +9,84 @@ import {
   Image,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { useCartStore } from '../store';
-import { storeService } from '../lib/supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { useCartStore, useAuthStore } from '../store';
+import { storeService, orderService, supabase } from '../lib/supabase';
+import { userService } from '../lib/userService';
+import { notificationService } from '../lib/notificationService';
 
 export const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [store, setStore] = useState<any>(null);
   const [loadingStore, setLoadingStore] = useState(false);
+  const [storesData, setStoresData] = useState<any[]>([]);
 
   const { items, removeItem, updateQuantity, getTotal, storeId } = useCartStore();
   const subtotal = getTotal();
+  const user = useAuthStore((s) => s.user);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const [processingBulk, setProcessingBulk] = useState(false);
 
-  // Load store data for tax and shipping
+  // prepare grouping and aggregated totals
+  const groups = Object.entries(items.reduce((acc: Record<string, any[]>, it) => {
+    const sid = (it.product as any)?.store_id || 'unknown';
+    acc[sid] = acc[sid] || [];
+    acc[sid].push(it);
+    return acc;
+  }, {}));
+
+  let aggregatedTax = 0;
+  let aggregatedShipping = 0;
+  groups.forEach(([sid, group]) => {
+    const storeInfo = storesData.find(s => s?.id === sid) || (sid === 'unknown' ? { id: 'unknown', name: 'Divers' } : null);
+    const subtotalByStore = group.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
+    if (storeInfo?.tax_rate) aggregatedTax += Math.round(subtotalByStore * (storeInfo.tax_rate / 100));
+    aggregatedShipping += storeInfo?.shipping_price || 0;
+  });
+
+  const grandTotal = subtotal + aggregatedTax + aggregatedShipping;
+
+  // Load store data for tax and shipping (support multiple stores)
   useEffect(() => {
-    if (!storeId) return;
-    const loadStore = async () => {
+    let mounted = true;
+    const load = async () => {
       try {
         setLoadingStore(true);
-        const storeData = await storeService.getById(storeId);
-        setStore(storeData);
+        // gather unique store ids from items
+        const ids = Array.from(new Set(items.map(i => (i.product as any)?.store_id).filter(Boolean)));
+        if (ids.length === 1 && storeId) {
+          const s = await storeService.getById(storeId);
+          if (!mounted) return;
+          setStore(s);
+          setStoresData(s ? [s] : []);
+        } else if (ids.length > 0) {
+          const stores = await Promise.all(ids.map(id => storeService.getById(id)));
+          if (!mounted) return;
+          setStore(null);
+          setStoresData(stores.filter(Boolean));
+        } else {
+          setStore(null);
+          setStoresData([]);
+        }
       } catch (e) {
-        console.warn('load store for cart', e);
+        errorHandler.handle(e, 'load store for cart', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
-        setLoadingStore(false);
+        if (mounted) setLoadingStore(false);
       }
     };
-    loadStore();
-  }, [storeId]);
+    load();
+    return () => { mounted = false; };
+  }, [storeId, items]);
 
-  const taxRate = store?.tax_rate || 0; // %
-  const shippingPrice = store?.shipping_price || 0; // FCFA
-  const taxAmount = subtotal * (taxRate / 100);
-  const total = subtotal + taxAmount + shippingPrice;
+  const taxRate = store?.tax_rate || 0; // legacy single-store rate for label
+  const shippingPrice = store?.shipping_price || 0; // legacy single-store shipping
+  // For display and totals we compute aggregated values in-place when rendering
+  const total = subtotal; // will add taxes/shipping in UI per-store or aggregated
 
   const renderCartItem = (item: (typeof items)[number]) => (
     <View key={item.product.id} style={styles.cartItem}>
@@ -57,7 +99,7 @@ export const CartScreen: React.FC = () => {
       )}
       <View style={styles.itemInfo}>
         <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
-        <Text style={styles.itemStore}>{storeId || ''}</Text>
+        <Text style={styles.itemStore}>{((item.product as any)?.store_name) || ''}</Text>
         <View style={styles.itemBottom}>
           <Text style={styles.itemPrice}>{item.product.price.toLocaleString()} FCA</Text>
           <View style={styles.quantityControls}>
@@ -108,15 +150,66 @@ export const CartScreen: React.FC = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cart Items */}
+        {/* Cart Items grouped by store */}
         <View style={styles.cartSection}>
-          {items.length > 0 ? items.map(renderCartItem) : (
+          {items.length === 0 ? (
             <View style={{ paddingVertical: SPACING.xxxl, alignItems: 'center' }}>
               <Ionicons name="cart-outline" size={64} color={COLORS.textMuted} />
               <Text style={{ marginTop: SPACING.md, color: COLORS.textMuted, fontSize: FONT_SIZE.md }}>
                 Ton panier est vide
               </Text>
             </View>
+          ) : (
+            // group items by store_id (or 'unknown')
+            Object.entries(items.reduce((acc: Record<string, any[]>, it) => {
+              const sid = (it.product as any)?.store_id || 'unknown';
+              acc[sid] = acc[sid] || [];
+              acc[sid].push(it);
+              return acc;
+            }, {})).map(([sid, group]) => {
+              const storeInfo = storesData.find(s => s?.id === sid) || (sid === 'unknown' ? { id: 'unknown', name: 'Divers' } : null);
+              const subtotalByStore = group.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
+              const tax = storeInfo?.tax_rate ? Math.round(subtotalByStore * (storeInfo.tax_rate / 100)) : 0;
+              const shipping = storeInfo?.shipping_price || 0;
+
+              return (
+                <View key={`group-${sid}`} style={{ marginBottom: SPACING.lg }}>
+                  <View style={[styles.summarySection, { paddingBottom: SPACING.md }]}>
+                    <Text style={[styles.sectionTitle, { fontSize: FONT_SIZE.md }]}>{storeInfo?.name || 'Boutique'}</Text>
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Sous-total</Text>
+                      <Text style={styles.summaryValue}>{subtotalByStore.toLocaleString()} FCA</Text>
+                    </View>
+                    {tax > 0 && (
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>TVA</Text>
+                        <Text style={styles.summaryValue}>{tax.toLocaleString()} FCA</Text>
+                      </View>
+                    )}
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Livraison</Text>
+                      <Text style={styles.summaryValue}>{shipping > 0 ? `${shipping.toLocaleString()} FCA` : 'Gratuite'}</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.totalLabel}>Total</Text>
+                      <Text style={styles.totalValue}>{(subtotalByStore + tax + shipping).toLocaleString()} FCA</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md }}>
+                      <TouchableOpacity
+                        style={[styles.checkoutButton, { flex: 1, backgroundColor: COLORS.accent }]}
+                        onPress={() => navigation.navigate('Checkout', { storeId: sid === 'unknown' ? null : sid, itemsJson: JSON.stringify(group) })}
+                      >
+                        <Text style={[styles.checkoutButtonText, { color: COLORS.text }]}>Passer la commande (cette boutique)</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Items of the group */}
+                  {group.map((it: any) => renderCartItem(it))}
+                </View>
+              );
+            })
           )}
         </View>
 
@@ -186,15 +279,115 @@ export const CartScreen: React.FC = () => {
       <View style={styles.bottomBar}>
         <View style={styles.totalContainer}>
           <Text style={styles.bottomTotalLabel}>Total TTC</Text>
-          <Text style={styles.bottomTotalValue}>{total.toLocaleString()} FCA</Text>
+          <Text style={styles.bottomTotalValue}>{grandTotal.toLocaleString()} FCA</Text>
         </View>
         <TouchableOpacity 
           style={styles.checkoutButton}
-          onPress={() => navigation.navigate('Checkout')}
-          disabled={items.length === 0}
+          onPress={async () => {
+            // Create separate orders per store
+            if (items.length === 0) return;
+            try {
+              setProcessingBulk(true);
+              // Ensure user profile
+              if (!user?.id) {
+                setProcessingBulk(false);
+                // ask to login
+                navigation.navigate('SellerAuth');
+                return;
+              }
+              await userService.upsertProfile(String(user.id), {
+                full_name: user.full_name || 'Client',
+                phone: user.whatsapp_number || user.phone || '',
+              });
+
+              // group items by store id
+              const groups: Record<string, any[]> = {};
+              for (const it of items) {
+                const sid = (it.product as any)?.store_id || 'unknown';
+                groups[sid] = groups[sid] || [];
+                groups[sid].push(it);
+              }
+
+              const createdOrders: any[] = [];
+              for (const [sid, group] of Object.entries(groups)) {
+                const storeIdForOrder = sid === 'unknown' ? null : sid;
+                const subtotalByStore = group.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
+                const tax = storeInfo?.tax_rate ? Math.round(subtotalByStore * (storeInfo.tax_rate / 100)) : 0;
+                const shipping = storeInfo?.shipping_price || 0;
+                const totalForOrder = subtotalByStore + tax + shipping;
+
+                const baseOrderPayload: any = {
+                  user_id: String(user.id),
+                  store_id: storeIdForOrder,
+                  total_amount: Number(totalForOrder),
+                  status: 'pending',
+                  payment_method: 'cash_on_delivery',
+                  payment_status: 'pending',
+                  shipping_address: user?.address || null,
+                  customer_phone: user?.whatsapp_number || user?.phone || null,
+                  notes: null,
+                  // include breakdown for server/UI convenience
+                  delivery_fee: shipping,
+                  tax_amount: tax,
+                };
+
+                let created: any;
+                try {
+                  created = await orderService.create({ ...baseOrderPayload, customer_name: user?.full_name });
+                } catch (e: any) {
+                  const msg = String(e?.message || '').toLowerCase();
+                  const isSchemaCacheIssue = msg.includes('schema') && msg.includes('cache') && msg.includes('customer_name');
+                  const isMissingColumnIssue = msg.includes('column') && msg.includes('customer_name');
+                  if (isSchemaCacheIssue || isMissingColumnIssue) {
+                    created = await orderService.create(baseOrderPayload);
+                  } else {
+                    throw e;
+                  }
+                }
+
+                // insert order_items
+                try {
+                  if (supabase && created?.id) {
+                    const rows = group.map((it: any) => ({
+                      order_id: created.id,
+                      product_id: it.product.id,
+                      quantity: it.quantity,
+                      price: it.product.price,
+                    }));
+                    const { error } = await supabase.from('order_items').insert(rows);
+                    if (error) errorHandler.handle(error, 'failed to insert order items', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+                  }
+                } catch (e) {
+                  errorHandler.handle(e, 'order_items insert skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+                }
+
+                // keep order in pending state and do NOT run post-processing here.
+                // Payment will trigger the RPC and notifications per-order.
+                createdOrders.push(created);
+              }
+
+              // navigate to the bulk payment flow so the user can pay each order separately
+              navigation.navigate('BulkPayment', {
+                createdOrders,
+                groups,
+              });
+            } catch (e) {
+              errorHandler.handle(e, 'bulk create orders failed', ErrorCategory.SYSTEM, ErrorSeverity.HIGH);
+              Alert.alert('Erreur', 'La création des commandes a échoué. Réessayez.');
+            } finally {
+              setProcessingBulk(false);
+            }
+          }}
+          disabled={items.length === 0 || processingBulk}
         >
-          <Text style={styles.checkoutButtonText}>Passer la commande</Text>
-          <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+          {processingBulk ? (
+            <ActivityIndicator color={COLORS.text} />
+          ) : (
+            <>
+              <Text style={styles.checkoutButtonText}>Passer toutes les commandes</Text>
+              <Ionicons name="arrow-forward" size={20} color={COLORS.text} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -434,7 +627,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   checkoutButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
     marginRight: SPACING.sm,

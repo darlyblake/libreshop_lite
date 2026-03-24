@@ -22,7 +22,7 @@ export const showAlert = (title: string, message?: string) => {
       Alert.alert(title, message || '');
     }
   } catch (e) {
-    console.error('Alert failed:', title, message);
+    errorHandler.handleDatabaseError(title, message, 'Alert failed:');
   }
 };
 
@@ -49,7 +49,7 @@ export const showConfirm = (title: string, message?: string): Promise<boolean> =
         );
       }
     } catch (e) {
-      console.error('Confirm failed:', title, message);
+      errorHandler.handleDatabaseError(title, message, 'Confirm failed:');
       resolve(false);
     }
   });
@@ -67,11 +67,11 @@ export const openURL = (url: string, target = '_blank') => {
       // React Native - use Linking
       const { Linking } = require('react-native');
       Linking.openURL(url).catch((err: any) => {
-        console.error('Failed to open URL:', url, err);
+        errorHandler.handleDatabaseError(url, err, 'Failed to open URL:');
       });
     }
   } catch (e) {
-    console.error('Open URL failed:', url);
+    errorHandler.handleDatabaseError(url, 'Open URL failed:');
   }
 };
 
@@ -83,9 +83,9 @@ export const reloadPage = () => {
     if (typeof window !== 'undefined' && window.location?.reload) {
       window.location.reload();
     } else {
-      console.warn('Page reload not available in React Native');
+      errorHandler.handle('Page reload not available in React Native', 'UnknownContext', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
     }
   } catch (e) {
-    console.error('Reload failed:', e);
+    errorHandler.handleDatabaseError(e, 'Reload failed:');
   }
 };

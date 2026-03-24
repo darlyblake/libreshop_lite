@@ -88,7 +88,7 @@ export const ResponsiveCard: React.FC<ResponsiveCardProps> = ({
   const { component, spacing } = useResponsive();
 
   const cardStyle: ViewStyle = {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'COLORS.text',
     borderRadius: component.cardBorderRadius,
     padding: component.cardPadding,
     shadowColor: '#000',
@@ -99,6 +99,7 @@ export const ResponsiveCard: React.FC<ResponsiveCardProps> = ({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    // CSS box-shadow for web compatibility
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
     ...style,
   };
@@ -157,15 +158,15 @@ export const ResponsiveButton: React.FC<ResponsiveButtonProps> = ({
   const getVariantStyle = (): ViewStyle => {
     switch (variant) {
       case 'secondary':
-        return { backgroundColor: '#f3f4f6' };
+        return { backgroundColor: 'COLORS.lightGray' };
       case 'outline':
         return {
           backgroundColor: 'transparent',
           borderWidth: 1,
-          borderColor: '#6b7280',
+          borderColor: 'COLORS.gray',
         };
       default:
-        return { backgroundColor: '#6366f1' };
+        return { backgroundColor: 'COLORS.categoryColors[5]' };
     }
   };
 
@@ -177,7 +178,7 @@ export const ResponsiveButton: React.FC<ResponsiveButtonProps> = ({
       <Text
         style={[
           {
-            color: variant === 'primary' ? '#ffffff' : '#374151',
+            color: variant === 'primary' ? 'COLORS.text' : '#374151',
             fontSize: fontSize.md,
             fontWeight: '600',
           },

@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useResponsive } from '../utils/useResponsive';
 import AddCollectionModal, { NewCollectionData } from '../components/AddCollectionModal';
 import { useAuthStore } from '../store';
@@ -119,7 +120,7 @@ export const SellerCollectionScreen: React.FC = () => {
 
       setCollections(uiCols);
     } catch (e) {
-      console.error('load collections', e);
+      errorHandler.handleDatabaseError(e, 'load collections');
       Alert.alert('Erreur', 'Impossible de charger les collections');
     } finally {
       setLoading(false);
@@ -210,7 +211,7 @@ export const SellerCollectionScreen: React.FC = () => {
       setShowAddModal(false);
       Alert.alert('Succès', `Collection "${data.name}" ajoutée avec succès`);
     } catch (e) {
-      console.error('create collection', e);
+      errorHandler.handleDatabaseError(e, 'create collection');
       Alert.alert('Erreur', "Impossible d'ajouter la collection");
     }
   };
@@ -230,7 +231,7 @@ export const SellerCollectionScreen: React.FC = () => {
               setCollections((prev) => prev.filter((c) => c.id !== id));
               Alert.alert('Succès', 'Collection supprimée');
             } catch (e) {
-              console.error('delete collection', e);
+              errorHandler.handleDatabaseError(e, 'delete collection');
               Alert.alert('Erreur', 'Impossible de supprimer la collection');
             }
           },
@@ -255,7 +256,7 @@ export const SellerCollectionScreen: React.FC = () => {
               );
               Alert.alert('Succès', `Collection ${currentStatus ? 'désactivée' : 'activée'}`);
             } catch (e) {
-              console.error('toggle collection status', e);
+              errorHandler.handleDatabaseError(e, 'toggle collection status');
               Alert.alert('Erreur', "Impossible de modifier l'état");
             }
           },
@@ -350,7 +351,7 @@ export const SellerCollectionScreen: React.FC = () => {
         <View style={styles.collectionHeader}>
           <View style={styles.collectionInfo}>
             <View style={[styles.collectionIcon, { backgroundColor: iconColor }]}>
-              <Ionicons name={collection.icon} size={fontSize.xl} color={COLORS.white} />
+              <Ionicons name={collection.icon} size={fontSize.xl} color={COLORS.text} />
             </View>
             
             <View style={styles.collectionDetails}>
@@ -393,7 +394,7 @@ export const SellerCollectionScreen: React.FC = () => {
             <Ionicons 
               name={collection.isActive ? 'checkmark' : 'close'} 
               size={fontSize.sm} 
-              color={COLORS.white} 
+              color={COLORS.text} 
             />
           </TouchableOpacity>
         </View>
@@ -548,7 +549,7 @@ export const SellerCollectionScreen: React.FC = () => {
       color: COLORS.text,
     },
     filterTabTextActive: {
-      color: COLORS.white,
+      color: COLORS.text,
     },
     viewToggle: {
       flexDirection: 'row',
@@ -754,7 +755,7 @@ export const SellerCollectionScreen: React.FC = () => {
       borderRadius: RADIUS.lg,
     },
     emptyStateButtonText: {
-      color: COLORS.white,
+      color: COLORS.text,
       fontWeight: '600',
       fontSize: fontSize.md,
     },
@@ -885,7 +886,7 @@ export const SellerCollectionScreen: React.FC = () => {
       backgroundColor: COLORS.accent,
     },
     confirmButtonText: {
-      color: COLORS.white,
+      color: COLORS.text,
       fontWeight: '600',
     },
   });
@@ -935,7 +936,7 @@ export const SellerCollectionScreen: React.FC = () => {
                   setShowAddModal(true);
                 }}
               >
-                <Ionicons name="add" size={fontSize.lg} color={COLORS.white} />
+                <Ionicons name="add" size={fontSize.lg} color={COLORS.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1000,7 +1001,7 @@ export const SellerCollectionScreen: React.FC = () => {
               <Ionicons 
                 name="text" 
                 size={fontSize.sm} 
-                color={sortBy === 'name' ? COLORS.white : COLORS.textMuted} 
+                color={sortBy === 'name' ? COLORS.text : COLORS.textMuted} 
               />
               <Text style={[
                 styles.filterTabText,
@@ -1012,7 +1013,7 @@ export const SellerCollectionScreen: React.FC = () => {
                 <Ionicons 
                   name={sortOrder === 'asc' ? 'chevron-up' : 'chevron-down'} 
                   size={fontSize.xs} 
-                  color={COLORS.white} 
+                  color={COLORS.text} 
                 />
               )}
             </TouchableOpacity>
@@ -1034,7 +1035,7 @@ export const SellerCollectionScreen: React.FC = () => {
               <Ionicons 
                 name="cube" 
                 size={fontSize.sm} 
-                color={sortBy === 'productCount' ? COLORS.white : COLORS.textMuted} 
+                color={sortBy === 'productCount' ? COLORS.text : COLORS.textMuted} 
               />
               <Text style={[
                 styles.filterTabText,
@@ -1046,7 +1047,7 @@ export const SellerCollectionScreen: React.FC = () => {
                 <Ionicons 
                   name={sortOrder === 'asc' ? 'chevron-up' : 'chevron-down'} 
                   size={fontSize.xs} 
-                  color={COLORS.white} 
+                  color={COLORS.text} 
                 />
               )}
             </TouchableOpacity>
@@ -1068,7 +1069,7 @@ export const SellerCollectionScreen: React.FC = () => {
               <Ionicons 
                 name="calendar" 
                 size={fontSize.sm} 
-                color={sortBy === 'date' ? COLORS.white : COLORS.textMuted} 
+                color={sortBy === 'date' ? COLORS.text : COLORS.textMuted} 
               />
               <Text style={[
                 styles.filterTabText,
@@ -1080,7 +1081,7 @@ export const SellerCollectionScreen: React.FC = () => {
                 <Ionicons 
                   name={sortOrder === 'asc' ? 'chevron-up' : 'chevron-down'} 
                   size={fontSize.xs} 
-                  color={COLORS.white} 
+                  color={COLORS.text} 
                 />
               )}
             </TouchableOpacity>
@@ -1100,7 +1101,7 @@ export const SellerCollectionScreen: React.FC = () => {
               <Ionicons 
                 name="list" 
                 size={fontSize.md} 
-                color={viewMode === 'list' ? COLORS.white : COLORS.textMuted} 
+                color={viewMode === 'list' ? COLORS.text : COLORS.textMuted} 
               />
             </TouchableOpacity>
             <TouchableOpacity 
@@ -1113,7 +1114,7 @@ export const SellerCollectionScreen: React.FC = () => {
               <Ionicons 
                 name="grid" 
                 size={fontSize.md} 
-                color={viewMode === 'grid' ? COLORS.white : COLORS.textMuted} 
+                color={viewMode === 'grid' ? COLORS.text : COLORS.textMuted} 
               />
             </TouchableOpacity>
           </View>

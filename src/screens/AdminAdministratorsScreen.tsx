@@ -343,7 +343,7 @@ export const AdminAdministratorsScreen: React.FC = () => {
           </View>
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <Ionicons name="add" size={20} color={COLORS.white} />
+          <Ionicons name="add" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterTextActive: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
   adminsList: {
     flex: 1,
@@ -904,7 +904,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   submitButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },

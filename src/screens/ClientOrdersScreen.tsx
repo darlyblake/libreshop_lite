@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -76,10 +77,15 @@ const generateWhatsAppMessage = (order: OrderWithDetails): string => {
   return `Bonjour ! Je vous contacte concernant ma commande #${order.id} du ${formatDate(order.created_at)}:\n\n${products}\n\nTotal: ${order.total_amount} FCA\n\nStatut: ${getStatusLabel(order.status)}\n\nPourriez-vous me donner plus d'informations ?`;
 };
 
-const generateWhatsAppUrl = (order: OrderWithDetails): string => {
-  if (!order.seller?.phone) return '#';
+const generateWhatsAppUrl = (order: OrderWithDetails): string | null => {
+  // Use the store's phone (already loaded via the order join)
+  const rawPhone = order.store?.phone || (order.store as any)?.whatsapp_number;
+  if (!rawPhone) return null;
+  // Normalise: keep only digits (wa.me expects international digits, no '+')
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (!digits) return null;
   const message = generateWhatsAppMessage(order);
-  return `https://wa.me/${order.seller.phone.replace(/[^\d+]/g, '')}?text=${encodeURIComponent(message)}`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 };
 
 export const ClientOrdersScreen: React.FC = () => {
@@ -114,7 +120,7 @@ export const ClientOrdersScreen: React.FC = () => {
       
       setOrders(ordersWithDetails);
     } catch (e: any) {
-      console.warn('load orders failed', e);
+      errorHandler.handle(e, 'load orders failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       Alert.alert('Erreur', e?.message ? String(e.message) : 'Impossible de charger vos commandes');
       setOrders([]);
     } finally {
@@ -189,7 +195,7 @@ export const ClientOrdersScreen: React.FC = () => {
       
       Alert.alert('Succès', 'La commande a été marquée comme reçue');
     } catch (e: any) {
-      console.error('mark as received failed', e);
+      errorHandler.handleDatabaseError(e, 'mark as received failed');
       Alert.alert('Erreur', 'Impossible de marquer la commande comme reçue');
     } finally {
       setMarkingAsReceived(null);
@@ -199,11 +205,30 @@ export const ClientOrdersScreen: React.FC = () => {
   // Contacter le vendeur
   const contactSeller = (order: OrderWithDetails) => {
     const whatsappUrl = generateWhatsAppUrl(order);
-    if (whatsappUrl !== '#') {
-      Linking.openURL(whatsappUrl);
-    } else {
-      Alert.alert('Erreur', 'Impossible de contacter le vendeur');
+    if (!whatsappUrl) {
+      Alert.alert(
+        'Numéro introuvable',
+        'Cette boutique n\'a pas encore renseigné un numéro WhatsApp de contact.'
+      );
+      return;
     }
+
+    // On web, prefer opening in a new tab to avoid app routing collisions
+    if (typeof window !== 'undefined' && window && window.location && window.open) {
+      try {
+        window.open(whatsappUrl, '_blank');
+        return;
+      } catch (e) {
+        // fallthrough to Linking
+      }
+    }
+
+    Linking.openURL(whatsappUrl).catch(() => {
+      Alert.alert(
+        'Impossible d\'ouvrir WhatsApp',
+        'Vérifiez que WhatsApp est installé sur votre appareil, ou copiez le numéro manuellement.'
+      );
+    });
   };
 
   // Voir les détails
@@ -288,10 +313,10 @@ export const ClientOrdersScreen: React.FC = () => {
             disabled={markingAsReceived === order.id}
           >
             {markingAsReceived === order.id ? (
-              <ActivityIndicator color={COLORS.white} size="small" />
+              <ActivityIndicator color={COLORS.text} size="small" />
             ) : (
               <>
-                <Ionicons name="checkmark-circle" size={18} color={COLORS.white} />
+                <Ionicons name="checkmark-circle" size={18} color={COLORS.text} />
                 <Text style={styles.actionButtonText}>Comme reçu</Text>
               </>
             )}
@@ -302,7 +327,7 @@ export const ClientOrdersScreen: React.FC = () => {
           style={[styles.actionButton, styles.contactButton]}
           onPress={() => contactSeller(order)}
         >
-          <Ionicons name="logo-whatsapp" size={18} color={COLORS.white} />
+          <Ionicons name="logo-whatsapp" size={18} color={COLORS.text} />
           <Text style={styles.actionButtonText}>Contacter</Text>
         </TouchableOpacity>
         
@@ -727,7 +752,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   storeInfo: {
     flexDirection: 'row',
@@ -799,7 +824,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.success,
   },
   contactButton: {
-    backgroundColor: '#25D366',
+    backgroundColor: 'COLORS.whatsapp',
   },
   detailsButton: {
     backgroundColor: COLORS.accent + '10',
@@ -809,7 +834,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.text,
     marginLeft: SPACING.xs,
   },
   // Modal styles
@@ -880,7 +905,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   filterOptionTextSelected: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
   detailSection: {
     marginBottom: SPACING.lg,

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -49,7 +50,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
       const filtered = (prods || []).filter((p) => String((p as any).collection_id || '') === String(col.id));
       setProductsPreview(filtered.slice(0, 2) as any);
     } catch (e) {
-      console.error('load collection', e);
+      errorHandler.handleDatabaseError(e, 'load collection');
       Alert.alert('Erreur', 'Impossible de charger la collection');
     } finally {
       setLoading(false);
@@ -81,7 +82,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
       Alert.alert('Succès', 'Collection mise à jour avec succès');
       navigation.goBack();
     } catch (e) {
-      console.error('update collection', e);
+      errorHandler.handleDatabaseError(e, 'update collection');
       Alert.alert('Erreur', "Impossible d'enregistrer");
     } finally {
       setLoading(false);
@@ -108,7 +109,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
               Alert.alert('Succès', 'Collection supprimée avec succès');
               navigation.goBack();
             } catch (e) {
-              console.error('delete collection', e);
+              errorHandler.handleDatabaseError(e, 'delete collection');
               Alert.alert('Erreur', 'Impossible de supprimer la collection');
             } finally {
               setLoading(false);
@@ -182,7 +183,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
                 <Ionicons 
                   name={collection.isActive ? 'checkmark' : 'close'} 
                   size={16} 
-                  color={COLORS.white} 
+                  color={COLORS.text} 
                 />
                 <Text style={styles.switchText}>
                   {collection.isActive ? 'Active' : 'Inactive'}
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
   switchText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   productsPreview: {
     flexDirection: 'row',

@@ -9,9 +9,10 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore, useCartStore } from '../store';
 import { genericStorage } from '../lib/storage';
 import { storeService } from '../lib/supabase';
@@ -19,9 +20,26 @@ import { storeService } from '../lib/supabase';
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
-  const { items, getTotal, storeId } = useCartStore();
+  const { items: globalItems, getTotal, storeId: storeIdFromStore } = useCartStore();
+  const route = useRoute<any>();
+
+  // allow passing `itemsJson` or `items` in navigation to checkout a subset (per-store)
+  const paramItems = (() => {
+    const p = route.params || {};
+    if (Array.isArray(p.items)) return p.items;
+    if (typeof p.itemsJson === 'string') {
+      try { return JSON.parse(p.itemsJson); } catch { return undefined; }
+    }
+    return undefined;
+  })();
+
+  const items = paramItems ?? globalItems;
+  const activeStoreId = route.params?.storeId ?? storeIdFromStore;
   const [store, setStore] = useState<any>(null);
   const [loadingStore, setLoadingStore] = useState(false);
+    const [storesData, setStoresData] = useState<any[]>([]);
+    const [aggregatedTaxAmount, setAggregatedTaxAmount] = useState(0);
+    const [aggregatedShipping, setAggregatedShipping] = useState(0);
 
   const [paymentMethod, setPaymentMethod] = useState('mobile_money');
   const [formData, setFormData] = useState({
@@ -31,29 +49,83 @@ export const CheckoutScreen: React.FC = () => {
     notes: '',
   });
 
-  // Load store data for tax and shipping
+  // Load store data for tax and shipping. Supports single-store or mixed carts.
   useEffect(() => {
-    if (!storeId) return;
-    const loadStore = async () => {
+    let mounted = true;
+    const loadStores = async () => {
       try {
         setLoadingStore(true);
-        const storeData = await storeService.getById(storeId);
-        setStore(storeData);
+
+            // If a single storeId is locked, load that store only
+            if (activeStoreId) {
+              const storeData = await storeService.getById(activeStoreId);
+          if (!mounted) return;
+              setStore(storeData);
+              setStoresData(storeData ? [storeData] : []);
+              // compute aggregated values for single store -- use passed items when available
+              const subtotalSingle = (paramItems && Array.isArray(paramItems))
+                ? paramItems.reduce((s: number, it: any) => s + (it.product.price || 0) * (it.quantity || 0), 0)
+                : getTotal();
+          const taxAmt = storeData?.tax_rate ? subtotalSingle * (storeData.tax_rate / 100) : 0;
+          const ship = storeData?.shipping_price || 0;
+          setAggregatedTaxAmount(Math.round(taxAmt));
+          setAggregatedShipping(ship);
+          return;
+        }
+
+        // Mixed cart: gather unique store ids from items and fetch each store
+        const ids = Array.from(new Set((paramItems ?? items).map(i => (i.product as any)?.store_id).filter(Boolean)));
+        if (ids.length === 0) {
+          setStore(null);
+          setStoresData([]);
+          setAggregatedTaxAmount(0);
+          setAggregatedShipping(0);
+          return;
+        }
+
+        const stores = await Promise.all(ids.map((id) => storeService.getById(id)));
+        if (!mounted) return;
+        setStore(null);
+        setStoresData(stores.filter(Boolean));
+
+        // compute subtotal per store
+        const subtotalByStore: Record<string, number> = {};
+        (paramItems ?? items).forEach((it) => {
+          const sid = (it.product as any)?.store_id || (it as any).store_id;
+          if (!sid) return;
+          subtotalByStore[sid] = (subtotalByStore[sid] || 0) + ((it.product?.price || 0) * (it.quantity || 0));
+        });
+
+        let taxSum = 0;
+        let shippingSum = 0;
+        for (const s of stores) {
+          if (!s) continue;
+          const sid = s.id;
+          const storeSubtotal = subtotalByStore[sid] || 0;
+          const t = s.tax_rate ? storeSubtotal * (s.tax_rate / 100) : 0;
+          taxSum += t;
+          shippingSum += s.shipping_price || 0;
+        }
+        setAggregatedTaxAmount(Math.round(taxSum));
+        setAggregatedShipping(shippingSum);
       } catch (e) {
-        console.warn('load store for checkout', e);
+        errorHandler.handle(e, 'load store for checkout', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
-        setLoadingStore(false);
+        if (mounted) setLoadingStore(false);
       }
     };
-    loadStore();
-  }, [storeId]);
+    loadStores();
+    return () => { mounted = false; };
+  }, [activeStoreId, items, paramItems]);
 
-  const subtotal = getTotal();
-  const taxRate = store?.tax_rate || 0; // %
-  const shippingPrice = store?.shipping_price || 0; // FCFA
-  const taxAmount = subtotal * (taxRate / 100);
-  const total = subtotal + taxAmount + shippingPrice;
-  const cartEmpty = items.length === 0;
+  const subtotal = (paramItems && Array.isArray(paramItems))
+    ? paramItems.reduce((s: number, it: any) => s + (it.product.price || 0) * (it.quantity || 0), 0)
+    : getTotal();
+  const taxRate = store?.tax_rate || 0; // legacy single-store rate for label
+  const shippingPrice = store?.shipping_price || 0; // legacy single-store shipping
+  const taxAmount = store ? Math.round(subtotal * (taxRate / 100)) : aggregatedTaxAmount;
+  const total = subtotal + taxAmount + (store ? shippingPrice : aggregatedShipping);
+  const cartEmpty = (paramItems ? paramItems.length === 0 : items.length === 0);
 
   useEffect(() => {
     const restore = async () => {
@@ -210,7 +282,7 @@ export const CheckoutScreen: React.FC = () => {
           </View>
           
           <View style={styles.summaryCard}>
-            {items.map((item) => (
+            {(paramItems ?? items).map((item) => (
               <View key={item.product.id} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel} numberOfLines={1}>
                   {item.product.name} × {item.quantity}
@@ -225,16 +297,36 @@ export const CheckoutScreen: React.FC = () => {
               <Text style={styles.summaryLabel}>Sous-total</Text>
               <Text style={styles.summaryValue}>{subtotal.toLocaleString()} FCA</Text>
             </View>
-            {taxRate > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>TVA ({taxRate}%)</Text>
-                <Text style={styles.summaryValue}>{taxAmount.toLocaleString()} FCA</Text>
-              </View>
+            {/* Taxes */}
+            {storesData.length <= 1 ? (
+              taxRate > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>TVA ({taxRate}%)</Text>
+                  <Text style={styles.summaryValue}>{taxAmount.toLocaleString()} FCA</Text>
+                </View>
+              )
+            ) : (
+              // Mixed cart: show per-store tax lines
+              storesData.map((s) => {
+                const sid = s?.id;
+                const storeSubtotal = (paramItems ?? items).reduce((sum, it) => {
+                  return sum + ((it.product as any)?.store_id === sid ? (it.product.price || 0) * (it.quantity || 0) : 0);
+                }, 0);
+                const tax = s?.tax_rate ? Math.round(storeSubtotal * (s.tax_rate / 100)) : 0;
+                return (
+                  <View style={styles.summaryRow} key={`tax-${sid}`}>
+                    <Text style={styles.summaryLabel}>TVA {s?.name ? `(${s.name})` : ''}</Text>
+                    <Text style={styles.summaryValue}>{tax.toLocaleString()} FCA</Text>
+                  </View>
+                );
+              })
             )}
+
+            {/* Shipping */}
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Livraison</Text>
               <Text style={styles.summaryValue}>
-                {loadingStore ? '...' : shippingPrice > 0 ? `${shippingPrice.toLocaleString()} FCA` : 'Gratuite'}
+                {loadingStore ? '...' : (store ? (shippingPrice > 0 ? `${shippingPrice.toLocaleString()} FCA` : 'Gratuite') : `${aggregatedShipping.toLocaleString()} FCA`)}
               </Text>
             </View>
             <View style={styles.divider} />
@@ -267,14 +359,14 @@ export const CheckoutScreen: React.FC = () => {
           <Text style={styles.bottomTotalLabel}>Total TTC</Text>
           <Text style={styles.bottomTotalValue}>{total.toLocaleString()} FCA</Text>
         </View>
-        <TouchableOpacity 
+          <TouchableOpacity 
           style={[styles.orderButton, cartEmpty && { opacity: 0.6 }]}
           disabled={cartEmpty}
           onPress={() =>
             navigation.navigate('Payment', {
               amount: total,
-              storeId,
-              itemsJson: JSON.stringify(items),
+              storeId: activeStoreId,
+              itemsJson: JSON.stringify(paramItems ?? items),
               customerJson: JSON.stringify({
                 name: formData.name,
                 phone: formData.phone,
@@ -486,7 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   orderButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },

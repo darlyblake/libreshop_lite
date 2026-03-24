@@ -13,6 +13,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Button } from '../components';
 import { planService, storeService } from '../lib/supabase';
 import { useAuthStore } from '../store';
@@ -88,7 +89,7 @@ export const PricingScreen: React.FC = () => {
             hasTrialStore = stores.subscription_status === 'trial' || stores.subscription_status === 'expired';
           }
         } catch (e) {
-          console.warn('could not load user stores', e);
+          errorHandler.handle(e, 'could not load user stores', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
       }
       
@@ -108,7 +109,7 @@ export const PricingScreen: React.FC = () => {
         disabledReason: p.price === 0 && hasTrialStore ? 'Vous avez déjà utilisé le plan gratuit' : undefined,
       })));
     } catch (e) {
-      console.error('load pricing plans', e);
+      errorHandler.handleDatabaseError(e, 'load pricing plans');
       if (
         typeof e === 'object' &&
         (String(e).includes('Failed to fetch') || (e as any).message?.includes('Failed to fetch'))

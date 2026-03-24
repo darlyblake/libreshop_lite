@@ -8,7 +8,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface ButtonProps {
   title: string;
@@ -31,6 +31,14 @@ export const Button: React.FC<ButtonProps> = ({
   icon,
   style,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+
   const buttonStyles = [
     styles.button,
     styles[variant],
@@ -51,7 +59,7 @@ export const Button: React.FC<ButtonProps> = ({
     
     // Si l'icône est une chaîne de caractères, utiliser Ionicons
     if (typeof icon === 'string') {
-      const iconColor = variant === 'outline' ? COLORS.text : COLORS.white;
+      const iconColor = variant === 'outline' ? COLORS.text : COLORS.text;
       const iconSize = size === 'small' ? 16 : size === 'large' ? 24 : 20;
       
       return <Ionicons name={icon} size={iconSize} color={iconColor} />;
@@ -70,7 +78,7 @@ export const Button: React.FC<ButtonProps> = ({
     >
       {loading ? (
         <ActivityIndicator 
-          color={variant === 'outline' ? COLORS.accent : COLORS.white} 
+          color={variant === 'outline' ? COLORS.accent : COLORS.text} 
           size="small" 
         />
       ) : (
@@ -83,7 +91,12 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -133,25 +146,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryText: {
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   secondaryText: {
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   outlineText: {
     color: COLORS.text,
   },
   dangerText: {
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   successText: {
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   warningText: {
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   accentText: {
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   smallText: {
     fontSize: FONT_SIZE.sm,
@@ -166,4 +179,5 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
 });
+};
 

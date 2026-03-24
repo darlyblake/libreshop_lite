@@ -84,7 +84,7 @@ export const ConfirmationScreen: React.FC = () => {
         {/* Success Icon */}
         <View style={styles.iconContainer}>
           <View style={styles.iconCircle}>
-            <Ionicons name="checkmark" size={48} color={COLORS.white} />
+            <Ionicons name="checkmark" size={48} color={COLORS.text} />
           </View>
         </View>
 
@@ -180,7 +180,7 @@ export const ConfirmationScreen: React.FC = () => {
           style={styles.primaryButton}
           onPress={() => navigation.navigate('ClientTabs')}
         >
-          <Ionicons name="home" size={20} color={COLORS.white} />
+          <Ionicons name="home" size={20} color={COLORS.text} />
           <Text style={styles.primaryButtonText}>Accueil</Text>
         </TouchableOpacity>
       </View>
@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   primaryButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },

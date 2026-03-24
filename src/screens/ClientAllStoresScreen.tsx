@@ -26,10 +26,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import StoreFiltersModal from '../components/StoreFiltersModal';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { storeService, storeStatsService, Store, StoreStats } from '../lib/supabase';
 import { useResponsive } from '../utils/responsive';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MAX_CONTENT_WIDTH = 1200;
 
 export const ClientAllStoresScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -63,42 +66,80 @@ export const ClientAllStoresScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [categories, setCategories] = useState<string[]>(['Toutes']);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<{ deliveryOnly?: boolean; minRating?: number; countryId?: string; cityId?: string }>({});
   const [statsByStoreId, setStatsByStoreId] = useState<Record<string, StoreStats>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     loadStores();
   }, []);
 
-  const loadStores = async () => {
+  const loadStores = async (reset = true) => {
     try {
-      setIsLoading(true);
+      if (reset) {
+        setIsLoading(true);
+        setPage(0);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
       setError(null);
-      const data = await storeService.getAll();
-      const list = (data || []) as Store[];
-      setStores(list);
+      const currentPage = reset ? 0 : page;
+      const pageSize = 20;
 
-      const uniqueCategories = Array.from(
-        new Set(list.map((s) => s.category).filter(Boolean))
-      ) as string[];
-      setCategories(['Toutes', ...uniqueCategories]);
+      // Récupérer les boutiques triées par 'score' (store_score calculé en base)
+      const data = await storeService.getAll(currentPage, pageSize, 'score');
+      const list = (data || []) as Store[];
+      
+      if (reset) {
+        setStores(list);
+        const uniqueCategories = Array.from(
+          new Set(list.map((s) => s.category).filter(Boolean))
+        ) as string[];
+        setCategories(['Toutes', ...uniqueCategories]);
+      } else {
+        setStores(prev => [...prev, ...list]);
+      }
+      
+      setHasMore(list.length === pageSize);
 
       const storeIds = list.map((s) => s.id);
-      const stats = await storeStatsService.getByStores(storeIds);
-      const nextStatsById: Record<string, StoreStats> = {};
-      for (const st of stats) {
-        nextStatsById[st.store_id] = st;
+      if (storeIds.length > 0) {
+        const stats = await storeStatsService.getByStores(storeIds);
+        setStatsByStoreId(prev => {
+          const next = { ...prev };
+          for (const st of stats) {
+            next[st.store_id] = st;
+          }
+          return next;
+        });
       }
-      setStatsByStoreId(nextStatsById);
     } catch (e) {
-      console.error('ClientAllStoresScreen loadStores error', e);
+      errorHandler.handleDatabaseError(e, 'ClientAllStoresScreen loadStores error');
       setError('Impossible de charger les boutiques');
-      Alert.alert('Erreur', 'Impossible de charger les boutiques. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
+      setLoadingMore(false);
       setRefreshing(false);
     }
   };
+
+  const handleLoadMore = () => {
+    if (!isLoading && !loadingMore && hasMore) {
+      setPage(prev => prev + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (page > 0) {
+      loadStores(false);
+    }
+  }, [page]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -122,6 +163,24 @@ export const ClientAllStoresScreen: React.FC = () => {
 
     if (selectedCategory !== 'Toutes') {
       storesList = storesList.filter((store) => store.category === selectedCategory);
+    }
+
+    // apply modal filters
+    if (filters.deliveryOnly) {
+      storesList = storesList.filter((s) => (s.shipping_price || 0) > 0);
+    }
+    if (typeof filters.minRating === 'number' && filters.minRating > 0) {
+      storesList = storesList.filter((s) => {
+        const st = statsByStoreId[s.id];
+        const avg = st?.rating_avg || 0;
+        return avg >= (filters.minRating || 0);
+      });
+    }
+    if (filters.countryId) {
+      storesList = storesList.filter((s) => s.country_id === filters.countryId);
+    }
+    if (filters.cityId) {
+      storesList = storesList.filter((s) => s.city_id === filters.cityId);
     }
 
     if (searchQuery.trim()) {
@@ -280,137 +339,178 @@ export const ClientAllStoresScreen: React.FC = () => {
   );
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.flexContainer}
-      keyboardVerticalOffset={insets.top}
-    >
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        {/* Header avec dégradé */}
-        <LinearGradient
-          colors={[COLORS.accent, COLORS.accentDark || COLORS.accent]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.header}
-        >
-          <View style={styles.headerContent}>
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              style={styles.backBtn}
-            >
-              <Ionicons name="arrow-back" size={22} color="white" />
-            </TouchableOpacity>
-
-            <View style={styles.headerTitles}>
-              <Text style={styles.title}>Boutiques</Text>
-              <Text style={styles.subtitle}>Découvrez nos vendeurs partenaires</Text>
-            </View>
-
-            <TouchableOpacity style={styles.filterBtn}>
-              <Ionicons name="options-outline" size={22} color="white" />
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-
-        {/* Barre de recherche flottante */}
-        <BlurView intensity={80} tint="light" style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Rechercher une boutique..."
-              placeholderTextColor={COLORS.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              autoCapitalize="none"
-              returnKeyType="search"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={handleClearSearch}>
-                <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
+    <View style={styles.maxWidthContainer}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flexContainer}
+        keyboardVerticalOffset={insets.top}
+      >
+        <View style={[styles.container, { paddingTop: insets.top }]}>
+          {/* Header avec dégradé */}
+          <LinearGradient
+            colors={[COLORS.accent, COLORS.accentDark || COLORS.accent]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.header}
+          >
+            <View style={styles.headerContent}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.backBtn}
+              >
+                <Ionicons name="arrow-back" size={22} color="white" />
               </TouchableOpacity>
+
+              <View style={styles.headerTitles}>
+                <Text style={styles.title}>Boutiques</Text>
+                <Text style={styles.subtitle}>Découvrez nos vendeurs partenaires</Text>
+              </View>
+
+                  <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilters(true)}>
+                <Ionicons name="options-outline" size={22} color="white" />
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+
+          {/* Barre de recherche flottante */}
+          <BlurView intensity={80} tint="light" style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Rechercher une boutique..."
+                placeholderTextColor={COLORS.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCapitalize="none"
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={handleClearSearch}>
+                  <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </BlurView>
+
+          {/* Catégories scrollables */}
+          <View style={styles.categoriesWrapper}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+            >
+              {categories.map(renderCategoryChip)}
+            </ScrollView>
+          </View>
+
+          {/* En-tête des résultats */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsCount}>
+              {isLoading ? 'Chargement...' : `${filteredStores.length} boutique${filteredStores.length !== 1 ? 's' : ''}`}
+            </Text>
+            {!isLoading && filteredStores.length > 0 && (
+              <Text style={styles.resultsSubtext}>
+                {selectedCategory !== 'Toutes' ? `Dans ${selectedCategory}` : 'Toutes catégories'}
+              </Text>
             )}
           </View>
-        </BlurView>
 
-        {/* Catégories scrollables */}
-        <View style={styles.categoriesWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          >
-            {categories.map(renderCategoryChip)}
-          </ScrollView>
-        </View>
+          {/* Liste des boutiques */}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={COLORS.accent} />
+              <Text style={styles.loadingText}>Chargement des boutiques...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
+              <Text style={styles.errorTitle}>Oups !</Text>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={loadStores}>
+                <Text style={styles.retryButtonText}>Réessayer</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <FlatList
+                data={filteredStores}
+                keyExtractor={(item) => item.id}
+                numColumns={numColumns}
+                key={numColumns}
+                contentContainerStyle={dynamicStyles.listContent}
+                columnWrapperStyle={numColumns > 1 ? dynamicStyles.columnWrapper : undefined}
+                showsVerticalScrollIndicator={false}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                onEndReached={handleLoadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                  loadingMore ? (
+                    <View style={styles.footerLoader}>
+                      <ActivityIndicator color={COLORS.accent} />
+                    </View>
+                  ) : null
+                }
+                ListEmptyComponent={
+                  <Animated.View entering={FadeIn} style={styles.emptyState}>
+                    <Ionicons name="storefront-outline" size={80} color={COLORS.textMuted} />
+                    <Text style={styles.emptyTitle}>Aucune boutique trouvée</Text>
+                    <Text style={styles.emptyText}>
+                      Essayez avec un autre mot-clé ou une autre catégorie
+                    </Text>
+                    {(searchQuery || selectedCategory !== 'Toutes') && (
+                      <TouchableOpacity
+                        style={styles.clearFiltersButton}
+                        onPress={() => {
+                          setSearchQuery('');
+                          setSelectedCategory('Toutes');
+                        }}
+                      >
+                        <Text style={styles.clearFiltersText}>Effacer les filtres</Text>
+                      </TouchableOpacity>
+                    )}
+                  </Animated.View>
+                }
+                renderItem={renderStoreCard}
+              />
 
-        {/* En-tête des résultats */}
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsCount}>
-            {isLoading ? 'Chargement...' : `${filteredStores.length} boutique${filteredStores.length !== 1 ? 's' : ''}`}
-          </Text>
-          {!isLoading && filteredStores.length > 0 && (
-            <Text style={styles.resultsSubtext}>
-              {selectedCategory !== 'Toutes' ? `Dans ${selectedCategory}` : 'Toutes catégories'}
-            </Text>
+              <StoreFiltersModal
+                visible={showFilters}
+                onClose={() => setShowFilters(false)}
+                categories={categories}
+                initial={{
+                  category: selectedCategory,
+                  deliveryOnly: Boolean(filters.deliveryOnly),
+                  minRating: filters.minRating || 0,
+                  countryId: filters.countryId,
+                  cityId: filters.cityId,
+                }}
+                onApply={(f) => {
+                  setSelectedCategory(f.category || 'Toutes');
+                  setFilters({ deliveryOnly: f.deliveryOnly, minRating: f.minRating, countryId: f.countryId, cityId: f.cityId });
+                }}
+              />
+            </>
           )}
         </View>
-
-        {/* Liste des boutiques */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.accent} />
-            <Text style={styles.loadingText}>Chargement des boutiques...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
-            <Text style={styles.errorTitle}>Oups !</Text>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadStores}>
-              <Text style={styles.retryButtonText}>Réessayer</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredStores}
-            keyExtractor={(item) => item.id}
-            numColumns={numColumns}
-            key={numColumns}
-            contentContainerStyle={dynamicStyles.listContent}
-            columnWrapperStyle={numColumns > 1 ? dynamicStyles.columnWrapper : undefined}
-            showsVerticalScrollIndicator={false}
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            ListEmptyComponent={
-              <Animated.View entering={FadeIn} style={styles.emptyState}>
-                <Ionicons name="storefront-outline" size={80} color={COLORS.textMuted} />
-                <Text style={styles.emptyTitle}>Aucune boutique trouvée</Text>
-                <Text style={styles.emptyText}>
-                  Essayez avec un autre mot-clé ou une autre catégorie
-                </Text>
-                {(searchQuery || selectedCategory !== 'Toutes') && (
-                  <TouchableOpacity
-                    style={styles.clearFiltersButton}
-                    onPress={() => {
-                      setSearchQuery('');
-                      setSelectedCategory('Toutes');
-                    }}
-                  >
-                    <Text style={styles.clearFiltersText}>Effacer les filtres</Text>
-                  </TouchableOpacity>
-                )}
-              </Animated.View>
-            }
-            renderItem={renderStoreCard}
-          />
-        )}
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  maxWidthContainer: {
+    maxWidth: MAX_CONTENT_WIDTH,
+    width: '100%',
+    alignSelf: 'center',
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  footerLoader: {
+    paddingVertical: SPACING.xl,
+    alignItems: 'center',
+  },
   flexContainer: {
     flex: 1,
   },
@@ -428,9 +528,10 @@ const styles = StyleSheet.create({
       ? { boxShadow: `0px 4px 8px ${COLORS.accent}33` }
       : {
           shadowColor: COLORS.accent,
-          shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.2,
           shadowRadius: 8,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
         }),
   },
   headerContent: {
@@ -453,7 +554,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: '800',
-    color: 'white',
+    color: COLORS.text,
     letterSpacing: -0.5,
   },
   subtitle: {
@@ -478,16 +579,13 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
         }),
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: COLORS.card,
     paddingHorizontal: SPACING.lg,
     height: 52,
     gap: SPACING.sm,
@@ -495,7 +593,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: COLORS.textSoft, // Utiliser textSoft pour le contraste
     paddingVertical: 0,
   },
   categoriesWrapper: {
@@ -515,10 +613,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0px 1px 2px rgba(0,0,0,0.05)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.05,
-          shadowRadius: 2,
+          boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.05)',
           elevation: 2,
         }),
   },
@@ -532,7 +627,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSoft,
   },
   categoryTextActive: {
-    color: 'white',
+    color: COLORS.text,
   },
   resultsHeader: {
     flexDirection: 'row',
@@ -586,7 +681,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   retryButtonText: {
-    color: 'white',
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },
@@ -634,10 +729,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0px 2px 4px rgba(0,0,0,0.05)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
+          boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.05)',
           elevation: 2,
         }),
   },
@@ -670,10 +762,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0px 2px 4px rgba(0,0,0,0.1)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
+          boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
           elevation: 3,
         }),
   },
@@ -692,7 +781,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: SPACING.sm,
     right: SPACING.sm,
-    backgroundColor: 'white',
+    backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 2,
   },

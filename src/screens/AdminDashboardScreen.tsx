@@ -19,6 +19,7 @@ import Animated, {
   SlideInRight,
 } from 'react-native-reanimated';
 import { COLORS, SPACING, FONT_SIZE, RADIUS, SHADOWS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -123,7 +124,7 @@ export const AdminDashboardScreen: React.FC = () => {
         pendingPayments,
       });
     } catch (e) {
-      console.error('load dashboard stats', e);
+      errorHandler.handleDatabaseError(e, 'load dashboard stats');
     } finally {
       setLoading(false);
     }
@@ -214,7 +215,7 @@ export const AdminDashboardScreen: React.FC = () => {
       items.sort((a, b) => String(b._createdAt).localeCompare(String(a._createdAt)));
       setRecentActivity(items.slice(0, 5).map(({ _createdAt, ...rest }) => rest));
     } catch (e) {
-      console.error('load recent activity', e);
+      errorHandler.handleDatabaseError(e, 'load recent activity');
     }
   }, []);
 
@@ -240,7 +241,7 @@ export const AdminDashboardScreen: React.FC = () => {
         throw err;
       }
     } catch (e) {
-      console.error('load unread notifications', e);
+      errorHandler.handleDatabaseError(e, 'load unread notifications');
     }
   }, []);
 
@@ -802,7 +803,7 @@ const styles = StyleSheet.create({
   notificationText: {
     fontSize: 8,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   profileButton: {
     width: 44,
@@ -830,10 +831,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.06)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 2,
+          boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
           elevation: 1,
         }),
   },
@@ -881,10 +879,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.06)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 2,
+          boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
           elevation: 1,
         }),
   },
@@ -931,10 +926,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.06)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 2,
+          boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
           elevation: 1,
         }),
   },
@@ -978,10 +970,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.06)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 2,
+          boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
           elevation: 1,
         }),
   },
@@ -1028,10 +1017,7 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 1px 2px rgba(0, 0, 0, 0.06)' }
       : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 2,
+          boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
           elevation: 1,
         }),
   },

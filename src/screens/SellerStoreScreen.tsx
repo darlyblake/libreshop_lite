@@ -19,14 +19,16 @@ import * as Linking from 'expo-linking';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { cloudinaryService } from '../lib/cloudinaryService';
 import { orderService, productService, storeService, type Store, authService } from '../lib/supabase';
 import { useAuthStore } from '../store';
 import { useCategoryStore } from '../store/categoryStore';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { useTheme } from '../hooks/useTheme';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /* =========================
-   TYPES
+   TYPES & MOCK DATA
 ========================= */
 
 type StoreData = {
@@ -53,10 +55,6 @@ type StoreData = {
   shippingPrice?: number;
 };
 
-/* =========================
-   MOCK DATA
-========================= */
-
 const STORE_DATA: StoreData = {};
 
 /* =========================
@@ -67,6 +65,8 @@ export const SellerStoreScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user, signOut } = useAuthStore();
+  const { getColor, spacing, radius, fontSize, isDark } = useTheme();
+  
   const [activeTab, setActiveTab] = useState<'info' | 'settings' | 'analytics'>(
     'info'
   );
@@ -97,26 +97,17 @@ export const SellerStoreScreen: React.FC = () => {
   );
 
   const storePublicUrl = useMemo(() => {
-    if (!store?.slug) {
-      console.log('storePublicUrl: store or slug missing', { store: store?.id, slug: store?.slug });
-      return null;
-    }
+    if (!store?.slug) return null;
     
-    // Use environment variable for web base URL (production URL)
-    // On web, fallback to window.location.origin if env var is not set
     let webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
     
-    // Fallback for web: use current origin if no env var is set
     if (!webBaseUrl && Platform.OS === 'web' && typeof window !== 'undefined') {
       webBaseUrl = window.location.origin.replace(/\/+$/, '');
     }
     
-    const url = webBaseUrl
+    return webBaseUrl
       ? `${webBaseUrl}/store/${store.slug}`
       : Linking.createURL(`/store/${store.slug}`);
-    
-    console.log('storePublicUrl generated:', { url, webBaseUrl, slug: store.slug });
-    return url;
   }, [store?.slug]);
 
   const loadStore = useCallback(async () => {
@@ -125,21 +116,12 @@ export const SellerStoreScreen: React.FC = () => {
       setLoading(true);
       const s = (await storeService.getByUser(user.id)) as Store | null;
       if (!s?.id) {
-        console.log('loadStore: No store found');
         setStore(null);
         setStoreData({});
         return;
       }
 
-      console.log('loadStore: Store loaded', { id: s.id, name: s.name, slug: s.slug });
-
-      // Check subscription status - if expired or not visible, user should not access dashboard
       if (!storeService.isSubscriptionActive(s)) {
-        console.warn('Store subscription inactive - redirecting to Pricing', {
-          storeId: s.id,
-          subscriptionStatus: s.subscription_status,
-          visible: s.visible,
-        });
         Alert.alert(
           'Abonnement expiré',
           `Votre abonnement pour "${s.name}" a expiré. Vous devez le renouveler pour accéder au tableau de bord.`,
@@ -175,7 +157,6 @@ export const SellerStoreScreen: React.FC = () => {
         promoTargetUrl: (s as any).promo_target_url ? String((s as any).promo_target_url) : undefined,
         products: Array.isArray(products) ? products.length : 0,
         orders: Array.isArray(orders) ? orders.length : 0,
-        rating: undefined,
         phone: (s as any).phone,
         whatsapp: (s as any).whatsapp,
         email: (s as any).email,
@@ -184,26 +165,21 @@ export const SellerStoreScreen: React.FC = () => {
         shippingPrice: Number((s as any).shipping_price) || 0,
       });
     } catch (e: any) {
-      console.warn('load store failed', e);
+      errorHandler.handleDatabaseError(e, 'LoadStore');
       Alert.alert('Erreur', e?.message || 'Impossible de charger la boutique');
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, navigation]);
 
   useEffect(() => {
     void loadStore();
   }, [loadStore]);
 
   const handleSaveStore = async (next: StoreData) => {
-    if (!store?.id) {
-      Alert.alert('Erreur', 'Aucune boutique à mettre à jour');
-      return;
-    }
-
+    if (!store?.id) return;
     try {
       setSaving(true);
-
       let logoUrl = next.logoUrl;
       let bannerUrl = next.bannerUrl;
       let promoImageUrl = next.promoImageUrl;
@@ -239,7 +215,7 @@ export const SellerStoreScreen: React.FC = () => {
       await loadStore();
       Alert.alert('Succès', 'Boutique mise à jour');
     } catch (e: any) {
-      console.warn('save store failed', e);
+      errorHandler.handleDatabaseError(e, 'SaveStore');
       Alert.alert('Erreur', e?.message || 'Impossible de sauvegarder');
     } finally {
       setSaving(false);
@@ -263,87 +239,63 @@ export const SellerStoreScreen: React.FC = () => {
 
   const handleShareStore = async () => {
     if (!storePublicUrl) {
-      console.warn('handleShareStore: storePublicUrl is null/undefined', { 
-        storeId: store?.id, 
-        storeSlug: store?.slug,
-        storeName: store?.name,
-        storePublicUrl 
-      });
-      Alert.alert('Partager', 'Lien boutique indisponible. Veuillez recharger la page.');
+      Alert.alert('Partager', 'Lien boutique indisponible.');
       return;
     }
-
     try {
-      // Check if Share API is supported (not available on all browsers)
-      if (Platform.OS === 'web' || !Share || !Share.share) {
-        // Fallback for web or when Share is not available
-        // Copy to clipboard and show a message
+      if (Platform.OS === 'web' || !Share?.share) {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
           await navigator.clipboard.writeText(storePublicUrl);
           Alert.alert('Succès', `Lien copié:\n${storePublicUrl}`);
         } else {
-          // Final fallback: just show the URL
-          Alert.alert('Lien boutique', storePublicUrl, [
-            { text: 'Fermer', style: 'cancel' },
-          ]);
+          Alert.alert('Lien boutique', storePublicUrl);
         }
       } else {
-        // Use native Share API on mobile platforms
         await Share.share({ message: storePublicUrl });
       }
     } catch (e: any) {
-      console.error('Share error:', e);
-      // Fallback if anything fails
-      Alert.alert('Lien boutique', storePublicUrl, [
-        { text: 'Fermer', style: 'cancel' },
-      ]);
+      Alert.alert('Lien boutique', storePublicUrl);
     }
   };
 
   const handleShowQrLink = () => {
-    if (!storePublicUrl) {
-      console.warn('handleShowQrLink: storePublicUrl is null/undefined', { 
-        storeId: store?.id,
-        storeSlug: store?.slug,
-        storeName: store?.name,
-        storePublicUrl 
-      });
-      Alert.alert('QR Code', 'Lien boutique indisponible. Veuillez recharger la page.');
-      return;
-    }
+    if (!storePublicUrl) return;
     Alert.alert('Lien boutique', storePublicUrl, [
       { text: 'Fermer', style: 'cancel' },
       { text: 'Partager', onPress: handleShareStore },
     ]);
   };
 
-  const handleSignOut = () => {
-    console.log('handleSignOut called');
-    setShowSignOutModal(true);
-  };
+  const handleQuickImageUpdate = async (type: 'logoUrl' | 'bannerUrl') => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: type === 'logoUrl' ? [1, 1] : [16, 9],
+    });
 
-  const confirmSignOut = async () => {
-    console.log('Sign out confirmed');
-    try {
-      setSigningOut(true);
-      setShowSignOutModal(false);
-      console.log('Starting sign out process...');
-      await signOut();
-      console.log('Sign out successful, navigating...');
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'SellerAuth' }],
-      });
-    } catch (error) {
-      console.error('Error during sign out:', error);
-      Alert.alert('Erreur', 'Impossible de se déconnecter. Veuillez réessayer.');
-    } finally {
-      setSigningOut(false);
+    if (!result.canceled && result.assets?.[0]) {
+      const uri = result.assets[0].uri;
+      setStoreData(prev => ({ ...prev, [type]: uri }));
+      await handleSaveStore({ ...storeData, [type]: uri });
     }
   };
 
-  const handleChangePassword = () => {
-    setShowPasswordModal(true);
+  const confirmSignOut = async () => {
+    try {
+      setSigningOut(true);
+      setShowSignOutModal(false);
+      await signOut();
+      navigation.reset({ index: 0, routes: [{ name: 'SellerAuth' }] });
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de se déconnecter.');
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   const handleUpdatePassword = async () => {
@@ -351,163 +303,280 @@ export const SellerStoreScreen: React.FC = () => {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
       return;
     }
-
     if (passwordData.newPassword.length < 6) {
       Alert.alert('Erreur', 'Le nouveau mot de passe doit contenir au moins 6 caractères');
       return;
     }
-
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
       return;
     }
-
     try {
       setChangingPassword(true);
-      
-      // Vérifier l'ancien mot de passe en essayant de se connecter
-      if (user?.email) {
-        await authService.signIn(user.email, passwordData.currentPassword);
-      }
-      
-      // Mettre à jour le mot de passe
+      if (user?.email) await authService.signIn(user.email, passwordData.currentPassword);
       await authService.updatePassword(passwordData.newPassword);
-      
       Alert.alert('Succès', 'Mot de passe mis à jour avec succès', [
-        {
-          text: 'OK',
-          onPress: () => {
-            setShowPasswordModal(false);
-            setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-          },
-        },
+        { text: 'OK', onPress: () => {
+          setShowPasswordModal(false);
+          setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+        }}
       ]);
     } catch (e: any) {
-      console.error('update password error', e);
-      if (e?.message?.includes('Invalid login')) {
-        Alert.alert('Erreur', 'L\'ancien mot de passe est incorrect');
-      } else {
-        Alert.alert('Erreur', e?.message || 'Impossible de mettre à jour le mot de passe');
-      }
+      Alert.alert('Erreur', e?.message || 'Impossible de mettre à jour le mot de passe');
     } finally {
       setChangingPassword(false);
     }
   };
 
+  // Styles dynamiques
+  const styles = useMemo(() => StyleSheet.create({
+    container: { flex: 1, backgroundColor: getColor.bg },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.xl, paddingBottom: spacing.lg },
+    backButton: { padding: 10 },
+    headerTitle: { fontSize: fontSize.lg, fontWeight: '600', color: getColor.text },
+    editButton: { padding: 10 },
+    bannerContainer: { height: 140, marginHorizontal: spacing.xl },
+    banner: { width: '100%', height: '100%', borderRadius: radius.lg },
+    bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: radius.lg },
+    logoContainer: { position: 'absolute', bottom: -35, left: spacing.lg },
+    logo: { width: 75, height: 75, borderRadius: 40, borderWidth: 3, borderColor: getColor.accent },
+    storeInfo: { paddingTop: 50, alignItems: 'center', paddingHorizontal: spacing.xl },
+    storeName: { fontSize: fontSize.xxl, fontWeight: '700', color: getColor.text },
+    categoryBadge: { marginTop: spacing.sm, backgroundColor: getColor.accent + '20', paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
+    categoryText: { fontSize: fontSize.xs, color: getColor.accent },
+    storeDescription: { marginTop: spacing.md, textAlign: 'center', color: getColor.textSoft },
+    statsRow: { flexDirection: 'row', marginTop: spacing.xl, backgroundColor: getColor.card, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: getColor.border },
+    stat: { flex: 1, alignItems: 'center' },
+    statValue: { fontSize: fontSize.xxl, fontWeight: '700', color: getColor.text },
+    statLabel: { fontSize: fontSize.xs, color: getColor.textMuted },
+    statDivider: { width: 1, backgroundColor: getColor.border },
+    tabsContainer: { flexDirection: 'row', marginTop: spacing.xl, paddingHorizontal: spacing.xl, gap: spacing.sm },
+    tab: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.md, alignItems: 'center', backgroundColor: getColor.card },
+    tabActive: { backgroundColor: getColor.accent },
+    tabText: { fontSize: fontSize.sm, color: getColor.textSoft },
+    tabTextActive: { color: isDark ? getColor.text : '#ffffff' },
+    tabContent: { padding: spacing.xl },
+    card: { backgroundColor: getColor.card, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: getColor.border },
+    infoRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
+    infoLabel: { fontSize: fontSize.xs, color: getColor.textMuted },
+    infoValue: { fontSize: fontSize.md, color: getColor.text, fontWeight: '500' },
+    settingItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.md },
+    settingLabel: { flex: 1, marginLeft: spacing.md, fontSize: fontSize.md, color: getColor.text },
+    analyticsTitle: { fontSize: fontSize.lg, fontWeight: '600', marginBottom: spacing.md, color: getColor.text },
+    analyticsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.md },
+    analyticsLabel: { color: getColor.textSoft },
+    analyticsValue: { fontWeight: '600', color: getColor.text },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
+    modalContent: { backgroundColor: getColor.card, borderRadius: radius.lg, width: '100%', maxWidth: 500, maxHeight: '90%', padding: spacing.lg },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: getColor.border },
+    modalTitle: { fontSize: fontSize.lg, fontWeight: '600', color: getColor.text },
+    closeButton: { width: 32, height: 32, borderRadius: 16, backgroundColor: getColor.bg, alignItems: 'center', justifyContent: 'center' },
+    modalLabel: { fontSize: fontSize.sm, color: getColor.textSoft, marginTop: spacing.md, marginBottom: 4 },
+    modalInput: { backgroundColor: getColor.bg, borderWidth: 1, borderColor: getColor.border, borderRadius: radius.md, padding: spacing.md, color: getColor.text, fontSize: fontSize.md },
+    modalPreview: { width: 80, height: 80, borderRadius: radius.sm, marginBottom: spacing.sm, backgroundColor: getColor.bg },
+    modalImageButton: { backgroundColor: getColor.bg, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: getColor.border, alignItems: 'center', marginBottom: spacing.md },
+    modalImageButtonText: { color: getColor.text },
+    modalButtonRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.md, marginTop: spacing.xl },
+    button: { paddingVertical: spacing.md, paddingHorizontal: spacing.xl, borderRadius: radius.md, minWidth: 100, alignItems: 'center' },
+    submitButton: { backgroundColor: getColor.accent },
+    cancelButton: { backgroundColor: getColor.bg, borderWidth: 1, borderColor: getColor.border },
+    submitText: { color: isDark ? getColor.text : '#ffffff', fontWeight: '600' },
+    cancelText: { color: getColor.text, fontWeight: '600' },
+    categoryPickerRow: { paddingVertical: spacing.sm, gap: spacing.sm },
+    categoryChip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.full, backgroundColor: getColor.bg, borderWidth: 1, borderColor: getColor.border },
+    categoryChipActive: { backgroundColor: getColor.accent + '20', borderColor: getColor.accent + '40' },
+    categoryChipText: { color: getColor.textSoft, fontWeight: '600', fontSize: fontSize.sm },
+    categoryChipTextActive: { color: getColor.accent },
+    signOutModalContent: { backgroundColor: getColor.card, borderRadius: radius.xl, padding: spacing.xl, width: '90%', maxWidth: 400 },
+    signOutModalTitle: { fontSize: fontSize.xl, fontWeight: '700', color: getColor.text, marginTop: spacing.md },
+    signOutModalMessage: { fontSize: fontSize.md, color: getColor.textSoft, textAlign: 'center', lineHeight: 22 },
+    signOutConfirmButton: { backgroundColor: getColor.error },
+  }), [getColor, spacing, radius, fontSize, isDark]);
+
+  // Helpers
+  const renderInfoItem = (icon: any, label: string, value?: string) => {
+    if (!value) return null;
+    return (
+      <View style={styles.infoRow}>
+        <Ionicons name={icon} size={20} color={getColor.accent} />
+        <View style={{ marginLeft: spacing.md }}>
+          <Text style={styles.infoLabel}>{label}</Text>
+          <Text style={styles.infoValue}>{value}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderSettingItem = (icon: any, label: string, danger?: boolean, onPress?: () => void) => (
+    <TouchableOpacity style={styles.settingItem} onPress={onPress} disabled={!onPress}>
+      <Ionicons name={icon} size={22} color={danger ? getColor.danger : getColor.accent} />
+      <Text style={[styles.settingLabel, danger && { color: getColor.danger }]}>{label}</Text>
+      <Ionicons name="chevron-forward" size={20} color={getColor.textMuted} />
+    </TouchableOpacity>
+  );
+
+  const renderAnalyticsRow = (label: string, value: string) => (
+    <View style={styles.analyticsRow}>
+      <Text style={styles.analyticsLabel}>{label}</Text>
+      <Text style={styles.analyticsValue}>{value}</Text>
+    </View>
+  );
+
+  // Edit Modal Component (Internal)
+  const EditStoreModal: React.FC<{ visible: boolean; data: StoreData; onSave: (d: StoreData) => void; onClose: () => void; }> = ({ visible, data, onSave, onClose }) => {
+    const [form, setForm] = useState<StoreData>({ ...data });
+    const { categories, loadCategories, isLoading: categoriesLoading } = useCategoryStore();
+
+    useEffect(() => {
+      if (visible) {
+        setForm({ ...data });
+        void loadCategories();
+      }
+    }, [visible, data, loadCategories]);
+
+    const handleChange = (key: keyof StoreData, value: any) => setForm(prev => ({ ...prev, [key]: value }));
+
+    const pickImage = async (field: 'logoUrl' | 'bannerUrl' | 'promoImageUrl') => {
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
+      if (!result.canceled && result.assets?.[0]) handleChange(field, result.assets[0].uri);
+    };
+
+    return (
+      <Modal visible={visible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier le profil</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={getColor.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalLabel}>Nom</Text>
+              <TextInput style={styles.modalInput} value={form.name} onChangeText={t => handleChange('name', t)} />
+              
+              <Text style={styles.modalLabel}>Description</Text>
+              <TextInput style={[styles.modalInput, { height: 80 }]} value={form.description} onChangeText={t => handleChange('description', t)} multiline />
+              
+              <Text style={styles.modalLabel}>Catégorie</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryPickerRow}>
+                {categoriesLoading ? <ActivityIndicator size="small" color={getColor.accent} /> : 
+                  categories.map(c => (
+                    <TouchableOpacity key={c.id} style={[styles.categoryChip, form.category === c.name && styles.categoryChipActive]} onPress={() => handleChange('category', c.name)}>
+                      <Text style={[styles.categoryChipText, form.category === c.name && styles.categoryChipTextActive]}>{c.name}</Text>
+                    </TouchableOpacity>
+                  ))
+                }
+              </ScrollView>
+
+              <Text style={styles.modalLabel}>Logo</Text>
+              {form.logoUrl && <Image source={{ uri: form.logoUrl }} style={styles.modalPreview} />}
+              <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('logoUrl')}><Text style={styles.modalImageButtonText}>Changer le logo</Text></TouchableOpacity>
+
+              <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('bannerUrl')}><Text style={styles.modalImageButtonText}>Changer la bannière</Text></TouchableOpacity>
+              
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalLabel}>TVA (%)</Text>
+                  <TextInput 
+                    style={styles.modalInput} 
+                    value={form.taxRate?.toString() || ''} 
+                    onChangeText={t => handleChange('taxRate', parseFloat(t) || 0)} 
+                    keyboardType="numeric"
+                    placeholder="Ex: 18"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalLabel}>Frais livraison (FCFA)</Text>
+                  <TextInput 
+                    style={styles.modalInput} 
+                    value={form.shippingPrice?.toString() || ''} 
+                    onChangeText={t => handleChange('shippingPrice', parseFloat(t) || 0)} 
+                    keyboardType="numeric"
+                    placeholder="Ex: 1500"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}><Text style={styles.cancelText}>Annuler</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.submitButton]} onPress={() => onSave(form)}><Text style={styles.submitText}>Enregistrer</Text></TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={getColor.bg} />
 
-      {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={getColor.text} />
         </TouchableOpacity>
-
         <Text style={styles.headerTitle}>Ma boutique</Text>
-
         <TouchableOpacity style={styles.editButton} onPress={() => setShowEditModal(true)}>
-          <Ionicons name="pencil" size={18} color={COLORS.accent} />
+          <Ionicons name="pencil" size={18} color={getColor.accent} />
         </TouchableOpacity>
       </View>
 
-      <EditStoreModal
-        visible={showEditModal}
-        data={storeData}
-        onClose={() => setShowEditModal(false)}
-        onSave={handleSaveStore}
-      />
+      <EditStoreModal visible={showEditModal} data={storeData} onClose={() => setShowEditModal(false)} onSave={handleSaveStore} />
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 }}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
         {loading ? (
-          <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
-            <ActivityIndicator color={COLORS.accent} />
-          </View>
+          <ActivityIndicator style={{ marginTop: 40 }} color={getColor.accent} />
         ) : !store ? (
-          <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
-            <Text style={{ color: COLORS.textSoft, textAlign: 'center' }}>Aucune boutique trouvée pour ce compte.</Text>
-          </View>
+          <Text style={{ textAlign: 'center', marginTop: 40, color: getColor.textSoft }}>Boutique non trouvée.</Text>
         ) : (
           <>
-            {/* BANNER */}
             <View style={styles.bannerContainer}>
-              <Image
-                source={{
-                  uri: storeData.bannerUrl ?? 'https://picsum.photos/800',
-                }}
-                style={styles.banner}
-              />
-              <View style={styles.bannerOverlay} />
-
-              <View style={styles.logoContainer}>
-                <Image
-                  source={{
-                    uri: storeData.logoUrl ?? 'https://picsum.photos/200',
-                  }}
-                  style={styles.logo}
-                />
-              </View>
+              <TouchableOpacity onPress={() => handleQuickImageUpdate('bannerUrl')} activeOpacity={0.8}>
+                <Image source={{ uri: storeData.bannerUrl || 'https://picsum.photos/800' }} style={styles.banner} />
+                <View style={styles.bannerOverlay} />
+                <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 15, padding: 6 }}>
+                  <Ionicons name="camera" size={16} color="white" />
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.logoContainer} onPress={() => handleQuickImageUpdate('logoUrl')} activeOpacity={0.8}>
+                <Image source={{ uri: storeData.logoUrl || 'https://picsum.photos/200' }} style={styles.logo} />
+                <View style={{ position: 'absolute', bottom: -5, right: -5, backgroundColor: getColor.accent, borderRadius: 15, padding: 4, borderWidth: 2, borderColor: getColor.bg }}>
+                  <Ionicons name="camera" size={14} color="white" />
+                </View>
+              </TouchableOpacity>
             </View>
 
-            {/* STORE INFO */}
             <View style={styles.storeInfo}>
-              <Text style={styles.storeName}>{storeData.name ?? 'Ma boutique'}</Text>
-
-              {storeData.category && (
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.categoryText}>{storeData.category}</Text>
-                </View>
-              )}
-
+              <Text style={styles.storeName}>{storeData.name}</Text>
+              {storeData.category && <View style={styles.categoryBadge}><Text style={styles.categoryText}>{storeData.category}</Text></View>}
               {storeData.description && <Text style={styles.storeDescription}>{storeData.description}</Text>}
 
-              {/* STATS */}
               <View style={styles.statsRow}>
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{(storeData.rating ?? 0).toFixed(1)}</Text>
-                  <Text style={styles.statLabel}>Note</Text>
-                </View>
-
+                <View style={styles.stat}><Text style={styles.statValue}>{(storeData.products ?? 0)}</Text><Text style={styles.statLabel}>Produits</Text></View>
                 <View style={styles.statDivider} />
-
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{(storeData.products ?? 0).toLocaleString('fr-FR')}</Text>
-                  <Text style={styles.statLabel}>Produits</Text>
-                </View>
-
-                <View style={styles.statDivider} />
-
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>{(storeData.orders ?? 0).toLocaleString('fr-FR')}</Text>
-                  <Text style={styles.statLabel}>Commandes</Text>
-                </View>
+                <View style={styles.stat}><Text style={styles.statValue}>{(storeData.orders ?? 0)}</Text><Text style={styles.statLabel}>Commandes</Text></View>
               </View>
             </View>
 
-            {/* TABS */}
             <View style={styles.tabsContainer}>
-              {tabs.map((tab) => (
-                <TouchableOpacity
-                  key={tab.id}
-                  style={[styles.tab, activeTab === tab.id && styles.tabActive]}
-                  onPress={() => setActiveTab(tab.id as any)}
-                >
-                  <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>{tab.label}</Text>
+              {tabs.map(t => (
+                <TouchableOpacity key={t.id} style={[styles.tab, activeTab === t.id && styles.tabActive]} onPress={() => setActiveTab(t.id as any)}>
+                  <Text style={[styles.tabText, activeTab === t.id && styles.tabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* CONTENT */}
             <View style={styles.tabContent}>
               {activeTab === 'info' && (
                 <View style={styles.card}>
-                  {renderInfoItem('phone-portrait-outline', 'Téléphone', storeData.phone)}
+                  {renderInfoItem('call-outline', 'Téléphone', storeData.phone)}
                   {renderInfoItem('logo-whatsapp', 'WhatsApp', storeData.whatsapp)}
                   {renderInfoItem('mail-outline', 'Email', storeData.email)}
                   {renderInfoItem('location-outline', 'Adresse', storeData.address)}
@@ -516,33 +585,44 @@ export const SellerStoreScreen: React.FC = () => {
 
               {activeTab === 'settings' && (
                 <View style={styles.card}>
-                  {renderSettingItem('storefront-outline', 'Modifier la boutique', false, () => setShowEditModal(true))}
-                  {renderSettingItem('qr-code-outline', 'QR Code de la boutique', false, handleShowQrLink)}
+                  {renderSettingItem('qr-code-outline', 'QR Code boutique', false, handleShowQrLink)}
                   {renderSettingItem('share-social-outline', 'Partager la boutique', false, handleShareStore)}
-                  {renderSettingItem('notifications-outline', 'Notifications', false, () => navigation.navigate('Notifications'))}
-                  {renderSettingItem('key-outline', 'Changer le mot de passe', false, handleChangePassword)}
-                  {renderSettingItem('log-out-outline', signingOut ? 'Déconnexion...' : 'Se déconnecter', true, signingOut ? undefined : handleSignOut)}
-                  {renderSettingItem('pause-circle-outline', 'Mettre en pause', true, () => {
-                    if (saving) return;
-                    Alert.alert(
-                      'Confirmation',
-                      Boolean((store as any)?.visible) ? 'Mettre la boutique en pause ?' : 'Réactiver la boutique ?',
-                      [
-                        { text: 'Annuler', style: 'cancel' },
-                        { text: 'Confirmer', onPress: handleTogglePause },
-                      ]
-                    );
-                  })}
+                  
+                  <View style={styles.settingItem}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      <Ionicons name="color-palette-outline" size={22} color={getColor.accent} />
+                      <Text style={styles.settingLabel}>Thème de l'application</Text>
+                    </View>
+                    <ThemeToggle />
+                  </View>
+
+                  {renderSettingItem('cash-outline', `TVA: ${storeData.taxRate || 0}%`, false, () => setShowEditModal(true))}
+                  {renderSettingItem('car-outline', `Livraison: ${storeData.shippingPrice || 0} FCFA`, false, () => setShowEditModal(true))}
+
+                  {renderSettingItem('key-outline', 'Changer le mot de passe', false, () => setShowPasswordModal(true))}
+                  {renderSettingItem('log-out-outline', 'Se déconnecter', true, () => setShowSignOutModal(true))}
                 </View>
               )}
 
               {activeTab === 'analytics' && (
-                <View style={styles.card}>
-                  <Text style={styles.analyticsTitle}>Performances</Text>
-                  {renderAnalyticsRow('Produits actifs', `${(storeData.products ?? 0).toLocaleString('fr-FR')}`)}
-                  {renderAnalyticsRow('Commandes totales', `${(storeData.orders ?? 0).toLocaleString('fr-FR')}`)}
-                  {renderAnalyticsRow('TVA appliquée', `${(storeData.taxRate ?? 0) > 0 ? `${storeData.taxRate}%` : 'Non'}`)}
-                  {renderAnalyticsRow('Frais de port', `${(storeData.shippingPrice ?? 0) > 0 ? `${(storeData.shippingPrice ?? 0).toLocaleString('fr-FR')} FCA` : 'Gratuit'}`)}
+                <View>
+                  <Text style={[styles.analyticsTitle, { marginBottom: 16 }]}>Aperçu des performances</Text>
+                  <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+                    <View style={[styles.card, { flex: 1, alignItems: 'center', paddingVertical: 24 }]}>
+                      <Ionicons name="cube" size={32} color={getColor.accent} style={{ marginBottom: 8 }} />
+                      <Text style={{ fontSize: 24, fontWeight: '700', color: getColor.text }}>{storeData.products || 0}</Text>
+                      <Text style={{ fontSize: 13, color: getColor.textMuted }}>Produits Actifs</Text>
+                    </View>
+                    <View style={[styles.card, { flex: 1, alignItems: 'center', paddingVertical: 24 }]}>
+                      <Ionicons name="cart" size={32} color="#10b981" style={{ marginBottom: 8 }} />
+                      <Text style={{ fontSize: 24, fontWeight: '700', color: getColor.text }}>{storeData.orders || 0}</Text>
+                      <Text style={{ fontSize: 13, color: getColor.textMuted }}>Commandes Totales</Text>
+                    </View>
+                  </View>
+                  <View style={styles.card}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: getColor.text, marginBottom: 16 }}>Détails livraison</Text>
+                    {renderAnalyticsRow('Frais de livraison', storeData.shippingPrice ? `${storeData.shippingPrice} FCFA` : 'Livraison Gratuite')}
+                  </View>
                 </View>
               )}
             </View>
@@ -550,849 +630,34 @@ export const SellerStoreScreen: React.FC = () => {
         )}
       </ScrollView>
 
-      {/* CHANGE PASSWORD MODAL */}
-      {showPasswordModal && (
-        <Modal
-          animationType="slide"
-          transparent
-          visible={showPasswordModal}
-          onRequestClose={() => setShowPasswordModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.passwordModal}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Changer le mot de passe</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setShowPasswordModal(false)}
-                >
-                  <Ionicons name="close" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.passwordForm}>
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Mot de passe actuel</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="Entrez votre mot de passe actuel"
-                    placeholderTextColor={COLORS.textMuted}
-                    secureTextEntry
-                    value={passwordData.currentPassword}
-                    onChangeText={(text) => setPasswordData(prev => ({ ...prev, currentPassword: text }))}
-                  />
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Nouveau mot de passe</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="Minimum 6 caractères"
-                    placeholderTextColor={COLORS.textMuted}
-                    secureTextEntry
-                    value={passwordData.newPassword}
-                    onChangeText={(text) => setPasswordData(prev => ({ ...prev, newPassword: text }))}
-                  />
-                </View>
-
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Confirmer le mot de passe</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="Retapez le nouveau mot de passe"
-                    placeholderTextColor={COLORS.textMuted}
-                    secureTextEntry
-                    value={passwordData.confirmPassword}
-                    onChangeText={(text) => setPasswordData(prev => ({ ...prev, confirmPassword: text }))}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setShowPasswordModal(false)}
-                >
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.confirmButton]}
-                  onPress={handleUpdatePassword}
-                  disabled={changingPassword}
-                >
-                  {changingPassword ? (
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.confirmButtonText}>Mettre à jour</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
+      {/* Reusable Modals */}
+      <Modal visible={showPasswordModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+             <Text style={styles.modalTitle}>Changer le mot de passe</Text>
+             <TextInput style={[styles.modalInput, { marginTop: 20 }]} placeholder="Mot de passe actuel" secureTextEntry onChangeText={t => setPasswordData(p => ({...p, currentPassword: t}))} />
+             <TextInput style={[styles.modalInput, { marginTop: 10 }]} placeholder="Nouveau mot de passe" secureTextEntry onChangeText={t => setPasswordData(p => ({...p, newPassword: t}))} />
+             <TextInput style={[styles.modalInput, { marginTop: 10 }]} placeholder="Confirmer" secureTextEntry onChangeText={t => setPasswordData(p => ({...p, confirmPassword: t}))} />
+             <View style={styles.modalButtonRow}>
+               <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setShowPasswordModal(false)}><Text style={styles.cancelText}>Annuler</Text></TouchableOpacity>
+               <TouchableOpacity style={[styles.button, styles.submitButton]} onPress={handleUpdatePassword}><Text style={styles.submitText}>Mettre à jour</Text></TouchableOpacity>
+             </View>
           </View>
-        </Modal>
-      )}
-
-      {/* SIGN OUT CONFIRMATION MODAL */}
-      {showSignOutModal && (
-        <Modal
-          animationType="fade"
-          transparent
-          visible={showSignOutModal}
-          onRequestClose={() => setShowSignOutModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.signOutModalContent}>
-              <View style={styles.signOutModalHeader}>
-                <Ionicons name="warning" size={32} color={COLORS.danger} />
-                <Text style={styles.signOutModalTitle}>Déconnexion</Text>
-              </View>
-              
-              <View style={styles.signOutModalBody}>
-                <Text style={styles.signOutModalMessage}>
-                  Êtes-vous sûr de vouloir vous déconnecter ?
-                </Text>
-              </View>
-              
-              <View style={styles.signOutModalActions}>
-                <TouchableOpacity
-                  style={[styles.signOutModalButton, styles.signOutModalCancelButton]}
-                  onPress={() => setShowSignOutModal(false)}
-                  disabled={signingOut}
-                >
-                  <Text style={styles.signOutModalCancelText}>Annuler</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.signOutModalButton, styles.signOutModalConfirmButton]}
-                  onPress={confirmSignOut}
-                  disabled={signingOut}
-                >
-                  {signingOut ? (
-                    <ActivityIndicator color={COLORS.white} size="small" />
-                  ) : (
-                    <Text style={styles.signOutModalConfirmText}>Se déconnecter</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-    </View>
-  );
-};
-
-/* =========================
-   REUSABLE RENDERERS
-========================= */
-
-const renderInfoItem = (
-  icon: any,
-  label: string,
-  value?: string
-) => {
-  if (!value) return null;
-
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={20} color={COLORS.accent} />
-      <View style={{ marginLeft: SPACING.md }}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
-      </View>
-    </View>
-  );
-};
-
-const renderSettingItem = (
-  icon: any,
-  label: string,
-  danger?: boolean,
-  onPress?: () => void
-) => (
-  <TouchableOpacity style={styles.settingItem} onPress={onPress} disabled={!onPress}>
-    <Ionicons
-      name={icon}
-      size={22}
-      color={danger ? COLORS.danger : COLORS.accent}
-    />
-    <Text
-      style={[
-        styles.settingLabel,
-        danger && { color: COLORS.danger },
-      ]}
-    >
-      {label}
-    </Text>
-    <Ionicons
-      name="chevron-forward"
-      size={20}
-      color={COLORS.textMuted}
-    />
-  </TouchableOpacity>
-);
-
-const renderAnalyticsRow = (
-  label: string,
-  value: string
-) => (
-  <View style={styles.analyticsRow}>
-    <Text style={styles.analyticsLabel}>{label}</Text>
-    <Text style={styles.analyticsValue}>{value}</Text>
-  </View>
-);
-
-
-/* =========================
-   EDIT MODAL
-========================= */
-
-const EditStoreModal: React.FC<{
-  visible: boolean;
-  data: StoreData;
-  onSave: (d: StoreData) => void;
-  onClose: () => void;
-}> = ({ visible, data, onSave, onClose }) => {
-  const [form, setForm] = useState<StoreData>({ ...data });
-  const { categories, loadCategories, isLoading: categoriesLoading } = useCategoryStore();
-
-  useEffect(() => {
-    if (!visible) return;
-    setForm({ ...data });
-    void loadCategories();
-  }, [visible, data, loadCategories]);
-
-  const handleChange = (key: keyof StoreData, value: string | number) => {
-    setForm(prev => ({ ...prev, [key]: value }));
-  };
-
-  const pickImage = async (field: 'logoUrl' | 'bannerUrl' | 'promoImageUrl') => {
-    if (Platform.OS !== 'web') {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission refusée', "Nous avons besoin de l'accès aux images.");
-        return;
-      }
-    }
-
-    const mediaTypesModern = (ImagePicker as any)?.MediaType?.Images;
-    const mediaTypesLegacy = (ImagePicker as any)?.MediaTypeOptions?.Images;
-    const mediaTypes = mediaTypesModern ? [mediaTypesModern] : mediaTypesLegacy;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes,
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      handleChange(field, result.assets[0].uri);
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!form.name || !form.description) {
-      Alert.alert('Erreur', 'Le nom et la description sont requis.');
-      return;
-    }
-    onSave(form);
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Modifier le profil</Text>
-          <ScrollView>
-            <Text style={styles.modalLabel}>Nom</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.name ?? ''}
-              onChangeText={t => handleChange('name', t)}
-            />
-
-            <Text style={styles.modalLabel}>Description</Text>
-            <TextInput
-              style={[styles.modalInput, { height: 80 }]}
-              value={form.description ?? ''}
-              onChangeText={t => handleChange('description', t)}
-              multiline
-            />
-
-            <Text style={styles.modalLabel}>Catégorie</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.category ?? ''}
-              onChangeText={t => handleChange('category', t)}
-            />
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryPickerRow}
-            >
-              {categoriesLoading ? (
-                <View style={styles.categoryChip}>
-                  <Text style={styles.categoryChipText}>Chargement...</Text>
-                </View>
-              ) : (
-                categories.map((c) => {
-                  const isActive = form.category === c.name;
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                      onPress={() => handleChange('category', c.name)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
-                        {c.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </ScrollView>
-
-            {/* images */}
-            <Text style={styles.modalLabel}>Logo</Text>
-            {form.logoUrl ? (
-              <Image source={{ uri: form.logoUrl }} style={styles.modalPreview} />
-            ) : null}
-            <TouchableOpacity
-              style={styles.modalImageButton}
-              onPress={() => pickImage('logoUrl')}
-            >
-              <Text style={styles.modalImageButtonText}>Changer le logo</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.modalLabel}>Bannière</Text>
-            {form.bannerUrl ? (
-              <Image source={{ uri: form.bannerUrl }} style={[styles.modalPreview, { height: 80 }]} />
-            ) : null}
-            <TouchableOpacity
-              style={styles.modalImageButton}
-              onPress={() => pickImage('bannerUrl')}
-            >
-              <Text style={styles.modalImageButtonText}>Changer la bannière</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.modalLabel}>Bannière promo</Text>
-            <TouchableOpacity
-              style={[styles.modalImageButton, form.promoEnabled ? { borderColor: COLORS.accent } : null]}
-              onPress={() => setForm(prev => ({ ...prev, promoEnabled: !Boolean(prev.promoEnabled) }))}
-            >
-              <Text style={styles.modalImageButtonText}>
-                {form.promoEnabled ? 'Promo activée' : 'Promo désactivée'}
-              </Text>
-            </TouchableOpacity>
-
-            <Text style={styles.modalLabel}>Titre promo</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.promoTitle ?? ''}
-              onChangeText={t => handleChange('promoTitle', t)}
-            />
-
-            <Text style={styles.modalLabel}>Sous-titre promo</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.promoSubtitle ?? ''}
-              onChangeText={t => handleChange('promoSubtitle', t)}
-            />
-
-            <Text style={styles.modalLabel}>Image promo</Text>
-            {form.promoImageUrl ? (
-              <Image source={{ uri: form.promoImageUrl }} style={[styles.modalPreview, { width: 140, height: 80 }]} />
-            ) : null}
-            <TouchableOpacity
-              style={styles.modalImageButton}
-              onPress={() => pickImage('promoImageUrl')}
-            >
-              <Text style={styles.modalImageButtonText}>Changer l'image promo</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.modalLabel}>Cible promo (type)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.promoTargetType ?? ''}
-              onChangeText={t => handleChange('promoTargetType', t)}
-              placeholder="collection | product | url"
-              placeholderTextColor={COLORS.textMuted}
-            />
-
-            <Text style={styles.modalLabel}>Cible promo (ID)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.promoTargetId ?? ''}
-              onChangeText={t => handleChange('promoTargetId', t)}
-              placeholder="UUID collection/produit"
-              placeholderTextColor={COLORS.textMuted}
-            />
-
-            <Text style={styles.modalLabel}>Cible promo (URL)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.promoTargetUrl ?? ''}
-              onChangeText={t => handleChange('promoTargetUrl', t)}
-              placeholder="https://..."
-              placeholderTextColor={COLORS.textMuted}
-              autoCapitalize="none"
-            />
-
-            <Text style={styles.modalLabel}>TVA (%)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.taxRate ? String(form.taxRate) : ''}
-              onChangeText={t => handleChange('taxRate', parseFloat(t) || 0)}
-              placeholder="18"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.modalLabel}>Prix de livraison (FCFA)</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={form.shippingPrice ? String(form.shippingPrice) : ''}
-              onChangeText={t => handleChange('shippingPrice', parseFloat(t) || 0)}
-              placeholder="0"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="numeric"
-            />
-
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={onClose}
-              >
-                <Text style={styles.cancelText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.submitButton]}
-                onPress={handleSubmit}
-              >
-                <Text style={styles.submitText}>Enregistrer</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+
+      <Modal visible={showSignOutModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.signOutModalContent}>
+             <Text style={styles.signOutModalTitle}>Déconnexion</Text>
+             <Text style={styles.signOutModalMessage}>Voulez-vous vraiment vous déconnecter ?</Text>
+             <View style={styles.modalButtonRow}>
+               <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setShowSignOutModal(false)}><Text style={styles.cancelText}>Annuler</Text></TouchableOpacity>
+               <TouchableOpacity style={[styles.button, styles.signOutConfirmButton]} onPress={confirmSignOut}><Text style={styles.submitText}>Quitter</Text></TouchableOpacity>
+             </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
-
-/* =========================
-   STYLES
-========================= */
-
-const styles = StyleSheet.create({
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '90%', maxHeight: '80%', backgroundColor: COLORS.card, borderRadius: RADIUS.xl, padding: SPACING.lg },
-  modalTitle: { fontSize: FONT_SIZE.xl, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.md, textAlign: 'center' },
-  modalLabel: { color: COLORS.textMuted, marginTop: SPACING.md, marginBottom: 4 },
-  modalInput: { backgroundColor: COLORS.bg, color: COLORS.text, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
-  modalPreview: {
-    width: 80,
-    height: 80,
-    borderRadius: RADIUS.sm,
-    marginBottom: SPACING.sm,
-    backgroundColor: COLORS.border,
-  },
-  modalImageButton: {
-    backgroundColor: COLORS.card,
-    padding: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  modalImageButtonText: { color: COLORS.text },
-  modalButtonRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: SPACING.sm, marginTop: SPACING.lg },
-  button: { paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, borderRadius: RADIUS.md, minWidth: 90, alignItems: 'center' },
-  cancelButton: { backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border },
-  submitButton: { backgroundColor: COLORS.accent },
-  cancelText: { color: COLORS.text },
-  submitText: { color: COLORS.white },
-
-  categoryPickerRow: {
-    paddingVertical: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  categoryChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  categoryChipActive: {
-    backgroundColor: 'rgba(139, 92, 246, 0.18)',
-    borderColor: 'rgba(139, 92, 246, 0.35)',
-  },
-  categoryChipText: {
-    color: COLORS.textSoft,
-    fontWeight: '600',
-    fontSize: FONT_SIZE.sm,
-  },
-  categoryChipTextActive: {
-    color: COLORS.accent,
-  },
-
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingBottom: SPACING.lg,
-  },
-
-  backButton: {
-    padding: 10,
-  },
-
-  headerTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-
-  editButton: {
-    padding: 10,
-  },
-
-  bannerContainer: {
-    height: 140,
-    marginHorizontal: SPACING.xl,
-  },
-
-  banner: {
-    width: '100%',
-    height: '100%',
-    borderRadius: RADIUS.lg,
-  },
-
-  bannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    borderRadius: RADIUS.lg,
-  },
-
-  logoContainer: {
-    position: 'absolute',
-    bottom: -35,
-    left: SPACING.lg,
-  },
-
-  logo: {
-    width: 75,
-    height: 75,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: COLORS.accent,
-  },
-
-  storeInfo: {
-    paddingTop: 50,
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-  },
-
-  storeName: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-
-  categoryBadge: {
-    marginTop: SPACING.sm,
-    backgroundColor: COLORS.accent + '20',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-  },
-
-  categoryText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.accent,
-  },
-
-  storeDescription: {
-    marginTop: SPACING.md,
-    textAlign: 'center',
-    color: COLORS.textSoft,
-  },
-
-  statsRow: {
-    flexDirection: 'row',
-    marginTop: SPACING.xl,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  stat: { flex: 1, alignItems: 'center' },
-
-  statValue: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-
-  statLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-  },
-
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.border,
-  },
-
-  tabsContainer: {
-    flexDirection: 'row',
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.sm,
-  },
-
-  tab: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    backgroundColor: COLORS.card,
-  },
-
-  tabActive: {
-    backgroundColor: COLORS.accent,
-  },
-
-  tabText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
-  },
-
-  tabTextActive: {
-    color: COLORS.white,
-  },
-
-  tabContent: {
-    padding: SPACING.xl,
-  },
-
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-  },
-
-  infoLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-  },
-
-  infoValue: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-  },
-
-  settingLabel: {
-    flex: 1,
-    marginLeft: SPACING.md,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-  },
-
-  analyticsTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
-    marginBottom: SPACING.md,
-    color: COLORS.text,
-  },
-
-  analyticsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-  },
-
-  analyticsLabel: {
-    color: COLORS.textSoft,
-  },
-
-  analyticsValue: {
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-
-  // Password Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-  },
-  passwordModal: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  passwordForm: {
-    padding: SPACING.lg,
-  },
-  formGroup: {
-    marginBottom: SPACING.lg,
-  },
-  formLabel: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
-    marginBottom: SPACING.sm,
-  },
-  formInput: {
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    padding: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    gap: SPACING.md,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  cancelButtonText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '500',
-  },
-  confirmButton: {
-    backgroundColor: COLORS.accent,
-  },
-  confirmButtonText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '500',
-  },
-  // Sign Out Modal Styles
-  signOutModalContent: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    width: '90%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-  signOutModalHeader: {
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  signOutModalTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginTop: SPACING.md,
-  },
-  signOutModalBody: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  signOutModalMessage: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textSoft,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  signOutModalActions: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  signOutModalButton: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  signOutModalCancelButton: {
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  signOutModalCancelText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  signOutModalConfirmButton: {
-    backgroundColor: COLORS.danger,
-  },
-  signOutModalConfirmText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-});

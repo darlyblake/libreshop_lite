@@ -11,6 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/types';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { useAuthStore } from '../store';
 import { authService } from '../lib/supabase';
@@ -44,11 +45,11 @@ export const AdminProfileScreen: React.FC = () => {
         setWhatsappNumber(profile.whatsapp_number || '');
         setUser(profile as any);
       } catch (e: any) {
-        console.warn('failed to load admin profile row', e);
+        errorHandler.handle(e, 'failed to load admin profile row', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         // If RLS policy blocks access, the profile might not be accessible
         // but we can work with the auth user info for now
         if (e.code === '42501') {
-          console.warn('RLS policy blocked access - ensure admin role is set in user_metadata');
+          errorHandler.handle('RLS policy blocked access - ensure admin role is set in user_metadata', 'UnknownContext', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
       }
     };
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.md,
     backgroundColor: '#FFFFFF',
-    color: '#000000',
+    color: 'COLORS.bg',
     fontSize: FONT_SIZE.md,
   },
   saveButton: {
@@ -167,7 +168,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   saveText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
   logoutButton: {

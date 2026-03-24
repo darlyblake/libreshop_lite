@@ -146,7 +146,7 @@ export const AdminReportsScreen: React.FC = () => {
                   style={[styles.statusOption, status === s && styles.statusOptionSelected]}
                   onPress={() => setStatus(s)}
                 >
-                  <Text style={[styles.statusOptionText, status === s && { color: COLORS.white }]}>
+                  <Text style={[styles.statusOptionText, status === s && { color: COLORS.text }]}>
                     {s}
                   </Text>
                 </TouchableOpacity>
@@ -195,5 +195,5 @@ const styles = StyleSheet.create({
   statusOptionText: { fontSize: FONT_SIZE.sm, color: COLORS.text },
   input: { backgroundColor: COLORS.bg, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.md, color: COLORS.text, marginBottom: SPACING.md, textAlignVertical: 'top' },
   saveButton: { backgroundColor: COLORS.accent, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center' },
-  saveButtonText: { color: COLORS.white, fontSize: FONT_SIZE.md, fontWeight: '700' },
+  saveButtonText: { color: COLORS.text, fontSize: FONT_SIZE.md, fontWeight: '700' },
 });

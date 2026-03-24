@@ -14,6 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { categoryService } from '../lib/categoryService';
@@ -124,7 +125,7 @@ export const AdminCategoriesScreen: React.FC = () => {
     setAddModalVisible(true);
   };
   const openEditModal = (cat: Category) => {
-    console.log('openEditModal', cat);
+    // openEditModal: cat;
     setEditingCategory(cat);
     setAddModalVisible(true);
   };
@@ -223,7 +224,7 @@ export const AdminCategoriesScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gestion des catégories</Text>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <Ionicons name="add" size={20} color={COLORS.white} />
+          <Ionicons name="add" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
@@ -293,7 +294,7 @@ export const AdminCategoriesScreen: React.FC = () => {
                     ]}
                     onPress={() => setNewIcon(item)}
                   >
-                    <Ionicons name={item as any} size={22} color={item === newIcon ? COLORS.white : COLORS.text} />
+                    <Ionicons name={item as any} size={22} color={item === newIcon ? COLORS.text : COLORS.text} />
                   </TouchableOpacity>
                 )}
               />
@@ -304,7 +305,7 @@ export const AdminCategoriesScreen: React.FC = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity style={[styles.modalActionButton, { backgroundColor: COLORS.accent }]} onPress={submitNewCategory}>
-                  <Text style={[styles.modalActionText, { color: COLORS.white }]}>{editingCategory ? 'Mettre à jour' : 'Créer'}</Text>
+                  <Text style={[styles.modalActionText, { color: COLORS.text }]}>{editingCategory ? 'Mettre à jour' : 'Créer'}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -381,7 +382,7 @@ export const AdminCategoriesScreen: React.FC = () => {
                   <Ionicons 
                     name={category.status === 'active' ? 'pause' : 'play'} 
                     size={18} 
-                    color={COLORS.white} 
+                    color={COLORS.text} 
                   />
                 </TouchableOpacity>
               </View>

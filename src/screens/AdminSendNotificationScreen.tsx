@@ -139,7 +139,7 @@ export const AdminSendNotificationScreen: React.FC = () => {
           onPress={handleSendNotification}
           disabled={loading}
         >
-          <Ionicons name="send" size={20} color={COLORS.white} />
+          <Ionicons name="send" size={20} color={COLORS.text} />
           <Text style={styles.buttonText}>
             {loading ? 'Envoi en cours...' : 'Envoyer'}
           </Text>
@@ -159,7 +159,7 @@ export const AdminSendNotificationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.card,
     padding: SPACING.lg,
   },
   title: {
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
-    backgroundColor: '#FFFFFF',
-    color: '#000000',
+    backgroundColor: COLORS.card,
+    color: COLORS.bg,
     fontSize: FONT_SIZE.md,
   },
   messageInput: {
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
   },
   buttonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },

@@ -111,7 +111,7 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
           box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .header {
-          background: linear-gradient(135deg, #8b5cf6, #06b6d4);
+          background: linear-gradient(135deg, COLORS.accent, COLORS.accent2);
           color: white;
           padding: 30px;
           text-align: center;
@@ -181,7 +181,7 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
         .grand-total {
           font-size: 20px;
           font-weight: 700;
-          color: #8b5cf6;
+          color: COLORS.accent;
           border-top: 2px solid #ddd;
           padding-top: 12px;
           margin-top: 8px;
@@ -196,7 +196,7 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
         }
         .status-paid { background: #d1fae5; color: #065f46; }
         .status-pending { background: #fef3c7; color: #92400e; }
-        .status-shipped { background: #dbeafe; color: #1e40af; }
+        .status-shipped { background: #dbeafe; color: COLORS.info; }
         .status-delivered { background: #d1fae5; color: #065f46; }
         .status-cancelled { background: #fee2e2; color: #991b1b; }
         .footer {
@@ -314,7 +314,7 @@ export const exportOrderToPDF = async (order: OrderData): Promise<void> => {
       Alert.alert('Succès', `PDF saved to: ${uri}`);
     }
   } catch (error) {
-    console.error('Error exporting PDF:', error);
+    errorHandler.handleDatabaseError(error, 'Error exporting PDF:');
     Alert.alert('Erreur', 'Impossible de générer le PDF');
   }
 };
@@ -352,7 +352,7 @@ export const exportOrdersToPDF = async (
           body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; }
           h1 { color: #333; margin-bottom: 20px; text-align: center; }
           table { width: 100%; border-collapse: collapse; }
-          th { background: #8b5cf6; color: white; padding: 12px; text-align: left; }
+          th { background: COLORS.accent; color: white; padding: 12px; text-align: left; }
           td { padding: 12px; border-bottom: 1px solid #eee; }
           .status-badge {
             display: inline-block;
@@ -363,7 +363,7 @@ export const exportOrdersToPDF = async (
           }
           .status-pending { background: #fef3c7; color: #92400e; }
           .status-paid { background: #d1fae5; color: #065f46; }
-          .status-shipped { background: #dbeafe; color: #1e40af; }
+          .status-shipped { background: #dbeafe; color: COLORS.info; }
           .status-delivered { background: #d1fae5; color: #065f46; }
           .status-cancelled { background: #fee2e2; color: #991b1b; }
           .total-row { font-weight: 700; background: #f8f9fa; }
@@ -406,7 +406,7 @@ export const exportOrdersToPDF = async (
       Alert.alert('Succès', `PDF saved to: ${uri}`);
     }
   } catch (error) {
-    console.error('Error exporting orders PDF:', error);
+    errorHandler.handleDatabaseError(error, 'Error exporting orders PDF:');
     Alert.alert('Erreur', 'Impossible de générer le PDF');
   }
 };

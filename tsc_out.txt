@@ -1,0 +1,1 @@
+tsconfig.json(3,3): error TS5098: Option 'customConditions' can only be used when 'moduleResolution' is set to 'node16', 'nodenext', or 'bundler'.

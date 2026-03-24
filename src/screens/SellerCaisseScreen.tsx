@@ -16,6 +16,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -23,7 +24,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../store';
-import { productService, storeService, orderService, type Product, type Order } from '../lib/supabase';
+import { productService, storeService, orderService, supabase, type Product, type Order } from '../lib/supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 
 type Product = {
   id: string;
@@ -39,6 +42,7 @@ type CartItem = Product & {
 };
 
 export const SellerCaisseScreen = () => {
+  const navigation = useNavigation<any>();
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
   const [cartVisible, setCartVisible] = useState(true);
@@ -53,6 +57,10 @@ export const SellerCaisseScreen = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [store, setStore] = useState<any>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [clients, setClients] = useState<{id: string, name: string, phone: string}[]>([]);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -72,14 +80,16 @@ export const SellerCaisseScreen = () => {
         const store = await storeService.getByUser(user.id);
         if (!store?.id) {
           setStoreId(null);
+          setStore(null);
           setProducts([]);
           return;
         }
         setStoreId(store.id);
+        setStore(store);
         const data = await productService.getByStoreAvailable(store.id);
         setProducts(data || []);
       } catch (e) {
-        console.error('Erreur chargement produits caisse', e);
+        errorHandler.handleDatabaseError(e, 'Erreur chargement produits caisse');
         Alert.alert('Erreur', 'Impossible de charger les produits');
         setProducts([]);
       } finally {
@@ -189,8 +199,37 @@ export const SellerCaisseScreen = () => {
     [cart]
   );
 
-  const tax = subtotal * 0.18; // TVA 18%
+  const taxRate = store?.tax_rate !== undefined ? Number(store.tax_rate) : 18;
+  const tax = subtotal * (taxRate / 100);
   const total = subtotal + tax;
+
+  useEffect(() => {
+    if (!storeId) return;
+    const loadClients = async () => {
+      try {
+        const orders = await orderService.getByStore(storeId, { includeUser: true });
+        const map = new Map<string, {id: string, name: string, phone: string}>();
+        (orders as any[]).forEach((o: any) => {
+          const cPhone = String(o?.customer_phone || '').trim();
+          const cName = String(o?.customer_name || '').trim();
+          const uId = String(o?.user_id || '').trim();
+          const id = String(cPhone || cName || uId || o?.id || '');
+          if (!id) return;
+          const name = String(cName || o?.users?.full_name || '').trim();
+          const phone = String(cPhone || o?.users?.phone || '').trim();
+          if (!map.has(id) && name && name.toLowerCase() !== 'client') {
+            map.set(id, { id, name, phone });
+          }
+        });
+        setClients(Array.from(map.values()));
+      } catch (e) {
+        console.warn('Erreur chargement clients:', e);
+      }
+    };
+    loadClients();
+  }, [storeId]);
+
+  const cartTotalElements = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
   const cartItemCount = useMemo(
     () => cart.reduce((count, item) => count + item.quantity, 0),
@@ -231,7 +270,7 @@ export const SellerCaisseScreen = () => {
   ====================== */
 
   const renderProduct = ({ item, index }: { item: Product; index: number }) => {
-    const stockColor = item.stock > 10 ? '#22c55e' : item.stock > 0 ? '#f59e0b' : '#ef4444';
+    const stockColor = item.stock > 10 ? COLORS.success : item.stock > 0 ? COLORS.warning : COLORS.danger;
     
     return (
       <TouchableOpacity
@@ -244,7 +283,7 @@ export const SellerCaisseScreen = () => {
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={item.stock <= 0 ? ['#2d3748', '#1e293b'] : ['#1e293b', '#0f172a']}
+          colors={item.stock <= 0 ? [COLORS.border, COLORS.card] : [COLORS.card, COLORS.bg]}
           style={styles.productGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -253,7 +292,7 @@ export const SellerCaisseScreen = () => {
             <Ionicons 
               name={item.icon || 'cube'} 
               size={32} 
-              color={item.stock <= 0 ? '#64748b' : '#3b82f6'} 
+              color={item.stock <= 0 ? COLORS.textMuted : COLORS.info} 
             />
           </View>
           
@@ -261,9 +300,9 @@ export const SellerCaisseScreen = () => {
             {item.name}
           </Text>
           
-          {item.category && (
+          {item.category ? (
             <Text style={styles.productCategory}>{item.category}</Text>
-          )}
+          ) : null}
           
           <Text style={styles.productPrice}>
             {format(item.price)}
@@ -276,11 +315,11 @@ export const SellerCaisseScreen = () => {
               </Text>
             </View>
             
-            {item.stock > 0 && (
+            {item.stock > 0 ? (
               <View style={styles.addButton}>
                 <Ionicons name="add" size={20} color="white" />
               </View>
-            )}
+            ) : null}
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -295,7 +334,7 @@ export const SellerCaisseScreen = () => {
     <View style={styles.cartItem}>
       <View style={styles.cartItemLeft}>
         <View style={styles.cartItemIcon}>
-          <Ionicons name={item.icon || 'cube'} size={20} color="#3b82f6" />
+          <Ionicons name={item.icon || 'cube'} size={20} color={COLORS.info} />
         </View>
         <View style={styles.cartItemInfo}>
           <Text style={styles.cartItemName}>{item.name}</Text>
@@ -309,7 +348,7 @@ export const SellerCaisseScreen = () => {
             style={styles.quantityButton}
             onPress={() => removeFromCart(item.id)}
           >
-            <Ionicons name="remove" size={18} color="#94a3b8" />
+            <Ionicons name="remove" size={18} color={COLORS.textMuted} />
           </TouchableOpacity>
           
           <Text style={styles.quantityText}>{item.quantity}</Text>
@@ -337,18 +376,28 @@ export const SellerCaisseScreen = () => {
     if (cart.length === 0) return;
     
     if (paymentMethod === 'cash') {
-      const received = parseFloat(cashReceived);
+      const received = cashReceived ? parseFloat(cashReceived) : total;
       if (isNaN(received) || received < total) {
         Alert.alert('Erreur', 'Le montant reçu est insuffisant ou invalide.');
         return;
       }
       
       const change = received - total;
-      Alert.alert(
-        'Monnaie à rendre',
-        `${format(change)}`,
-        [{ text: 'OK', onPress: () => finalizeCheckout() }]
-      );
+      if (change > 0) {
+        if (Platform.OS === 'web') {
+          // Sur le web, Alert.alert avec boutons "custom" peut bloquer le composant sous certaines versions
+          window.alert(`Monnaie à rendre : ${format(change)}`);
+          finalizeCheckout();
+        } else {
+          Alert.alert(
+            'Monnaie à rendre',
+            `${format(change)}`,
+            [{ text: 'OK', onPress: () => finalizeCheckout() }]
+          );
+        }
+      } else {
+        finalizeCheckout();
+      }
     } else {
       finalizeCheckout();
     }
@@ -370,6 +419,8 @@ export const SellerCaisseScreen = () => {
         payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod === 'card' ? 'card' : 'mobile_money',
         payment_status: 'paid',
         notes: `Vente caisse - ${paymentMethod}`,
+        customer_name: customerName.trim() || undefined,
+        customer_phone: customerPhone.trim() || undefined,
       };
 
       const order = await orderService.create(orderPayload);
@@ -381,47 +432,193 @@ export const SellerCaisseScreen = () => {
         quantity: item.quantity,
         price: item.price,
       }));
-      await orderService.client?.from('order_items').insert(itemsPayload);
+      await supabase.from('order_items').insert(itemsPayload);
 
       // Décrémenter le stock via le RPC
-      await orderService.client?.rpc('process_order_after_payment', {
+      await supabase.rpc('process_order_after_payment', {
         p_order_id: order.id,
       });
 
-      // Génération du ticket
+      // Génération du ticket format thermique (58/80mm)
       const html = `
-        <html>
-          <body style="font-family: Arial; padding: 20px;">
-            <h1 style="text-align: center;">TICKET DE CAISSE</h1>
-            <p>Date: ${new Date().toLocaleString()}</p>
-            <p>Commande: ${order.id}</p>
-            <hr/>
-            ${cart.map(item => `
-              <div style="display: flex; justify-content: space-between;">
-                <span>${item.name} x${item.quantity}</span>
-                <span>${format(item.price * item.quantity)}</span>
+        <!DOCTYPE html>
+        <html lang="fr">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Ticket de caisse</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+            body {
+              font-family: 'Courier Prime', 'Courier New', monospace;
+              margin: 0 auto;
+              padding: 15px;
+              width: 300px;
+              color: #000;
+              font-size: 13px;
+              line-height: 1.4;
+              background: white;
+            }
+            .center { text-align: center; }
+            .right { text-align: right; }
+            .left { text-align: left; }
+            .bold { font-weight: bold; }
+            .dashed-line {
+              border-top: 1px dashed #000;
+              margin: 10px 0;
+            }
+            .store-name {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 5px;
+              text-transform: uppercase;
+            }
+            .header-info {
+              font-size: 12px;
+              margin-bottom: 3px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 10px;
+              font-size: 13px;
+            }
+            th, td {
+              padding: 4px 0;
+              vertical-align: top;
+            }
+            .item-name {
+              text-transform: uppercase;
+              padding-right: 5px;
+              word-wrap: break-word;
+            }
+            img.logo {
+              max-width: 120px;
+              max-height: 80px;
+              margin-bottom: 10px;
+              filter: grayscale(100%);
+            }
+          </style>
+        </head>
+        <body>
+          <div class="center">
+            ${store?.logo_url ? `<img src="${store.logo_url}" class="logo" />` : ''}
+            <div class="store-name">${store?.name || 'BOUTIQUE'}</div>
+            ${store?.address ? `<div class="header-info">${store.address}</div>` : ''}
+            ${store?.phone ? `<div class="header-info">Tél: ${store.phone}</div>` : ''}
+          </div>
+
+          <div class="dashed-line"></div>
+
+          <div style="margin-bottom: 10px;">
+            <div><span class="bold">Date :</span> ${new Date().toLocaleString('fr-FR')}</div>
+            <div><span class="bold">Ticket N° :</span> ${order.id.slice(0, 8).toUpperCase()}</div>
+            <div><span class="bold">Caissier :</span> ${user?.user_metadata?.full_name || 'Admin'}</div>
+            ${customerName.trim() ? `<div><span class="bold">Client :</span> ${customerName.trim()}</div>` : ''}
+          </div>
+
+          <div class="center bold" style="margin: 15px 0; font-size: 15px;">TICKET DE CAISSE</div>
+          <div class="dashed-line"></div>
+
+          <table>
+            <thead>
+              <tr style="border-bottom: 1px solid #000;">
+                <th class="left" style="width: 70%;">QTE & ARTICLE</th>
+                <th class="right" style="width: 30%;">MONTANT</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${cart.map(item => `
+                <tr>
+                  <td class="item-name">
+                    ${item.quantity}x ${item.name}
+                    <div style="font-size: 11px; margin-top: 2px;">${format(item.price)}/U</div>
+                  </td>
+                  <td class="right bold">${format(item.price * item.quantity)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="dashed-line"></div>
+
+          <table style="font-size: 14px;">
+            <tr>
+              <td class="left">SOUS-TOTAL :</td>
+              <td class="right">${format(subtotal)}</td>
+            </tr>
+            <tr>
+              <td class="left">TVA (${taxRate}%) :</td>
+              <td class="right">${format(tax)}</td>
+            </tr>
+            <tr class="bold" style="font-size: 18px;">
+              <td class="left" style="padding-top: 10px;">NET A PAYER :</td>
+              <td class="right" style="padding-top: 10px;">${format(total)}</td>
+            </tr>
+          </table>
+
+          <div class="dashed-line"></div>
+
+          <div style="font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>Mode de paiement :</span>
+              <span class="bold">${paymentMethod === 'cash' ? 'ESPECES' : paymentMethod === 'card' ? 'CARTE' : 'MOBILE MONEY'}</span>
+            </div>
+            ${paymentMethod === 'cash' ? `
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Espèces reçues :</span>
+                <span>${format(parseFloat(cashReceived || total.toString()))}</span>
               </div>
-            `).join('')}
-            <hr/>
-            <div style="display: flex; justify-content: space-between;">
-              <strong>Sous-total</strong>
-              <strong>${format(subtotal)}</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <strong>TVA (18%)</strong>
-              <strong>${format(tax)}</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 18px;">
-              <strong>TOTAL</strong>
-              <strong>${format(total)}</strong>
-            </div>
-            <p style="text-align: center; margin-top: 30px;">Merci de votre visite !</p>
-          </body>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Monnaie rendue :</span>
+                <span class="bold">${format(parseFloat(cashReceived || total.toString()) - total)}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="dashed-line"></div>
+
+          <div class="center" style="margin-top: 20px;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${order.id}&format=png" style="width: 80px; height: 80px; margin-bottom: 10px;" />
+            <div class="bold" style="font-size: 14px;">MERCI ET A BIENTOT !</div>
+            <div style="font-size: 10px; margin-top: 15px; color: #666;">Propulsé par LibreShop App</div>
+          </div>
+        </body>
         </html>
       `;
 
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri);
+      try {
+        if (Platform.OS === 'web') {
+          // Sur le web, expo-print ignore "html" et lance l'impression de toute la page
+          // On injecte manuellement une iframe pour n'imprimer que le rendu HTML du ticket
+          const iframe = document.createElement('iframe');
+          iframe.style.position = 'absolute';
+          iframe.style.width = '0px';
+          iframe.style.height = '0px';
+          iframe.style.border = 'none';
+          document.body.appendChild(iframe);
+          
+          if (iframe.contentWindow) {
+            iframe.contentWindow.document.open();
+            iframe.contentWindow.document.write(html);
+            iframe.contentWindow.document.close();
+            
+            // Un court délai pour laisser charger les polices et images
+            setTimeout(() => {
+              iframe.contentWindow?.focus();
+              iframe.contentWindow?.print();
+              setTimeout(() => {
+                document.body.removeChild(iframe);
+              }, 1000);
+            }, 500);
+          }
+        } else {
+          const { uri } = await Print.printToFileAsync({ html });
+          await Sharing.shareAsync(uri);
+        }
+      } catch (printError) {
+        console.warn('Erreur lors de l\'impression ou du partage du ticket:', printError);
+      }
       
       // Recharger les produits pour mettre à jour les stocks
       const updatedProducts = await productService.getByStoreAvailable(storeId);
@@ -434,19 +631,22 @@ export const SellerCaisseScreen = () => {
       
       Alert.alert('Succès', 'Vente effectuée avec succès !');
     } catch (error) {
-      console.error('Erreur finalisation caisse:', error);
+      errorHandler.handleDatabaseError(error, 'Erreur finalisation caisse:');
       Alert.alert('Erreur', 'Impossible de finaliser la vente');
+      
+      // Ensure Modal closes even if order errors out partially
+      setShowCheckoutModal(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
       
       {/* Loading */}
       {loading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <ActivityIndicator size="large" color={COLORS.info} />
           <Text style={styles.loadingText}>Chargement des produits...</Text>
         </View>
       )}
@@ -456,20 +656,23 @@ export const SellerCaisseScreen = () => {
       
       {/* Header avec padding pour éviter les boutons système */}
       <LinearGradient
-        colors={['#1e293b', '#0f172a']}
+        colors={[COLORS.card, COLORS.bg]}
         style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 10 : 15 }]}
       >
         <View style={styles.headerLeft}>
-          <Ionicons name="cash-outline" size={28} color="#3b82f6" />
+          <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('SellerDashboard')} style={{ marginRight: 16 }}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Ionicons name="cash-outline" size={28} color={COLORS.info} />
           <Text style={styles.headerTitle}>Smart Caisse</Text>
         </View>
         
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="stats-chart" size={22} color="#94a3b8" />
+            <Ionicons name="stats-chart" size={22} color={COLORS.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="person-outline" size={22} color="#94a3b8" />
+            <Ionicons name="person-outline" size={22} color={COLORS.textMuted} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -485,19 +688,19 @@ export const SellerCaisseScreen = () => {
           {/* Barre de recherche */}
           <View style={styles.searchContainer}>
             <View style={styles.searchWrapper}>
-              <Ionicons name="search" size={20} color="#94a3b8" />
+              <Ionicons name="search" size={20} color={COLORS.textMuted} />
               <TextInput
                 placeholder="Rechercher un produit..."
-                placeholderTextColor="#64748b"
+                placeholderTextColor={COLORS.textMuted}
                 value={search}
                 onChangeText={setSearch}
                 style={styles.searchInput}
               />
-              {search !== '' && (
+              {search !== '' ? (
                 <TouchableOpacity onPress={() => setSearch('')}>
-                  <Ionicons name="close-circle" size={20} color="#94a3b8" />
+                  <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
                 </TouchableOpacity>
-              )}
+              ) : null}
             </View>
           </View>
 
@@ -543,11 +746,11 @@ export const SellerCaisseScreen = () => {
                 size={24} 
                 color="white" 
               />
-              {cartItemCount > 0 && (
+              {cartItemCount > 0 ? (
                 <View style={styles.cartBadge}>
                   <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
                 </View>
-              )}
+              ) : null}
             </BlurView>
           </TouchableOpacity>
         )}
@@ -560,28 +763,28 @@ export const SellerCaisseScreen = () => {
             !isTablet && { position: 'absolute', right: 0, top: 0, bottom: 0 }
           ]}>
             <LinearGradient
-              colors={['#111827', '#0f172a']}
+              colors={[COLORS.bg, COLORS.bg]}
               style={styles.cartGradient}
             >
               {/* En-tête panier */}
               <View style={styles.cartHeader}>
                 <View style={styles.cartHeaderLeft}>
-                  <Ionicons name="cart" size={24} color="#3b82f6" />
+                  <Ionicons name="cart" size={24} color={COLORS.info} />
                   <Text style={styles.cartTitle}>Panier</Text>
-                  {cartItemCount > 0 && (
+                  {cartItemCount > 0 ? (
                     <View style={styles.cartItemCount}>
                       <Text style={styles.cartItemCountText}>
                         {cartItemCount}
                       </Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
                 
-                {cart.length > 0 && (
+                {cart.length > 0 ? (
                   <TouchableOpacity onPress={clearCart}>
                     <Text style={styles.clearCartText}>Vider</Text>
                   </TouchableOpacity>
-                )}
+                ) : null}
               </View>
 
               {/* Liste articles panier */}
@@ -603,7 +806,7 @@ export const SellerCaisseScreen = () => {
               )}
 
               {/* Résumé et paiement */}
-              {cart.length > 0 && (
+              {cart.length > 0 ? (
                 <View style={styles.cartFooter}>
                   <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>Sous-total</Text>
@@ -611,7 +814,7 @@ export const SellerCaisseScreen = () => {
                   </View>
                   
                   <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>TVA (18%)</Text>
+                    <Text style={styles.summaryLabel}>TVA ({taxRate}%)</Text>
                     <Text style={styles.summaryValue}>{format(tax)}</Text>
                   </View>
                   
@@ -625,7 +828,7 @@ export const SellerCaisseScreen = () => {
                     onPress={() => setShowCheckoutModal(true)}
                   >
                     <LinearGradient
-                      colors={['#22c55e', '#16a34a']}
+                      colors={[COLORS.success, COLORS.accent]}
                       style={styles.payButtonGradient}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
@@ -635,7 +838,7 @@ export const SellerCaisseScreen = () => {
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
-              )}
+              ) : null}
             </LinearGradient>
           </Animated.View>
         )}
@@ -657,13 +860,52 @@ export const SellerCaisseScreen = () => {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Paiement</Text>
                 <TouchableOpacity onPress={() => setShowCheckoutModal(false)}>
-                  <Ionicons name="close" size={24} color="#94a3b8" />
+                  <Ionicons name="close" size={24} color={COLORS.textMuted} />
                 </TouchableOpacity>
               </View>
 
               <Text style={styles.modalTotal}>
                 Total à payer : {format(total)}
               </Text>
+
+              {/* Infos Client (Optionnel) */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.textMuted, marginBottom: 8, textTransform: 'uppercase' }}>
+                  Client (Optionnel)
+                </Text>
+                <TextInput
+                  style={[styles.cashInput, { marginBottom: 10, fontSize: 14 }]}
+                  placeholder="Rechercher ou entrer un nom de client"
+                  placeholderTextColor="#9ca3af"
+                  value={customerName}
+                  onChangeText={(text) => {
+                    setCustomerName(text);
+                    setCustomerPhone(''); // Reset phone when typing manually
+                  }}
+                />
+                
+                {/* AUTOCOMPLETE SUGGESTIONS */}
+                {customerName.length > 1 && !clients.find(c => c.name.toLowerCase() === customerName.trim().toLowerCase()) && (
+                  <View style={{ marginBottom: 10, backgroundColor: COLORS.bg, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border }}>
+                    {clients
+                      .filter(c => c.name.toLowerCase().includes(customerName.toLowerCase()) || c.phone.includes(customerName))
+                      .slice(0, 3)
+                      .map(client => (
+                        <TouchableOpacity 
+                          key={client.id}
+                          style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border }}
+                          onPress={() => {
+                            setCustomerName(client.name);
+                            setCustomerPhone(client.phone);
+                          }}
+                        >
+                          <Text style={{ color: COLORS.text, fontSize: 14, fontWeight: '500' }}>{client.name}</Text>
+                          {client.phone ? <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 2 }}>{client.phone}</Text> : null}
+                        </TouchableOpacity>
+                      ))}
+                  </View>
+                )}
+              </View>
 
               {/* Méthodes de paiement */}
               <View style={styles.paymentMethods}>
@@ -677,7 +919,7 @@ export const SellerCaisseScreen = () => {
                   <Ionicons 
                     name="cash-outline" 
                     size={24} 
-                    color={paymentMethod === 'cash' ? '#22c55e' : '#94a3b8'} 
+                    color={paymentMethod === 'cash' ? COLORS.success : COLORS.textMuted} 
                   />
                   <Text style={[
                     styles.paymentMethodText,
@@ -697,7 +939,7 @@ export const SellerCaisseScreen = () => {
                   <Ionicons 
                     name="card-outline" 
                     size={24} 
-                    color={paymentMethod === 'card' ? '#22c55e' : '#94a3b8'} 
+                    color={paymentMethod === 'card' ? COLORS.success : COLORS.textMuted} 
                   />
                   <Text style={[
                     styles.paymentMethodText,
@@ -717,7 +959,7 @@ export const SellerCaisseScreen = () => {
                   <Ionicons 
                     name="phone-portrait-outline" 
                     size={24} 
-                    color={paymentMethod === 'transfer' ? '#22c55e' : '#94a3b8'} 
+                    color={paymentMethod === 'transfer' ? COLORS.success : COLORS.textMuted} 
                   />
                   <Text style={[
                     styles.paymentMethodText,
@@ -732,6 +974,19 @@ export const SellerCaisseScreen = () => {
               {paymentMethod === 'cash' && (
                 <View style={styles.cashInputContainer}>
                   <Text style={styles.cashInputLabel}>Montant reçu</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                    {[total, Math.ceil(total/5000)*5000, Math.ceil(total/10000)*10000].filter((v, i, a) => v >= total && a.indexOf(v) === i).map((amt, idx) => (
+                      <TouchableOpacity 
+                        key={idx}
+                        style={{ backgroundColor: COLORS.border, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 }}
+                        onPress={() => setCashReceived(amt.toString())}
+                      >
+                         <Text style={{ color: 'white', fontWeight: '600', fontSize: 13 }}>
+                           {amt === total ? 'Exact' : `${amt.toLocaleString('fr-FR')} F`}
+                         </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                   <TextInput
                     style={styles.cashInput}
                     placeholder="0"
@@ -747,16 +1002,20 @@ export const SellerCaisseScreen = () => {
               <TouchableOpacity
                 style={styles.validateButton}
                 onPress={handleCheckout}
+                disabled={loading}
               >
-                <LinearGradient
-                  colors={['#3b82f6', '#2563eb']}
-                  style={styles.validateButtonGradient}
-                >
-                  <Text style={styles.validateButtonText}>
-                    Valider le paiement
-                  </Text>
-                  <Ionicons name="checkmark-circle" size={20} color="white" />
-                </LinearGradient>
+                <View style={[styles.validateButtonGradient, { backgroundColor: COLORS.accent }]}>
+                  {loading ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <>
+                      <Text style={[styles.validateButtonText, { color: 'white' }]}>
+                        Valider le paiement
+                      </Text>
+                      <Ionicons name="checkmark-circle" size={20} color="white" />
+                    </>
+                  )}
+                </View>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -807,7 +1066,7 @@ const ScrollableCategories = ({ categories, selectedCategory, onSelectCategory }
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',
@@ -816,14 +1075,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: COLORS.card,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerTitle: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 10,
@@ -848,17 +1107,17 @@ const styles = StyleSheet.create({
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
+    backgroundColor: COLORS.card,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: COLORS.border,
   },
   searchInput: {
     flex: 1,
     marginLeft: 10,
-    color: 'white',
+    color: COLORS.text,
     fontSize: 16,
     padding: 0,
   },
@@ -871,23 +1130,23 @@ const styles = StyleSheet.create({
   categoryChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#1e293b',
+    backgroundColor: COLORS.card,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: COLORS.border,
   },
   categoryChipActive: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: COLORS.info,
+    borderColor: COLORS.info,
   },
   categoryChipText: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     fontSize: 14,
     fontWeight: '500',
   },
   categoryChipTextActive: {
-    color: 'white',
+    color: COLORS.text,
   },
   productGrid: {
     paddingBottom: 20,
@@ -909,24 +1168,24 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor: '#2d3748',
+    backgroundColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   productName: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
   productCategory: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     fontSize: 12,
     marginBottom: 8,
   },
   productPrice: {
-    color: '#3b82f6',
+    color: COLORS.info,
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
@@ -949,7 +1208,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#3b82f6',
+    backgroundColor: COLORS.info,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -959,7 +1218,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyStateText: {
-    color: '#64748b',
+    color: COLORS.textMuted,
     fontSize: 16,
     marginTop: 10,
   },
@@ -981,7 +1240,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     right: -5,
-    backgroundColor: '#ef4444',
+    backgroundColor: COLORS.danger,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -989,7 +1248,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cartBadgeText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 10,
     fontWeight: 'bold',
   },
@@ -997,7 +1256,7 @@ const styles = StyleSheet.create({
     height: '100%',
     overflow: 'hidden',
     borderLeftWidth: 1,
-    borderLeftColor: '#1e293b',
+    borderLeftColor: COLORS.card,
   },
   cartGradient: {
     flex: 1,
@@ -1014,25 +1273,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cartTitle: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 8,
   },
   cartItemCount: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: COLORS.info,
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 2,
     marginLeft: 8,
   },
   cartItemCountText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 12,
     fontWeight: 'bold',
   },
   clearCartText: {
-    color: '#ef4444',
+    color: COLORS.danger,
     fontSize: 14,
   },
   cartList: {
@@ -1044,7 +1303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: COLORS.card,
   },
   cartItemLeft: {
     flexDirection: 'row',
@@ -1055,7 +1314,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: '#1e293b',
+    backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
@@ -1064,13 +1323,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cartItemName: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 2,
   },
   cartItemPrice: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     fontSize: 12,
   },
   cartItemRight: {
@@ -1085,21 +1344,21 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#2d3748',
+    backgroundColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
   quantityButtonAdd: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: COLORS.info,
   },
   quantityText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 14,
     fontWeight: '600',
     marginHorizontal: 8,
   },
   cartItemTotal: {
-    color: '#3b82f6',
+    color: COLORS.info,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1110,7 +1369,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyCartText: {
-    color: '#64748b',
+    color: COLORS.textMuted,
     fontSize: 16,
     marginTop: 10,
   },
@@ -1118,7 +1377,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: COLORS.card,
   },
   summaryItem: {
     flexDirection: 'row',
@@ -1126,26 +1385,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryLabel: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     fontSize: 14,
   },
   summaryValue: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 14,
   },
   totalItem: {
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: COLORS.card,
   },
   totalLabel: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
   totalValue: {
-    color: '#22c55e',
+    color: COLORS.success,
     fontSize: 20,
     fontWeight: 'bold',
   },
@@ -1162,7 +1421,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   payButtonText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -1175,7 +1434,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1e293b',
+    backgroundColor: COLORS.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -1188,12 +1447,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitle: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 20,
     fontWeight: 'bold',
   },
   modalTotal: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -1208,19 +1467,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#2d3748',
+    backgroundColor: COLORS.border,
     minWidth: 100,
   },
   paymentMethodActive: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: COLORS.info,
   },
   paymentMethodText: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     marginTop: 8,
     fontSize: 14,
   },
   paymentMethodTextActive: {
-    color: 'white',
+    color: COLORS.text,
     marginTop: 8,
     fontSize: 14,
   },
@@ -1228,15 +1487,15 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   cashInputLabel: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     fontSize: 14,
     marginBottom: 8,
   },
   cashInput: {
-    backgroundColor: '#2d3748',
+    backgroundColor: COLORS.border,
     borderRadius: 12,
     padding: 16,
-    color: 'white',
+    color: COLORS.text,
     fontSize: 18,
   },
   validateButton: {
@@ -1251,7 +1510,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   validateButtonText: {
-    color: 'white',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -1259,10 +1518,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f172a',
+    backgroundColor: COLORS.bg,
   },
   loadingText: {
-    color: '#94a3b8',
+    color: COLORS.textMuted,
     marginTop: 16,
     fontSize: 16,
   },

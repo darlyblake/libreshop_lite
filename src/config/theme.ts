@@ -1,55 +1,75 @@
-// Configuration Supabase - à personnaliser avec vos propres credentials
-// The values below are usually provided via environment variables when running
-// with Expo (`.env` file or `app.json`), but we keep default placeholders so
-// the app still compiles. **You must replace them with your project URL and
-// anon key or the client will attempt to reach an invalid host and requests will
-// fail with network errors (see console `Failed to fetch`).**
-//
-// Example `.env` file (see README.md):
-// EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-// EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+// Configuration Supabase - Variables d'environnement sécurisées
+// Les valeurs sont chargées depuis les variables d'environnement pour la sécurité
+// Plus aucune clé n'est stockée en dur dans le code source
 
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-// WARN: Replace these with your real Supabase project credentials!
-// The current project appears to be unavailable (404 error).
-export const supabaseConfig = {
-  supabaseUrl:
-    (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_SUPABASE_URL ||
-    process.env.EXPO_PUBLIC_SUPABASE_URL ||
-    'https://zivymbnalmxkargmfljm.supabase.co', // replace with your real project URL
-  supabaseAnonKey:
-    (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
-    'sb_publishable_sGJYXmYlGm_tFlDjNbtMkg_97uPkhDw', // replace with your anon key
-};
-
-// Check and warn at startup if placeholders were not replaced
-function checkSupabaseConfig() {
-  const { supabaseUrl, supabaseAnonKey } = supabaseConfig;
-  const isPlaceholderUrl = supabaseUrl.includes('YOUR_PROJECT');
-  // real anon keys currently start with "eyJ" or "sb_publishable_"; the
-  // latter used to be mis-detected as a placeholder.  Only warn when the key
-  // literally equals the placeholder string.
-  const isPlaceholderKey = supabaseAnonKey === 'YOUR_ANON_KEY';
-  const isLikelyPublishableKey = supabaseAnonKey.startsWith('sb_publishable_');
-  const isLikelyJwtAnonKey = supabaseAnonKey.startsWith('eyJ');
+// Fonction de validation des configurations
+function validateSupabaseConfig(url: string, key: string) {
+  const errors = [];
   
-  if (isPlaceholderUrl || isPlaceholderKey) {
-    console.warn(
-      '⚠️ Using placeholder Supabase credentials. Replace with your real project credentials in theme.ts or .env file.'
-    );
-  } else if (isLikelyPublishableKey && !isLikelyJwtAnonKey) {
-    console.warn(
-      '⚠️ Supabase key looks like a publishable key (sb_publishable_*). For Auth to work, use the Project API "anon/public" key (JWT, usually starts with eyJ...) in EXPO_PUBLIC_SUPABASE_ANON_KEY.'
-    );
-  } else {
-    console.log(`✅ Supabase config loaded url=${supabaseUrl} key=${supabaseAnonKey.substring(0, 8)}…`);
+  if (!url || url.includes('YOUR_PROJECT') || url.includes('your-project')) {
+    errors.push('URL Supabase invalide ou non configurée');
   }
+  
+  if (!key || key === 'YOUR_ANON_KEY') {
+    errors.push('Clé Supabase anon invalide ou non configurée');
+  }
+  
+  // Validation du format de l'URL
+  const urlPattern = /^https:\/\/[a-z0-9-]+\.supabase\.co$/;
+  if (url && !urlPattern.test(url)) {
+    errors.push('Format URL Supabase invalide (attendu: https://project-id.supabase.co)');
+  }
+  
+  // Validation du format de la clé
+  const jwtPattern = /^eyJ[a-zA-Z0-9_-]*\.eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*$/;
+  const publishablePattern = /^sb_publishable_[a-zA-Z0-9_-]*$/;
+  if (key && !jwtPattern.test(key) && !publishablePattern.test(key)) {
+    errors.push('Format clé Supabase invalide');
+  }
+  
+  return errors;
 }
 
-checkSupabaseConfig();
+// Récupération sécurisée des variables d'environnement
+const getEnvVar = (key: string, fallback?: string) => {
+  return Constants?.expoConfig?.extra?.[key] || 
+         process.env[key] || 
+         fallback;
+};
+
+export const supabaseConfig = {
+  supabaseUrl: getEnvVar('EXPO_PUBLIC_SUPABASE_URL'),
+  supabaseAnonKey: getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+};
+
+// Validation au démarrage
+function checkSupabaseConfig() {
+  const { supabaseUrl, supabaseAnonKey } = supabaseConfig;
+  const errors = validateSupabaseConfig(supabaseUrl, supabaseAnonKey);
+  
+  if (errors.length > 0) {
+    console.error('⚠️ Erreurs de configuration Supabase:');
+    errors.forEach(error => console.error(`  - ${error}`));
+    console.error('\n📖 Pour corriger:');
+    console.error('1. Copiez .env.example vers .env.local');
+    console.error('2. Remplacez les valeurs par vos vraies clés Supabase');
+    console.error('3. Redémarrez votre application');
+    return false;
+  }
+  
+  if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    const keyLabel = supabaseAnonKey ? supabaseAnonKey.replace(/(.{8}).+(.{8})/, '$1…$2') : 'null';
+    // Log: `✅ Configuration Supabase valide: url=${supabaseUrl} key=${keyLabel}`;
+  }
+  
+  return true;
+}
+
+// Export de la validité pour utilisation dans l'app
+export const isSupabaseConfigured = checkSupabaseConfig();
 
 // Configuration Cloudinary
 export const cloudinaryConfig = {
@@ -64,47 +84,79 @@ export const cloudinaryConfig = {
 };
 
 export const COLORS = {
-  // Dark theme colors with better contrast
-  bg: '#0a0c12',
-  bgGradient: 'linear-gradient(145deg, #0a0c12 0%, #0e1018 100%)',
-  card: 'rgba(22, 25, 34, 0.8)',
-  cardHover: 'rgba(28, 32, 42, 0.95)',
+  // Base colors from lightColors
+  bg: '#ffffff',
+  bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%)',
   
   // Vibrant accent colors
   accent: '#8b5cf6',      // Violet vif
-  accent2: '#06b6d4',     // Cyan vif
-  accentDark: '#7c3aed',   // Violet foncé
-  accentGlow: 'rgba(139, 92, 246, 0.4)',
+  accent2: '#0ea5e9',     // Cyan vif (mapped to primary 500)
+  accentDark: '#7c3aed', 
+  accentGlow: 'rgba(139, 92, 246, 0.15)',
   
   // Bright status colors
-  success: '#10b981',      // Vert vif
-  warning: '#f59e0b',      // Orange vif
-  danger: '#ef4444',       // Rouge vif
-  info: '#3b82f6',         // Bleu vif
+  success: '#1e7e34',
+  warning: '#b45f06',
+  danger: '#b71c1c',
+  info: '#0c5460',
   
-  // High contrast text colors
-  text: '#ffffff',         // Blanc pur
-  textSoft: 'rgba(255, 255, 255, 0.8)',  // Plus visible
-  textMuted: 'rgba(255, 255, 255, 0.6)', // Plus visible
-  textBright: '#f8fafc',   // Blanc cassé très clair
+  // Text colors
+  text: '#0f172a',
+  textSoft: '#475569',
+  textMuted: '#64748b',
+  textBright: '#f8fafc',
+  textInverse: '#ffffff',
   
-  // Enhanced borders
-  border: 'rgba(255, 255, 255, 0.08)',
-  borderHover: 'rgba(255, 255, 255, 0.15)',
-  borderLight: 'rgba(255, 255, 255, 0.12)',
+  // Cards
+  card: '#f8fafc',
+  cardHover: '#f1f5f9',
+  
+  // Borders
+  border: '#e2e8f0',
+  borderHover: '#cbd5e1',
+  borderLight: '#f1f5f9',
   borderBright: 'rgba(139, 92, 246, 0.3)',
   
   // Core colors
   white: '#ffffff',
   black: '#000000',
-  gray: '#6b7280',
-  dark: '#1a1a1a',
+  gray: '#94a3b8',
+  dark: '#0f172a',
   
   // Additional vibrant colors for buttons
-  primary: '#8b5cf6',     // Violet
-  secondary: '#06b6d4',   // Cyan
-  tertiary: '#f59e0b',    // Orange
-  quaternary: '#10b981',   // Vert
+  primary: '#8b5cf6',
+  secondary: '#0ea5e9',
+  tertiary: '#b45f06',
+  quaternary: '#1e7e34',
+  
+  // Social media colors
+  facebook: '#1877f2',
+  instagram: '#e4405f',  
+  twitter: '#1da1f2',
+  whatsapp: '#25d366',
+  
+  // Ranking colors
+  gold: '#ffd700',
+  silver: '#c0c0c0',
+  bronze: '#cd7f32',
+  
+  // Star rating colors
+  star: '#ffb400',
+  
+  // Additional UI colors
+  darkBlue: '#0f172a',
+  lightGray: '#f8fafc',
+  mediumGray: '#cbd5e1',
+  
+  // Gradient colors
+  dangerGradient: ['#b71c1c', '#ef4444'],
+  successGradient: ['#1e7e34', '#22c55e'],
+  
+  // Category colors array
+  categoryColors: [
+    '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
+    '#ec4899', '#6366f1', '#06b6d4', '#84cc16', '#f97316'
+  ],
 };
 
 export const SPACING = {

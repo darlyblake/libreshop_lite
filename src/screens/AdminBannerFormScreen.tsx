@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 import { homeBannerService, HomeBanner, HomeBannerPlacement } from '../lib/supabase';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -90,7 +91,7 @@ export const AdminBannerFormScreen: React.FC = () => {
         navigation.goBack();
       }
     } catch (error) {
-      console.error('Error loading banner:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading banner:');
       Alert.alert('Erreur', 'Impossible de charger la bannière');
       navigation.goBack();
     } finally {
@@ -149,7 +150,7 @@ export const AdminBannerFormScreen: React.FC = () => {
       
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving banner:', error);
+      errorHandler.handleDatabaseError(error, 'Error saving banner:');
       Alert.alert('Erreur', 'Impossible de sauvegarder la bannière');
     } finally {
       setSaving(false);
@@ -456,7 +457,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   placementTextActive: {
-    color: 'white',
+    color: COLORS.text,
   },
   inputGroup: {
     marginBottom: SPACING.md,
@@ -518,7 +519,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   screenOptionTextActive: {
-    color: 'white',
+    color: COLORS.text,
   },
   statusToggle: {
     flexDirection: 'row',

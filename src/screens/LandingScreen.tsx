@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   heroTitleAccent: {
-    color: '#a5b4fc',
+    color: COLORS.accent2,
   },
   heroSubtitle: {
     fontSize: width < 500 ? FONT_SIZE.sm : FONT_SIZE.md,
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   pricingBadgeText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.textInverse,
   },
   ctaSection: {
     paddingHorizontal: SPACING.lg,

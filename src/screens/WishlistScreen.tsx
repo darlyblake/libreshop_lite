@@ -16,6 +16,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
 import { wishlistService } from '../lib/wishlistService';
 import { shopFollowService, ShopFollow } from '../lib/shopFollowService';
@@ -77,7 +78,7 @@ export const WishlistScreen: React.FC = () => {
               product: product || undefined
             };
           } catch (err) {
-            console.warn(`Erreur chargement produit ${item.product_id}:`, err);
+            errorHandler.handle(`Erreur chargement produit ${item.product_id}:`, err, 'UnknownContext', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
             return item;
           }
         })
@@ -85,7 +86,7 @@ export const WishlistScreen: React.FC = () => {
       
       setWishlistItems(itemsWithDetails.filter(item => item.product));
     } catch (error) {
-      console.error('Error loading wishlist:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading wishlist:');
       setWishlistItems([]);
     }
   };
@@ -95,8 +96,9 @@ export const WishlistScreen: React.FC = () => {
     if (!user?.id) return;
 
     try {
+      // Utiliser la table canonique store_followers au lieu de shop_follows
       const { data, error } = await supabase!
-        .from('shop_follows')
+        .from('store_followers')
         .select('*, store:stores(*)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -104,7 +106,7 @@ export const WishlistScreen: React.FC = () => {
       if (error) throw error;
       setFollowedStores(data || []);
     } catch (error) {
-      console.error('Error loading followed shops:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading followed shops:');
       setFollowedStores([]);
     }
   };
@@ -119,7 +121,7 @@ export const WishlistScreen: React.FC = () => {
     try {
       await Promise.all([loadWishlist(), loadFollowedStores()]);
     } catch (error) {
-      console.error('Error loading data:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading data:');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -143,7 +145,7 @@ export const WishlistScreen: React.FC = () => {
       setWishlistItems(prev => prev.filter(item => item.product_id !== productId));
       Alert.alert('✅ Succès', 'Produit retiré des favoris');
     } catch (error) {
-      console.error('Error removing from wishlist:', error);
+      errorHandler.handleDatabaseError(error, 'Error removing from wishlist:');
       Alert.alert('❌ Erreur', 'Impossible de retirer ce produit');
     } finally {
       setRemovingItem(null);
@@ -160,7 +162,7 @@ export const WishlistScreen: React.FC = () => {
       setFollowedStores(prev => prev.filter(item => item.store_id !== storeId));
       Alert.alert('✅ Succès', 'Vous avez arrêté de suivre cette boutique');
     } catch (error) {
-      console.error('Error unfollowing store:', error);
+      errorHandler.handleDatabaseError(error, 'Error unfollowing store:');
       Alert.alert('❌ Erreur', 'Impossible d\'arrêter de suivre cette boutique');
     } finally {
       setUnfollowingStore(null);
@@ -231,7 +233,7 @@ export const WishlistScreen: React.FC = () => {
           <Text style={styles.productPrice}>
             {item.product?.price ? item.product.price.toLocaleString('fr-FR') : '0'} FCFA
           </Text>
-          {item.product?.compare_price && item.product.compare_price > 0 && (
+          {item.product?.compare_price && item.product.compare_price > (item.product.price || 0) && (
             <Text style={styles.comparePrice}>
               {item.product.compare_price.toLocaleString('fr-FR')} FCFA
             </Text>
@@ -288,9 +290,10 @@ export const WishlistScreen: React.FC = () => {
           </Text>
         </View>
         
-        {follow.store?.products_count && (
+        {/* products_count est calculé ou ignoré si la colonne est absente */}
+        {follow.store?.total_orders !== undefined && (
           <Text style={styles.productCount}>
-            {follow.store.products_count} produit(s)
+            {follow.store.total_orders} commande(s) réalisée(s)
           </Text>
         )}
       </View>
@@ -353,7 +356,7 @@ export const WishlistScreen: React.FC = () => {
             style={styles.backButtonLight} 
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitleLight}>Mes favoris</Text>
           <View style={styles.headerPlaceholder} />
@@ -369,7 +372,7 @@ export const WishlistScreen: React.FC = () => {
           <Ionicons 
             name={activeTab === 'products' ? 'heart' : 'heart-outline'} 
             size={20} 
-            color={activeTab === 'products' ? COLORS.white : COLORS.textMuted} 
+            color={activeTab === 'products' ? COLORS.text : COLORS.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
             Produits ({wishlistItems.length})
@@ -383,7 +386,7 @@ export const WishlistScreen: React.FC = () => {
           <Ionicons 
             name={activeTab === 'shops' ? 'storefront' : 'storefront-outline'} 
             size={20} 
-            color={activeTab === 'shops' ? COLORS.white : COLORS.textMuted} 
+            color={activeTab === 'shops' ? COLORS.text : COLORS.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'shops' && styles.activeTabText]}>
             Boutiques ({followedStores.length})
@@ -484,7 +487,7 @@ const styles = StyleSheet.create({
   headerTitleLight: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   backButton: {
     width: 40,
@@ -533,7 +536,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   activeTabText: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
   // Content
   scrollContent: {
@@ -577,7 +580,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   exploreButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },

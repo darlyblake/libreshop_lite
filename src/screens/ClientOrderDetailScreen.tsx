@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import { Order, OrderItem, Product, Store, orderService } from '../lib/supabase';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -45,18 +46,23 @@ export const ClientOrderDetailScreen: React.FC = () => {
       // Charger les vraies données de la commande avec infos utilisateur et boutique
       const orderData = await orderService.getById(orderId, { includeUser: true, includeStore: true });
       
+      if (!orderData) {
+        setOrder(null);
+        return;
+      }
+      
       // Normaliser: Supabase peut retourner `products` ou `product`, normaliser vers `product`
       const normalized = {
         ...orderData,
-        order_items: ((orderData?.order_items || []) as any[]).map((item: any) => ({
+        order_items: ((orderData.order_items || []) as any[]).map((item: any) => ({
           ...item,
           product: item.product || item.products, // Normaliser le nom de la clé
         })),
       };
       
-      setOrder(normalized);
+      setOrder(normalized as OrderWithDetails);
     } catch (error) {
-      console.error('Error loading order:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading order:');
       Alert.alert('Erreur', 'Impossible de charger la commande');
     } finally {
       setLoading(false);

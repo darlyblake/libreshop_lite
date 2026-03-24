@@ -21,10 +21,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { orderService, productService, storeService, authService } from '../lib/supabase';
+import { productLikesService } from '../lib/productLikesService';
 import { notificationService } from '../lib/notificationService';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card, LoadingSpinner } from '../components';
-import { AddProductModal } from '../components/AddProductModal';
 import { useResponsive } from '../utils/useResponsive';
 
 // Types
@@ -117,7 +118,6 @@ export const SellerDashboardScreen: React.FC = () => {
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('7d');
 
   const [store, setStore] = useState<Partial<import('../lib/supabase').Store>>({});
@@ -208,21 +208,16 @@ export const SellerDashboardScreen: React.FC = () => {
       if (user) {
         const s = await storeService.getByUser(user.id);
         if (!s) {
-          // No store found - redirect to store creation
-          console.log('No store found, redirecting to create store...');
+          // Si aucune boutique n'est réellement trouvée (pas d'erreur DB)
           setTimeout(() => {
             navigation.replace('SellerAddStore');
           }, 500);
           return;
         }
-        setStore(s || {});
+        setStore(s);
       }
     } catch (e) {
-      console.error('load store', e);
-      // On error, still redirect to store creation as fallback
-      setTimeout(() => {
-        navigation.replace('SellerAddStore');
-      }, 500);
+      errorHandler.handleDatabaseError(e, 'load store');
     }
   }, [user, navigation]);
 
@@ -255,7 +250,7 @@ export const SellerDashboardScreen: React.FC = () => {
         setNotifications(notifications);
       }
     } catch (e) {
-      console.error('load notifications', e);
+      errorHandler.handleDatabaseError(e, 'load notifications');
     }
   }, [user?.id, setNotifications]);
 
@@ -272,6 +267,7 @@ export const SellerDashboardScreen: React.FC = () => {
   }, [navigation, loadNotifications]);
 
   const isTrial = store.subscription_status === 'trial';
+  const isActive = store.subscription_status === 'active';
   const isExpired = store.subscription_status === 'expired';
 
   // Rediriger vers Pricing si l'abonnement est expiré
@@ -284,7 +280,7 @@ export const SellerDashboardScreen: React.FC = () => {
           {
             text: 'Choisir un plan',
             onPress: () => {
-              navigation.navigate('Pricing' as never);
+              navigation.navigate('SubscriptionExpired' as never);
             },
           },
         ]
@@ -299,9 +295,10 @@ export const SellerDashboardScreen: React.FC = () => {
 
       const { start, prevStart, prevEnd } = getRangeBounds(timeRange);
 
-      const [orders, products] = await Promise.all([
+      const [orders, products, totalLikes] = await Promise.all([
         orderService.getByStore(store.id),
         productService.getByStore(store.id),
+        productLikesService.getStoreLikesCount(store.id).catch(() => 0),
       ]);
 
       const ordersInRange = (orders as any[]).filter((o: any) => {
@@ -331,6 +328,8 @@ export const SellerDashboardScreen: React.FC = () => {
           : totalRevenue >= 1000
             ? `${Math.round(totalRevenue / 1000)}K`
             : String(Math.round(totalRevenue));
+
+      const totalViews = (products as any[]).reduce((sum, p) => sum + (Number(p?.view_count) || 0), 0);
 
       setStats([
         {
@@ -364,6 +363,22 @@ export const SellerDashboardScreen: React.FC = () => {
           icon: 'time',
           positive: pendingOrders === 0,
           color: COLORS.info,
+        },
+        {
+          title: 'Total Vues',
+          value: totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}K` : String(totalViews),
+          trend: '',
+          icon: 'eye',
+          positive: true,
+          color: COLORS.accent,
+        },
+        {
+          title: 'Favoris',
+          value: String(totalLikes),
+          trend: '',
+          icon: 'heart',
+          positive: true,
+          color: COLORS.danger,
         },
       ]);
 
@@ -446,13 +461,13 @@ export const SellerDashboardScreen: React.FC = () => {
           color: COLORS.info,
         });
       }
-      if (!isExpired && daysLeft > 0 && daysLeft <= 3) {
+      if (!isExpired && daysLeft > 0 && daysLeft <= 7) {
         nextAlerts.push({
           id: 'sub_expiring',
           title: 'Abonnement bientôt expiré',
           subtitle: `${daysLeft} jour(s) restant(s)`,
           icon: 'calendar',
-          color: COLORS.warning,
+          color: daysLeft <= 3 ? COLORS.danger : COLORS.warning,
         });
       }
       setAlerts(nextAlerts);
@@ -525,7 +540,7 @@ export const SellerDashboardScreen: React.FC = () => {
       setActivities(recentActivities.length > 0 ? recentActivities : []);
       setSummary({ totalRevenue, pendingOrders, deliveredOrders });
     } catch (e: any) {
-      console.error('load dashboard data', e);
+      errorHandler.handleDatabaseError(e, 'load dashboard data');
       const rawMsg = String(e?.message || '');
       const isRls =
         rawMsg.toLowerCase().includes('permission denied') ||
@@ -548,7 +563,10 @@ export const SellerDashboardScreen: React.FC = () => {
   }, [loadDashboardData]);
 
   const effectiveSubscriptionEnd = React.useMemo(() => {
+    // 1. Trust the explicit subscription_end from database
     if (store.subscription_end) return store.subscription_end;
+    
+    // 2. Fallback only if missing (should be rare now)
     if (!store.subscription_start) return null;
 
     const start = new Date(store.subscription_start);
@@ -557,7 +575,8 @@ export const SellerDashboardScreen: React.FC = () => {
     const status = String(store.subscription_status || '').toLowerCase();
     const plan = String(store.subscription_plan || '').toLowerCase();
 
-    const isTrialLike = status === 'trial' || plan.includes('essai');
+    // Default durations if end date is missing
+    const isTrialLike = status === 'trial' || plan.includes('essai') || plan.includes('trial');
     const days = isTrialLike ? 7 : 30;
     const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
     return end.toISOString();
@@ -572,10 +591,15 @@ export const SellerDashboardScreen: React.FC = () => {
   const planLabel = React.useMemo(() => {
     const raw = String(store.subscription_plan || '').trim();
     if (raw) return raw;
-    if (store.subscription_status === 'trial') return 'Essai gratuit';
-    if (store.subscription_status === 'active') return 'Abonnement actif';
-    if (store.subscription_status === 'expired') return 'Expiré';
-    return 'Plan';
+    
+    // Fallback si le nom du plan est vide
+    switch (store.subscription_status) {
+      case 'trial': return 'Essai gratuit';
+      case 'active': return 'Abonnement actif';
+      case 'expired': return 'Plan expiré';
+      case 'cancelled': return 'Plan annulé';
+      default: return 'Plan Standard';
+    }
   }, [store.subscription_plan, store.subscription_status]);
 
   const planEndsAtLabel = React.useMemo(() => {
@@ -619,7 +643,7 @@ export const SellerDashboardScreen: React.FC = () => {
         ]
       );
     } catch (e) {
-      console.error('Logout error:', e);
+      errorHandler.handleDatabaseError(e, 'Logout error:');
     }
   };
 
@@ -682,6 +706,17 @@ export const SellerDashboardScreen: React.FC = () => {
     { key: 'month', label: 'Mois' },
   ];
 
+  const getDateRangeForFilter = (key: TimeRange) => {
+    const now = new Date();
+    const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+    if (key === 'today') return fmt.format(now);
+    const past = new Date();
+    if (key === '7d') past.setDate(now.getDate() - 7);
+    if (key === '30d') past.setDate(now.getDate() - 30);
+    if (key === 'month') past.setDate(1);
+    return `${fmt.format(past)} - ${fmt.format(now)}`;
+  };
+
   const renderTimeFilters = () => {
     return (
       <View style={[styles.timeFilters, { marginBottom: spacing.lg }]}>
@@ -698,14 +733,18 @@ export const SellerDashboardScreen: React.FC = () => {
                   {
                     borderRadius: RADIUS.full,
                     paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.xs,
+                    paddingVertical: spacing.sm,
                     backgroundColor: active ? COLORS.accent : COLORS.card,
                     borderColor: active ? COLORS.accent : COLORS.border,
+                    alignItems: 'center',
                   },
                 ]}
               >
-                <Text style={{ color: active ? COLORS.white : COLORS.textSoft, fontWeight: '600' }}>
+                <Text style={{ color: active ? COLORS.textInverse : COLORS.textSoft, fontWeight: '600' }}>
                   {r.label}
+                </Text>
+                <Text style={{ color: active ? COLORS.textInverse + 'CC' : COLORS.textMuted, fontSize: fontSize.xs, marginTop: 2 }}>
+                  {getDateRangeForFilter(r.key)}
                 </Text>
               </TouchableOpacity>
             );
@@ -734,7 +773,7 @@ export const SellerDashboardScreen: React.FC = () => {
               style={[
                 styles.alertRow,
                 {
-                  padding: spacing.md,
+                  padding: spacing.lg,
                   backgroundColor: COLORS.card,
                   borderRadius: component.cardBorderRadius,
                 },
@@ -1046,11 +1085,13 @@ export const SellerDashboardScreen: React.FC = () => {
 
   // Rendu des actions rapides
   const renderQuickActions = () => {
-    const handleActionPress = (screen: string) => {
-      if (screen === 'SellerAddProduct') {
-        setShowAddProductModal(true);
+    const handleActionPress = (action: { screen: string; storeId?: string }) => {
+      if (action.screen === 'SellerAddProduct') {
+        navigation.navigate('SellerProducts');
+      } else if (action.screen === 'StoreDetail') {
+        navigation.navigate('StoreDetail', { storeId: action.storeId });
       } else {
-        navigation.navigate(screen);
+        navigation.navigate(action.screen);
       }
     };
 
@@ -1068,10 +1109,11 @@ export const SellerDashboardScreen: React.FC = () => {
         screen: 'SellerCaisse' 
       },
       { 
-        label: 'Ma boutique', 
-        icon: 'storefront', 
+        label: 'Voir ma boutique', 
+        icon: 'eye', 
         color: COLORS.success,
-        screen: 'SellerStore' 
+        screen: 'StoreDetail',
+        storeId: store?.id,
       },
       { 
         label: 'Collections', 
@@ -1115,7 +1157,7 @@ export const SellerDashboardScreen: React.FC = () => {
                   minWidth: isDesktop ? 200 : isTablet ? 180 : 'auto',
                 }
               ]}
-              onPress={() => handleActionPress(action.screen)}
+              onPress={() => handleActionPress(action)}
               activeOpacity={0.7}
             >
               <View style={[
@@ -1217,6 +1259,16 @@ export const SellerDashboardScreen: React.FC = () => {
     );
   }
 
+  // Bloquer l'accès au tableau de bord si l'abonnement est expiré
+  if (isExpired && store?.id) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+        <LoadingSpinner />
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
@@ -1302,20 +1354,32 @@ export const SellerDashboardScreen: React.FC = () => {
         </LinearGradient>
 
         {/* Bannières d'abonnement */}
-        {isTrial && (
-          <View style={[styles.trialBanner, { padding: spacing.lg, marginHorizontal: spacing.lg }]}> 
+        {(isTrial || (isActive && remainingDays <= 7)) && (
+          <View style={[
+            styles.trialBanner, 
+            { 
+              padding: spacing.lg, 
+              marginHorizontal: spacing.lg,
+              borderLeftColor: isTrial ? COLORS.success : COLORS.accent,
+              borderLeftWidth: 4
+            }
+          ]}> 
             <View style={{ flex: 1 }}>
-              <Text style={{ color: COLORS.success, fontWeight: '600' }}>
-                🎉 Essai gratuit : {remainingDays} jours restants
+              <Text style={{ 
+                color: isTrial ? COLORS.success : COLORS.accent, 
+                fontWeight: '700',
+                fontSize: 15
+              }}>
+                {isTrial ? '🎉 Essai gratuit' : `📦 Plan ${planLabel}`} : {remainingDays} jours restants
               </Text>
               {planEndsAtLabel && (
                 <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs, marginTop: spacing.xs }}>
-                  Expire le: {planEndsAtLabel}
+                  Expire le {planEndsAtLabel.split(',')[0]}
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('Pricing')}>
-              <Text style={[styles.seeAll, { marginLeft: spacing.md }]}>Voir plans</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SellerChangePlan' as never)}>
+              <Text style={[styles.seeAll, { marginLeft: spacing.md, color: COLORS.accent }]}>Changer</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1324,8 +1388,8 @@ export const SellerDashboardScreen: React.FC = () => {
             <Text style={{ color: COLORS.danger, fontWeight: '600', flex: 1 }}>
               ⚠️ Abonnement expiré
             </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Pricing')}>
-              <Text style={[styles.seeAll, { marginLeft: spacing.md }]}>Réactiver</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SellerChangePlan' as never)}>
+              <Text style={[styles.seeAll, { marginLeft: spacing.md }]}>Procéder</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1363,9 +1427,32 @@ export const SellerDashboardScreen: React.FC = () => {
             </Text>
             {!!store.subscription_status && (
               <Text style={[styles.planMeta, { fontSize: fontSize.xs }]} numberOfLines={1}>
-                Statut: {store.subscription_status}
+                Statut: {
+                  store.subscription_status === 'trial' ? 'Essai' : 
+                  store.subscription_status === 'active' ? 'Actif' :
+                  store.subscription_status === 'expired' ? 'Expiré' :
+                  store.subscription_status
+                }
               </Text>
             )}
+
+            <TouchableOpacity 
+              style={{ 
+                marginTop: spacing.md, 
+                backgroundColor: COLORS.accent + '15',
+                paddingVertical: spacing.xs,
+                borderRadius: RADIUS.sm,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: COLORS.accent + '20'
+              }}
+              onPress={() => navigation.navigate('SellerChangePlan' as never)}
+            >
+              <Text style={{ color: COLORS.accent, fontSize: 11, fontWeight: '600' }}>Changer d'offre</Text>
+              <Ionicons name="swap-horizontal" size={12} color={COLORS.accent} style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
           </View>
 
           <View
@@ -1387,11 +1474,11 @@ export const SellerDashboardScreen: React.FC = () => {
               </View>
             </View>
             <Text style={[styles.planValue, { fontSize: fontSize.xl }]} numberOfLines={1}>
-              {store.subscription_end ? `${remainingDays} jour(s)` : '—'}
+              {effectiveSubscriptionEnd ? `${remainingDays} jour(s)` : '—'}
             </Text>
             {!!planEndsAtLabel && (
               <Text style={[styles.planMeta, { fontSize: fontSize.xs }]} numberOfLines={1}>
-                Fin: {planEndsAtLabel}
+                Fin: {planEndsAtLabel.split(',')[0]}
               </Text>
             )}
           </View>
@@ -1452,14 +1539,14 @@ export const SellerDashboardScreen: React.FC = () => {
                 ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
                 : {
                     shadowColor: COLORS.accent,
-                    shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: 0.3,
                     shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 4 },
                     elevation: 8,
                   }),
             }
           ]}
-          onPress={() => setShowAddProductModal(true)}
+          onPress={() => navigation.navigate('SellerProducts')}
         >
           <LinearGradient
             colors={[COLORS.accent, COLORS.accent2]}
@@ -1467,23 +1554,10 @@ export const SellerDashboardScreen: React.FC = () => {
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
-          <Ionicons name="add" size={fontSize.xxl} color={COLORS.white} />
+          <Ionicons name="add" size={fontSize.xxl} color={COLORS.text} />
         </TouchableOpacity>
       )}
 
-      <AddProductModal
-        visible={showAddProductModal}
-        onClose={() => setShowAddProductModal(false)}
-        collections={[]}
-        onAdd={(product) => {
-          Alert.alert(
-            'Succès', 
-            `Produit "${product.name}" ajouté${product.barcode ? `\nCode: ${product.barcode}` : ''}`
-          );
-          setShowAddProductModal(false);
-          loadDashboardData(); // Recharger les données
-        }}
-      />
     </View>
   );
 };
@@ -1535,7 +1609,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.bg,
   },
   notificationText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: 10,
     fontWeight: '700',
   },
@@ -1561,7 +1635,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileInitials: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
   trialBanner: {
@@ -1948,9 +2022,9 @@ const styles = StyleSheet.create({
       ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
       : {
           shadowColor: COLORS.accent,
-          shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.3,
           shadowRadius: 8,
+          shadowOffset: { width: 0, height: 4 },
           elevation: 8,
         }),
   },

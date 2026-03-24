@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -69,7 +70,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
 
       setOrder(normalized);
     } catch (error) {
-      console.error('Error loading order:', error);
+      errorHandler.handleDatabaseError(error, 'Error loading order:');
       Alert.alert('Erreur', 'Impossible de charger la commande');
     } finally {
       setLoading(false);
@@ -84,7 +85,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
       setOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       Alert.alert('Succès', 'Statut de la commande mis à jour');
     } catch (error) {
-      console.error('Error updating order:', error);
+      errorHandler.handleDatabaseError(error, 'Error updating order:');
       Alert.alert('Erreur', 'Impossible de mettre à jour le statut');
     } finally {
       setUpdating(false);
@@ -204,7 +205,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
           style={styles.whatsappButton}
           onPress={handleWhatsApp}
         >
-          <Ionicons name="logo-whatsapp" size={20} color={COLORS.white} />
+          <Ionicons name="logo-whatsapp" size={20} color={COLORS.text} />
           <Text style={styles.whatsappButtonText}>Discuter sur WhatsApp</Text>
         </TouchableOpacity>
       </Card>
@@ -421,15 +422,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#25D366',
+    backgroundColor: COLORS.whatsapp,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.md,
     marginTop: SPACING.md,
-    gap: SPACING.sm,
   },
   whatsappButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
   },

@@ -12,7 +12,7 @@ export interface WishlistItem {
 export const wishlistService = {
   async getByUser(userId: string): Promise<WishlistItem[]> {
     const { data, error } = await supabase!
-      .from('wishlist')
+      .from('wishlists')
       .select('*, product:products(*)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -22,7 +22,7 @@ export const wishlistService = {
 
   async add(userId: string, productId: string): Promise<WishlistItem> {
     const { data, error } = await supabase!
-      .from('wishlist')
+      .from('wishlists')
       .insert({ user_id: userId, product_id: productId })
       .select('*, product:products(*)')
       .single();
@@ -32,7 +32,7 @@ export const wishlistService = {
 
   async remove(userId: string, productId: string): Promise<void> {
     const { error } = await supabase!
-      .from('wishlist')
+      .from('wishlists')
       .delete()
       .eq('user_id', userId)
       .eq('product_id', productId);
@@ -41,18 +41,18 @@ export const wishlistService = {
 
   async isInWishlist(userId: string, productId: string): Promise<boolean> {
     const { data, error } = await supabase!
-      .from('wishlist')
+      .from('wishlists')
       .select('id')
       .eq('user_id', userId)
       .eq('product_id', productId)
-      .single();
+      .maybeSingle();
     if (error) return false;
     return !!data;
   },
 
   async clear(userId: string): Promise<void> {
     const { error } = await supabase!
-      .from('wishlist')
+      .from('wishlists')
       .delete()
       .eq('user_id', userId);
     if (error) throw error;

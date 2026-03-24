@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface FooterLink {
   label: string;
@@ -20,6 +20,14 @@ export const Footer: React.FC<FooterProps> = ({
   companyName = 'LibreShop',
   style,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.links}>
@@ -41,7 +49,12 @@ export const Footer: React.FC<FooterProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     padding: SPACING.xl,
     borderTopWidth: 1,
@@ -72,4 +85,5 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
 });
+};
 

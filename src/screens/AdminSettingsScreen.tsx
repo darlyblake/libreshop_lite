@@ -8,6 +8,7 @@ import {
   TextInput,
   Switch,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +17,8 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
+import { settingsService } from '../lib/settingsService';
+import { useEffect } from 'react';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -36,11 +39,47 @@ export const AdminSettingsScreen: React.FC = () => {
     pushNotifications: true,
     autoApproveStores: false,
     requireVerification: true,
+    requireEmailConfirmation: true, // Nouveau réglage
   });
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const updateSetting = (key: keyof typeof settings, value: boolean) => {
+  // Charger les paramètres au montage
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const storedSettings = await settingsService.getSettings();
+        setSettings(prev => ({
+          ...prev,
+          ...storedSettings,
+        }));
+        
+        // Charger spécifiquement le numéro WhatsApp
+        if (storedSettings.whatsappNumber) {
+          setWhatsappNumber(storedSettings.whatsappNumber);
+        }
+      } catch (e) {
+        console.error('Error loading settings:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const updateSetting = async (key: string, value: any) => {
+    // Mise à jour optimiste de l'état local
     setSettings(prev => ({ ...prev, [key]: value }));
+    
+    try {
+      await settingsService.updateSetting(key, value);
+    } catch (e) {
+      console.error(`Error updating setting ${key}:`, e);
+      Alert.alert('Erreur', 'Impossible de sauvegarder le paramètre sur le serveur.');
+      // Revenir à l'ancien état en cas d'erreur
+      const storedSettings = await settingsService.getSettings();
+      setSettings(prev => ({ ...prev, ...storedSettings }));
+    }
   };
 
   const generalSettings: SettingItem[] = [
@@ -67,6 +106,14 @@ export const AdminSettingsScreen: React.FC = () => {
       type: 'toggle',
       value: settings.requireVerification,
       onPress: () => updateSetting('requireVerification', !settings.requireVerification),
+    },
+    {
+      title: "Confirmation d'email",
+      subtitle: "Exiger la confirmation d'email à l'inscription",
+      icon: 'mail-unread-outline',
+      type: 'toggle',
+      value: settings.requireEmailConfirmation,
+      onPress: () => updateSetting('requireEmailConfirmation', !settings.requireEmailConfirmation),
     },
   ];
 
@@ -120,7 +167,7 @@ export const AdminSettingsScreen: React.FC = () => {
     },
   ];
 
-  const saveWhatsappNumber = () => {
+  const saveWhatsappNumber = async () => {
     const num = whatsappNumber.trim();
     if (!num) {
       Alert.alert('Erreur', "Le numéro WhatsApp ne peut pas être vide.");
@@ -132,8 +179,13 @@ export const AdminSettingsScreen: React.FC = () => {
       return;
     }
 
-    // Ici on sauvegarde localement — remplacer par persistance backend si nécessaire
-    Alert.alert('Succès', `Numéro WhatsApp mis à jour: ${num}`);
+    try {
+      await settingsService.updateSetting('whatsappNumber', num);
+      Alert.alert('Succès', `Numéro WhatsApp mis à jour: ${num}`);
+    } catch (e) {
+      console.error('Error saving whatsapp number:', e);
+      Alert.alert('Erreur', 'Impossible de sauvegarder le numéro sur le serveur.');
+    }
   };
 
   const handleDangerAction = (title: string) => {
@@ -195,7 +247,13 @@ export const AdminSettingsScreen: React.FC = () => {
         {/* General Settings */}
         <Text style={styles.sectionTitle}>Général</Text>
         <Card style={styles.section}>
-          {generalSettings.map((item, index) => renderSettingItem(item, index))}
+          {loading ? (
+            <View style={{ padding: SPACING.lg, alignItems: 'center' }}>
+              <ActivityIndicator color={COLORS.accent} />
+            </View>
+          ) : (
+            generalSettings.map((item, index) => renderSettingItem(item, index))
+          )}
         </Card>
 
         {/* Notifications */}
@@ -369,7 +427,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
   },
   whatsappButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
 });

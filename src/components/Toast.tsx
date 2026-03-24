@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -28,7 +28,7 @@ const getIconName = (type: ToastType): string => {
   }
 };
 
-const getColors = (type: ToastType) => {
+const getColors = (type: ToastType, COLORS: any) => {
   switch (type) {
     case 'success':
       return { bg: COLORS.success + '20', border: COLORS.success, text: COLORS.success };
@@ -38,7 +38,7 @@ const getColors = (type: ToastType) => {
       return { bg: COLORS.warning + '20', border: COLORS.warning, text: COLORS.warning };
     case 'info':
     default:
-      return { bg: COLORS.accent + '20', border: COLORS.accent, text: COLORS.accent };
+      return { bg: COLORS.info + '20', border: COLORS.info, text: COLORS.info };
   }
 };
 
@@ -49,7 +49,15 @@ export const Toast: React.FC<ToastProps> = ({
   onHide,
   duration = 3000,
 }) => {
-  const colors = getColors(type);
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+
+  const colors = getColors(type, COLORS);
   const opacity = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -58,13 +66,13 @@ export const Toast: React.FC<ToastProps> = ({
         Animated.timing(opacity, {
           toValue: 1,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.delay(duration),
         Animated.timing(opacity, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start(() => onHide());
     }
@@ -85,7 +93,12 @@ export const Toast: React.FC<ToastProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     position: 'absolute',
     bottom: 100,
@@ -97,11 +110,22 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     gap: SPACING.md,
+    // Amélioration du contraste avec ombre portée
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   message: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
+    // Assurer le contraste même sur les couleurs de statut
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });
+};
 

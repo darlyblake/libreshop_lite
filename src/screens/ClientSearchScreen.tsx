@@ -13,7 +13,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BlurView } from 'expo-blur';
 import Animated, { 
   FadeInDown, 
@@ -37,9 +36,15 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useSearchStore } from '../store/searchStore';
 import { COLORS, SPACING, FONT_SIZE, RADIUS, SHADOWS } from '../config/theme';
 import { RootStackParamList } from '../navigation/types';
-import { productService, storeService, Product, Store } from '../lib/supabase';
+import { productService, Store, Product } from '../lib/supabase';
+import { storeService } from '../lib/supabase';
+import { SortTabs } from '../components/SortTabs';
+import { categoryService } from '../lib/categoryService';
+import { errorHandler } from '../utils/errorHandler';
 
 const { width, height } = Dimensions.get('window');
+const MAX_CONTENT_WIDTH = 1200;
+const PAGE_SIZE = 20;
 
 // Constantes optimisées
 const SEARCH_DEBOUNCE_DELAY = 300;
@@ -55,24 +60,28 @@ interface Category {
   color: string;
 }
 
-// Catégories populaires
-const POPULAR_CATEGORIES: Category[] = [
-  { id: '1', name: 'Smartphones', icon: 'phone-portrait-outline', color: '#8B5CF6' },
-  { id: '2', name: 'Ordinateurs', icon: 'laptop-outline', color: '#EC4899' },
-  { id: '3', name: 'Audio', icon: 'headset-outline', color: '#3B82F6' },
-  { id: '4', name: 'Tablettes', icon: 'tablet-portrait-outline', color: '#10B981' },
-  { id: '5', name: 'Accessoires', icon: 'watch-outline', color: '#F59E0B' },
-  { id: '6', name: 'Caméras', icon: 'camera-outline', color: '#EF4444' },
-];
+// Helper to get icon based on category name
+const getCategoryIcon = (name: string): keyof typeof Ionicons.glyphMap => {
+  const lowerName = name.toLowerCase();
+  if (lowerName.includes('phone') || lowerName.includes('mobile') || lowerName.includes('smart')) return 'phone-portrait-outline';
+  if (lowerName.includes('ordinateur') || lowerName.includes('computer') || lowerName.includes('laptop')) return 'laptop-outline';
+  if (lowerName.includes('audio') || lowerName.includes('écouteur') || lowerName.includes('casque')) return 'headset-outline';
+  if (lowerName.includes('tablet')) return 'tablet-portrait-outline';
+  if (lowerName.includes('accessoire')) return 'watch-outline';
+  if (lowerName.includes('caméra') || lowerName.includes('photo') || lowerName.includes('image')) return 'camera-outline';
+  if (lowerName.includes('jeux') || lowerName.includes('game')) return 'game-controller-outline';
+  if (lowerName.includes('mode') || lowerName.includes('vêtement')) return 'shirt-outline';
+  if (lowerName.includes('maison') || lowerName.includes('home')) return 'home-outline';
+  if (lowerName.includes('électro')) return 'flash-outline';
+  if (lowerName.includes('beauté') || lowerName.includes('soin')) return 'sparkles-outline';
+  return 'apps-outline';
+};
 
-// Suggestions de recherche
-const SUGGESTIONS = [
-  'iPhone 15',
-  'MacBook Pro',
-  'AirPods',
-  'Samsung Galaxy',
-  'PlayStation 5',
-];
+// Helper to get color based on index
+const getCategoryColor = (index: number): string => {
+  const colors = ['#8B5CF6', '#EC4899', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#F43F5E'];
+  return colors[index % colors.length];
+};
 
 // Calcul réactif du nombre de colonnes avec gestion d'orientation
 const useResponsiveGrid = () => {
@@ -91,26 +100,64 @@ const useResponsiveGrid = () => {
     if (width < 600) return 2;
     if (width < 900) return 3;
     if (width < 1200) return 4;
-    return 5;
+    if (width < 1500) return 5;
+    return 6;
   }, [dimensions]);
 };
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+// Styles for search sort tabs will be appended to styles object below.
 
-// Hook personnalisé pour la recherche optimisée
-const useSearch = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+type NavigationProp = any;
+
+const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'popular') => {
+  const [products, setProducts] = useState<any[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [popularSuggestions, setPopularSuggestions] = useState<string[]>([]);
+  const [popularCategories, setPopularCategories] = useState<Category[]>([]);
+  const [currentQuery, setCurrentQuery] = useState('');
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const performSearch = useCallback(async (query: string) => {
-    if (!query.trim() || query.trim().length < MIN_QUERY_LENGTH) {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [popularProducts, categoriesData] = await Promise.all([
+          productService.getAll(0, 8, sort as any),
+          categoryService.getByParent(null)
+        ]);
+
+        if (popularProducts) {
+          const names = Array.from(new Set(popularProducts.map(p => p.name))).slice(0, 6);
+          setPopularSuggestions(names);
+        }
+
+        if (categoriesData) {
+          const formattedCategories = categoriesData.map((cat, index) => ({
+            id: cat.id,
+            name: cat.name,
+            icon: getCategoryIcon(cat.name),
+            color: getCategoryColor(index)
+          }));
+          setPopularCategories(formattedCategories);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch trending data:', err);
+      }
+    };
+    fetchData();
+  }, [sort]);
+
+  const performSearch = useCallback(async (query: string, reset = true) => {
+    const q = query.trim();
+    if (!q || q.length < MIN_QUERY_LENGTH) {
       setProducts([]);
       setStores([]);
       setHasSearched(false);
@@ -119,20 +166,25 @@ const useSearch = () => {
       return;
     }
 
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (reset) {
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+      abortControllerRef.current = new AbortController();
+      setLoading(true);
+      setPage(0);
+      setHasMore(true);
+      setCurrentQuery(q);
+    } else {
+      setLoadingMore(true);
     }
-
-    abortControllerRef.current = new AbortController();
-
-    setLoading(true);
+    
     setHasSearched(true);
     setError(null);
 
+    const currentPage = reset ? 0 : page;
+
     try {
-      // Générer des suggestions basées sur la requête
-      const filteredSuggestions = SUGGESTIONS.filter(s => 
-        s.toLowerCase().includes(query.toLowerCase())
+      const filteredSuggestions = popularSuggestions.filter(s => 
+        s.toLowerCase().includes(q.toLowerCase())
       );
       setSuggestions(filteredSuggestions);
 
@@ -141,49 +193,79 @@ const useSearch = () => {
       });
 
       const searchPromise = Promise.all([
-        productService.search(query, abortControllerRef.current.signal),
-        storeService.search(query, abortControllerRef.current.signal)
+        productService.search(q, currentPage, PAGE_SIZE),
+        reset ? storeService.search(q) : Promise.resolve([])
       ]);
 
       const [productsData, storesData] = await Promise.race([
         searchPromise,
         timeoutPromise
-      ]) as [Product[], Store[]];
+      ]) as [any[], Store[]];
 
-      setProducts(productsData || []);
-      setStores(storesData || []);
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return;
+      // If 'ranked' sort is requested, compute score and sort client-side
+      const computeScored = (arr: any[]) => {
+        const now = Date.now();
+        return (arr || []).map(p => {
+          const total_sales = Number(p.total_sales || 0);
+          const view_count = Number(p.view_count || 0);
+          const ageDays = Math.max(0, (now - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24));
+          const freshness = Math.max(0, (30 - ageDays) / 30);
+          const score = total_sales * 0.5 + view_count * 0.3 + freshness * 100 * 0.2;
+          return { ...p, __score: score };
+        }).sort((a:any,b:any) => b.__score - a.__score);
+      };
+
+      if (reset) {
+        if (sort === 'ranked') {
+          const scored = computeScored(productsData || []);
+          setProducts(scored.map(s => { const copy = { ...s }; delete copy.__score; return copy; }));
+        } else {
+          setProducts(productsData || []);
+        }
+        setStores(storesData || []);
+      } else {
+        if (sort === 'ranked') {
+          const combined = [...products, ...(productsData || [])];
+          const scored = computeScored(combined);
+          setProducts(scored.map(s => { const copy = { ...s }; delete copy.__score; return copy; }));
+        } else {
+          setProducts(prev => [...prev, ...(productsData || [])]);
+        }
       }
-      
-      console.error('Search error:', error);
-      setError('Une erreur est survenue lors de la recherche');
-      setProducts([]);
-      setStores([]);
+      setHasMore((productsData?.length || 0) === PAGE_SIZE);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      const appError = errorHandler.handleNetworkError(error, 'ProductSearch');
+      setError(appError.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [page, popularSuggestions, products, sort]);
+
+  const loadMore = useCallback(() => {
+    if (!loading && !loadingMore && hasMore && currentQuery) {
+      setPage(prev => prev + 1);
+    }
+  }, [loading, loadingMore, hasMore, currentQuery]);
+
+  useEffect(() => {
+    if (page > 0 && currentQuery) {
+      performSearch(currentQuery, false);
+    }
+  }, [page]);
 
   const debouncedSearch = useCallback((query: string) => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
-      performSearch(query);
+      performSearch(query, true);
     }, SEARCH_DEBOUNCE_DELAY);
   }, [performSearch]);
 
   useEffect(() => {
     return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, []);
 
@@ -191,10 +273,15 @@ const useSearch = () => {
     products,
     stores,
     loading,
+    loadingMore,
+    hasMore,
     hasSearched,
     error,
     suggestions,
-    debouncedSearch
+    popularSuggestions,
+    popularCategories,
+    debouncedSearch,
+    loadMore
   };
 };
 
@@ -204,18 +291,32 @@ export const ClientSearchScreen: React.FC = () => {
   const numColumns = useResponsiveGrid();
   const scrollY = useSharedValue(0);
   
-  const { recentSearches, addToRecent, clearRecent } = useSearchStore();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { recentSearches, addRecentSearch, clearRecent } = useSearchStore();
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFocused, setIsFocused] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  
-  const { products, stores, loading, hasSearched, error, suggestions, debouncedSearch } = useSearch();
+  const [sort, setSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('popular');
+
+  const { 
+    products, 
+    stores, 
+    loading, 
+    loadingMore,
+    hasMore,
+    hasSearched, 
+    error, 
+    suggestions, 
+    popularSuggestions,
+    popularCategories,
+    debouncedSearch,
+    loadMore 
+  } = useSearch(sort);
 
   // Valeurs mémoïsées
-  const productItemWidth = useMemo(() => 
-    (width - SPACING.xl * 2 - SPACING.sm * (numColumns - 1)) / numColumns,
-    [numColumns]
-  );
+  const productItemWidth = useMemo(() => {
+    const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
+    return (contentWidth - SPACING.xl * 2 - SPACING.sm * (numColumns - 1)) / numColumns;
+  }, [numColumns]);
 
   const hasResults = useMemo(() => 
     products.length > 0 || stores.length > 0,
@@ -254,9 +355,9 @@ export const ClientSearchScreen: React.FC = () => {
   const handleSearchSubmit = useCallback(() => {
     Keyboard.dismiss();
     if (searchQuery.trim().length >= MIN_QUERY_LENGTH) {
-      addToRecent(searchQuery.trim());
+      addRecentSearch(searchQuery.trim());
     }
-  }, [searchQuery, addToRecent]);
+  }, [searchQuery, addRecentSearch]);
 
   const handleCategoryPress = useCallback((category: Category) => {
     setSelectedCategory(category.name);
@@ -267,10 +368,10 @@ export const ClientSearchScreen: React.FC = () => {
 
   const handleSuggestionPress = useCallback((suggestion: string) => {
     setSearchQuery(suggestion);
-    addToRecent(suggestion);
+    addRecentSearch(suggestion);
     debouncedSearch(suggestion);
     Keyboard.dismiss();
-  }, [addToRecent, debouncedSearch]);
+  }, [addRecentSearch, debouncedSearch]);
 
   const handleProductPress = useCallback((product: Product) => {
     navigation.navigate('ProductDetail', { productId: product.id });
@@ -306,6 +407,11 @@ export const ClientSearchScreen: React.FC = () => {
         imageUrl={item.images?.[0]}
         onPress={() => handleProductPress(item)}
       />
+      <View style={styles.storeNameBadge}>
+        <Text style={styles.storeNameText} numberOfLines={1}>
+          {item.stores?.name || 'Boutique'}
+        </Text>
+      </View>
     </Animated.View>
   ), [productItemWidth, handleProductPress]);
 
@@ -356,7 +462,7 @@ export const ClientSearchScreen: React.FC = () => {
             <Ionicons 
               name={item.icon} 
               size={24} 
-              color={selectedCategory === item.name ? COLORS.white : item.color} 
+              color={selectedCategory === item.name ? COLORS.text : item.color} 
             />
           </View>
           <Text style={[
@@ -380,7 +486,7 @@ export const ClientSearchScreen: React.FC = () => {
         style={styles.recentItem}
         onPress={() => {
           setSearchQuery(item);
-          addToRecent(item);
+          addRecentSearch(item);
           debouncedSearch(item);
         }}
         activeOpacity={0.7}
@@ -394,7 +500,7 @@ export const ClientSearchScreen: React.FC = () => {
         <Ionicons name="arrow-up" size={18} color={COLORS.textMuted} />
       </TouchableOpacity>
     </Animated.View>
-  ), [addToRecent, debouncedSearch]);
+  ), [addRecentSearch, debouncedSearch]);
 
   const renderSuggestionItem = useCallback(({ item, index }: { item: string; index: number }) => (
     <Animated.View
@@ -410,6 +516,31 @@ export const ClientSearchScreen: React.FC = () => {
       </TouchableOpacity>
     </Animated.View>
   ), [handleSuggestionPress]);
+
+  const renderSuggestionsDropdown = () => {
+    if (!isFocused || searchQuery.length < MIN_QUERY_LENGTH || suggestions.length === 0) {
+      return null;
+    }
+
+    return (
+      <Animated.View 
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(200)}
+        style={[styles.suggestionsDropdown, { top: 85 + insets.top }]}
+      >
+        <BlurView intensity={95} tint="light" style={styles.suggestionsBlur}>
+          <FlatList
+            data={suggestions}
+            renderItem={renderSuggestionItem}
+            keyExtractor={(item) => `suggestion-${item}`}
+            scrollEnabled={true}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.suggestionsList}
+          />
+        </BlurView>
+      </Animated.View>
+    );
+  };
 
   const renderHeader = () => (
     <Animated.View style={[styles.headerContainer, headerAnimatedStyle]}>
@@ -494,41 +625,35 @@ export const ClientSearchScreen: React.FC = () => {
                 <Text style={styles.sectionCount}>{products.length}</Text>
               </View>
             </View>
+            {/* Sort tabs for search results */}
+            <SortTabs
+              options={[
+                { id: 'popular', label: 'Populaires' },
+                { id: 'ranked', label: 'Tendance' },
+                { id: 'newest', label: 'Nouveaux' },
+                { id: 'sales', label: 'Top ventes' },
+              ]}
+              selected={sort}
+              onSelect={(id) => { setSort(id as any); debouncedSearch(searchQuery); }}
+            />
             
             <FlatList
-              data={products.slice(0, INITIAL_BATCH_SIZE)}
+              data={products}
               renderItem={renderProductItem}
               keyExtractor={(item) => `product-${item.id}`}
               numColumns={numColumns}
+              key={numColumns}
               scrollEnabled={false}
               columnWrapperStyle={styles.productsGrid}
-              initialNumToRender={INITIAL_BATCH_SIZE}
-              maxToRenderPerBatch={INITIAL_BATCH_SIZE}
-              windowSize={3}
-              removeClippedSubviews={Platform.OS === 'android'}
+              initialNumToRender={PAGE_SIZE}
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.5}
             />
             
-            {products.length > INITIAL_BATCH_SIZE && (
-              <TouchableOpacity 
-                style={styles.viewMoreButton}
-                onPress={() => navigation.navigate('ProductList', { 
-                  query: searchQuery,
-                  category: selectedCategory 
-                })}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={[COLORS.accent, COLORS.accentLight]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.viewMoreGradient}
-                >
-                  <Text style={styles.viewMoreText}>Voir tous les produits</Text>
-                  <View style={styles.viewMoreIconContainer}>
-                    <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
+            {loadingMore && (
+              <View style={styles.loadMoreItem}>
+                <LoadingSpinner size="small" />
+              </View>
             )}
           </View>
         )}
@@ -579,7 +704,7 @@ export const ClientSearchScreen: React.FC = () => {
         </View>
         
         <FlatList
-          data={POPULAR_CATEGORIES}
+          data={popularCategories}
           renderItem={renderCategoryItem}
           keyExtractor={(item) => item.id}
           horizontal
@@ -589,17 +714,17 @@ export const ClientSearchScreen: React.FC = () => {
       </View>
 
       {/* Suggestions */}
-      {SUGGESTIONS.length > 0 && (
+      {popularSuggestions.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
               <Ionicons name="flash-outline" size={22} color={COLORS.accent} />
-              <Text style={styles.sectionTitle}>Suggestions</Text>
+              <Text style={styles.sectionTitle}>Suggestions du moment</Text>
             </View>
           </View>
           
           <View style={styles.suggestionsGrid}>
-            {SUGGESTIONS.map((suggestion, index) => (
+            {popularSuggestions.map((suggestion, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.suggestionChip}
@@ -639,17 +764,33 @@ export const ClientSearchScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: COLORS.bg }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      
-      {renderHeader()}
-      
-      {hasSearched ? renderResults() : renderInitialState()}
+    <View style={styles.flexContainer}>
+      <View style={styles.maxWidthContainer}>
+        <View style={[styles.container, { backgroundColor: COLORS.bg }]}>
+          <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+          
+          {renderHeader()}
+          
+          {hasSearched ? renderResults() : renderInitialState()}
+
+          {renderSuggestionsDropdown()}
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  flexContainer: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  maxWidthContainer: {
+    maxWidth: MAX_CONTENT_WIDTH,
+    width: '100%',
+    alignSelf: 'center',
+    flex: 1,
+  },
   container: {
     flex: 1,
   },
@@ -675,11 +816,18 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xl,
     ...SHADOWS.small,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  loadMoreItem: {
+    paddingVertical: SPACING.lg,
     alignItems: 'center',
-    paddingTop: 100,
+  },
+  storeNameBadge: {
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  storeNameText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
   },
   loadingText: {
     marginTop: SPACING.md,
@@ -755,7 +903,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     alignItems: 'center',
     justifyContent: 'center',
     ...SHADOWS.small,
@@ -770,7 +918,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryNameActive: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
   suggestionsGrid: {
@@ -827,7 +975,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   productsGrid: {
-    gap: SPACING.sm,
+    justifyContent: 'flex-start',
+    gap: SPACING.md,
   },
   productItemContainer: {
     marginBottom: SPACING.md,
@@ -851,7 +1000,7 @@ const styles = StyleSheet.create({
   },
   viewMoreText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
   viewMoreIconContainer: {
@@ -862,6 +1011,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /* search sort tabs now use shared component SortTabs */
   suggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -877,5 +1027,23 @@ const styles = StyleSheet.create({
   emptyStateImage: {
     width: 200,
     height: 200,
+  },
+  suggestionsDropdown: {
+    position: 'absolute',
+    left: SPACING.lg,
+    right: SPACING.lg,
+    zIndex: 1000,
+    maxHeight: 300,
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
+    ...SHADOWS.large,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  suggestionsBlur: {
+    flex: 1,
+  },
+  suggestionsList: {
+    paddingVertical: SPACING.sm,
   },
 });

@@ -178,16 +178,16 @@ export const AdminAnalyticsScreen: React.FC = () => {
   const avgProductsRating = useMemo(() => (topProducts.reduce((sum, p) => sum + p.rating, 0) / topProducts.length).toFixed(1), [topProducts]);
 
   const getStoreRankColor = (index: number) => {
-    if (index === 0) return COLORS.warning; // Gold
-    if (index === 1) return '#C0C0C0'; // Silver
-    if (index === 2) return '#CD7F32'; // Bronze
+    if (index === 0) return COLORS.gold; // Gold
+    if (index === 1) return COLORS.silver; // Silver
+    if (index === 2) return COLORS.bronze; // Bronze
     return COLORS.border;
   };
 
   const getProductRankColor = (index: number) => {
-    if (index === 0) return COLORS.warning;
-    if (index === 1) return '#C0C0C0';
-    if (index === 2) return '#CD7F32';
+    if (index === 0) return COLORS.gold;
+    if (index === 1) return COLORS.silver;
+    if (index === 2) return COLORS.bronze;
     return COLORS.border;
   };
 

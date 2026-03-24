@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -70,7 +71,7 @@ export const AdminStoresScreen: React.FC = () => {
         }))
       );
     } catch (e) {
-      console.error('load stores', e);
+      errorHandler.handleDatabaseError(e, 'load stores');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de charger les boutiques');
       } else {
@@ -169,7 +170,7 @@ export const AdminStoresScreen: React.FC = () => {
         setSelectedStore((prev: any) => ({ ...prev, status: (data as any)?.status || nextStatus }));
       }
     } catch (e) {
-      console.error('update store status', e);
+      errorHandler.handleDatabaseError(e, 'update store status');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de modifier le statut de la boutique');
       } else {
@@ -190,7 +191,7 @@ export const AdminStoresScreen: React.FC = () => {
         setActiveTab('general');
       }
     } catch (e) {
-      console.error('delete store', e);
+      errorHandler.handleDatabaseError(e, 'delete store');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de supprimer la boutique');
       } else {
@@ -223,12 +224,12 @@ export const AdminStoresScreen: React.FC = () => {
     headerTitle: {
       fontSize: getResponsiveValue(24, 28, 32),
       fontWeight: '700',
-      color: COLORS.white,
+      color: COLORS.text,
       marginBottom: 8,
     },
     headerSubtitle: {
       fontSize: getResponsiveValue(14, 16, 18),
-      color: COLORS.white,
+      color: COLORS.text,
       opacity: 0.9,
     },
     searchContainer: {
@@ -308,7 +309,7 @@ export const AdminStoresScreen: React.FC = () => {
     statusText: {
       fontSize: getResponsiveValue(10, 12, 14),
       fontWeight: '500',
-      color: COLORS.white,
+      color: COLORS.text,
     },
     storeInfo: {
       marginBottom: getResponsiveValue(12, 16, 20),
@@ -468,7 +469,7 @@ export const AdminStoresScreen: React.FC = () => {
     closeButtonText: {
       fontSize: getResponsiveValue(14, 16, 18),
       fontWeight: '600',
-      color: COLORS.white,
+      color: COLORS.text,
     },
     emptyContainer: {
       flex: 1,
@@ -605,12 +606,12 @@ export const AdminStoresScreen: React.FC = () => {
                   navigation.navigate('StoreDetail', { storeId: item.id });
                 }}
               >
-                <Ionicons name="eye-outline" size={16} color={COLORS.white} />
-                <Text style={[styles.actionButtonText, { color: COLORS.white }]}>Voir</Text>
+                <Ionicons name="eye-outline" size={16} color={COLORS.text} />
+                <Text style={[styles.actionButtonText, { color: COLORS.text }]}>Voir</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.actionButton, styles.editButton]}>
-                <Ionicons name="create-outline" size={16} color={COLORS.white} />
-                <Text style={[styles.actionButtonText, { color: COLORS.white }]}>Modifier</Text>
+                <Ionicons name="create-outline" size={16} color={COLORS.text} />
+                <Text style={[styles.actionButtonText, { color: COLORS.text }]}>Modifier</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.actionButton, styles.deleteButton]}
@@ -621,8 +622,8 @@ export const AdminStoresScreen: React.FC = () => {
                   })();
                 }}
               >
-                <Ionicons name="trash-outline" size={16} color={COLORS.white} />
-                <Text style={[styles.actionButtonText, { color: COLORS.white }]}>Supprimer</Text>
+                <Ionicons name="trash-outline" size={16} color={COLORS.text} />
+                <Text style={[styles.actionButtonText, { color: COLORS.text }]}>Supprimer</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -640,14 +641,14 @@ export const AdminStoresScreen: React.FC = () => {
           <ScrollView>
             <View style={styles.detailSection}>
               <Text style={styles.detailTitle}>Informations générales</Text>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Nom</Text> <Text style={styles.detailValue}>{selectedStore.name}</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Logo</Text> <Text style={styles.detailValue}>[logo]</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Bannière</Text> <Text style={styles.detailValue}>[banner]</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Description</Text> <Text style={styles.detailValue}>{selectedStore.description || '-'}</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Téléphone</Text> <Text style={styles.detailValue}>{selectedStore.phone}</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Localisation</Text> <Text style={styles.detailValue}>{selectedStore.address}</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Date inscription</Text> <Text style={styles.detailValue}>{selectedStore.joinDate}</Text> </View>
-              <View style={styles.detailRow}> <Text style={styles.detailLabel}>Statut boutique</Text> <Text style={[styles.detailValue, { color: getStatusColor(selectedStore.status) }]}>{selectedStore.status}</Text> </View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Nom</Text><Text style={styles.detailValue}>{selectedStore.name}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Logo</Text><Text style={styles.detailValue}>[logo]</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Bannière</Text><Text style={styles.detailValue}>[logo]</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Description</Text><Text style={styles.detailValue}>{selectedStore.description || '-'}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Téléphone</Text><Text style={styles.detailValue}>{selectedStore.phone}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Localisation</Text><Text style={styles.detailValue}>{selectedStore.address}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Date inscription</Text><Text style={styles.detailValue}>{selectedStore.joinDate}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Statut boutique</Text><Text style={[styles.detailValue, { color: getStatusColor(selectedStore.status) }]}>{selectedStore.status}</Text></View>
             </View>
             <View style={styles.actionButtons}> 
               {selectedStore.status === 'pending' ? (
@@ -655,10 +656,12 @@ export const AdminStoresScreen: React.FC = () => {
                   style={[styles.actionButton, styles.editButton]}
                   onPress={() => void updateStoreStatus(selectedStore.id, 'active')}
                 >
-                  <Text style={[styles.actionButtonText, {color:COLORS.white}]}>Valider</Text>
+                  <Text style={[styles.actionButtonText, {color:COLORS.text}]}>Valider</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={[styles.actionButton, styles.editButton]}> <Text style={[styles.actionButtonText, {color:COLORS.white}]}>Modifier</Text> </TouchableOpacity>
+                <TouchableOpacity style={[styles.actionButton, styles.editButton]}>
+                  <Text style={[styles.actionButtonText, {color:COLORS.text}]}>Modifier</Text>
+                </TouchableOpacity>
               )}
 
               <TouchableOpacity
@@ -674,7 +677,7 @@ export const AdminStoresScreen: React.FC = () => {
                   })();
                 }}
               >
-                <Text style={[styles.actionButtonText, {color:COLORS.white}]}>
+                <Text style={[styles.actionButtonText, {color:COLORS.text}]}>
                   {selectedStore.status === 'active' ? 'Suspendre' : 'Réactiver'}
                 </Text>
               </TouchableOpacity>
@@ -686,7 +689,7 @@ export const AdminStoresScreen: React.FC = () => {
                   if (ok) await deleteStore(selectedStore.id);
                 })()}
               >
-                <Text style={[styles.actionButtonText, {color:COLORS.white}]}>Supprimer</Text>
+                <Text style={[styles.actionButtonText, {color:COLORS.text}]}>Supprimer</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

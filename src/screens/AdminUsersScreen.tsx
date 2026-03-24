@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
   Text,
@@ -95,7 +96,7 @@ export const AdminUsersScreen: React.FC = () => {
         }))
       );
     } catch (e) {
-      console.error('load users', e);
+      errorHandler.handleDatabaseError(e, 'load users');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de charger les utilisateurs');
       } else {
@@ -185,7 +186,7 @@ export const AdminUsersScreen: React.FC = () => {
           Alert.alert('Succès', `Utilisateur ${nextStatus === 'suspended' ? 'suspendu' : 'réactivé'}`);
         }
       } catch (e) {
-        console.error('suspend user', e);
+        errorHandler.handleDatabaseError(e, 'suspend user');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           window.alert('❌ Impossible de modifier le statut utilisateur');
         } else {
@@ -235,7 +236,7 @@ export const AdminUsersScreen: React.FC = () => {
         await Linking.openURL(url);
       }
     } catch (e) {
-      console.error('open whatsapp', e);
+      errorHandler.handleDatabaseError(e, 'open whatsapp');
       const msg = 'Impossible d’ouvrir WhatsApp.';
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert(`❌ ${msg}`);
@@ -274,7 +275,7 @@ export const AdminUsersScreen: React.FC = () => {
           Alert.alert('Succès', 'Vendeur validé avec succès');
         }
       } catch (e) {
-        console.error('validate seller', e);
+        errorHandler.handleDatabaseError(e, 'validate seller');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           window.alert('❌ Impossible de valider le vendeur');
         } else {
@@ -391,7 +392,7 @@ export const AdminUsersScreen: React.FC = () => {
                   style={[styles.actionButton, styles.validateButton]}
                   onPress={() => handleValidateSeller(item)}
                 >
-                  <Ionicons name="checkmark" size={20} color={COLORS.white} />
+                  <Ionicons name="checkmark" size={20} color={COLORS.text} />
                   <Text style={styles.validateText}>Valider</Text>
                 </TouchableOpacity>
               )}
@@ -815,7 +816,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filterChipTextActive: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
   sortContainer: {
     flexDirection: 'row',
@@ -875,7 +876,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   userDetails: {
     flex: 1,
@@ -958,7 +959,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.success,
   },
   validateText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
     marginLeft: 4,
@@ -1004,7 +1005,7 @@ const styles = StyleSheet.create({
   avatarLargeText: {
     fontSize: FONT_SIZE.xxxl,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   modalUserName: {
     fontSize: FONT_SIZE.xl,

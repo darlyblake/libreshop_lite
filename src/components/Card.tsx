@@ -8,7 +8,7 @@ import {
   ViewStyle,
   StyleProp,
 } from 'react-native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface CardProps {
   children: React.ReactNode;
@@ -17,6 +17,14 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, style, onPress }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   const Wrapper = onPress ? TouchableOpacity : View;
   return (
     <Wrapper
@@ -47,6 +55,14 @@ export const StoreCard: React.FC<StoreCardProps> = ({
   productCount,
   onPress,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <TouchableOpacity style={styles.storeCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.storeImageContainer}>
@@ -88,6 +104,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   imageUrl,
   onPress,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.productImageContainer}>
@@ -96,6 +120,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         ) : (
           <View style={styles.productImagePlaceholder}>
             <Text style={styles.productImagePlaceholderText}>📦</Text>
+          </View>
+        )}
+        {comparePrice && comparePrice > (price || 0) && (
+          <View style={styles.promoBadge}>
+            <Text style={styles.promoBadgeText}>PROMO</Text>
           </View>
         )}
       </View>
@@ -112,7 +141,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   card: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.xl,
@@ -150,7 +184,7 @@ const styles = StyleSheet.create({
   storeImagePlaceholderText: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   storeName: {
     fontSize: FONT_SIZE.lg,
@@ -180,7 +214,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   // Product Card Styles
   productCard: {
@@ -230,5 +264,23 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textDecorationLine: 'line-through',
   },
+  promoBadge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    left: SPACING.sm,
+    backgroundColor: '#FF3B30', // A vibrant red for promo
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    elevation: 4,
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.25)',
+  },
+  promoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 });
+};
 

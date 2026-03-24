@@ -14,6 +14,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { productService, Product, restockService } from '../lib/supabase';
 import { Button } from '../components/Button';
 import { DatePickerInput } from '../components/DatePickerInput';
@@ -65,7 +66,7 @@ export const SellerRestockScreen: React.FC = () => {
         const items = await restockService.getByProduct(productId);
         setHistory(items || []);
       } catch (e) {
-        console.error('Load restock data:', e);
+        errorHandler.handleDatabaseError(e, 'Load restock data:');
         Alert.alert('Erreur', 'Impossible de charger les données');
         navigation.goBack();
       } finally {
@@ -89,25 +90,30 @@ export const SellerRestockScreen: React.FC = () => {
       const previousStock = product.stock || 0;
       const newStock = previousStock + quantity;
 
-      // Save restock record to database
-      await restockService.create({
-        product_id: productId,
-        quantity_added: quantity,
-        previous_stock: previousStock,
-        new_stock: newStock,
-        reason: restockReason || undefined,
-        restock_date: restockDate || undefined,
-        notes: notes || undefined,
-      });
+      // Try to save restock record — may fail if the table doesn't exist yet
+      try {
+        await restockService.create({
+          product_id: productId,
+          quantity_added: quantity,
+          previous_stock: previousStock,
+          new_stock: newStock,
+          reason: restockReason || undefined,
+          restock_date: restockDate || undefined,
+          notes: notes || undefined,
+        });
 
-      // Update product stock
-      await productService.update(productId, {
-        stock: newStock,
-      } as any);
+        // Reload history only if table exists
+        const items = await restockService.getByProduct(productId);
+        setHistory(items || []);
+      } catch (historyError: any) {
+        // Table may not exist yet — log but don't block the stock update
+        if (__DEV__) {
+          console.warn('[SellerRestock] restock_history not available:', historyError?.message);
+        }
+      }
 
-      // Reload history
-      const items = await restockService.getByProduct(productId);
-      setHistory(items || []);
+      // Always update product stock
+      await productService.update(productId, { stock: newStock } as any);
 
       // Reset form
       setQuantityToAdd('');
@@ -119,9 +125,9 @@ export const SellerRestockScreen: React.FC = () => {
       const updated = await productService.getById(productId);
       setProduct(updated);
 
-      Alert.alert('Succès', 'Réapprovisionnement enregistré');
+      Alert.alert('✅ Succès', 'Stock mis à jour avec succès !');
     } catch (e) {
-      console.error('Save restock:', e);
+      errorHandler.handleDatabaseError(e, 'Save restock:');
       Alert.alert('Erreur', 'Impossible de sauvegarder le réapprovisionnement');
     } finally {
       setSaving(false);
@@ -142,7 +148,7 @@ export const SellerRestockScreen: React.FC = () => {
               setHistory([]);
               Alert.alert('Succès', 'Historique supprimé');
             } catch (e) {
-              console.error('Clear history:', e);
+              errorHandler.handleDatabaseError(e, 'Clear history:');
               Alert.alert('Erreur', 'Impossible de supprimer l\'historique');
             }
           },
@@ -193,7 +199,7 @@ export const SellerRestockScreen: React.FC = () => {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.white} />
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Réapprovisionnement</Text>
@@ -222,7 +228,7 @@ export const SellerRestockScreen: React.FC = () => {
             style={styles.input}
             placeholder="Quantité à ajouter"
             keyboardType="numeric"
-            placeholderTextColor={COLORS.textLight}
+            placeholderTextColor={COLORS.textMuted}
             value={quantityToAdd}
             onChangeText={setQuantityToAdd}
           />
@@ -230,7 +236,7 @@ export const SellerRestockScreen: React.FC = () => {
           <TextInput
             style={[styles.input, { marginTop: SPACING.md }]}
             placeholder="Raison du réapprovisionnement (optionnel)"
-            placeholderTextColor={COLORS.textLight}
+            placeholderTextColor={COLORS.textMuted}
             value={restockReason}
             onChangeText={setRestockReason}
           />
@@ -247,7 +253,7 @@ export const SellerRestockScreen: React.FC = () => {
           <TextInput
             style={[styles.input, { marginTop: SPACING.md, height: 80 }]}
             placeholder="Notes (optionnel)"
-            placeholderTextColor={COLORS.textLight}
+            placeholderTextColor={COLORS.textMuted}
             value={notes}
             onChangeText={setNotes}
             multiline
@@ -311,7 +317,7 @@ export const SellerRestockScreen: React.FC = () => {
                   style={styles.clearButton}
                   onPress={handleClearHistory}
                 >
-                  <Ionicons name="trash" size={18} color={COLORS.white} />
+                  <Ionicons name="trash" size={18} color={COLORS.text} />
                   <Text style={styles.clearButtonText}>Effacer l'historique</Text>
                 </TouchableOpacity>
               </>
@@ -326,7 +332,7 @@ export const SellerRestockScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bg,
   },
   centered: {
     flex: 1,
@@ -335,7 +341,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.error,
+    color: COLORS.danger,
   },
   headerGradient: {
     paddingTop: SPACING.lg,
@@ -355,11 +361,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   headerSubtitle: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.white,
+    color: COLORS.text,
     opacity: 0.8,
     marginTop: 4,
   },
@@ -385,11 +391,11 @@ const styles = StyleSheet.create({
   stockValue: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.text,
   },
   stockLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.white,
+    color: COLORS.text,
     marginTop: SPACING.sm,
   },
   input: {
@@ -400,7 +406,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     fontSize: FONT_SIZE.md,
     color: COLORS.text,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -409,7 +415,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   historyItem: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     marginBottom: SPACING.md,
@@ -434,7 +440,7 @@ const styles = StyleSheet.create({
   },
   historyDate: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textLight,
+    color: COLORS.textMuted,
     marginTop: SPACING.xs,
   },
   historyStock: {
@@ -444,17 +450,17 @@ const styles = StyleSheet.create({
   },
   historyReason: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textLight,
+    color: COLORS.textMuted,
     marginTop: SPACING.xs,
   },
   historyNotes: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textLight,
+    color: COLORS.textMuted,
     marginTop: SPACING.md,
     fontStyle: 'italic',
   },
   clearButton: {
-    backgroundColor: COLORS.error,
+    backgroundColor: COLORS.danger,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
@@ -464,7 +470,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   clearButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
     marginLeft: SPACING.sm,

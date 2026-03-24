@@ -50,6 +50,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   Features: undefined;
   Pricing: undefined;
+  SellerChangePlan: undefined;
 };
 
 export type ClientTabParamList = {
@@ -75,4 +76,21 @@ declare global {
     interface RootParamList extends RootStackParamList {}
   }
 }
+export type UserRole = 'client' | 'seller' | 'admin';
 
+export interface NotificationPayload {
+  new: {
+    id: string;
+    user_id: string;
+    title: string;
+    body: string;
+    type: 'order' | 'payment' | 'promo' | 'system';
+    read: boolean;
+    data?: any;
+    created_at: string;
+  };
+  old: any;
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  schema: string;
+  table: string;
+}

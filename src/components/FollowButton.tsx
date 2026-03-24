@@ -19,8 +19,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { shopFollowService } from '../lib/shopFollowService';
+import { authService } from '../lib/supabase';
 import { useAuthStore } from '../store';
 
 interface FollowButtonProps {
@@ -50,7 +52,7 @@ type SizeConfig = {
   borderRadius: number;
 };
 
-const SIZE_CONFIG: Record<'small' | 'medium' | 'large', SizeConfig> = {
+const getSizeConfig = (SPACING: any, RADIUS: any): Record<'small' | 'medium' | 'large', SizeConfig> => ({
   small: {
     icon: 16,
     fontSize: 12,
@@ -75,7 +77,7 @@ const SIZE_CONFIG: Record<'small' | 'medium' | 'large', SizeConfig> = {
     gap: SPACING.sm,
     borderRadius: RADIUS.lg,
   },
-};
+});
 
 export const FollowButton: React.FC<FollowButtonProps> = memo(({
   storeId,
@@ -97,6 +99,11 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   const { user } = useAuthStore();
   const effectiveUserId = propUserId || user?.id;
 
+  const themeContext = useTheme();
+  const { theme, getColor: COLORS, spacing: SPACING, radius: RADIUS } = themeContext;
+  
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+
   const [following, setFollowing] = useState(initialFollowing);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
   const [loading, setLoading] = useState(false);
@@ -108,7 +115,7 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   const countOpacity = useSharedValue(1);
   const buttonWidth = useSharedValue(0);
 
-  const sizeConfig = SIZE_CONFIG[size];
+  const sizeConfig = React.useMemo(() => getSizeConfig(SPACING, RADIUS)[size], [SPACING, RADIUS, size]);
 
   // Animation de pulsation pour le bouton
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
@@ -146,8 +153,8 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
       setFollowing(isFollowing);
       setFollowerCount(count);
       setError(null);
-    } catch (error) {
-      console.error('Error loading follow data:', error);
+    } catch (error: any) {
+      errorHandler.handleDatabaseError(error, 'Error loading follow data:');
       setError('Erreur de chargement');
     }
   }, [effectiveUserId, storeId]);
@@ -197,14 +204,19 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
 
   const handleFollow = useCallback(async (): Promise<void> => {
     if (!effectiveUserId) {
-      Alert.alert(
-        'Connexion requise',
-        `Connectez-vous pour suivre ${storeName}`,
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Se connecter', onPress: () => console.log('Navigate to login') }
-        ]
-      );
+      try {
+        const { data: { session } } = await authService.signInAnonymously();
+        if (!session?.user) throw new Error('Auth failed');
+        Alert.alert('Presque fini', `Identité créée. Réessayez de suivre ${storeName} !`);
+        return;
+      } catch (err) {
+        Alert.alert('Action impossible', 'Veuillez vérifier votre connexion internet.');
+        return;
+      }
+    }
+
+    if (!storeId || storeId === '' || storeId === 'undefined') {
+      console.warn('[FollowButton] storeId invalide, action ignorée:', storeId);
       return;
     }
 
@@ -241,8 +253,8 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
       }
       
       onFollowChange?.(result, newCount);
-    } catch (error) {
-      console.error('Error toggling follow:', error);
+    } catch (error: any) {
+      errorHandler.handleDatabaseError(error, 'Error toggling follow:');
       
       // Rollback
       setFollowing(previousFollowing);
@@ -302,16 +314,16 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
     if (following) {
       switch (variant) {
         case 'primary':
-          return COLORS.white;
+          return COLORS.text;
         case 'outline':
           return COLORS.success;
         case 'minimal':
           return COLORS.success;
         default:
-          return COLORS.white;
+          return COLORS.text;
       }
     }
-    return COLORS.white;
+    return COLORS.text;
   };
 
   const getIconColor = (): string => {
@@ -323,13 +335,13 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
         case 'minimal':
           return COLORS.success;
         default:
-          return COLORS.white;
+          return COLORS.text;
       }
     }
-    return COLORS.white;
+    return COLORS.text;
   };
 
-  const getBackgroundGradient = (): string[] | null => {
+  const getBackgroundGradient = (): [string, string] | null => {
     if (disabled || following || variant !== 'primary') return null;
     return [COLORS.accent, COLORS.accent2];
   };
@@ -429,65 +441,69 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   );
 });
 
-const styles = StyleSheet.create({
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Variantes suivre
-  followPrimary: {
-    backgroundColor: COLORS.accent,
-  },
-  followOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-  },
-  followMinimal: {
-    backgroundColor: 'transparent',
-  },
-  // Variantes suivi
-  followingPrimary: {
-    backgroundColor: COLORS.success,
-  },
-  followingOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.success,
-  },
-  followingMinimal: {
-    backgroundColor: 'transparent',
-  },
-  disabled: {
-    opacity: 0.5,
-    backgroundColor: COLORS.textMuted,
-  },
-  text: {
-    fontWeight: '600',
-  },
-  count: {
-    fontWeight: '500',
-    opacity: 0.9,
-  },
-  loader: {
-    marginLeft: SPACING.xs,
-  },
-  gradientButton: {
-    overflow: 'hidden',
-  },
-  errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    padding: SPACING.xs,
-  },
-  errorText: {
-    color: COLORS.warning,
-    fontWeight: '500',
-  },
-});
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  return StyleSheet.create({
+    button: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // Variantes suivre
+    followPrimary: {
+      backgroundColor: COLORS.accent,
+    },
+    followOutline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: COLORS.accent,
+    },
+    followMinimal: {
+      backgroundColor: 'transparent',
+    },
+    // Variantes suivi
+    followingPrimary: {
+      backgroundColor: COLORS.success,
+    },
+    followingOutline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: COLORS.success,
+    },
+    followingMinimal: {
+      backgroundColor: 'transparent',
+    },
+    disabled: {
+      opacity: 0.5,
+      backgroundColor: COLORS.textMuted,
+    },
+    text: {
+      fontWeight: '600',
+    },
+    count: {
+      fontWeight: '500',
+      opacity: 0.9,
+    },
+    loader: {
+      marginLeft: SPACING.xs,
+    },
+    gradientButton: {
+      overflow: 'hidden',
+    },
+    errorContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      padding: SPACING.xs,
+    },
+    errorText: {
+      color: COLORS.warning,
+      fontWeight: '500',
+    },
+  });
+};
 
 FollowButton.displayName = 'FollowButton';
 

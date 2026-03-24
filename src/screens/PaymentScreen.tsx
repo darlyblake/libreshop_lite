@@ -16,6 +16,7 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { supabase, type Product } from '../lib/supabase';
 import { authService, orderService } from '../lib/supabase';
@@ -47,7 +48,7 @@ export const PaymentScreen: React.FC = () => {
   const orderId = routeOrderId || `ORD-${Date.now()}`;
 
   const user = useAuthStore((s) => s.user);
-  const { clearCart } = useCartStore();
+  const { clearCart, removeItem } = useCartStore();
 
   const parseJsonParam = <T,>(value: any, fallback: T): T => {
     if (!value || typeof value !== 'string') return fallback;
@@ -129,7 +130,7 @@ export const PaymentScreen: React.FC = () => {
         try {
           const { data, error } = await supabase.auth.getUser();
           if (error) throw error;
-          userId = data?.user?.id || null;
+          userId = data?.user?.id || undefined;
         } catch {
           // ignore, will try anonymous sign-in below
         }
@@ -140,9 +141,9 @@ export const PaymentScreen: React.FC = () => {
           try {
             await authService.signInAnonymously();
             const { data } = await supabase.auth.getUser();
-            userId = data?.user?.id || null;
+            userId = data?.user?.id || undefined;
           } catch (e) {
-            console.warn('failed to create guest session at payment time', e);
+            errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'failed to create guest session at payment time', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           }
         }
       }
@@ -161,105 +162,249 @@ export const PaymentScreen: React.FC = () => {
       }
       if (!Array.isArray(items) || items.length === 0) throw new Error('Panier vide');
 
-      await userService.getOrCreateProfile(userId);
+      await userService.upsertProfile(userId, {
+        full_name: customer?.name || 'Client',
+        phone: phoneNumber,
+        whatsapp_number: phoneNumber,
+      });
 
-      const baseOrderPayload = {
-        user_id: userId,
-        store_id: String(storeId),
-        total_amount: Number(amount),
-        status: 'pending' as const,
-        payment_method:
-          selectedMethod === 'cash'
-            ? 'cash_on_delivery'
-            : selectedMethod === 'card'
+      const isExisting = !!route.params?.existingOrder;
+
+      if (isExisting) {
+        // Pay an existing order: mark as paid, insert order_items if needed, run post-processing RPC and notify seller
+        const existingOrderId = routeOrderId;
+        if (!existingOrderId) throw new Error('orderId manquant pour paiement existant');
+
+        try {
+          // update order payment status
+          const paymentMethodDb =
+            selectedMethod === 'cash'
+              ? 'cash_on_delivery'
+              : selectedMethod === 'card'
               ? 'card'
-              : 'mobile_money',
-        payment_status: 'paid' as const,
-        shipping_address: customer?.address,
-        customer_phone: phoneNumber,
-        notes: customer?.notes,
-      };
+              : 'mobile_money';
 
-      let created: any;
-      try {
-        created = await orderService.create({
-          ...baseOrderPayload,
-          customer_name: customer?.name,
-        });
-      } catch (e: any) {
-        const msg = typeof e?.message === 'string' ? e.message : '';
-        const isSchemaCacheIssue =
-          msg.toLowerCase().includes('schema') &&
-          msg.toLowerCase().includes('cache') &&
-          msg.toLowerCase().includes('customer_name');
-        const isMissingColumnIssue =
-          msg.toLowerCase().includes('column') &&
-          msg.toLowerCase().includes('customer_name');
+          const { data: updatedOrder, error: updErr } = await supabase
+            .from('orders')
+            .update({ payment_status: 'paid', payment_method: paymentMethodDb, status: 'paid' })
+            .eq('id', existingOrderId)
+            .select('*')
+            .single();
+          if (updErr) throw updErr;
 
-        if (isSchemaCacheIssue || isMissingColumnIssue) {
-          created = await orderService.create(baseOrderPayload);
-        } else {
+          // insert order_items if provided (best-effort)
+          try {
+            if (supabase && Array.isArray(items) && items.length > 0) {
+              const rows = items.map((it: { product: Product; quantity: number }) => ({
+                order_id: existingOrderId,
+                product_id: it.product.id,
+                quantity: it.quantity,
+                price: it.product.price,
+              }));
+              const { error } = await supabase.from('order_items').insert(rows);
+              if (error) console.warn('failed to insert order items for existing order', error);
+            }
+          } catch (e) {
+            console.warn('order_items insert skipped for existing order', e);
+          }
+
+          // run RPC to decrement stock + notify seller
+          try {
+            if (supabase) {
+              const { error } = await supabase.rpc('process_order_after_payment', { p_order_id: existingOrderId });
+              if (error) console.warn('process_order_after_payment failed for existing order', error);
+            }
+          } catch (e) {
+            console.warn('process_order_after_payment skipped for existing order', e);
+          }
+
+          // client-side notification (best-effort)
+          try {
+            const { storeService } = await import('../lib/supabase');
+            const { notificationService } = await import('../lib/notificationService');
+            if (storeId) {
+              const store = await storeService.getById(String(storeId));
+              if (store?.user_id) {
+                await notificationService.create({
+                  user_id: store.user_id,
+                  title: 'Nouvelle commande 🛍️',
+                  body: `Vous avez reçu une nouvelle commande de ${customer?.name || 'un client'} pour un montant de ${(amount / 1000).toFixed(0)} KCFA.`,
+                  type: 'order',
+                  read: false,
+                  data: { orderId: existingOrderId, storeId },
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('notification creation failed for existing order', e);
+          }
+
+          // remove paid items from cart
+          try {
+            if (Array.isArray(items) && items.length > 0) {
+              for (const it of items) {
+                try { removeItem(it.product.id); } catch (e) { /* ignore */ }
+              }
+            }
+          } catch (e) {
+            console.warn('failed to remove items from cart after existing order payment', e);
+          }
+
+          const successTitle = 'Paiement réussi';
+          const successMessage = `Votre paiement de ${(amount / 1000).toFixed(0)} KCFA a été traité avec succès.`;
+          if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
+            (window as any).alert(`${successTitle}\n\n${successMessage}`);
+          }
+
+          Alert.alert(
+            successTitle,
+            successMessage,
+            [
+              {
+                text: 'Continuer',
+                onPress: () => {
+                  navigation.navigate('Confirmation', {
+                    orderId: existingOrderId,
+                    amount,
+                    storeId,
+                    itemsJson: JSON.stringify(items),
+                    customerJson: JSON.stringify(customer || {}),
+                    paymentMethod: selectedMethod,
+                  });
+                },
+              },
+            ]
+          );
+        } catch (e: any) {
           throw e;
         }
-      }
+      } else {
+        // existing flow: create order then process
+        const baseOrderPayload = {
+          user_id: userId,
+          store_id: String(storeId),
+          total_amount: Number(amount),
+          status: 'pending' as const,
+          payment_method:
+            (selectedMethod === 'cash'
+              ? 'cash_on_delivery'
+              : selectedMethod === 'card'
+                ? 'card'
+                : 'mobile_money') as any,
+          payment_status: 'paid' as const,
+          shipping_address: customer?.address,
+          customer_phone: phoneNumber,
+          notes: customer?.notes,
+        };
 
-      // Insert order items (best effort). If the table differs, we still continue to confirmation.
-      try {
-        if (supabase) {
-          const rows = items.map((it: { product: Product; quantity: number }) => ({
-            order_id: created.id,
-            product_id: it.product.id,
-            quantity: it.quantity,
-            price: it.product.price,
-          }));
-          const { error } = await supabase.from('order_items').insert(rows);
-          if (error) console.warn('failed to insert order items', error);
-        }
-      } catch (e) {
-        console.warn('order_items insert skipped', e);
-      }
-
-      // Decrement stock + notify seller (best effort)
-      try {
-        if (supabase && created?.id) {
-          const { error } = await supabase.rpc('process_order_after_payment', {
-            p_order_id: created.id,
+        let created: any;
+        try {
+          created = await orderService.create({
+            ...baseOrderPayload,
+            customer_name: customer?.name,
           });
-          if (error) console.warn('process_order_after_payment failed', error);
+        } catch (e: any) {
+          const msg = typeof e?.message === 'string' ? e.message : '';
+          const isSchemaCacheIssue =
+            msg.toLowerCase().includes('schema') &&
+            msg.toLowerCase().includes('cache') &&
+            msg.toLowerCase().includes('customer_name');
+          const isMissingColumnIssue =
+            msg.toLowerCase().includes('column') &&
+            msg.toLowerCase().includes('customer_name');
+
+          if (isSchemaCacheIssue || isMissingColumnIssue) {
+            created = await orderService.create(baseOrderPayload);
+          } else {
+            throw e;
+          }
         }
-      } catch (e) {
-        console.warn('process_order_after_payment skipped', e);
-      }
 
-      clearCart();
+        // Insert order items (best effort). If the table differs, we still continue to confirmation.
+        try {
+          if (supabase) {
+            const rows = items.map((it: { product: Product; quantity: number }) => ({
+              order_id: created.id,
+              product_id: it.product.id,
+              quantity: it.quantity,
+              price: it.product.price,
+            }));
+            const { error } = await supabase.from('order_items').insert(rows);
+            if (error) errorHandler.handle(error, 'failed to insert order items', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+          }
+        } catch (e) {
+          errorHandler.handle(e, 'order_items insert skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+        }
 
-      const successTitle = 'Paiement réussi';
-      const successMessage = `Votre paiement de ${(amount / 1000).toFixed(0)} KCFA a été traité avec succès.`;
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
-        (window as any).alert(`${successTitle}\n\n${successMessage}`);
-      }
+        // Decrement stock + notify seller (best effort)
+        try {
+          if (supabase && created?.id) {
+            const { error } = await supabase.rpc('process_order_after_payment', {
+              p_order_id: created.id,
+            });
+            if (error) errorHandler.handle(error, 'process_order_after_payment failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+          }
+        } catch (e) {
+          errorHandler.handle(e, 'process_order_after_payment skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+        }
 
-      Alert.alert(
-        successTitle,
-        successMessage,
-        [
-          {
-text: 'Continuer',
-            onPress: () => {
-              navigation.navigate('Confirmation', {
-                orderId: created.id,
-                amount,
-                storeId,
-                itemsJson: JSON.stringify(items),
-                customerJson: JSON.stringify(customer || {}),
-                paymentMethod: selectedMethod,
+        // Notification créée par le RPC process_order_after_payment, mais on en ajoute une côté client 
+        // pour garantir une réception instantanée et fiable même si le RPC a un délai ou échoue.
+        try {
+          const { storeService } = await import('../lib/supabase');
+          const { notificationService } = await import('../lib/notificationService');
+          
+          if (storeId) {
+            const store = await storeService.getById(String(storeId));
+            if (store?.user_id) {
+              await notificationService.create({
+                user_id: store.user_id,
+                title: 'Nouvelle commande 🛍️',
+                body: `Vous avez reçu une nouvelle commande de ${customer?.name || 'un client'} pour un montant de ${(amount / 1000).toFixed(0)} KCFA.`,
+                type: 'order',
+                read: false,
+                data: {
+                  orderId: created?.id,
+                  storeId: storeId,
+                }
               });
+            }
+          }
+        } catch (e) {
+          errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'notification creation failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+        }
+
+
+        clearCart();
+
+        const successTitle = 'Paiement réussi';
+        const successMessage = `Votre paiement de ${(amount / 1000).toFixed(0)} KCFA a été traité avec succès.`;
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
+          (window as any).alert(`${successTitle}\n\n${successMessage}`);
+        }
+
+        Alert.alert(
+          successTitle,
+          successMessage,
+          [
+            {
+              text: 'Continuer',
+              onPress: () => {
+                navigation.navigate('Confirmation', {
+                  orderId: created.id,
+                  amount,
+                  storeId,
+                  itemsJson: JSON.stringify(items),
+                  customerJson: JSON.stringify(customer || {}),
+                  paymentMethod: selectedMethod,
+                });
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      }
     } catch (e: any) {
-      console.warn('payment confirm failed', e);
+      errorHandler.handle(e, 'payment confirm failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       const msg =
         typeof e?.message === 'string'
           ? e.message
@@ -465,10 +610,10 @@ text: 'Continuer',
           hitSlop={10}
         >
           {processing ? (
-            <ActivityIndicator color={COLORS.white} />
+            <ActivityIndicator color={COLORS.text} />
           ) : (
             <>
-              <Ionicons name="lock-closed-outline" size={20} color={COLORS.white} />
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.text} />
               <Text style={styles.payButtonText}>
                 Payer {formatCurrency(amount)}
               </Text>
@@ -712,7 +857,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   payButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     marginLeft: SPACING.sm,
@@ -786,6 +931,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   confirmButtonTextPrimary: {
-    color: COLORS.white,
+    color: COLORS.text,
   },
 });

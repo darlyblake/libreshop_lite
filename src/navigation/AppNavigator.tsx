@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 
 // Imports optimisés
@@ -16,6 +16,9 @@ import { useAuthStore } from '../store';
 import { sessionStorage } from '../lib/storage';
 import { authService, storeService, supabase } from '../lib/supabase';
 import { useNotificationStore } from '../store/notificationStore';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { useTheme } from '../hooks/useTheme';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const ClientTab = createBottomTabNavigator<ClientTabParamList>();
@@ -23,8 +26,7 @@ const SellerTab = createBottomTabNavigator<SellerTabParamList>();
 
 // Types
 interface NotificationSound {
-  sound: Audio.Sound;
-  unload: () => Promise<void>;
+  play: () => void;
 }
 
 // Configuration des liens profonds
@@ -67,33 +69,20 @@ const useResponsiveTabBar = () => {
 
 // Hook personnalisé pour les notifications sonores
 const useNotificationSound = () => {
+  const player = useAudioPlayer('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+
   const playNotificationSound = useCallback(async (): Promise<void> => {
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        {
-          uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg',
-        },
-        { shouldPlay: true }
-      );
-
-      // Nettoyage automatique après 5 secondes
-      const timeoutId = setTimeout(() => {
-        sound.unloadAsync().catch(() => {});
-      }, 5000);
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status?.didJustFinish) {
-          clearTimeout(timeoutId);
-          sound.unloadAsync().catch(() => {});
-        }
-      });
+      if (player) {
+        player.play();
+      }
     } catch (soundError) {
       // Fallback haptique
       if (Platform.OS !== 'web') {
         try {
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (hapticError) {
-          console.warn('Failed to play notification feedback', { soundError, hapticError });
+          errorHandler.handle(hapticError instanceof Error ? hapticError : new Error(String(hapticError)), 'NotificationFeedback', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
       }
     }
@@ -110,7 +99,7 @@ const useSubscriptionCheck = () => {
     const performCheck = async (): Promise<boolean> => {
       try {
         if (!userId || !supabase) {
-          console.error('Missing userId or supabase client');
+          errorHandler.handle(new Error('Missing userId or supabase client'), 'SubscriptionCheck', ErrorCategory.SYSTEM, ErrorSeverity.HIGH);
           return true;
         }
 
@@ -122,7 +111,7 @@ const useSubscriptionCheck = () => {
           .maybeSingle();
 
         if (storeError) {
-          console.error('Store query error:', storeError);
+          errorHandler.handleDatabaseError(storeError, 'SubscriptionCheck', 'stores subscription query');
           return true;
         }
 
@@ -143,7 +132,7 @@ const useSubscriptionCheck = () => {
 
         return false;
       } catch (error) {
-        console.error('Subscription check error:', error);
+        errorHandler.handleDatabaseError(error as Error, 'SubscriptionCheck');
         return true;
       }
     };
@@ -200,10 +189,7 @@ const ClientTabs: React.FC = React.memo(() => {
           ...Platform.select({
             web: { boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)' },
             default: {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
+              boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)',
             },
           }),
         },
@@ -271,10 +257,7 @@ const SellerTabs: React.FC = React.memo(() => {
             ...Platform.select({
               web: { boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)' },
               default: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
+                boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.1)',
               },
             }),
           }),
@@ -321,8 +304,12 @@ export const AppNavigator: React.FC = () => {
   };
 
   const addNotification = useNotificationStore((state) => state.addNotification);
+  const { theme, getColor: COLORS } = useTheme();
   const { playNotificationSound } = useNotificationSound();
   const { checkSubscription } = useSubscriptionCheck();
+  
+  // Enregistrement des notifications push
+  usePushNotifications(user?.id);
 
   // Gestion des notifications en temps réel
   useEffect(() => {
@@ -336,16 +323,15 @@ export const AppNavigator: React.FC = () => {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
         },
         async (payload: NotificationPayload) => {
           try {
-            if (payload.new) {
+            if (payload.new && payload.new.user_id === user.id) {
               addNotification(payload.new);
               await playNotificationSound();
             }
           } catch (error) {
-            console.warn('Notification handling error:', error);
+            errorHandler.handle(error as Error, 'NotificationHandling', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           }
         }
       )
@@ -367,6 +353,43 @@ export const AppNavigator: React.FC = () => {
 
     return () => subscription.remove();
   }, []);
+
+  // Fallback Polling for notifications (in case Supabase Realtime is disabled for the table)
+  const { unreadCount, setNotifications } = useNotificationStore();
+  const unreadCountRef = useRef(unreadCount);
+
+  // Sync ref with store
+  useEffect(() => {
+    unreadCountRef.current = unreadCount;
+  }, [unreadCount]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    // Polling every 15 seconds
+    const interval = setInterval(async () => {
+      try {
+        // Check if there are new unread notifications
+        const { notificationService } = await import('../lib/notificationService');
+        const count = await notificationService.getUnreadCount(user.id);
+        
+        if (count > unreadCountRef.current) {
+          // New notification arrived! Fetch them all and play sound
+          const notifs = await notificationService.getByUser(user.id);
+          setNotifications(notifs);
+          await playNotificationSound();
+        } else if (count < unreadCountRef.current) {
+          // Some were deleted or read elsewhere
+          const notifs = await notificationService.getByUser(user.id);
+          setNotifications(notifs);
+        }
+      } catch (err) {
+        // Ignore silent polling errors
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [user?.id, playNotificationSound, setNotifications]);
 
   // Restauration de session
   useEffect(() => {
@@ -399,10 +422,20 @@ export const AppNavigator: React.FC = () => {
           }
         }
 
-        // Pas de session active
-        setInitialRoute('ClientTabs');
+        // Pas de session active -> Sign in anonymously for "ghost" users
+        try {
+          const { data: { session: anonSession } } = await authService.signInAnonymously();
+          if (anonSession?.user) {
+            setUser(anonSession.user);
+            setSession(anonSession);
+          }
+          setInitialRoute('ClientTabs');
+        } catch (anonError) {
+          // If anonymous sign in fails, just continue as guest
+          setInitialRoute('ClientTabs');
+        }
       } catch (error) {
-        console.error('Session restoration error:', error);
+        errorHandler.handleAuthError(error as Error, 'SessionRestoration');
         setInitialRoute('Landing');
       } finally {
         setLoading(false);
@@ -436,7 +469,7 @@ export const AppNavigator: React.FC = () => {
           const route = await getInitialRouteForRole(role as UserRole, session.user.id);
           setInitialRoute(route);
         } catch (error) {
-          console.error('Auth state change error:', error);
+          errorHandler.handleAuthError(error as Error, 'AuthStateChange');
         }
       }
     );
@@ -473,9 +506,9 @@ export const AppNavigator: React.FC = () => {
   return (
     <NavigationContainer linking={linking}>
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.bg}
-        translucent={Platform.OS === 'android'}
+        barStyle={initialRoute === 'Landing' ? 'light-content' : 'dark-content'}
+        backgroundColor={initialRoute === 'Landing' ? 'transparent' : '#ffffff'}
+        translucent={Platform.OS === 'android' || initialRoute === 'Landing'}
       />
       <Stack.Navigator
         initialRouteName={initialRoute}
@@ -508,6 +541,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Cart" component={Screens.CartScreen} />
         <Stack.Screen name="Checkout" component={Screens.CheckoutScreen} />
         <Stack.Screen name="Payment" component={Screens.PaymentScreen} />
+        <Stack.Screen name="BulkPayment" component={Screens.BulkPaymentScreen} />
         <Stack.Screen name="Confirmation" component={Screens.ConfirmationScreen} />
         <Stack.Screen name="Wishlist" component={Screens.WishlistScreen} />
         <Stack.Screen name="Notifications" component={Screens.NotificationsScreen} />
@@ -549,6 +583,7 @@ export const AppNavigator: React.FC = () => {
         {/* Routes info */}
         <Stack.Screen name="Features" component={Screens.FeaturesScreen} />
         <Stack.Screen name="Pricing" component={Screens.PricingScreen} />
+        <Stack.Screen name="SellerChangePlan" component={Screens.SellerChangePlanScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -135,7 +135,7 @@ export const AdminAPKUpdatesScreen: React.FC = () => {
           style={styles.addButton}
           onPress={() => setShowForm(true)}
         >
-          <Ionicons name="add-circle" size={20} color={COLORS.white} />
+          <Ionicons name="add-circle" size={20} color={COLORS.text} />
           <Text style={styles.addButtonText}>Ajouter une nouvelle version</Text>
         </TouchableOpacity>
       )}
@@ -222,7 +222,7 @@ export const AdminAPKUpdatesScreen: React.FC = () => {
               <View style={styles.badgesContainer}>
                 {item.isRequired && (
                   <View style={styles.requiredBadge}>
-                    <Ionicons name="alert-circle" size={14} color={COLORS.white} />
+                    <Ionicons name="alert-circle" size={14} color={COLORS.text} />
                     <Text style={styles.requiredText}>Obligatoire</Text>
                   </View>
                 )}
@@ -230,7 +230,7 @@ export const AdminAPKUpdatesScreen: React.FC = () => {
                   <Ionicons
                     name={item.isActive ? 'checkmark-circle' : 'close-circle'}
                     size={14}
-                    color={COLORS.white}
+                    color={COLORS.text}
                   />
                   <Text style={styles.activeBadgeText}>{item.isActive ? 'Activée' : 'Désactivée'}</Text>
                 </View>
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   addButtonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     backgroundColor: '#FFFFFF',
-    color: '#000000',
+    color: 'COLORS.bg',
     fontSize: FONT_SIZE.md,
   },
   messageInput: {
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   buttonText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontWeight: '600',
   },
   cancelButtonText: {
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   requiredText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
   },
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.textMuted,
   },
   activeBadgeText: {
-    color: COLORS.white,
+    color: COLORS.text,
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
   },

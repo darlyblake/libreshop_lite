@@ -7,7 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 interface CategoryCardProps {
   name: string;
@@ -24,6 +24,14 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
   onPress,
   style,
 }) => {
+  const themeContext = useTheme();
+  const theme = themeContext.theme;
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+
   return (
     <TouchableOpacity
       style={[styles.container, style]}
@@ -47,7 +55,12 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
   container: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.xl,
@@ -78,4 +91,5 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
 });
+};
 
