@@ -939,6 +939,103 @@ export const productService = {
     return data;
   },
 
+  async getByStorePaginated(storeId: string, options: {
+    page?: number;
+    limit?: number;
+    collectionId?: string;
+    stockFilter?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+    search?: string;
+    sortBy?: SortOption;
+    isActive?: boolean;
+  }) {
+    const client = useSupabase();
+    const page = options.page || 0;
+    const limit = options.limit || 20;
+    const offset = page * limit;
+    
+    let query = client
+      .from('products')
+      .select('*', { count: 'exact' })
+      .eq('store_id', storeId);
+
+    // 🎯 Filtres intelligents
+    if (options.collectionId) {
+      query = query.eq('collection_id', options.collectionId);
+    }
+
+    if (options.stockFilter && options.stockFilter !== 'all') {
+      switch (options.stockFilter) {
+        case 'in_stock':
+          query = query.gt('stock', 0);
+          break;
+        case 'low_stock':
+          query = query.lte('stock', 10).gt('stock', 0);
+          break;
+        case 'out_of_stock':
+          query = query.eq('stock', 0);
+          break;
+      }
+    }
+
+    if (options.search) {
+      query = query.ilike('name', `%${options.search}%`);
+    }
+
+    if (options.isActive !== undefined) {
+      query = query.eq('is_active', options.isActive);
+    }
+
+    // 🎯 Tri optimisé
+    if (options.sortBy) {
+      switch (options.sortBy) {
+        case 'name_asc':
+          query = query.order('name', { ascending: true });
+          break;
+        case 'name_desc':
+          query = query.order('name', { ascending: false });
+          break;
+        case 'price_asc':
+          query = query.order('price', { ascending: true });
+          break;
+        case 'price_desc':
+          query = query.order('price', { ascending: false });
+          break;
+        case 'stock_asc':
+          query = query.order('stock', { ascending: true });
+          break;
+        case 'stock_desc':
+          query = query.order('stock', { ascending: false });
+          break;
+        case 'date_asc':
+          query = query.order('created_at', { ascending: true });
+          break;
+        case 'date_desc':
+        default:
+          query = query.order('created_at', { ascending: false });
+          break;
+      }
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const hasMore = (offset + limit) < (count || 0);
+    const totalPages = Math.ceil((count || 0) / limit);
+
+    return {
+      products: data || [],
+      hasMore,
+      totalCount: count || 0,
+      currentPage: page,
+      totalPages,
+      limit
+    };
+  },
+
   async getAll(page = 0, pageSize = 20, sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'newest') {
     const client = useSupabase();
     const from = page * pageSize;
@@ -1279,18 +1376,65 @@ export const orderService = {
     return data;
   },
 
-  async getByStore(storeId: string, options?: { includeUser?: boolean }) {
+  async getByStore(storeId: string, options?: { 
+  includeUser?: boolean; 
+  limit?: number; 
+  cursor?: string;
+  status?: string;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
     const client = useSupabase();
     const select = options?.includeUser
       ? '*, users(*), order_items(*, products(*))'
       : '*, order_items(*, products(*))';
-    const { data, error } = await client
+    
+    const limit = options?.limit || 20;
+    
+    let query = client
       .from('orders')
       .select(select)
       .eq('store_id', storeId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(limit + 1); // +1 pour savoir s'il y a plus de données
+
+    // 🎯 Cursor pagination (plus rapide que OFFSET)
+    if (options?.cursor) {
+      query = query.lt('created_at', options.cursor);
+    }
+
+    // 🎯 Filtrage intelligent
+    if (options?.status && options.status !== 'all') {
+      query = query.eq('status', options.status);
+    }
+
+    if (options?.search) {
+      query = query.or(`customer_name.ilike.%${options.search}%,customer_phone.ilike.%${options.search}%`);
+    }
+
+    if (options?.dateFrom) {
+      query = query.gte('created_at', options.dateFrom);
+    }
+
+    if (options?.dateTo) {
+      query = query.lte('created_at', options.dateTo);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
-    return data;
+
+    // 🔄 Gestion du curseur et hasMore
+    const hasMore = data.length > limit;
+    const orders = hasMore ? data.slice(0, -1) : data;
+    const nextCursor = orders.length > 0 ? orders[orders.length - 1].created_at : null;
+
+    return {
+      orders,
+      hasMore,
+      nextCursor,
+      count: orders.length
+    };
   },
 
   async updateStatus(id: string, status: OrderStatus) {

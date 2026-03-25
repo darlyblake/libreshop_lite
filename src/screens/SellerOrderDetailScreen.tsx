@@ -266,10 +266,19 @@ export const SellerOrderDetailScreen: React.FC = () => {
 
       {/* Actions */}
       <View style={styles.actions}>
+        {/* Bouton pour contacter le client */}
+        <TouchableOpacity 
+          style={styles.contactButton}
+          onPress={handleWhatsApp}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={COLORS.accent} />
+          <Text style={styles.contactText}>Contacter le client</Text>
+        </TouchableOpacity>
+
         {order.status === 'pending' && (
           <>
             <Button
-              title="Confirmer le paiement"
+              title="Accepter la commande"
               onPress={() => handleUpdateStatus('paid')}
               loading={updating}
               style={{ marginBottom: SPACING.md }}
@@ -411,6 +420,24 @@ const styles = StyleSheet.create({
   actions: {
     paddingHorizontal: SPACING.lg,
     marginTop: SPACING.lg,
+  },
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accent + '10',
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  contactText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.accent,
   },
   errorText: {
     fontSize: FONT_SIZE.md,

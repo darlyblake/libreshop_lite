@@ -61,22 +61,58 @@ export const SellerClientsScreen: React.FC = () => {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
 
-  const loadClients = useCallback(async () => {
+  // 🚀 États pour le scroll infini
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastCursor, setLastCursor] = useState<string | null>(null);
+
+  const loadClients = useCallback(async (reset = true, cursor?: string) => {
     if (!user?.id) return;
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setClients([]);
+        setHasMore(true);
+        setLastCursor(null);
+      } else {
+        setLoadingMore(true);
+      }
+      
+      console.log(`🔍 ${reset ? 'Chargement initial' : 'Chargement supplémentaire'} des clients pour le vendeur:`, user.id);
+      
       const store = await storeService.getByUser(user.id);
       if (!store?.id) {
+        console.log('❌ Aucune boutique trouvée pour le vendeur');
         setStoreId(null);
         setClients([]);
+        setHasMore(false);
         return;
       }
       setStoreId(store.id);
+      console.log('🏪 Boutique trouvée:', store.id);
 
-      const orders = await orderService.getByStore(store.id, { includeUser: true });
+      // 🚀 Appel avec pagination cursor
+      const orders = await orderService.getByStore(store.id, { 
+        includeUser: true, 
+        limit: 50,
+        cursor: reset ? undefined : cursor
+      });
+      
+      console.log('📦 Commandes brutes reçues:', orders);
+      
+      // Gérer les deux formats de réponse
+      const ordersData = (orders as any)?.orders || orders;
+      const hasMoreData = (orders as any)?.hasMore !== undefined ? (orders as any).hasMore : true;
+      const nextCursor = (orders as any)?.nextCursor || null;
+      
+      console.log('📋 Commandes traitées:', ordersData);
+      console.log('📊 Nombre de commandes:', Array.isArray(ordersData) ? ordersData.length : 'N/A');
+      console.log('🔄 hasMore:', hasMoreData, 'nextCursor:', nextCursor);
+      
       const map = new Map<string, Client>();
 
-      (orders as any[]).forEach((o: any) => {
+      // Extraire les clients des commandes
+      (ordersData as any[]).forEach((o: any) => {
         const customerPhone = String(o?.customer_phone || '').trim();
         const customerName = String(o?.customer_name || '').trim();
         const userId = String(o?.user_id || '').trim();
@@ -110,8 +146,20 @@ export const SellerClientsScreen: React.FC = () => {
         });
       });
 
-      setClients(Array.from(map.values()));
+      const newClients = Array.from(map.values());
+      console.log('👥 Clients générés:', newClients.length);
+      
+      // 🚀 Mettre à jour les états de pagination
+      if (!reset) {
+        setClients(prev => [...prev, ...newClients]);
+      } else {
+        setClients(newClients);
+      }
+      setHasMore(hasMoreData);
+      setLastCursor(nextCursor);
+      
     } catch (e: any) {
+      console.error('❌ Erreur lors du chargement des clients:', e);
       errorHandler.handle(e, 'load clients failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       const rawMsg = String(e?.message || '');
       const isRls =
@@ -127,17 +175,26 @@ export const SellerClientsScreen: React.FC = () => {
       );
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [user?.id]);
 
+  // 🚀 Fonction pour charger plus de clients (scroll infini)
+  const loadMoreClients = useCallback(async () => {
+    if (!hasMore || loadingMore || loading) return;
+    console.log('🔄 Chargement de plus de clients...');
+    await loadClients(false, lastCursor);
+  }, [hasMore, loadingMore, loading, lastCursor, loadClients]);
+
   useEffect(() => {
+    console.log('🚀 Chargement initial des clients');
     loadClients();
   }, [loadClients]);
 
   const onRefresh = useCallback(() => {
     const run = async () => {
       setRefreshing(true);
-      await loadClients();
+      await loadClients(true);
       setRefreshing(false);
     };
     run();
@@ -408,11 +465,37 @@ export const SellerClientsScreen: React.FC = () => {
             isDesktop && styles.clientsContainerDesktop,
           ]}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
+          
+          // 🚀 Props pour le scroll infini
+          onEndReached={loadMoreClients}
+          onEndReachedThreshold={0.3}
+          
+          // Props optimisées existantes
+          initialNumToRender={15}
           maxToRenderPerBatch={10}
           windowSize={5}
           removeClippedSubviews
+          
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          
+          ListFooterComponent={
+            <View style={styles.footerContainer}>
+              {loadingMore && (
+                <View style={styles.loadingMoreContainer}>
+                  <ActivityIndicator size="small" color={COLORS.accent} />
+                  <Text style={styles.loadingMoreText}>Chargement de plus de clients...</Text>
+                </View>
+              )}
+              {!hasMore && clients.length > 0 && (
+                <View style={styles.endOfListContainer}>
+                  <Text style={styles.endOfListText}>
+                    📋 Tous les clients chargés ({clients.length})
+                  </Text>
+                </View>
+              )}
+            </View>
+          }
+          
           ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 40 }}>
               {loading ? (
@@ -527,6 +610,7 @@ const styles = StyleSheet.create({
   },
 
   clientsContainerDesktop: {
+    paddingHorizontal: SPACING.xxl,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
@@ -624,6 +708,30 @@ const styles = StyleSheet.create({
   clientActions: {
     flexDirection: 'row',
     gap: SPACING.sm,
+  },
+
+  footerContainer: {
+    paddingVertical: SPACING.lg,
+  },
+  loadingMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+  },
+  loadingMoreText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+  },
+  endOfListContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+  },
+  endOfListText: {
+    color: COLORS.textSoft,
+    fontSize: FONT_SIZE.sm,
+    textAlign: 'center',
   },
 
   actionButton: {

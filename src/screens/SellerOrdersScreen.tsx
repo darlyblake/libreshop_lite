@@ -3,15 +3,15 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import {
   View,
   Text,
-  ScrollView,
-  StyleSheet,
   TouchableOpacity,
-  Alert,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  ActivityIndicator,
+  FlatList,
   StatusBar,
   TextInput,
-  RefreshControl,
-  Platform,
-  Linking,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -120,15 +120,21 @@ export const SellerOrdersScreen: React.FC = () => {
     width 
   } = useResponsive();
   
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const [sortBy, setSortBy] = useState<'date' | 'total' | 'status'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  const [loading, setLoading] = useState(false);
-  const [storeId, setStoreId] = useState<string | null>(null);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = React.useState<Order[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [selectedFilter, setSelectedFilter] = React.useState('all');
+  const [sortBy, setSortBy] = React.useState<'date' | 'total'>('date');
+  const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc');
+  const [storeId, setStoreId] = React.useState<string | null>(null);
+  const [updatingOrderId, setUpdatingOrderId] = React.useState<string | null>(null);
+  
+  // 🚀 États pour la pagination optimisée
+  const [hasMore, setHasMore] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
 
   const filtersWithCounts = useMemo(() => {
     return FILTERS.map((filter) => {
@@ -140,20 +146,56 @@ export const SellerOrdersScreen: React.FC = () => {
     });
   }, [orders]);
 
-  const loadOrders = React.useCallback(async () => {
-    if (!user?.id) return;
+  // 🚀 Fonction de chargement optimisée avec cursor pagination
+  const loadOrders = React.useCallback(async (reset = true) => {
+    if (!user?.id) {
+      console.log('❌ Aucun utilisateur connecté');
+      return;
+    }
+    
     try {
-      setLoading(true);
+      console.log('🔄 Début du chargement optimisé...');
+      
+      if (reset) {
+        setLoading(true);
+        setOrders([]);
+        setHasMore(true);
+        setNextCursor(null);
+        setIsInitialLoad(true);
+      } else {
+        setLoadingMore(true);
+      }
+      
       const store = await storeService.getByUser(user.id);
       if (!store?.id) {
+        console.log('❌ Aucune boutique trouvée pour l\'utilisateur:', user.id);
         setStoreId(null);
         setOrders([]);
+        setHasMore(false);
         return;
       }
+      
+      console.log('🏪 Boutique trouvée:', store.id);
       setStoreId(store.id);
 
-      const data = await orderService.getByStore(store.id);
-      const mapped: Order[] = (data as any[]).map((o: any) => {
+      // 🎯 Requête optimisée avec cursor et filtres
+      const result = await orderService.getByStore(store.id, {
+        limit: 20,
+        cursor: reset ? undefined : nextCursor,
+        status: selectedFilter !== 'all' ? selectedFilter : undefined,
+        search: searchQuery || undefined,
+      });
+
+      console.log(`📦 Données reçues: ${result.count} commandes, hasMore: ${result.hasMore}`);
+      
+      if (!result.orders || result.orders.length === 0) {
+        console.log('📭 Plus de commandes disponibles');
+        setHasMore(false);
+        return;
+      }
+
+      // 🔄 Mapping optimisé
+      const mapped: Order[] = result.orders.map((o: any) => {
         const items = Array.isArray(o.order_items)
           ? o.order_items.map((it: any) => ({
               name: String(it?.products?.name || 'Article'),
@@ -179,68 +221,75 @@ export const SellerOrdersScreen: React.FC = () => {
         };
       });
 
-      setOrders(mapped);
-    } catch (e: any) {
-      errorHandler.handleDatabaseError(e, 'load orders');
-      const rawMsg = String(e?.message || '');
-      const isRls =
-        rawMsg.toLowerCase().includes('permission denied') ||
-        rawMsg.toLowerCase().includes('row level security') ||
-        e?.code === '42501';
+      console.log('📊 Commandes mappées:', mapped.length);
 
-      Alert.alert(
-        'Erreur',
-        isRls
-          ? "Accès refusé (RLS). Vérifie que tu es connecté avec le compte vendeur propriétaire de la boutique et que les policies Supabase pour 'orders' sont appliquées (Store owners can view store orders)."
-          : rawMsg || 'Impossible de charger les commandes'
-      );
+      // 🚀 Mise à jour optimisée de l'état
+      if (reset) {
+        setOrders(mapped);
+      } else {
+        setOrders(prev => [...prev, ...mapped]);
+      }
+
+      // 🔄 Mise à jour du curseur et hasMore
+      setHasMore(result.hasMore);
+      setNextCursor(result.nextCursor);
+      setIsInitialLoad(false);
+      
+      if (!result.hasMore) {
+        console.log('📭 Toutes les commandes ont été chargées');
+      }
+      
+    } catch (e: any) {
+      console.error('❌ Erreur lors du chargement des commandes:', e);
+      errorHandler.handleDatabaseError(e, 'Error loading orders:');
+      setOrders([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
-    }
-  }, [user?.id]);
-
-  React.useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
-
-  const onRefresh = React.useCallback(() => {
-    const run = async () => {
-      setRefreshing(true);
-      await loadOrders();
+      setLoadingMore(false);
       setRefreshing(false);
-    };
-    run();
+      console.log('🏁 Fin du chargement optimisé');
+    }
+  }, [user?.id, nextCursor, selectedFilter, searchQuery]);
+
+  // 🚀 Chargement infini optimisé
+  const loadMoreOrders = async () => {
+    if (!hasMore || loadingMore || loading || isInitialLoad) return;
+    console.log('🔄 Chargement infini de plus de commandes...');
+    await loadOrders(false);
+  };
+
+  // 🔄 Refresh manuel optimisé
+  const onRefresh = React.useCallback(() => {
+    console.log('🔄 Refresh manuel déclenché');
+    setRefreshing(true);
+    loadOrders(true);
   }, [loadOrders]);
 
-  const filteredOrders = useMemo(() => {
-    let filtered = orders.filter((order) => {
-      const matchesFilter = selectedFilter === 'all' || order.status === selectedFilter;
-      const q = searchQuery.trim().toLowerCase();
-      if (!q) return matchesFilter;
+  // 🎯 Recherche optimisée avec debounce
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      console.log('🔍 Recherche optimisée pour:', searchQuery);
+      loadOrders(true);
+    }, 300); // Debounce de 300ms
 
-      const matchesQuery =
-        order.customer.toLowerCase().includes(q) ||
-        order.id.toLowerCase().includes(q) ||
-        order.phone.toLowerCase().includes(q);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
-      return matchesFilter && matchesQuery;
-    });
+  // 🎯 Filtre optimisé
+  React.useEffect(() => {
+    console.log('🎯 Filtre changé vers:', selectedFilter);
+    loadOrders(true);
+  }, [selectedFilter]);
 
-    // Tri
-    filtered.sort((a, b) => {
-      if (sortBy === 'date') {
-        return sortOrder === 'desc' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id);
-      } else if (sortBy === 'total') {
-        return sortOrder === 'desc' ? b.total - a.total : a.total - b.total;
-      } else {
-        return sortOrder === 'desc' 
-          ? a.status.localeCompare(b.status)
-          : b.status.localeCompare(a.status);
-      }
-    });
+  // 🚀 Chargement initial
+  React.useEffect(() => {
+    console.log('🚀 Chargement initial de la page');
+    loadOrders();
+  }, []);
 
-    return filtered;
-  }, [orders, selectedFilter, searchQuery, sortBy, sortOrder]);
+  // 🚀 Plus besoin de filtrage local - tout est géré par le backend optimisé !
+  const filteredOrders = orders;
 
   const stats = useMemo(() => ({
     total: orders.reduce((sum, order) => sum + order.total, 0),
@@ -248,26 +297,50 @@ export const SellerOrdersScreen: React.FC = () => {
     delivered: orders.filter((o) => o.status === 'delivered').length,
   }), [orders]);
 
-  const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
-    Alert.alert(
-      'Confirmation',
-      `Voulez-vous marquer cette commande comme ${getStatusLabel(newStatus).toLowerCase()} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: async () => {
-            try {
-              await orderService.updateStatus(orderId, newStatus);
-              await loadOrders();
-              Alert.alert('Succès', 'Statut mis à jour');
-            } catch (e: any) {
-              Alert.alert('Erreur', e?.message || 'Impossible de mettre à jour le statut');
-            }
-          },
-        }
-      ]
-    );
+  const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
+    console.log('=== DÉBUT DEBUG ===');
+    console.log('handleStatusChange appelé avec:', { orderId, newStatus });
+    
+    const actionText = newStatus === 'cancelled' ? 'annuler' : 
+                     newStatus === 'paid' ? 'accepter' : 
+                     newStatus === 'shipped' ? 'marquer comme expédiée' : 
+                     newStatus === 'delivered' ? 'marquer comme livrée' : 'mettre à jour';
+    
+    console.log('actionText:', actionText);
+    console.log('🔥 EXÉCUTION DIRECTE SANS CONFIRMATION');
+    
+    try {
+      console.log('1️⃣ setUpdatingOrderId...');
+      setUpdatingOrderId(orderId);
+      
+      // 🚀 Mise à jour optimisée après changement de statut
+      if (newStatus === 'cancelled') {
+        // Suppression optimiste
+        setOrders(prev => prev.filter(order => order.id !== orderId));
+      } else {
+        // Mise à jour optimiste
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { ...order, status: newStatus } : order
+        ));
+      }
+      
+      await orderService.updateStatus(orderId, newStatus);
+      Alert.alert('Succès', `Commande ${actionText} avec succès`);
+      
+      // 🚀 Pas de rechargement complet - juste une mise à jour locale optimisée
+      console.log('✅ Mise à jour locale effectuée, pas de rechargement réseau');
+      
+    } catch (e: any) {
+      console.error('❌ ERREUR CAPTURÉE:', e);
+      // En cas d'erreur, on recharge juste les données nécessaires
+      await loadOrders(true);
+      Alert.alert('Erreur', `Impossible de ${actionText} la commande: ${e?.message || 'Erreur inconnue'}`);
+    } finally {
+      setUpdatingOrderId(null);
+      console.log('=== FIN ACTION ===');
+    }
+    
+    console.log('=== FIN DEBUG ===');
   };
 
   const handleContactCustomer = (phone: string, customer: string, total: number) => {
@@ -473,28 +546,54 @@ export const SellerOrdersScreen: React.FC = () => {
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={[styles.actionButton, styles.rejectButton]}
-              onPress={() => handleStatusChange(order.id, 'cancelled')}
+              onPress={() => {
+                console.log('🔥 BOUTON SUPPRIMER CLIQUÉ');
+                console.log('🔥 order.id:', order.id);
+                handleStatusChange(order.id, 'cancelled');
+              }}
+              disabled={updatingOrderId === order.id}
             >
-              <Ionicons name="close" size={fontSize.md} color={COLORS.danger} />
-              <Text style={[styles.rejectButtonText, { fontSize: fontSize.sm }]}>
-                Refuser
-              </Text>
+              {updatingOrderId === order.id ? (
+                <Text style={[styles.rejectButtonText, { fontSize: fontSize.sm }]}>
+                  Traitement...
+                </Text>
+              ) : (
+                <>
+                  <Ionicons name="trash" size={fontSize.md} color={COLORS.danger} />
+                  <Text style={[styles.rejectButtonText, { fontSize: fontSize.sm }]}>
+                    Supprimer
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.actionButton, styles.confirmButton]}
-              onPress={() => handleStatusChange(order.id, 'paid')}
+              onPress={() => {
+                console.log('🔥 BOUTON ACCEPTER CLIQUÉ');
+                console.log('🔥 order.id:', order.id);
+                handleStatusChange(order.id, 'paid');
+              }}
+              disabled={updatingOrderId === order.id}
             >
-              <LinearGradient
-                colors={[COLORS.accent, COLORS.accent2]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.confirmGradient}
-              />
-              <Ionicons name="checkmark" size={fontSize.md} color={COLORS.text} />
-              <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>
-                Confirmer
-              </Text>
+              {updatingOrderId === order.id ? (
+                <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>
+                  Traitement...
+                </Text>
+              ) : (
+                <>
+                  <LinearGradient
+                    colors={[COLORS.accent, COLORS.accent2]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.confirmGradient}
+                  />
+                  <Ionicons name="checkmark-circle" size={fontSize.md} color={COLORS.text} />
+                  <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>
+                    Accepter
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         )}
@@ -667,6 +766,17 @@ export const SellerOrdersScreen: React.FC = () => {
     ordersContainer: {
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xxxl,
+    },
+    loadingMoreContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: spacing.lg,
+      gap: spacing.sm,
+    },
+    loadingMoreText: {
+      color: COLORS.textMuted,
+      fontSize: fontSize.sm,
     },
     orderCard: {
       borderWidth: 1,
@@ -1089,20 +1199,55 @@ export const SellerOrdersScreen: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView 
+      <FlatList
+        data={filteredOrders}
+        renderItem={({ item }) => renderOrder(item)}
+        keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
         }
-      >
-        <View style={styles.ordersContainer}>
-          {loading ? (
+        onEndReached={loadMoreOrders}
+        onEndReachedThreshold={0.3}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews={true}
+        ListFooterComponent={
+          <View>
+            {loadingMore && (
+              <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.loadingMoreText}>Chargement...</Text>
+              </View>
+            )}
+            {!loadingMore && hasMore && (
+              <View style={styles.loadingMoreContainer}>
+                <Text style={styles.loadingMoreText}>Tirez pour charger plus</Text>
+              </View>
+            )}
+            {!hasMore && orders.length > 0 && (
+              <View style={styles.loadingMoreContainer}>
+                <Text style={styles.loadingMoreText}>
+                  📭 Toutes les commandes sont chargées ({orders.length})
+                </Text>
+              </View>
+            )}
+          </View>
+        }
+        ListEmptyComponent={
+          loading ? (
             <View style={styles.ordersContainer}>
               {[1, 2, 3].map((i) => (
                 <OrderCardSkeleton key={i} />
               ))}
             </View>
-          ) : filteredOrders.length === 0 ? (
+          ) : (
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={80} color={COLORS.textMuted} style={styles.emptyStateIcon} />
               <Text style={styles.emptyStateTitle}>Aucune commande</Text>
@@ -1118,11 +1263,13 @@ export const SellerOrdersScreen: React.FC = () => {
                 <Text style={styles.emptyStateButtonText}>Nouvelle commande</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            filteredOrders.map(renderOrder)
-          )}
-        </View>
-      </ScrollView>
+          )
+        }
+        contentContainerStyle={[
+          styles.ordersContainer,
+          orders.length === 0 && { flex: 1 }
+        ]}
+      />
     </View>
   );
 };

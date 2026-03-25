@@ -14,6 +14,7 @@ import {
   Share,
   Switch,
   Modal,
+  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -59,24 +60,31 @@ export const SellerProductsScreen: React.FC = () => {
   // Core state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [store, setStore] = useState<Store | null>(null);
-  const [storeId, setStoreId] = useState<string | null>(null);
   const [products, setProducts] = useState<SupabaseProduct[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
-
-  // UI state
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectedCollection, setSelectedCollection] = useState('all');
   const [sortBy, setSortBy] = useState<SortOption>('date_desc');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [stockFilter, setStockFilter] = useState<StockFilterType>('all');
+  const [store, setStore] = useState<Store | null>(null);
+  const [storeId, setStoreId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // États pour le mode sélection
   const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
 
   // Advanced filters
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
-  const [stockFilter, setStockFilter] = useState<StockFilterType>('all');
 
   const getProductPublicUrl = useCallback((productId: string) => {
     const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
@@ -96,33 +104,106 @@ export const SellerProductsScreen: React.FC = () => {
     await Share.share({ message: url, url });
   }, [getProductPublicUrl]);
 
-  const loadProducts = useCallback(async () => {
+  // 🚀 Fonction de chargement avec pagination professionnelle
+  const loadProducts = useCallback(async (reset = true) => {
     if (!user?.id) return;
+    
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setCurrentPage(0);
+        setProducts([]);
+        setHasMore(true);
+      } else {
+        setLoadingMore(true);
+      }
+
       const store = await storeService.getByUser(user.id);
       if (!store?.id) {
         setStoreId(null);
         setProducts([]);
         setCollections([]);
+        setHasMore(false);
         return;
       }
+
       setStore(store);
       setStoreId(store.id);
+
       const cols = await collectionService.getByStore(store.id);
       setCollections(cols);
-      const data = await productService.getByStoreAll(store.id);
-      setProducts((data as any[]) as SupabaseProduct[]);
+
+      const page = reset ? 0 : currentPage;
+      console.log(`📄 Chargement page ${page} des produits (pagination)`);
+
+      const result = await productService.getByStorePaginated(store.id, {
+        page,
+        limit: 20,
+        collectionId: selectedCollection !== 'all' ? selectedCollection : undefined,
+        stockFilter,
+        search: searchQuery || undefined,
+        sortBy,
+        isActive: true,
+      });
+
+      console.log(`📦 Produits reçus: ${result.products.length}, Total: ${result.totalCount}, Page: ${result.currentPage + 1}/${result.totalPages}`);
+
+      if (reset) {
+        setProducts(result.products);
+      } else {
+        setProducts(prev => [...prev, ...result.products]);
+      }
+
+      setHasMore(result.hasMore);
+      setTotalCount(result.totalCount);
+      setTotalPages(result.totalPages);
+      
+      if (!reset) {
+        setCurrentPage(page + 1);
+      }
+
     } catch (e) {
       errorHandler.handleDatabaseError(e as Error, 'load products');
       Alert.alert('Erreur', 'Impossible de charger les produits');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [user?.id]);
+  }, [user?.id, currentPage, selectedCollection, stockFilter, searchQuery, sortBy]);
 
-  useEffect(() => { loadProducts(); }, [loadProducts]);
-  useFocusEffect(useCallback(() => { loadProducts(); }, [loadProducts]));
+  // 🚀 Chargement de la page suivante
+  const loadMoreProducts = async () => {
+    if (!hasMore || loadingMore || loading) return;
+    console.log('🔄 Chargement de plus de produits...');
+    await loadProducts(false);
+  };
+
+  // 🎯 Rechargement optimisé avec debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      console.log('🔍 Recherche optimisée pour:', searchQuery);
+      loadProducts(true);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // 🎯 Filtre optimisé
+  useEffect(() => {
+    console.log('🎯 Filtre changé vers:', selectedCollection);
+    loadProducts(true);
+  }, [selectedCollection, stockFilter, sortBy]);
+
+  // 🚀 Chargement initial
+  useEffect(() => {
+    console.log('🚀 Chargement initial des produits');
+    loadProducts();
+  }, []);
+
+  useFocusEffect(useCallback(() => { 
+    console.log('📱 Focus effect - rechargement des produits');
+    loadProducts(); 
+  }, [loadProducts]));
 
   const collectionFilters = useMemo(() => {
     return (collections || []).filter(c => c.is_active).map(c => ({ id: c.id, label: c.name, icon: 'albums-outline' as const }));
@@ -148,37 +229,7 @@ export const SellerProductsScreen: React.FC = () => {
     return s;
   }, [products, collectionFilters]);
 
-  const filteredProducts = useMemo(() => {
-    let filtered = products.filter(product => {
-      const matchesSearch = String(product.name || '').toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCollection = selectedFilter === 'all' || String((product as any).collection_id || '') === selectedFilter;
-      let matchesPrice = true;
-      if (priceRange.min) matchesPrice = product.price >= parseFloat(priceRange.min);
-      if (priceRange.max) matchesPrice = matchesPrice && product.price <= parseFloat(priceRange.max);
-      let matchesStock = true;
-      if (stockFilter === 'in_stock') matchesStock = product.stock > 3;
-      else if (stockFilter === 'low_stock') matchesStock = product.stock > 0 && product.stock <= 3;
-      else if (stockFilter === 'out_of_stock') matchesStock = product.stock <= 0;
-      return matchesSearch && matchesCollection && matchesPrice && matchesStock;
-    });
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'name_asc': return a.name.localeCompare(b.name);
-        case 'name_desc': return b.name.localeCompare(a.name);
-        case 'price_asc': return a.price - b.price;
-        case 'price_desc': return b.price - a.price;
-        case 'stock_asc': return a.stock - b.stock;
-        case 'stock_desc': return b.stock - a.stock;
-        case 'date_asc': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case 'date_desc': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        default: return 0;
-      }
-    });
-
-    return filtered;
-  }, [products, searchQuery, selectedFilter, priceRange, stockFilter, sortBy]);
+  const filteredProducts = products;
 
   const hasAnyCollection = collections.length > 0;
   const hasActiveFilters = priceRange.min || priceRange.max || stockFilter !== 'all';
@@ -576,6 +627,101 @@ export const SellerProductsScreen: React.FC = () => {
         isMobile={isMobile}
       />
 
+      {/* Product list with pagination */}
+      <FlatList
+        data={filteredProducts}
+        renderItem={({ item }) => renderProduct(item)}
+        keyExtractor={(item) => item.id}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.listContent, 
+          { paddingHorizontal: spacing.md, paddingBottom: 100 }
+        ]}
+        ListHeaderComponent={
+          <View>
+            {loading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color={COLORS.accent} />
+                <Text style={styles.loadingText}>Chargement des produits…</Text>
+              </View>
+            ) : storeId && !hasAnyCollection ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="albums-outline" size={72} color={COLORS.textMuted} />
+                <Text style={styles.emptyTitle}>Aucune collection</Text>
+                <Text style={styles.emptyText}>Créez d'abord une collection pour y ajouter des produits.</Text>
+                <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('SellerCollection')}>
+                  <Text style={styles.emptyBtnText}>Créer une collection</Text>
+                </TouchableOpacity>
+              </View>
+            ) : filteredProducts.length === 0 && !loading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="cube-outline" size={72} color={COLORS.textMuted} />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery || hasActiveFilters ? 'Aucun résultat' : 'Aucun produit'}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery || hasActiveFilters
+                    ? 'Essayez de modifier votre recherche ou vos filtres.'
+                    : storeId
+                      ? 'Commencez à ajouter vos produits ici.'
+                      : 'Créez votre boutique avant d\'ajouter des produits.'}
+                </Text>
+                {storeId && hasAnyCollection && (
+                  <TouchableOpacity
+                    style={styles.emptyBtn}
+                    onPress={() => {
+                      if (store?.product_limit && products.length >= store.product_limit) {
+                        Alert.alert(
+                          'Limite atteinte',
+                          `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
+                          [{ text: 'OK' }]
+                        );
+                        return;
+                      }
+                      setShowAddProductModal(true);
+                    }}
+                  >
+                    <Ionicons name="add" size={18} color="#fff" />
+                    <Text style={styles.emptyBtnText}>Ajouter un produit</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : null}
+          </View>
+        }
+        ListFooterComponent={
+          <View style={styles.paginationContainer}>
+            {loadingMore && (
+              <View style={styles.loadingMoreContainer}>
+                <ActivityIndicator size="small" color={COLORS.accent} />
+                <Text style={styles.loadingMoreText}>Chargement...</Text>
+              </View>
+            )}
+            {!loadingMore && hasMore && (
+              <TouchableOpacity 
+                style={styles.loadMoreBtn}
+                onPress={loadMoreProducts}
+              >
+                <Text style={styles.loadMoreBtnText}>
+                  Charger plus de produits ({products.length}/{totalCount})
+                </Text>
+              </TouchableOpacity>
+            )}
+            {!hasMore && products.length > 0 && (
+              <View style={styles.paginationInfo}>
+                <Text style={styles.paginationInfoText}>
+                  📦 Tous les produits chargés ({products.length}/{totalCount})
+                </Text>
+                <Text style={styles.paginationPagesText}>
+                  Page {Math.ceil(products.length / 20)} sur {totalPages}
+                </Text>
+              </View>
+            )}
+          </View>
+        }
+      />
+
       {/* Search + controls bar */}
       <View style={styles.controlsBar}>
         <View style={styles.searchBar}>
@@ -637,70 +783,6 @@ export const SellerProductsScreen: React.FC = () => {
           </View>
         </View>
       )}
-
-      {/* Product list */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.listContent, { paddingHorizontal: spacing.md, paddingBottom: 100 }]}
-      >
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={COLORS.accent} />
-            <Text style={styles.loadingText}>Chargement des produits…</Text>
-          </View>
-        ) : storeId && !hasAnyCollection ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="albums-outline" size={72} color={COLORS.textMuted} />
-            <Text style={styles.emptyTitle}>Aucune collection</Text>
-            <Text style={styles.emptyText}>Créez d'abord une collection pour y ajouter des produits.</Text>
-            <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('SellerCollection')}>
-              <Text style={styles.emptyBtnText}>Créer une collection</Text>
-            </TouchableOpacity>
-          </View>
-        ) : filteredProducts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="cube-outline" size={72} color={COLORS.textMuted} />
-            <Text style={styles.emptyTitle}>
-              {searchQuery || hasActiveFilters ? 'Aucun résultat' : 'Aucun produit'}
-            </Text>
-            <Text style={styles.emptyText}>
-              {searchQuery || hasActiveFilters
-                ? 'Essayez de modifier votre recherche ou vos filtres.'
-                : storeId
-                  ? 'Commencez à ajouter vos produits ici.'
-                  : 'Créez votre boutique avant d\'ajouter des produits.'}
-            </Text>
-            {storeId && hasAnyCollection && (
-              <TouchableOpacity
-                style={styles.emptyBtn}
-                onPress={() => {
-                  if (store?.product_limit && products.length >= store.product_limit) {
-                    Alert.alert(
-                      'Limite atteinte',
-                      `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
-                      [{ text: 'OK' }]
-                    );
-                    return;
-                  }
-                  setShowAddProductModal(true);
-                }}
-              >
-                <Ionicons name="add" size={18} color="#fff" />
-                <Text style={styles.emptyBtnText}>Ajouter un produit</Text>
-              </TouchableOpacity>
-            )}
-            {(searchQuery || hasActiveFilters) && (
-              <TouchableOpacity style={styles.emptyBtnOutline} onPress={() => { setSearchQuery(''); setPriceRange({ min: '', max: '' }); setStockFilter('all'); }}>
-                <Text style={styles.emptyBtnOutlineText}>Effacer les filtres</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : viewMode === 'grid' ? (
-          renderGridLayout()
-        ) : (
-          filteredProducts.map(renderProduct)
-        )}
-      </ScrollView>
 
       {/* FAB */}
       {isMobile && !selectionMode && (
@@ -980,4 +1062,45 @@ const styles = StyleSheet.create({
   filterOptionText: { fontSize: FONT_SIZE.md, fontWeight: '500' },
   applyBtn: { backgroundColor: COLORS.accent, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, alignItems: 'center', marginTop: SPACING.lg },
   applyBtnText: { color: '#fff', fontWeight: '700', fontSize: FONT_SIZE.md },
+
+  // Styles pour la pagination professionnelle
+  paginationContainer: {
+    paddingVertical: SPACING.lg,
+    alignItems: 'center',
+  },
+  loadingMoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+  },
+  loadingMoreText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+  },
+  loadMoreBtn: {
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.md,
+  },
+  loadMoreBtnText: {
+    color: '#fff',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+  },
+  paginationInfo: {
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+  },
+  paginationInfoText: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+    marginBottom: SPACING.xs,
+  },
+  paginationPagesText: {
+    color: COLORS.textSoft,
+    fontSize: FONT_SIZE.xs,
+  },
 });
