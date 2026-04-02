@@ -11,7 +11,6 @@ import * as Haptics from 'expo-haptics';
 // Imports optimisés
 import * as Screens from '../screens';
 import { RootStackParamList, ClientTabParamList, SellerTabParamList, UserRole, NotificationPayload } from './types';
-import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
 import { useAuthStore } from '../store';
 import { sessionStorage } from '../lib/storage';
 import { supabase } from '../lib/supabase';
@@ -47,12 +46,15 @@ const linking = {
   },
 };
 
-// Écran de chargement
-const LoadingScreen: React.FC = () => (
-  <View style={styles.loadingContainer}>
-    <Ionicons name="cart-outline" size={50} color={COLORS.accent} />
-  </View>
-);
+// Écran de chargement (thème dynamique)
+const LoadingScreen: React.FC = () => {
+  const { getColor } = useTheme();
+  return (
+    <View style={[styles.loadingContainer, { backgroundColor: getColor.bg }]}>
+      <Ionicons name="cart-outline" size={50} color={getColor.accent} />
+    </View>
+  );
+};
 
 // Hook personnalisé pour la gestion responsive
 const useResponsiveTabBar = () => {
@@ -149,6 +151,7 @@ const useSubscriptionCheck = () => {
 
 // Navigation Client
 const ClientTabs: React.FC = React.memo(() => {
+  const { getColor } = useTheme();
   const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels } = useResponsiveTabBar();
 
   const getIconName = (routeName: string, focused: boolean): keyof typeof Ionicons.glyphMap => {
@@ -158,7 +161,6 @@ const ClientTabs: React.FC = React.memo(() => {
       ClientSearch: ['search', 'search-outline'],
       Wishlist: ['heart', 'heart-outline'],
       ClientProfile: ['person', 'person-outline'],
-      Cart: ['cart', 'cart-outline'],
     };
     
     const [focusedIcon, outlineIcon] = icons[routeName] || ['home', 'home-outline'];
@@ -175,11 +177,11 @@ const ClientTabs: React.FC = React.memo(() => {
             color={color} 
           />
         ),
-        tabBarActiveTintColor: COLORS.accent,
-        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarActiveTintColor: getColor.accent,
+        tabBarInactiveTintColor: getColor.textMuted,
         tabBarStyle: {
-          backgroundColor: COLORS.bg,
-          borderTopColor: COLORS.border,
+          backgroundColor: getColor.bg,
+          borderTopColor: getColor.border,
           borderTopWidth: 1,
           height: tabBarHeight,
           paddingBottom: bottomPadding,
@@ -207,13 +209,13 @@ const ClientTabs: React.FC = React.memo(() => {
       <ClientTab.Screen name="ClientSearch" component={Screens.ClientSearchScreen} options={{ title: 'Recherche' }} />
       <ClientTab.Screen name="Wishlist" component={Screens.WishlistScreen} options={{ title: 'Favoris' }} />
       <ClientTab.Screen name="ClientProfile" component={Screens.ClientProfileScreen} options={{ title: 'Profil' }} />
-      <ClientTab.Screen name="Cart" component={Screens.CartScreen} options={{ title: 'Panier' }} />
     </ClientTab.Navigator>
   );
 });
 
 // Navigation Vendeur
 const SellerTabs: React.FC = React.memo(() => {
+  const { getColor } = useTheme();
   const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels, isLandscape } = useResponsiveTabBar();
 
   const getIconName = (routeName: string, focused: boolean): keyof typeof Ionicons.glyphMap => {
@@ -242,11 +244,11 @@ const SellerTabs: React.FC = React.memo(() => {
             color={color} 
           />
         ),
-        tabBarActiveTintColor: COLORS.accent,
-        tabBarInactiveTintColor: COLORS.textMuted,
+        tabBarActiveTintColor: getColor.accent,
+        tabBarInactiveTintColor: getColor.textMuted,
         tabBarStyle: {
-          backgroundColor: COLORS.bg,
-          borderTopColor: COLORS.border,
+          backgroundColor: getColor.bg,
+          borderTopColor: getColor.border,
           borderTopWidth: 1,
           height: isLandscapeIOS ? 60 : tabBarHeight,
           paddingBottom: isLandscapeIOS ? 5 : bottomPadding,
@@ -538,7 +540,6 @@ export const AppNavigator: React.FC = () => {
         
         {/* Routes clients */}
         <Stack.Screen name="ClientDetail" component={Screens.ClientDetailScreen} />
-        <Stack.Screen name="ClientOrders" component={Screens.ClientOrdersScreen} />
         <Stack.Screen name="ClientOrderDetail" component={Screens.ClientOrderDetailScreen} />
         <Stack.Screen name="ClientEdit" component={Screens.ClientEditScreen} />
         <Stack.Screen name="ClientAllStores" component={Screens.ClientAllStoresScreen} />
@@ -550,7 +551,6 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Payment" component={Screens.PaymentScreen} />
         <Stack.Screen name="BulkPayment" component={Screens.BulkPaymentScreen} />
         <Stack.Screen name="Confirmation" component={Screens.ConfirmationScreen} />
-        <Stack.Screen name="Wishlist" component={Screens.WishlistScreen} />
         <Stack.Screen name="Notifications" component={Screens.NotificationsScreen} />
         
         {/* Routes vendeurs */}
@@ -600,7 +600,6 @@ export const AppNavigator: React.FC = () => {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: COLORS.bg,
     alignItems: 'center',
     justifyContent: 'center',
   },

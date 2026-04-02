@@ -7,6 +7,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../hooks/useTheme';
 
 interface HeaderProps {
@@ -63,6 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
 
 // Custom Header for Landing Page
 export const LandingHeader: React.FC = () => {
+  const navigation = useNavigation<any>();
   const themeContext = useTheme();
   const theme = themeContext.theme;
   const COLORS = themeContext.getColor;
@@ -81,13 +83,13 @@ export const LandingHeader: React.FC = () => {
       <View style={styles.landingContent}>
         <Text style={styles.logo}>LibreShop</Text>
         <View style={styles.landingNav}>
-          <TouchableOpacity style={styles.navLink}>
+          <TouchableOpacity style={styles.navLink} onPress={() => navigation.navigate('Features')}>
             <Text style={styles.navLinkText}>Fonctionnement</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navLink}>
+          <TouchableOpacity style={styles.navLink} onPress={() => navigation.navigate('Pricing')}>
             <Text style={styles.navLinkText}>Tarifs</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.navLink}>
+          <TouchableOpacity style={styles.navLink} onPress={() => navigation.navigate('ClientTabs')}>
             <Text style={styles.navLinkText}>Explorer</Text>
           </TouchableOpacity>
         </View>

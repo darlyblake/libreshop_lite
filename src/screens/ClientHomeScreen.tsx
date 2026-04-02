@@ -21,7 +21,9 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
+import { navigateToClientTab } from '../navigation/clientNavigation';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { StoreCard, ProductCard } from '../components';
 import { PWAInstallButton } from '../components/PWAInstallButton';
@@ -51,6 +53,12 @@ export const ClientHomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { width, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
   const { items } = useCartStore();
+  const palette = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE, isDark } = useTheme();
+  const styles = useMemo(
+    () => createClientHomeStyles(palette, SPACING, RADIUS, FONT_SIZE),
+    [palette, SPACING, RADIUS, FONT_SIZE]
+  );
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -64,7 +72,7 @@ export const ClientHomeScreen: React.FC = () => {
     const totalHorizontalPadding = SPACING.xl * 2; // paddingHorizontal des deux côtés
     const totalGap = SPACING.md * (numProductColumns - 1); // gap entre colonnes
     return (contentWidth - totalHorizontalPadding - totalGap) / numProductColumns;
-  }, [contentWidth, numProductColumns]);
+  }, [contentWidth, numProductColumns, SPACING]);
   
   // Real data states
   const [stores, setStores] = useState<Store[]>([]);
@@ -292,7 +300,7 @@ export const ClientHomeScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={palette.bg} />
        <ScrollView 
         style={styles.container} 
         contentContainerStyle={styles.scrollContent}
@@ -301,14 +309,14 @@ export const ClientHomeScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={COLORS.accent}
-            colors={[COLORS.accent]}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
           />
         }
       >
         <View style={styles.maxWidthContainer}>
           <LinearGradient
-            colors={[COLORS.accent, COLORS.accentDark || COLORS.accent]}
+            colors={[palette.accent, palette.accentDark || palette.accent]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.header}
@@ -319,7 +327,10 @@ export const ClientHomeScreen: React.FC = () => {
                 <Text style={styles.logoSlogan}>Achetez local, vivez mieux</Text>
               </View>
               <View style={styles.headerActions}>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => navigateToClientTab(navigation, 'Wishlist')}
+                >
                   <Ionicons name="heart-outline" size={22} color="white" />
                 </TouchableOpacity>
                 <TouchableOpacity 
@@ -342,7 +353,7 @@ export const ClientHomeScreen: React.FC = () => {
               onPress={() => navigation.navigate('ClientSearch')}
               activeOpacity={0.7}
             >
-              <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
+              <Ionicons name="search-outline" size={20} color={palette.textMuted} />
               <Text style={styles.searchPlaceholder}>Rechercher un produit, une boutique...</Text>
             </TouchableOpacity>
           </LinearGradient>
@@ -350,14 +361,14 @@ export const ClientHomeScreen: React.FC = () => {
           {/* Loading/Error State */}
           {loading && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.accent} />
+              <ActivityIndicator size="large" color={palette.accent} />
               <Text style={styles.loadingText}>Chargement des meilleures offres...</Text>
             </View>
           )}
 
           {error && !loading && (
             <View style={styles.errorContainer}>
-              <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
+              <Ionicons name="warning-outline" size={64} color={palette.danger} />
               <Text style={styles.errorTitle}>Oups !</Text>
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
@@ -416,37 +427,37 @@ export const ClientHomeScreen: React.FC = () => {
               <View style={styles.quickActions}>
                 <TouchableOpacity style={styles.quickAction}>
                   <LinearGradient
-                    colors={[COLORS.accent + '20', COLORS.accent + '05']}
+                    colors={[palette.accent + '20', palette.accent + '05']}
                     style={styles.quickActionIcon}
                   >
-                    <Ionicons name="flash" size={24} color={COLORS.accent} />
+                    <Ionicons name="flash" size={24} color={palette.accent} />
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Flash deals</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.quickAction}>
                   <LinearGradient
-                    colors={[COLORS.success + '20', COLORS.success + '05']}
+                    colors={[palette.success + '20', palette.success + '05']}
                     style={styles.quickActionIcon}
                   >
-                    <Ionicons name="gift" size={24} color={COLORS.success} />
+                    <Ionicons name="gift" size={24} color={palette.success} />
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Bons plans</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.quickAction}>
                   <LinearGradient
-                    colors={[COLORS.warning + '20', COLORS.warning + '05']}
+                    colors={[palette.warning + '20', palette.warning + '05']}
                     style={styles.quickActionIcon}
                   >
-                    <Ionicons name="star" size={24} color={COLORS.warning} />
+                    <Ionicons name="star" size={24} color={palette.warning} />
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Nouveautés</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.quickAction}>
                   <LinearGradient
-                    colors={[COLORS.info + '20', COLORS.info + '05']}
+                    colors={[palette.info + '20', palette.info + '05']}
                     style={styles.quickActionIcon}
                   >
-                    <Ionicons name="heart" size={24} color={COLORS.info} />
+                    <Ionicons name="heart" size={24} color={palette.info} />
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Favoris</Text>
                 </TouchableOpacity>
@@ -500,8 +511,8 @@ export const ClientHomeScreen: React.FC = () => {
                 >
                   <LinearGradient
                     colors={[
-                      normalizeHexColor(promoBanners[0].color) || COLORS.danger,
-                      COLORS.dangerGradient[1],
+                      normalizeHexColor(promoBanners[0].color) || palette.danger,
+                      palette.dangerGradient[1],
                     ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -581,10 +592,10 @@ export const ClientHomeScreen: React.FC = () => {
                     disabled={loadingMoreProducts}
                   >
                     {loadingMoreProducts ? (
-                      <ActivityIndicator size="small" color={COLORS.accent} />
+                      <ActivityIndicator size="small" color={palette.accent} />
                     ) : (
                       <>
-                        <Ionicons name="refresh" size={16} color={COLORS.accent} />
+                        <Ionicons name="refresh" size={16} color={palette.accent} />
                         <Text style={styles.loadMoreText}>Charger plus de produits</Text>
                       </>
                     )}
@@ -602,14 +613,18 @@ export const ClientHomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any) {
+  return StyleSheet.create({
+  promoSection: {
+    marginBottom: SPACING.xl,
+  },
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   scrollContent: {
     flexGrow: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   maxWidthContainer: {
     maxWidth: MAX_CONTENT_WIDTH,
@@ -636,7 +651,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '800',
-    color: COLORS.text,
+    color: palette.text,
     letterSpacing: 0.5,
   },
   logoSlogan: {
@@ -660,24 +675,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: COLORS.danger,
+    backgroundColor: palette.danger,
     width: 18,
     height: 18,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   cartBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
@@ -686,7 +701,7 @@ const styles = StyleSheet.create({
   searchPlaceholder: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   
   // Banner Carousel
@@ -702,7 +717,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     ...(Platform.OS === 'web'
       ? { boxShadow: '0px 4px 8px rgba(0,0,0,0.2)' }
       : {
@@ -731,7 +746,7 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '800',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 4,
     ...(Platform.OS === 'web'
       ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
@@ -762,7 +777,7 @@ const styles = StyleSheet.create({
   bannerButtonText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   paginationContainer: {
     flexDirection: 'row',
@@ -775,11 +790,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: COLORS.border,
+    backgroundColor: palette.border,
   },
   paginationDotActive: {
     width: 24,
-    backgroundColor: COLORS.accent,
+    backgroundColor: palette.accent,
   },
   
   // Quick Actions
@@ -803,7 +818,7 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '500',
-    color: COLORS.text,
+    color: palette.text,
   },
   
   // Categories
@@ -820,16 +835,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
   },
   sectionSubtitle: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginTop: 2,
   },
   seeAll: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
+    color: palette.accent,
     fontWeight: '600',
   },
   categoriesList: {
@@ -840,21 +855,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   categoryChipActive: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
   },
   categoryChipText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
-    color: COLORS.textSoft,
+    color: palette.textSoft,
   },
   categoryChipTextActive: {
-    color: COLORS.text,
+    color: palette.text,
   },
   
   // Sections
@@ -878,7 +893,7 @@ const styles = StyleSheet.create({
   },
   storeNameLabel: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginTop: 4,
     paddingHorizontal: 2,
   },
@@ -900,7 +915,7 @@ const styles = StyleSheet.create({
   promoTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '800',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 4,
   },
   promoSubtitle: {
@@ -921,7 +936,7 @@ const styles = StyleSheet.create({
   promoButtonText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   promoImage: {
     width: 120,
@@ -941,20 +956,20 @@ const styles = StyleSheet.create({
   newsletterTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.sm,
     textAlign: 'center',
   },
   newsletterText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
   newsletterButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.accent,
+    backgroundColor: palette.accent,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.full,
@@ -963,7 +978,7 @@ const styles = StyleSheet.create({
   newsletterButtonText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   
   // Load More
@@ -975,17 +990,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   loadMoreText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.accent,
+    color: palette.accent,
   },
   
   // Loading & Error States
@@ -998,7 +1013,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   errorContainer: {
     flex: 1,
@@ -1011,25 +1026,26 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
   },
   errorText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
   retryButton: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: palette.accent,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.full,
   },
   retryButtonText: {
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },
 });
+}
 
 export default ClientHomeScreen;

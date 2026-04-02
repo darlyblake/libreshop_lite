@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 import { Order, OrderItem, Product, Store, User } from '../lib/supabase';
 import { orderService } from '../services/orderService';
 import { useAuthStore } from '../store';
@@ -36,14 +37,14 @@ interface OrderFilters {
 
 
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string, p: LegacyPalette) => {
   switch (status) {
-    case 'pending': return COLORS.warning;
-    case 'paid': return COLORS.accent;
-    case 'shipped': return COLORS.accent2;
-    case 'delivered': return COLORS.success;
-    case 'cancelled': return COLORS.danger;
-    default: return COLORS.textMuted;
+    case 'pending': return p.warning;
+    case 'paid': return p.accent;
+    case 'shipped': return p.accent2;
+    case 'delivered': return p.success;
+    case 'cancelled': return p.danger;
+    default: return p.textMuted;
   }
 };
 
@@ -102,6 +103,13 @@ export const ClientOrdersScreen: React.FC = () => {
   const [filters, setFilters] = useState<OrderFilters>({});
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [markingAsReceived, setMarkingAsReceived] = useState<string | null>(null);
+
+  const palette = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = useMemo(
+    () => createClientOrdersStyles(palette, SPACING, RADIUS, FONT_SIZE),
+    [palette, SPACING, RADIUS, FONT_SIZE]
+  );
 
   // Charger les commandes avec détails
   const loadOrders = useCallback(async () => {
@@ -267,7 +275,7 @@ export const ClientOrdersScreen: React.FC = () => {
           <Text style={styles.orderId}>Commande #{order.id}</Text>
           <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) }]}>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status, palette) }]}>
           <Text style={styles.statusText}>{getStatusLabel(order.status)}</Text>
         </View>
       </View>
@@ -275,7 +283,7 @@ export const ClientOrdersScreen: React.FC = () => {
       {/* Boutique */}
       {order.store && (
         <View style={styles.storeInfo}>
-          <Ionicons name="storefront-outline" size={16} color={COLORS.textMuted} />
+          <Ionicons name="storefront-outline" size={16} color={palette.textMuted} />
           <Text style={styles.storeName}>{order.store.name}</Text>
         </View>
       )}
@@ -314,10 +322,10 @@ export const ClientOrdersScreen: React.FC = () => {
             disabled={markingAsReceived === order.id}
           >
             {markingAsReceived === order.id ? (
-              <ActivityIndicator color={COLORS.text} size="small" />
+              <ActivityIndicator color={palette.text} size="small" />
             ) : (
               <>
-                <Ionicons name="checkmark-circle" size={18} color={COLORS.text} />
+                <Ionicons name="checkmark-circle" size={18} color={palette.text} />
                 <Text style={styles.actionButtonText}>Comme reçu</Text>
               </>
             )}
@@ -328,7 +336,7 @@ export const ClientOrdersScreen: React.FC = () => {
           style={[styles.actionButton, styles.contactButton]}
           onPress={() => contactSeller(order)}
         >
-          <Ionicons name="logo-whatsapp" size={18} color={COLORS.text} />
+          <Ionicons name="logo-whatsapp" size={18} color={palette.text} />
           <Text style={styles.actionButtonText}>Contacter</Text>
         </TouchableOpacity>
         
@@ -336,8 +344,8 @@ export const ClientOrdersScreen: React.FC = () => {
           style={[styles.actionButton, styles.detailsButton]}
           onPress={() => viewOrderDetails(order)}
         >
-          <Ionicons name="eye-outline" size={18} color={COLORS.accent} />
-          <Text style={[styles.actionButtonText, { color: COLORS.accent }]}>Détails</Text>
+          <Ionicons name="eye-outline" size={18} color={palette.accent} />
+          <Text style={[styles.actionButtonText, { color: palette.accent }]}>Détails</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -345,7 +353,7 @@ export const ClientOrdersScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor={palette.bg} />
       
       {/* Header */}
       <View style={styles.header}>
@@ -354,19 +362,19 @@ export const ClientOrdersScreen: React.FC = () => {
           style={styles.filterButton}
           onPress={() => setShowFilters(true)}
         >
-          <Ionicons name="filter-outline" size={20} color={COLORS.accent} />
+          <Ionicons name="filter-outline" size={20} color={palette.accent} />
         </TouchableOpacity>
       </View>
 
       {/* Barre de recherche */}
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+        <Ionicons name="search" size={20} color={palette.textMuted} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Rechercher une commande..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={palette.textMuted}
         />
       </View>
 
@@ -381,7 +389,7 @@ export const ClientOrdersScreen: React.FC = () => {
                   Statut: {getStatusLabel(filters.status)}
                 </Text>
                 <TouchableOpacity onPress={() => setFilters(prev => ({ ...prev, status: undefined }))}>
-                  <Ionicons name="close-circle" size={16} color={COLORS.danger} />
+                  <Ionicons name="close-circle" size={16} color={palette.danger} />
                 </TouchableOpacity>
               </View>
             )}
@@ -391,7 +399,7 @@ export const ClientOrdersScreen: React.FC = () => {
                   Boutique: {uniqueStores.find(s => s.id === filters.storeId)?.name}
                 </Text>
                 <TouchableOpacity onPress={() => setFilters(prev => ({ ...prev, storeId: undefined }))}>
-                  <Ionicons name="close-circle" size={16} color={COLORS.danger} />
+                  <Ionicons name="close-circle" size={16} color={palette.danger} />
                 </TouchableOpacity>
               </View>
             )}
@@ -402,12 +410,12 @@ export const ClientOrdersScreen: React.FC = () => {
       {/* Liste des commandes */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={COLORS.accent} size="large" />
+          <ActivityIndicator color={palette.accent} size="large" />
           <Text style={styles.loadingText}>Chargement de vos commandes...</Text>
         </View>
       ) : filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="receipt-outline" size={64} color={COLORS.textMuted} />
+          <Ionicons name="receipt-outline" size={64} color={palette.textMuted} />
           <Text style={styles.emptyTitle}>Aucune commande trouvée</Text>
           <Text style={styles.emptySubtitle}>
             {searchQuery ? 'Essayez une autre recherche' : 'Commencez vos achats pour voir vos commandes ici'}
@@ -437,7 +445,7 @@ export const ClientOrdersScreen: React.FC = () => {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filtrer les commandes</Text>
               <TouchableOpacity onPress={() => setShowFilters(false)}>
-                <Ionicons name="close" size={24} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={palette.text} />
               </TouchableOpacity>
             </View>
             
@@ -550,7 +558,7 @@ export const ClientOrdersScreen: React.FC = () => {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Détails de la commande #{selectedOrder.id}</Text>
                 <TouchableOpacity onPress={() => setSelectedOrder(null)}>
-                  <Ionicons name="close" size={24} color={COLORS.text} />
+                  <Ionicons name="close" size={24} color={palette.text} />
                 </TouchableOpacity>
               </View>
               
@@ -614,10 +622,11 @@ export const ClientOrdersScreen: React.FC = () => {
 };
 
 // Styles
-const styles = StyleSheet.create({
+function createClientOrdersStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   header: {
     flexDirection: 'row',
@@ -625,30 +634,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   headerTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
   },
   filterButton: {
     padding: SPACING.sm,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.accent + '10',
+    backgroundColor: palette.accent + '10',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     margin: SPACING.lg,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   searchIcon: {
     marginRight: SPACING.md,
@@ -656,7 +665,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
     paddingVertical: 0,
   },
   activeFilters: {
@@ -667,13 +676,13 @@ const styles = StyleSheet.create({
   },
   filterLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginRight: SPACING.sm,
   },
   activeFilter: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.accent + '10',
+    backgroundColor: palette.accent + '10',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.md,
@@ -681,7 +690,7 @@ const styles = StyleSheet.create({
   },
   activeFilterText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
+    color: palette.accent,
     marginRight: SPACING.xs,
   },
   loadingContainer: {
@@ -693,7 +702,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   emptyContainer: {
     flex: 1,
@@ -704,13 +713,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginTop: SPACING.lg,
     marginBottom: SPACING.sm,
   },
   emptySubtitle: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -719,12 +728,12 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   orderCard: {
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -738,12 +747,12 @@ const styles = StyleSheet.create({
   orderId: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.xs,
   },
   orderDate: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   statusBadge: {
     paddingHorizontal: SPACING.sm,
@@ -753,7 +762,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   storeInfo: {
     flexDirection: 'row',
@@ -762,7 +771,7 @@ const styles = StyleSheet.create({
   },
   storeName: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginLeft: SPACING.sm,
   },
   productsList: {
@@ -777,17 +786,17 @@ const styles = StyleSheet.create({
   productName: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    color: palette.text,
     marginRight: SPACING.sm,
   },
   productQuantity: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontWeight: '500',
   },
   moreProducts: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
+    color: palette.accent,
     fontStyle: 'italic',
   },
   orderTotal: {
@@ -796,16 +805,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: palette.border,
   },
   totalLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   totalAmount: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.accent,
+    color: palette.accent,
   },
   orderActions: {
     flexDirection: 'row',
@@ -822,20 +831,20 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   receivedButton: {
-    backgroundColor: COLORS.success,
+    backgroundColor: palette.success,
   },
   contactButton: {
-    backgroundColor: 'COLORS.whatsapp',
+    backgroundColor: 'palette.whatsapp',
   },
   detailsButton: {
-    backgroundColor: COLORS.accent + '10',
+    backgroundColor: palette.accent + '10',
     borderWidth: 1,
-    borderColor: COLORS.accent,
+    borderColor: palette.accent,
   },
   actionButtonText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginLeft: SPACING.xs,
   },
   // Modal styles
@@ -846,14 +855,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   filterModal: {
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.xl,
     width: '90%',
     maxWidth: 400,
     maxHeight: '80%',
   },
   detailsModal: {
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.xl,
     width: '95%',
     maxWidth: 500,
@@ -865,12 +874,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   modalTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   modalContent: {
     padding: SPACING.lg,
@@ -881,7 +890,7 @@ const styles = StyleSheet.create({
   filterSectionTitle: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.md,
   },
   filterOptions: {
@@ -893,20 +902,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   filterOptionSelected: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
   },
   filterOptionText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    color: palette.text,
   },
   filterOptionTextSelected: {
-    color: COLORS.text,
+    color: palette.text,
   },
   detailSection: {
     marginBottom: SPACING.lg,
@@ -914,12 +923,12 @@ const styles = StyleSheet.create({
   detailSectionTitle: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.md,
   },
   detailText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.sm,
   },
   detailItem: {
@@ -928,16 +937,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   detailProductName: {
     flex: 1,
     fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    color: palette.text,
   },
   detailProductPrice: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontWeight: '500',
   },
   detailRow: {
@@ -948,28 +957,29 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   detailValue: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '500',
   },
   totalRow: {
     borderTopWidth: 2,
-    borderTopColor: COLORS.accent,
+    borderTopColor: palette.accent,
     paddingTop: SPACING.md,
     marginTop: SPACING.sm,
   },
   detailTotalLabel: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   detailTotalValue: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.accent,
+    color: palette.accent,
   },
 });
+}
 

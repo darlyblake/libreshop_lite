@@ -37,7 +37,6 @@ export type RootStackParamList = {
   Cart: undefined;
   Checkout: undefined;
   Confirmation: undefined;
-  Wishlist: undefined;
   SellerDashboard: undefined;
   SellerProducts: undefined;
   SellerOrders: undefined;
@@ -53,7 +52,6 @@ export type RootStackParamList = {
   ClientAllStores: undefined;
   ClientAllProducts: undefined;
   ClientDetail: { clientId: string };
-  ClientOrders: undefined;
   ClientOrderDetail: { orderId: string };
   ClientEdit: { userId: string };
   SellerEditCollection: { collectionId: string };
@@ -74,7 +72,6 @@ export type ClientTabParamList = {
   ClientSearch: undefined;
   Wishlist: undefined;
   ClientProfile: undefined;
-  Cart: undefined;
 };
 
 export type SellerTabParamList = {

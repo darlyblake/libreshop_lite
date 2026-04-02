@@ -99,11 +99,15 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <View style={{ flex: 1, width, height }}>
-          <AppNavigator />
-        </View>
-      </ThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <View style={{ flex: 1, width, height }}>
+              <AppNavigator />
+            </View>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

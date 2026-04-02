@@ -140,6 +140,7 @@ export const productService = {
         .from('products')
         .select('*, stores(name, logo_url)')
         .eq('is_active', true)
+        .gt('stock', 0)
         .order('created_at', { ascending: false })
         .range(0, maxFetch - 1);
       if (error) throw error;
@@ -164,7 +165,8 @@ export const productService = {
     let query = client
       .from('products')
       .select('*, stores(name, logo_url)')
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .gt('stock', 0);
 
     if (sort === 'popular' || sort === 'trending') {
       query = query.order('created_at', { ascending: false });

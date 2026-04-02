@@ -34,7 +34,9 @@ import { ProductCard, StoreCard } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useSearchStore } from '../store/searchStore';
-import { COLORS, SPACING, FONT_SIZE, RADIUS, SHADOWS } from '../config/theme';
+import { SHADOWS } from '../config/theme';
+import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 import { RootStackParamList } from '../navigation/types';
 import { Store, Product } from '../lib/supabase';
 import { productService } from '../services/productService';
@@ -291,6 +293,13 @@ export const ClientSearchScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const numColumns = useResponsiveGrid();
   const scrollY = useSharedValue(0);
+
+  const palette = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = useMemo(
+    () => createClientSearchStyles(palette, SPACING, RADIUS, FONT_SIZE, SHADOWS),
+    [palette, SPACING, RADIUS, FONT_SIZE, SHADOWS]
+  );
   
   const { recentSearches, addRecentSearch, clearRecent } = useSearchStore();
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -317,7 +326,7 @@ export const ClientSearchScreen: React.FC = () => {
   const productItemWidth = useMemo(() => {
     const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
     return (contentWidth - SPACING.xl * 2 - SPACING.sm * (numColumns - 1)) / numColumns;
-  }, [numColumns]);
+  }, [numColumns, SPACING]);
 
   const hasResults = useMemo(() => 
     products.length > 0 || stores.length > 0,
@@ -450,7 +459,7 @@ export const ClientSearchScreen: React.FC = () => {
         <LinearGradient
           colors={selectedCategory === item.name 
             ? [item.color, `${item.color}DD`]
-            : [COLORS.card, COLORS.card]
+            : [palette.card, palette.card]
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -463,7 +472,7 @@ export const ClientSearchScreen: React.FC = () => {
             <Ionicons 
               name={item.icon} 
               size={24} 
-              color={selectedCategory === item.name ? COLORS.text : item.color} 
+              color={selectedCategory === item.name ? palette.text : item.color} 
             />
           </View>
           <Text style={[
@@ -493,12 +502,12 @@ export const ClientSearchScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         <View style={styles.recentIconContainer}>
-          <Ionicons name="time-outline" size={20} color={COLORS.accent} />
+          <Ionicons name="time-outline" size={20} color={palette.accent} />
         </View>
         <Text style={styles.recentText} numberOfLines={1}>
           {item}
         </Text>
-        <Ionicons name="arrow-up" size={18} color={COLORS.textMuted} />
+        <Ionicons name="arrow-up" size={18} color={palette.textMuted} />
       </TouchableOpacity>
     </Animated.View>
   ), [addRecentSearch, debouncedSearch]);
@@ -512,7 +521,7 @@ export const ClientSearchScreen: React.FC = () => {
         onPress={() => handleSuggestionPress(item)}
         activeOpacity={0.7}
       >
-        <Ionicons name="search-outline" size={18} color={COLORS.textMuted} />
+        <Ionicons name="search-outline" size={18} color={palette.textMuted} />
         <Text style={styles.suggestionText}>{item}</Text>
       </TouchableOpacity>
     </Animated.View>
@@ -619,7 +628,7 @@ export const ClientSearchScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <Ionicons name="cube-outline" size={22} color={COLORS.accent} />
+                <Ionicons name="cube-outline" size={22} color={palette.accent} />
                 <Text style={styles.sectionTitle}>Produits</Text>
               </View>
               <View style={styles.sectionBadge}>
@@ -663,7 +672,7 @@ export const ClientSearchScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <Ionicons name="storefront-outline" size={22} color={COLORS.accent} />
+                <Ionicons name="storefront-outline" size={22} color={palette.accent} />
                 <Text style={styles.sectionTitle}>Boutiques</Text>
               </View>
               <View style={styles.sectionBadge}>
@@ -699,7 +708,7 @@ export const ClientSearchScreen: React.FC = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="apps-outline" size={22} color={COLORS.accent} />
+            <Ionicons name="apps-outline" size={22} color={palette.accent} />
             <Text style={styles.sectionTitle}>Catégories populaires</Text>
           </View>
         </View>
@@ -719,7 +728,7 @@ export const ClientSearchScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
-              <Ionicons name="flash-outline" size={22} color={COLORS.accent} />
+              <Ionicons name="flash-outline" size={22} color={palette.accent} />
               <Text style={styles.sectionTitle}>Suggestions du moment</Text>
             </View>
           </View>
@@ -732,7 +741,7 @@ export const ClientSearchScreen: React.FC = () => {
                 onPress={() => handleSuggestionPress(suggestion)}
                 activeOpacity={0.7}
               >
-                <Ionicons name="search-outline" size={16} color={COLORS.accent} />
+                <Ionicons name="search-outline" size={16} color={palette.accent} />
                 <Text style={styles.suggestionChipText}>{suggestion}</Text>
               </TouchableOpacity>
             ))}
@@ -745,7 +754,7 @@ export const ClientSearchScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleContainer}>
-              <Ionicons name="time-outline" size={22} color={COLORS.accent} />
+              <Ionicons name="time-outline" size={22} color={palette.accent} />
               <Text style={styles.sectionTitle}>Récent</Text>
             </View>
             <TouchableOpacity onPress={clearRecent} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -767,7 +776,7 @@ export const ClientSearchScreen: React.FC = () => {
   return (
     <View style={styles.flexContainer}>
       <View style={styles.maxWidthContainer}>
-        <View style={[styles.container, { backgroundColor: COLORS.bg }]}>
+        <View style={[styles.container, { backgroundColor: palette.bg }]}>
           <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
           
           {renderHeader()}
@@ -781,10 +790,11 @@ export const ClientSearchScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any, shadows: typeof SHADOWS) {
+  return StyleSheet.create({
   flexContainer: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   maxWidthContainer: {
     maxWidth: MAX_CONTENT_WIDTH,
@@ -801,7 +811,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    ...SHADOWS.medium,
+    ...shadows.medium,
   },
   headerBlur: {
     overflow: 'hidden',
@@ -815,7 +825,7 @@ const styles = StyleSheet.create({
   searchBar: {
     marginTop: SPACING.sm,
     borderRadius: RADIUS.xl,
-    ...SHADOWS.small,
+    ...shadows.small,
   },
   loadMoreItem: {
     paddingVertical: SPACING.lg,
@@ -827,13 +837,13 @@ const styles = StyleSheet.create({
   },
   storeNameText: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontWeight: '500',
   },
   loadingText: {
     marginTop: SPACING.md,
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   resultsContainer: {
     flex: 1,
@@ -868,17 +878,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   sectionBadge: {
-    backgroundColor: COLORS.accent + '20',
+    backgroundColor: palette.accent + '20',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.round,
   },
   sectionCount: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
+    color: palette.accent,
     fontWeight: '600',
   },
   categoriesList: {
@@ -890,7 +900,7 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
-    ...SHADOWS.small,
+    ...shadows.small,
   },
   categoryItemActive: {
     transform: [{ scale: 1.05 }],
@@ -904,22 +914,22 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.small,
+    ...shadows.small,
   },
   categoryIconContainerActive: {
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   categoryName: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '500',
     textAlign: 'center',
   },
   categoryNameActive: {
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '600',
   },
   suggestionsGrid: {
@@ -930,36 +940,36 @@ const styles = StyleSheet.create({
   suggestionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.round,
     gap: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.small,
+    borderColor: palette.border,
+    ...shadows.small,
   },
   suggestionChipText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '500',
   },
   recentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOWS.small,
+    borderColor: palette.border,
+    ...shadows.small,
   },
   recentIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.accent + '10',
+    backgroundColor: palette.accent + '10',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.lg,
@@ -967,12 +977,12 @@ const styles = StyleSheet.create({
   recentText: {
     flex: 1,
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '500',
   },
   clearButton: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
+    color: palette.accent,
     fontWeight: '600',
   },
   productsGrid: {
@@ -989,7 +999,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    ...SHADOWS.medium,
+    ...shadows.medium,
   },
   viewMoreGradient: {
     flexDirection: 'row',
@@ -1001,7 +1011,7 @@ const styles = StyleSheet.create({
   },
   viewMoreText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '600',
   },
   viewMoreIconContainer: {
@@ -1019,11 +1029,11 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     gap: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   suggestionText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
   },
   emptyStateImage: {
     width: 200,
@@ -1037,9 +1047,9 @@ const styles = StyleSheet.create({
     maxHeight: 300,
     borderRadius: RADIUS.xl,
     overflow: 'hidden',
-    ...SHADOWS.large,
+    ...shadows.large,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   suggestionsBlur: {
     flex: 1,
@@ -1048,3 +1058,4 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
 });
+}

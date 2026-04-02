@@ -445,7 +445,7 @@ export const ProductDetailScreen: React.FC = () => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => navigation.navigate("Cart")}
+            onPress={() => navigation.navigate('Cart')}
           >
             <View style={styles.cartIconContainer}>
               <Ionicons name="bag-handle" size={22} color="white" />
@@ -825,7 +825,7 @@ export const ProductDetailScreen: React.FC = () => {
               void Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success,
               );
-              navigation.navigate("Cart");
+              navigation.navigate('Cart');
             }}
             disabled={!productData.inStock}
             activeOpacity={0.85}

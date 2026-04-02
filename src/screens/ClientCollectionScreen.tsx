@@ -143,7 +143,7 @@ export const ClientCollectionScreen: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.actionButton}
-          onPress={() => navigation.navigate('ClientOrders', { clientId: client.id })}
+          onPress={() => navigation.navigate('SellerTabs', { screen: 'SellerOrders' })}
         >
           <Ionicons name="receipt-outline" size={20} color={COLORS.accent} />
           <Text style={styles.actionText}>Commandes</Text>

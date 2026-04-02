@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useCartStore, useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
@@ -24,6 +26,7 @@ import { cloudinaryService } from '../services/cloudinaryService';
 
 export const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [store, setStore] = useState<any>(null);
   const [loadingStore, setLoadingStore] = useState(false);
   const [storesData, setStoresData] = useState<any[]>([]);
@@ -33,6 +36,13 @@ export const CartScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const clearCart = useCartStore((s) => s.clearCart);
   const [processingBulk, setProcessingBulk] = useState(false);
+
+  const palette = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = useMemo(
+    () => createCartStyles(palette, SPACING, RADIUS, FONT_SIZE),
+    [palette, SPACING, RADIUS, FONT_SIZE]
+  );
 
   // prepare grouping and aggregated totals
   const groups = Object.entries(items.reduce((acc: Record<string, any[]>, it) => {
@@ -52,6 +62,7 @@ export const CartScreen: React.FC = () => {
   });
 
   const grandTotal = subtotal + aggregatedTax + aggregatedShipping;
+  const multiStore = groups.length > 1;
 
   // Load store data for tax and shipping (support multiple stores)
   useEffect(() => {
@@ -85,6 +96,22 @@ export const CartScreen: React.FC = () => {
     return () => { mounted = false; };
   }, [storeId, items]);
 
+  const stockCheckKey = useMemo(
+    () => items.map((i) => `${i.product.id}:${i.product.stock ?? 0}`).join('|'),
+    [items]
+  );
+
+  /** Retirer du panier les produits en rupture (données embarquées). */
+  useEffect(() => {
+    const out = items.filter((it) => (it.product.stock ?? 0) <= 0);
+    if (out.length === 0) return;
+    out.forEach((it) => removeItem(it.product.id));
+    Alert.alert(
+      'Rupture de stock',
+      `${out.length} article(s) indisponible(s) ${out.length > 1 ? 'ont été retirés' : 'a été retiré'} du panier.`,
+    );
+  }, [stockCheckKey]);
+
   const taxRate = store?.tax_rate || 0; // legacy single-store rate for label
   const shippingPrice = store?.shipping_price || 0; // legacy single-store shipping
   // For display and totals we compute aggregated values in-place when rendering
@@ -96,7 +123,7 @@ export const CartScreen: React.FC = () => {
         <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 800) }} style={styles.itemImage} />
       ) : (
         <View style={styles.itemImagePlaceholder}>
-          <Ionicons name="image-outline" size={28} color={COLORS.textMuted} />
+          <Ionicons name="image-outline" size={28} color={palette.textMuted} />
         </View>
       )}
       <View style={styles.itemInfo}>
@@ -106,11 +133,11 @@ export const CartScreen: React.FC = () => {
           <Text style={styles.itemPrice}>{item.product.price.toLocaleString()} FCA</Text>
           <View style={styles.quantityControls}>
             <Pressable
-              style={[styles.quantityBadge, { backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border }]}
+              style={[styles.quantityBadge, { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border }]}
               onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
               hitSlop={10}
             >
-              <Text style={[styles.quantityText, { color: COLORS.text }]}>-</Text>
+              <Text style={[styles.quantityText, { color: palette.text }]}>-</Text>
             </Pressable>
             <View style={[styles.quantityBadge, styles.quantityMiddle]}>
               <Text style={styles.quantityText}>×{item.quantity}</Text>
@@ -126,14 +153,14 @@ export const CartScreen: React.FC = () => {
         </View>
       </View>
       <Pressable style={styles.removeButton} onPress={() => removeItem(item.product.id)} hitSlop={10}>
-        <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
+        <Ionicons name="trash-outline" size={20} color={palette.danger} />
       </Pressable>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
       
       {/* Header */}
       <View style={styles.header}>
@@ -142,49 +169,58 @@ export const CartScreen: React.FC = () => {
           onPress={() => {
             const canGoBack = typeof navigation?.canGoBack === 'function' ? navigation.canGoBack() : false;
             if (canGoBack) navigation.goBack();
-            else navigation.navigate('ClientHome');
+            else navigation.navigate('ClientTabs', { screen: 'ClientHome' });
           }}
         >
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mon Panier</Text>
         <View style={styles.headerRight} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Cart Items grouped by store */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: SPACING.xxxl + 120 + insets.bottom }}
+      >
         <View style={styles.cartSection}>
           {items.length === 0 ? (
             <View style={{ paddingVertical: SPACING.xxxl, alignItems: 'center' }}>
-              <Ionicons name="cart-outline" size={64} color={COLORS.textMuted} />
-              <Text style={{ marginTop: SPACING.md, color: COLORS.textMuted, fontSize: FONT_SIZE.md }}>
+              <Ionicons name="cart-outline" size={64} color={palette.textMuted} />
+              <Text style={{ marginTop: SPACING.md, color: palette.textMuted, fontSize: FONT_SIZE.md }}>
                 Ton panier est vide
               </Text>
             </View>
           ) : (
-            // group items by store_id (or 'unknown')
-            Object.entries(items.reduce((acc: Record<string, any[]>, it) => {
-              const sid = (it.product as any)?.store_id || 'unknown';
-              acc[sid] = acc[sid] || [];
-              acc[sid].push(it);
-              return acc;
-            }, {})).map(([sid, group]) => {
-              const storeInfo = storesData.find(s => s?.id === sid) || (sid === 'unknown' ? { id: 'unknown', name: 'Divers' } : null);
+            groups.map(([sid, group]) => {
+              const storeInfo = storesData.find((s) => s?.id === sid) || (sid === 'unknown' ? { id: 'unknown', name: 'Boutique' } : null);
               const subtotalByStore = group.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
               const tax = storeInfo?.tax_rate ? Math.round(subtotalByStore * (storeInfo.tax_rate / 100)) : 0;
               const shipping = storeInfo?.shipping_price || 0;
+              const lineTotal = subtotalByStore + tax + shipping;
+              const canCheckoutStore = sid !== 'unknown' && !!storeInfo?.id;
 
               return (
-                <View key={`group-${sid}`} style={{ marginBottom: SPACING.lg }}>
-                  <View style={[styles.summarySection, { paddingBottom: SPACING.md }]}>
-                    <Text style={[styles.sectionTitle, { fontSize: FONT_SIZE.md }]}>{storeInfo?.name || 'Boutique'}</Text>
+                <View key={`group-${sid}`} style={{ marginBottom: SPACING.xl }}>
+                  <View style={[styles.storeBlockHeader, { borderColor: palette.border, backgroundColor: palette.card }]}>
+                    <Ionicons name="storefront-outline" size={20} color={palette.accent} />
+                    <Text style={[styles.storeBlockTitle, { color: palette.text, fontSize: FONT_SIZE.md }]}>
+                      {storeInfo?.name || 'Boutique'}
+                    </Text>
+                  </View>
+
+                  {group.map((it: any) => renderCartItem(it))}
+
+                  <View style={[styles.storeRecap, { borderColor: palette.border, backgroundColor: palette.card }]}>
+                    <Text style={[styles.recapHint, { color: palette.textMuted, fontSize: FONT_SIZE.xs }]}>
+                      Total pour cette boutique (TVA et livraison vendeur incluses si configurés)
+                    </Text>
                     <View style={styles.summaryRow}>
                       <Text style={styles.summaryLabel}>Sous-total</Text>
                       <Text style={styles.summaryValue}>{subtotalByStore.toLocaleString()} FCA</Text>
                     </View>
                     {tax > 0 && (
                       <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>TVA</Text>
+                        <Text style={styles.summaryLabel}>TVA {storeInfo?.tax_rate ? `(${storeInfo.tax_rate}%)` : ''}</Text>
                         <Text style={styles.summaryValue}>{tax.toLocaleString()} FCA</Text>
                       </View>
                     )}
@@ -194,174 +230,172 @@ export const CartScreen: React.FC = () => {
                     </View>
                     <View style={styles.divider} />
                     <View style={styles.summaryRow}>
-                      <Text style={styles.totalLabel}>Total</Text>
-                      <Text style={styles.totalValue}>{(subtotalByStore + tax + shipping).toLocaleString()} FCA</Text>
+                      <Text style={styles.totalLabel}>Total TTC boutique</Text>
+                      <Text style={styles.totalValue}>{lineTotal.toLocaleString()} FCA</Text>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md }}>
+                    {multiStore && canCheckoutStore && (
                       <TouchableOpacity
-                        style={[styles.checkoutButton, { flex: 1, backgroundColor: COLORS.accent }]}
-                        onPress={() => navigation.navigate('Checkout', { storeId: sid === 'unknown' ? null : sid, itemsJson: JSON.stringify(group) })}
+                        style={[styles.checkoutButtonOutline, { borderColor: palette.accent, marginTop: SPACING.md }]}
+                        onPress={() =>
+                          navigation.navigate('Checkout', {
+                            storeId: sid,
+                            itemsJson: JSON.stringify(group),
+                          })
+                        }
                       >
-                        <Text style={[styles.checkoutButtonText, { color: COLORS.text }]}>Passer la commande (cette boutique)</Text>
+                        <Ionicons name="bag-check-outline" size={20} color={palette.accent} />
+                        <Text style={[styles.checkoutButtonOutlineText, { color: palette.accent }]}>
+                          Commander uniquement cette boutique
+                        </Text>
                       </TouchableOpacity>
-                    </View>
+                    )}
+                    {multiStore && !canCheckoutStore && (
+                      <Text style={{ marginTop: SPACING.sm, fontSize: FONT_SIZE.xs, color: palette.warning }}>
+                        Impossible de commander sans boutique associée à ces articles.
+                      </Text>
+                    )}
                   </View>
-
-                  {/* Items of the group */}
-                  {group.map((it: any) => renderCartItem(it))}
                 </View>
               );
             })
           )}
         </View>
 
-        {/* Order Summary */}
-        <View style={styles.summarySection}>
-          <Text style={styles.sectionTitle}>Résumé de la commande</Text>
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Sous-total</Text>
-            <Text style={styles.summaryValue}>{subtotal.toLocaleString()} FCA</Text>
-          </View>
-          
-          {aggregatedTax > 0 && (
+        {items.length > 0 && multiStore && (
+          <View style={styles.summarySection}>
+            <Text style={styles.sectionTitle}>Synthèse multi-boutiques</Text>
+            <Text style={{ fontSize: FONT_SIZE.sm, color: palette.textMuted, marginBottom: SPACING.md }}>
+              Chaque boutique appliquera ses propres frais (TVA, livraison). Le bouton ci-dessous crée une commande séparée chez chaque vendeur, puis vous pourrez payer chaque commande.
+            </Text>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>TVA Totale</Text>
-              <Text style={styles.summaryValue}>{aggregatedTax.toLocaleString()} FCA</Text>
+              <Text style={styles.summaryLabel}>Sous-total global</Text>
+              <Text style={styles.summaryValue}>{subtotal.toLocaleString()} FCA</Text>
             </View>
-          )}
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Livraison</Text>
-            <Text style={styles.summaryValue}>
-              {loadingStore ? '...' : aggregatedShipping > 0 ? `${aggregatedShipping.toLocaleString()} FCA` : 'Gratuite'}
+            {aggregatedTax > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>TVA (toutes boutiques)</Text>
+                <Text style={styles.summaryValue}>{aggregatedTax.toLocaleString()} FCA</Text>
+              </View>
+            )}
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Livraison (toutes boutiques)</Text>
+              <Text style={styles.summaryValue}>
+                {loadingStore ? '...' : aggregatedShipping > 0 ? `${aggregatedShipping.toLocaleString()} FCA` : 'Gratuite'}
+              </Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.totalLabel}>Total estimé TTC</Text>
+              <Text style={styles.totalValue}>{grandTotal.toLocaleString()} FCA</Text>
+            </View>
+          </View>
+        )}
+
+        {items.length > 0 && (
+          <View style={styles.deliverySection}>
+            <View style={styles.deliveryHeader}>
+              <Ionicons name="location-outline" size={20} color={palette.accent} />
+              <Text style={styles.deliveryTitle}>Livraison</Text>
+            </View>
+            <Text style={styles.deliveryText}>
+              La livraison est organisée par chaque vendeur. Après commande, suivi habituellement par WhatsApp.
             </Text>
           </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Total TTC</Text>
-            <Text style={styles.totalValue}>{grandTotal.toLocaleString()} FCA</Text>
-          </View>
-        </View>
-
-        {/* Delivery Info */}
-        <View style={styles.deliverySection}>
-          <View style={styles.deliveryHeader}>
-            <Ionicons name="location-outline" size={20} color={COLORS.accent} />
-            <Text style={styles.deliveryTitle}>Livraison</Text>
-          </View>
-          <Text style={styles.deliveryText}>
-            La livraison sera effectuée par le vendeur. Vous recevrez les coordonnées WhatsApp pour le suivi.
-          </Text>
-        </View>
-
-        {/* Payment Methods */}
-        <View style={styles.paymentSection}>
-          <View style={styles.paymentHeader}>
-            <Ionicons name="card-outline" size={20} color={COLORS.accent} />
-            <Text style={styles.paymentTitle}>Moyens de paiement</Text>
-          </View>
-          <View style={styles.paymentOptions}>
-            <TouchableOpacity style={styles.paymentOption}>
-              <Ionicons name="phone-portrait-outline" size={24} color={COLORS.accent2} />
-              <Text style={styles.paymentOptionText}>Mobile Money</Text>
-            </TouchableOpacity>
-            <View style={styles.paymentOptionSpacer} />
-            <TouchableOpacity style={styles.paymentOption}>
-              <Ionicons name="cash-outline" size={24} color={COLORS.success} />
-              <Text style={styles.paymentOptionText}>Paiement à la livraison</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
       </ScrollView>
 
-      {/* Bottom Bar */}
-      <View style={styles.bottomBar}>
-        <View style={styles.totalContainer}>
-          <Text style={styles.bottomTotalLabel}>Total TTC</Text>
-          <Text style={styles.bottomTotalValue}>{grandTotal.toLocaleString()} FCA</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.checkoutButton}
-          onPress={async () => {
-            // Create separate orders per store
-            if (items.length === 0) return;
-            try {
-              setProcessingBulk(true);
-              // Ensure user profile
-              if (!user?.id) {
-                setProcessingBulk(false);
-                // ask to login
-                navigation.navigate('SellerAuth');
+      {items.length > 0 && (
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(SPACING.md, insets.bottom) }]}>
+          <View style={styles.totalContainer}>
+            <Text style={styles.bottomTotalLabel}>Total TTC {multiStore ? '(estimé)' : ''}</Text>
+            <Text style={styles.bottomTotalValue}>{grandTotal.toLocaleString()} FCA</Text>
+            {multiStore && (
+              <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 4 }}>
+                {groups.length} boutiques · {groups.length} commandes créées
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity
+            style={styles.checkoutButton}
+            onPress={async () => {
+              if (items.length === 0) return;
+              if (!multiStore) {
+                const [sid, group] = groups[0];
+                if (sid === 'unknown') {
+                  Alert.alert('Panier', 'Impossible de finaliser : boutique inconnue pour certains articles.');
+                  return;
+                }
+                navigation.navigate('Checkout', {
+                  storeId: sid,
+                  itemsJson: JSON.stringify(group),
+                });
                 return;
               }
-              await userService.upsertProfile(String(user.id), {
-                full_name: user.full_name || 'Client',
-                phone: user.whatsapp_number || user.phone || '',
-              });
-
-              // Prepare metadata for order creation
-              const userMetadata = {
-                full_name: user.full_name || 'Client',
-                phone: user.whatsapp_number || user.phone || '',
-                address: (user as any)?.address || null,
-              };
-
-              // Map groups to include computed tax/shipping for the service
-              const groupsForService: Record<string, any[]> = {};
-              for (const [sid, group] of Object.entries(groups)) {
-                const storeInfo = storesData.find(s => s?.id === sid);
-                const subtotalByStore = group.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
-                const tax = storeInfo?.tax_rate ? Math.round(subtotalByStore * (storeInfo.tax_rate / 100)) : 0;
-                const shipping = storeInfo?.shipping_price || 0;
-                
-                groupsForService[sid] = group.map((it: any) => ({
-                  ...it,
-                  tax_amount: tax,
-                  delivery_fee: shipping
-                }));
+              try {
+                setProcessingBulk(true);
+                if (!user?.id) {
+                  setProcessingBulk(false);
+                  navigation.navigate('SellerAuth');
+                  return;
+                }
+                await userService.upsertProfile(String(user.id), {
+                  full_name: user.full_name || 'Client',
+                  phone: user.whatsapp_number || user.phone || '',
+                });
+                const userMetadata = {
+                  full_name: user.full_name || 'Client',
+                  phone: user.whatsapp_number || user.phone || '',
+                  address: (user as any)?.address || null,
+                };
+                const groupsForService: Record<string, any[]> = {};
+                for (const [gsid, grp] of groups) {
+                  const storeInfo = storesData.find((s) => s?.id === gsid);
+                  const subtotalByStore = grp.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
+                  const tax = storeInfo?.tax_rate ? Math.round(subtotalByStore * (storeInfo.tax_rate / 100)) : 0;
+                  const shipping = storeInfo?.shipping_price || 0;
+                  groupsForService[gsid] = grp.map((it: any) => ({
+                    ...it,
+                    tax_amount: tax,
+                    delivery_fee: shipping,
+                  }));
+                }
+                const createdOrders = await orderService.createBulkOrders(String(user.id), groupsForService, userMetadata);
+                clearCart();
+                navigation.navigate('BulkPayment', {
+                  createdOrders,
+                  groups: groupsForService,
+                });
+              } catch (e: any) {
+                errorHandler.handle(e, 'bulk create orders failed', ErrorCategory.SYSTEM, ErrorSeverity.HIGH);
+                Alert.alert('Erreur', 'La création des commandes a échoué. Réessayez.');
+              } finally {
+                setProcessingBulk(false);
               }
-
-              const createdOrders = await orderService.createBulkOrders(
-                String(user.id),
-                groupsForService,
-                userMetadata
-              );
-
-              // navigate to the bulk payment flow
-              navigation.navigate('BulkPayment', {
-                createdOrders,
-                groups: groupsForService,
-              });
-            } catch (e: any) {
-              errorHandler.handle(e, 'bulk create orders failed', ErrorCategory.SYSTEM, ErrorSeverity.HIGH);
-              Alert.alert('Erreur', 'La création des commandes a échoué. Réessayez.');
-            } finally {
-              setProcessingBulk(false);
-            }
-          }}
-          disabled={items.length === 0 || processingBulk}
-        >
-          {processingBulk ? (
-            <ActivityIndicator color={COLORS.text} />
-          ) : (
-            <>
-              <Text style={styles.checkoutButtonText}>Passer toutes les commandes</Text>
-              <Ionicons name="arrow-forward" size={20} color={COLORS.text} />
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+            }}
+            disabled={items.length === 0 || processingBulk}
+          >
+            {processingBulk ? (
+              <ActivityIndicator color={palette.text} />
+            ) : (
+              <>
+                <Text style={styles.checkoutButtonText}>
+                  {multiStore ? `Commander toutes les boutiques (${groups.length})` : 'Passer la commande'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color={palette.text} />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   header: {
     flexDirection: 'row',
@@ -375,16 +409,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   headerTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   headerRight: {
     width: 40,
@@ -392,14 +426,51 @@ const styles = StyleSheet.create({
   cartSection: {
     paddingHorizontal: SPACING.xl,
   },
+  storeBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+  },
+  storeBlockTitle: {
+    fontWeight: '700',
+    flex: 1,
+  },
+  storeRecap: {
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    padding: SPACING.lg,
+    marginTop: SPACING.sm,
+  },
+  recapHint: {
+    marginBottom: SPACING.sm,
+  },
+  checkoutButtonOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.full,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  checkoutButtonOutlineText: {
+    fontWeight: '700',
+    fontSize: FONT_SIZE.sm,
+  },
   cartItem: {
     flexDirection: 'row',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   itemImage: {
     width: 80,
@@ -410,9 +481,9 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -424,11 +495,11 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   itemStore: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   itemBottom: {
     flexDirection: 'row',
@@ -438,10 +509,10 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.accent2,
+    color: palette.accent2,
   },
   quantityBadge: {
-    backgroundColor: COLORS.accent + '20',
+    backgroundColor: palette.accent + '20',
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.sm,
@@ -455,7 +526,7 @@ const styles = StyleSheet.create({
   },
   quantityText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
+    color: palette.accent,
     fontWeight: '600',
   },
   removeButton: {
@@ -468,7 +539,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.lg,
   },
   summaryRow: {
@@ -479,26 +550,26 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textSoft,
+    color: palette.textSoft,
   },
   summaryValue: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: palette.text,
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: palette.border,
     marginVertical: SPACING.md,
   },
   totalLabel: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   totalValue: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.accent,
+    color: palette.accent,
   },
   deliverySection: {
     paddingHorizontal: SPACING.xl,
@@ -512,12 +583,12 @@ const styles = StyleSheet.create({
   deliveryTitle: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginLeft: SPACING.sm,
   },
   deliveryText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
+    color: palette.textSoft,
     lineHeight: 22,
   },
   paymentSection: {
@@ -532,7 +603,7 @@ const styles = StyleSheet.create({
   paymentTitle: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginLeft: SPACING.sm,
   },
   paymentOptions: {
@@ -542,18 +613,18 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   paymentOptionSpacer: {
     width: SPACING.md,
   },
   paymentOptionText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
+    color: palette.textSoft,
     fontWeight: '500',
     marginLeft: SPACING.sm,
   },
@@ -566,35 +637,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: SPACING.xl,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: palette.border,
   },
   totalContainer: {
     flex: 1,
   },
   bottomTotalLabel: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
+    color: palette.textSoft,
   },
   bottomTotalValue: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
   },
   checkoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.accent,
+    backgroundColor: palette.accent,
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.full,
   },
   checkoutButtonText: {
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
     marginRight: SPACING.sm,
   },
 });
+}
 

@@ -87,17 +87,20 @@ export const useCartStore = create<CartState>()(
           set({ storeId: null });
         }
 
+        const maxStock = Math.max(0, product.stock ?? 0);
         const existingItem = items.find((item) => item.product.id === product.id);
+        if (!existingItem && maxStock <= 0) return;
         if (existingItem) {
+          const merged = existingItem.quantity + quantity;
+          const capped = maxStock > 0 ? Math.min(merged, maxStock) : merged;
           set({
             items: items.map((item) =>
-              item.product.id === product.id
-                ? { ...item, quantity: item.quantity + quantity }
-                : item
+              item.product.id === product.id ? { ...item, quantity: capped } : item
             ),
           });
         } else {
-          set({ items: [...items, { product, quantity }] });
+          const initialQty = maxStock > 0 ? Math.min(quantity, maxStock) : quantity;
+          set({ items: [...items, { product, quantity: initialQty }] });
         }
       },
       removeItem: (productId) => {
@@ -116,9 +119,12 @@ export const useCartStore = create<CartState>()(
           get().removeItem(productId);
         } else {
           set({
-            items: get().items.map((item) =>
-              item.product.id === productId ? { ...item, quantity } : item
-            ),
+            items: get().items.map((item) => {
+              if (item.product.id !== productId) return item;
+              const maxStock = Math.max(0, item.product.stock ?? 0);
+              const capped = maxStock > 0 ? Math.min(quantity, maxStock) : quantity;
+              return { ...item, quantity: capped };
+            }),
           });
         }
       },

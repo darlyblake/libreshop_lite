@@ -22,16 +22,32 @@ import { useTheme } from '../hooks/useTheme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { authService } from '../services/authService';
+import { navigateToClientTab } from '../navigation/clientNavigation';
+import type { ClientTabParamList } from '../navigation/types';
 
-const MENU_ITEMS = [
-  { icon: 'person-outline', label: 'Informations personnelles', screen: '' },
-  { icon: 'location-outline', label: 'Adresses enregistrées', screen: '' },
+const CLIENT_TAB_NAMES: (keyof ClientTabParamList)[] = [
+  'ClientHome',
+  'ClientOrders',
+  'ClientSearch',
+  'Wishlist',
+  'ClientProfile',
+];
+
+const MENU_ITEMS: Array<{
+  icon: string;
+  label: string;
+  screen?: keyof ClientTabParamList | 'Notifications';
+  soon?: boolean;
+  action?: string;
+}> = [
+  { icon: 'person-outline', label: 'Informations personnelles', soon: true },
+  { icon: 'location-outline', label: 'Adresses enregistrées', soon: true },
   { icon: 'heart-outline', label: 'Mes favoris', screen: 'Wishlist' },
   { icon: 'receipt-outline', label: 'Mes Commandes', screen: 'ClientOrders' },
   { icon: 'sync-outline', label: 'Restaurer mon historique', action: 'restore' },
-  { icon: 'notifications-outline', label: 'Notifications', screen: '' },
-  { icon: 'shield-checkmark-outline', label: 'Sécurité', screen: '' },
-  { icon: 'help-circle-outline', label: 'Aide et support', screen: '' },
+  { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications' },
+  { icon: 'shield-checkmark-outline', label: 'Sécurité', soon: true },
+  { icon: 'help-circle-outline', label: 'Aide et support', soon: true },
 ];
 
 export const ClientProfileScreen: React.FC = () => {
@@ -71,7 +87,7 @@ export const ClientProfileScreen: React.FC = () => {
           setFavoritesCount(0);
         }
 
-        setAddressesCount(2); // Temporaire
+        setAddressesCount(0);
       } catch (error) {
         errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error loading user data:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
@@ -156,11 +172,21 @@ export const ClientProfileScreen: React.FC = () => {
     }
   };
 
-  const handleMenuPress = (item: any) => {
+  const handleMenuPress = (item: (typeof MENU_ITEMS)[number]) => {
     if (item.action === 'restore') {
       setShowRestoreModal(true);
-    } else if (item.screen) {
-      navigation.navigate(item.screen);
+      return;
+    }
+    if (item.soon) {
+      Alert.alert('Bientôt disponible', 'Cette fonctionnalité arrive prochainement.');
+      return;
+    }
+    if (item.screen === 'Notifications') {
+      navigation.navigate('Notifications');
+      return;
+    }
+    if (item.screen && CLIENT_TAB_NAMES.includes(item.screen as keyof ClientTabParamList)) {
+      navigateToClientTab(navigation, item.screen as keyof ClientTabParamList);
     }
   };
 
@@ -393,7 +419,12 @@ export const ClientProfileScreen: React.FC = () => {
               Membre depuis {user?.created_at ? formatDate(user.created_at) : 'Date inconnue'}
             </Text>
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              Alert.alert('Bientôt disponible', 'La modification du profil sera disponible prochainement.')
+            }
+          >
             <Ionicons name="pencil" size={18} color={getColor.accent} />
           </TouchableOpacity>
         </View>
@@ -407,13 +438,16 @@ export const ClientProfileScreen: React.FC = () => {
             <>
               <TouchableOpacity 
                 style={styles.statItem}
-                onPress={() => navigation.navigate('ClientOrders')}
+                onPress={() => navigateToClientTab(navigation, 'ClientOrders')}
               >
                 <Text style={styles.statValue}>{ordersCount}</Text>
                 <Text style={styles.statLabel}>Commandes</Text>
               </TouchableOpacity>
               <View style={styles.statDivider} />
-              <TouchableOpacity style={styles.statItem}>
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={() => navigateToClientTab(navigation, 'Wishlist')}
+              >
                 <Text style={styles.statValue}>{favoritesCount}</Text>
                 <Text style={styles.statLabel}>Favoris</Text>
               </TouchableOpacity>

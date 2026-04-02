@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
 import { wishlistService } from '../services/wishlistService';
@@ -51,6 +52,18 @@ export const WishlistScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [removingItem, setRemovingItem] = useState<string | null>(null);
   const [unfollowingStore, setUnfollowingStore] = useState<string | null>(null);
+
+  const palette = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = useMemo(
+    () => createWishlistStyles(palette, SPACING, RADIUS, FONT_SIZE),
+    [palette, SPACING, RADIUS, FONT_SIZE]
+  );
+
+  const goBackSafe = () => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate('ClientTabs', { screen: 'ClientHome' });
+  };
 
   // Charger les favoris depuis Supabase
   const loadWishlist = async (): Promise<void> => {
@@ -218,9 +231,9 @@ export const WishlistScreen: React.FC = () => {
         disabled={removingItem === item.product_id}
       >
         {removingItem === item.product_id ? (
-          <ActivityIndicator size="small" color={COLORS.danger} />
+          <ActivityIndicator size="small" color={palette.danger} />
         ) : (
-          <Ionicons name="heart" size={22} color={COLORS.danger} />
+          <Ionicons name="heart" size={22} color={palette.danger} />
         )}
       </TouchableOpacity>
     </TouchableOpacity>
@@ -246,7 +259,7 @@ export const WishlistScreen: React.FC = () => {
           {follow.store?.category || 'Non catégorisé'}
         </Text>
         <View style={styles.storeStats}>
-          <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
+          <Ionicons name="checkmark-circle" size={14} color={palette.success} />
           <Text style={styles.statText}>
             {follow.store?.verified ? 'Vérifiée · ' : ''}
             Suivie depuis {new Date(follow.created_at).toLocaleDateString('fr-FR')}
@@ -267,9 +280,9 @@ export const WishlistScreen: React.FC = () => {
         disabled={unfollowingStore === follow.store_id}
       >
         {unfollowingStore === follow.store_id ? (
-          <ActivityIndicator size="small" color={COLORS.danger} />
+          <ActivityIndicator size="small" color={palette.danger} />
         ) : (
-          <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+          <Ionicons name="close-circle" size={24} color={palette.danger} />
         )}
       </TouchableOpacity>
     </TouchableOpacity>
@@ -278,17 +291,17 @@ export const WishlistScreen: React.FC = () => {
   if (!user) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+        <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          <TouchableOpacity style={styles.backButton} onPress={goBackSafe}>
+            <Ionicons name="arrow-back" size={24} color={palette.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Mes favoris</Text>
           <View style={styles.headerPlaceholder} />
         </View>
         
         <View style={styles.emptyState}>
-          <Ionicons name="heart-outline" size={80} color={COLORS.textMuted} />
+          <Ionicons name="heart-outline" size={80} color={palette.textMuted} />
           <Text style={styles.emptyTitle}>Connectez-vous</Text>
           <Text style={styles.emptyText}>
             Connectez-vous pour voir vos produits favoris et boutiques suivies
@@ -305,11 +318,11 @@ export const WishlistScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
       
       {/* Header avec dégradé */}
       <LinearGradient
-        colors={[COLORS.accent, COLORS.accent2]}
+        colors={[palette.accent, palette.accent2]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.headerGradient}
@@ -317,9 +330,9 @@ export const WishlistScreen: React.FC = () => {
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButtonLight} 
-            onPress={() => navigation.goBack()}
+            onPress={goBackSafe}
           >
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            <Ionicons name="arrow-back" size={24} color={palette.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitleLight}>Mes favoris</Text>
           <View style={styles.headerPlaceholder} />
@@ -335,7 +348,7 @@ export const WishlistScreen: React.FC = () => {
           <Ionicons 
             name={activeTab === 'products' ? 'heart' : 'heart-outline'} 
             size={20} 
-            color={activeTab === 'products' ? COLORS.text : COLORS.textMuted} 
+            color={activeTab === 'products' ? palette.text : palette.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'products' && styles.activeTabText]}>
             Produits ({wishlistItems.length})
@@ -349,7 +362,7 @@ export const WishlistScreen: React.FC = () => {
           <Ionicons 
             name={activeTab === 'shops' ? 'storefront' : 'storefront-outline'} 
             size={20} 
-            color={activeTab === 'shops' ? COLORS.text : COLORS.textMuted} 
+            color={activeTab === 'shops' ? palette.text : palette.textMuted} 
           />
           <Text style={[styles.tabText, activeTab === 'shops' && styles.activeTabText]}>
             Boutiques ({followedStores.length})
@@ -363,21 +376,21 @@ export const WishlistScreen: React.FC = () => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor={COLORS.accent}
-            colors={[COLORS.accent]}
+            tintColor={palette.accent}
+            colors={[palette.accent]}
           />
         }
         contentContainerStyle={styles.scrollContent}
       >
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator color={COLORS.accent} size="large" />
+            <ActivityIndicator color={palette.accent} size="large" />
             <Text style={styles.loadingText}>Chargement de vos favoris...</Text>
           </View>
         ) : activeTab === 'products' ? (
           wishlistItems.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="heart-outline" size={80} color={COLORS.textMuted} />
+              <Ionicons name="heart-outline" size={80} color={palette.textMuted} />
               <Text style={styles.emptyTitle}>Aucun produit favori</Text>
               <Text style={styles.emptyText}>
                 Ajoutez des produits à vos favoris en cliquant sur le cœur
@@ -397,7 +410,7 @@ export const WishlistScreen: React.FC = () => {
         ) : (
           followedStores.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="storefront-outline" size={80} color={COLORS.textMuted} />
+              <Ionicons name="storefront-outline" size={80} color={palette.textMuted} />
               <Text style={styles.emptyTitle}>Aucune boutique suivie</Text>
               <Text style={styles.emptyText}>
                 Suivez vos boutiques préférées pour voir leurs nouveautés
@@ -422,10 +435,11 @@ export const WishlistScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+function createWishlistStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any) {
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   headerGradient: {
     paddingTop: SPACING.xl,
@@ -450,17 +464,17 @@ const styles = StyleSheet.create({
   headerTitleLight: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   header: {
     flexDirection: 'row',
@@ -473,7 +487,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   headerPlaceholder: {
     width: 40,
@@ -492,22 +506,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   activeTab: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accent,
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
   },
   tabText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
   },
   activeTabText: {
-    color: COLORS.text,
+    color: palette.text,
   },
   // Content
   scrollContent: {
@@ -521,7 +535,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: SPACING.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontSize: FONT_SIZE.md,
   },
   emptyState: {
@@ -533,12 +547,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: FONT_SIZE.xl,
     fontWeight: '700',
-    color: COLORS.text,
+    color: palette.text,
     marginTop: SPACING.lg,
   },
   emptyText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginTop: SPACING.sm,
     textAlign: 'center',
     lineHeight: 22,
@@ -547,11 +561,11 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.accent,
+    backgroundColor: palette.accent,
     borderRadius: RADIUS.full,
   },
   exploreButtonText: {
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
   },
@@ -567,12 +581,12 @@ const styles = StyleSheet.create({
   },
   wishlistCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
     elevation: 2,
   },
@@ -589,12 +603,12 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.xs,
   },
   productStore: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginBottom: SPACING.xs,
   },
   priceRow: {
@@ -606,16 +620,16 @@ const styles = StyleSheet.create({
   productPrice: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.accent,
+    color: palette.accent,
   },
   comparePrice: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     textDecorationLine: 'line-through',
   },
   outOfStockBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.danger + '20',
+    backgroundColor: palette.danger + '20',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: RADIUS.sm,
@@ -623,7 +637,7 @@ const styles = StyleSheet.create({
   },
   outOfStockText: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.danger,
+    color: palette.danger,
     fontWeight: '600',
   },
   removeButton: {
@@ -640,12 +654,12 @@ const styles = StyleSheet.create({
   },
   storeCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     alignItems: 'center',
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
     elevation: 2,
@@ -662,12 +676,12 @@ const styles = StyleSheet.create({
   storeName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: SPACING.xs,
   },
   storeCategory: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginBottom: SPACING.xs,
   },
   storeStats: {
@@ -678,12 +692,12 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.success,
+    color: palette.success,
     flex: 1,
   },
   productCount: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   unfollowButton: {
     justifyContent: 'center',
@@ -695,3 +709,4 @@ const styles = StyleSheet.create({
     height: SPACING.xxl,
   },
 });
+}

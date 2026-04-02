@@ -336,8 +336,8 @@ export const SellerClientsScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.actionButton}
               onPress={() =>
-                navigation.navigate('ClientOrders', {
-                  clientId: item.id,
+                navigation.navigate('SellerTabs', {
+                  screen: 'SellerOrders',
                 })
               }
             >
