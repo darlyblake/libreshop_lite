@@ -9,8 +9,9 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { supabase } from '../lib/supabase';
+import { authService } from '../services/authService';
+import { errorHandler } from '../utils/errorHandler';
+// import { supabase } from '../lib/supabase'; // Removed unused import
 
 export const SellerEmailConfirmScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -47,21 +48,13 @@ export const SellerEmailConfirmScreen: React.FC = () => {
 
         // Confirming email with token:: type, token;
 
-        // Verify the token with Supabase
-        const { data, error } = await supabase.auth.verifyOtp({
+        // Verify the token with authService
+        const result = await authService.verifyOtp({
           token_hash: token,
           type: type as 'signup' | 'recovery',
         });
 
-        if (error) {
-          errorHandler.handleDatabaseError(error, 'Email confirmation error:');
-          setMessage(`❌ Erreur: ${error.message}`);
-          setSuccess(false);
-          setLoading(false);
-          return;
-        }
-
-        if (data?.user) {
+        if (result?.user) {
           setMessage('✅ Email confirmé avec succès!');
           setSuccess(true);
           setLoading(false);

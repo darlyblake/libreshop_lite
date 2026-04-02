@@ -14,7 +14,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { BackToDashboard } from '../components/BackToDashboard';
-import { supabase } from '../lib/supabase';
+import { countryService } from '../services/countryService';
+import { cityService } from '../services/cityService';
 
 type Country = {
   id: string;
@@ -48,10 +49,8 @@ export const AdminCitiesScreen: React.FC = () => {
 
   const loadCountries = async () => {
     try {
-      if (!supabase) throw new Error('Supabase not initialized');
-      const { data, error } = await supabase.from('countries').select('id,name,code').order('name', { ascending: true });
-      if (error) throw error;
-      setCountries((data || []) as Country[]);
+      const data = await countryService.getAll();
+      setCountries(data);
       if (!countryId && data && data.length > 0) {
         setCountryId(data[0].id);
       }
@@ -62,18 +61,12 @@ export const AdminCitiesScreen: React.FC = () => {
 
   const loadCities = async () => {
     try {
-      if (!supabase) throw new Error('Supabase not initialized');
       if (!countryId) {
         setCities([]);
         return;
       }
-      const { data, error } = await supabase
-        .from('cities')
-        .select('*')
-        .eq('country_id', countryId)
-        .order('name', { ascending: true });
-      if (error) throw error;
-      setCities((data || []) as City[]);
+      const data = await cityService.getAllByCountry(countryId);
+      setCities(data);
     } catch (e: any) {
       Alert.alert('Erreur', e.message || 'Impossible de charger les villes.');
     }
@@ -114,7 +107,6 @@ export const AdminCitiesScreen: React.FC = () => {
 
   const save = async () => {
     try {
-      if (!supabase) throw new Error('Supabase not initialized');
       const n = name.trim();
       if (!countryId) {
         Alert.alert('Erreur', 'Choisissez un pays');
@@ -126,11 +118,9 @@ export const AdminCitiesScreen: React.FC = () => {
       }
 
       if (editing) {
-        const { error } = await supabase.from('cities').update({ name: n, country_id: countryId }).eq('id', editing.id);
-        if (error) throw error;
+        await cityService.update(editing.id, n, countryId);
       } else {
-        const { error } = await supabase.from('cities').insert({ name: n, country_id: countryId });
-        if (error) throw error;
+        await cityService.create(n, countryId);
       }
 
       setModalVisible(false);
@@ -148,9 +138,7 @@ export const AdminCitiesScreen: React.FC = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            if (!supabase) throw new Error('Supabase not initialized');
-            const { error } = await supabase.from('cities').delete().eq('id', city.id);
-            if (error) throw error;
+            await cityService.delete(city.id);
             await loadCities();
           } catch (e: any) {
             Alert.alert('Erreur', e.message || 'Impossible de supprimer.');

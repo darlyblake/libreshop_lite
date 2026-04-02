@@ -25,15 +25,11 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { AddProductModal } from '../components/AddProductModal';
 import { SellerFiltersRow } from '../components/SellerFiltersRow';
 import { useResponsive } from '../utils/useResponsive';
-import {
-  collectionService,
-  productService,
-  storeService,
-  type Collection,
-  type Product as SupabaseProduct,
-  type Store,
-} from '../lib/supabase';
-import { cloudinaryService } from '../lib/cloudinaryService';
+import { type Collection, type Product as SupabaseProduct, type Store } from '../lib/supabase';
+import { collectionService } from '../services/collectionService';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
+import { cloudinaryService } from '../services/cloudinaryService';
 import { useAuthStore } from '../store';
 
 type SortOption = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc' | 'date_desc' | 'date_asc';
@@ -59,7 +55,6 @@ export const SellerProductsScreen: React.FC = () => {
 
   // Core state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<SupabaseProduct[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -134,7 +129,6 @@ export const SellerProductsScreen: React.FC = () => {
       setCollections(cols);
 
       const page = reset ? 0 : currentPage;
-      console.log(`📄 Chargement page ${page} des produits (pagination)`);
 
       const result = await productService.getByStorePaginated(store.id, {
         page,
@@ -143,10 +137,9 @@ export const SellerProductsScreen: React.FC = () => {
         stockFilter,
         search: searchQuery || undefined,
         sortBy,
-        isActive: true,
+        isActive: undefined, // Seller sees all products (active & inactive)
       });
 
-      console.log(`📦 Produits reçus: ${result.products.length}, Total: ${result.totalCount}, Page: ${result.currentPage + 1}/${result.totalPages}`);
 
       if (reset) {
         setProducts(result.products);
@@ -174,14 +167,12 @@ export const SellerProductsScreen: React.FC = () => {
   // 🚀 Chargement de la page suivante
   const loadMoreProducts = async () => {
     if (!hasMore || loadingMore || loading) return;
-    console.log('🔄 Chargement de plus de produits...');
     await loadProducts(false);
   };
 
   // 🎯 Rechargement optimisé avec debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      console.log('🔍 Recherche optimisée pour:', searchQuery);
       loadProducts(true);
     }, 300);
 
@@ -190,23 +181,20 @@ export const SellerProductsScreen: React.FC = () => {
 
   // 🎯 Filtre optimisé
   useEffect(() => {
-    console.log('🎯 Filtre changé vers:', selectedCollection);
     loadProducts(true);
   }, [selectedCollection, stockFilter, sortBy]);
 
   // 🚀 Chargement initial
   useEffect(() => {
-    console.log('🚀 Chargement initial des produits');
     loadProducts();
   }, []);
 
   useFocusEffect(useCallback(() => { 
-    console.log('📱 Focus effect - rechargement des produits');
     loadProducts(); 
   }, [loadProducts]));
 
   const collectionFilters = useMemo(() => {
-    return (collections || []).filter(c => c.is_active).map(c => ({ id: c.id, label: c.name, icon: 'albums-outline' as const }));
+    return (collections || []).map(c => ({ id: c.id, label: c.name, icon: 'albums-outline' as const }));
   }, [collections]);
 
   const filters = useMemo(() => [{ id: 'all', label: 'Tous', icon: 'apps-outline' as const }, ...collectionFilters], [collectionFilters]);
@@ -216,9 +204,10 @@ export const SellerProductsScreen: React.FC = () => {
     const inStock = products.filter(p => p.stock > 3).length;
     const lowStock = products.filter(p => p.stock > 0 && p.stock <= 3).length;
     const outOfStock = products.filter(p => p.stock <= 0).length;
+    const inactive = products.filter(p => !p.is_active).length;
     const promoCount = products.filter(p => p.compare_price && p.compare_price > p.price).length;
-    const totalViews = products.reduce((sum, p) => sum + (Number(p.views_count) || 0), 0);
-    return { total, inStock, lowStock, outOfStock, promoCount, totalViews };
+    const totalViews = products.reduce((sum, p) => sum + (Number(p.view_count) || 0), 0);
+    return { total, inStock, lowStock, outOfStock, inactive, promoCount, totalViews };
   }, [products]);
 
   const collectionStats = useMemo(() => {
@@ -395,7 +384,7 @@ export const SellerProductsScreen: React.FC = () => {
         {/* Image */}
         <View style={[styles.productImageContainer, isGrid && styles.productImageContainerGrid]}>
           {product.images && product.images[0] ? (
-            <Image source={{ uri: product.images[0] }} style={[styles.productImage, isGrid && styles.productImageGrid]} resizeMode="cover" />
+            <Image source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 800) }} style={[styles.productImage, isGrid && styles.productImageGrid]} resizeMode="cover" />
           ) : (
             <LinearGradient colors={[COLORS.border + '60', COLORS.border + '20']} style={[styles.productImage, isGrid && styles.productImageGrid, styles.imagePlaceholder]}>
               {isGrid ? (
@@ -443,9 +432,18 @@ export const SellerProductsScreen: React.FC = () => {
           </View>
 
           {/* Stock badge */}
-          <View style={[styles.stockBadge, { backgroundColor: stockInfo.color + '18' }]}>
-            <Ionicons name={stockInfo.icon} size={13} color={stockInfo.color} />
-            <Text style={[styles.stockText, { color: stockInfo.color }]}>{stockInfo.label}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' }}>
+            <View style={[styles.stockBadge, { backgroundColor: stockInfo.color + '18' }]}>
+              <Ionicons name={stockInfo.icon} size={13} color={stockInfo.color} />
+              <Text style={[styles.stockText, { color: stockInfo.color }]}>{stockInfo.label}</Text>
+            </View>
+            
+            {!product.is_active && (
+              <View style={[styles.stockBadge, { backgroundColor: COLORS.textMuted + '18' }]}>
+                <Ionicons name="eye-off-outline" size={13} color={COLORS.textMuted} />
+                <Text style={[styles.stockText, { color: COLORS.textMuted }]}>Masqué</Text>
+              </View>
+            )}
           </View>
 
           {/* Engagement metrics & Chevron */}
@@ -602,6 +600,11 @@ export const SellerProductsScreen: React.FC = () => {
           <Text style={[styles.statNumber, { color: COLORS.danger }]}>{stats.outOfStock}</Text>
           <Text style={styles.statLabel}>❌ Rupture</Text>
         </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: COLORS.textSoft }]}>{stats.inactive}</Text>
+          <Text style={styles.statLabel}>👁️‍🗨️ Masqués</Text>
+        </View>
         {stats.promoCount > 0 && <>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
@@ -621,14 +624,15 @@ export const SellerProductsScreen: React.FC = () => {
       {/* Collection filters */}
       <SellerFiltersRow
         filters={filters}
-        selectedId={selectedFilter}
-        onSelect={setSelectedFilter}
+        selectedId={selectedCollection}
+        onSelect={setSelectedCollection}
         counts={collectionStats as any}
         isMobile={isMobile}
       />
 
       {/* Product list with pagination */}
       <FlatList
+        key={viewMode}
         data={filteredProducts}
         renderItem={({ item }) => renderProduct(item)}
         keyExtractor={(item) => item.id}

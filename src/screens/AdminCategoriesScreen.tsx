@@ -17,7 +17,7 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
-import { categoryService } from '../lib/categoryService';
+import { categoryService } from '../services/categoryService';
 
 interface Category {
   id: string;

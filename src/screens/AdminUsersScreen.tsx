@@ -31,7 +31,7 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { supabase } from '../lib/supabase';
+import { adminService } from '../services/adminService';
 
 const { width } = Dimensions.get('window');
 
@@ -68,17 +68,12 @@ export const AdminUsersScreen: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   const loadUsers = useCallback(async () => {
-    if (!supabase) return;
-    setLoading(true);
+    setLoadingUsers(true);
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id,email,full_name,role,status,created_at,phone,whatsapp_number,avatar_url')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const data = await adminService.getUsers();
 
       setUsers(
         (data || []).map((u: any) => ({
@@ -95,7 +90,7 @@ export const AdminUsersScreen: React.FC = () => {
           total_spent: 0,
         }))
       );
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'load users');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de charger les utilisateurs');
@@ -103,7 +98,7 @@ export const AdminUsersScreen: React.FC = () => {
         Alert.alert('Erreur', 'Impossible de charger les utilisateurs');
       }
     } finally {
-      setLoading(false);
+      setLoadingUsers(false);
     }
   }, []);
 
@@ -167,16 +162,8 @@ export const AdminUsersScreen: React.FC = () => {
     const message = `Êtes-vous sûr de vouloir ${user.status === 'active' ? 'suspendre' : 'réactiver'} ${user.full_name} ?`;
 
     const run = async () => {
-      if (!supabase) return;
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .update({ status: nextStatus })
-          .eq('id', user.id)
-          .select('id,status')
-          .single();
-
-        if (error) throw error;
+        const data = await adminService.updateUserStatus(user.id, nextStatus);
 
         setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, status: (data as any)?.status || nextStatus } : u)));
 
@@ -185,7 +172,7 @@ export const AdminUsersScreen: React.FC = () => {
         } else {
           Alert.alert('Succès', `Utilisateur ${nextStatus === 'suspended' ? 'suspendu' : 'réactivé'}`);
         }
-      } catch (e) {
+      } catch (e: any) {
         errorHandler.handleDatabaseError(e, 'suspend user');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           window.alert('❌ Impossible de modifier le statut utilisateur');
@@ -235,7 +222,7 @@ export const AdminUsersScreen: React.FC = () => {
       } else {
         await Linking.openURL(url);
       }
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'open whatsapp');
       const msg = 'Impossible d’ouvrir WhatsApp.';
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -250,16 +237,8 @@ export const AdminUsersScreen: React.FC = () => {
     const message = `Voulez-vous valider ${user.full_name} en tant que vendeur ?`;
 
     const run = async () => {
-      if (!supabase) return;
       try {
-        const { data, error } = await supabase
-          .from('users')
-          .update({ status: 'active', role: 'seller' })
-          .eq('id', user.id)
-          .select('id,status,role')
-          .single();
-
-        if (error) throw error;
+        const data = await adminService.validateSeller(user.id);
 
         setUsers(prev =>
           prev.map(u =>
@@ -274,7 +253,7 @@ export const AdminUsersScreen: React.FC = () => {
         } else {
           Alert.alert('Succès', 'Vendeur validé avec succès');
         }
-      } catch (e) {
+      } catch (e: any) {
         errorHandler.handleDatabaseError(e, 'validate seller');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           window.alert('❌ Impossible de valider le vendeur');
@@ -298,9 +277,9 @@ export const AdminUsersScreen: React.FC = () => {
 
   const getRoleBadge = (role: User['role']) => {
     const badges = {
-      admin: { label: 'Admin', variant: 'danger' as const, icon: 'shield' },
+      admin: { label: 'Admin', variant: 'error' as const, icon: 'shield' },
       seller: { label: 'Vendeur', variant: 'warning' as const, icon: 'storefront' },
-      client: { label: 'Client', variant: 'accent' as const, icon: 'person' },
+      client: { label: 'Client', variant: 'info' as const, icon: 'person' },
     };
     const config = badges[role];
     return (
@@ -315,7 +294,7 @@ export const AdminUsersScreen: React.FC = () => {
   const getStatusBadge = (status: User['status']) => {
     const badges = {
       active: { label: 'Actif', variant: 'success' as const, icon: 'checkmark-circle' },
-      suspended: { label: 'Suspendu', variant: 'danger' as const, icon: 'ban' },
+      suspended: { label: 'Suspendu', variant: 'error' as const, icon: 'ban' },
       pending: { label: 'En attente', variant: 'warning' as const, icon: 'time' },
     };
     const config = badges[status];

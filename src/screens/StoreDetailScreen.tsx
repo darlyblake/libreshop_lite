@@ -25,12 +25,11 @@ import * as ExpoLinking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from "../config/theme";
 import { ProductCard, FollowButton } from "../components";
-import {
-  collectionService,
-  productService,
-  storeService,
-  storeStatsService,
-} from "../lib/supabase";
+import { collectionService } from '../services/collectionService';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
+import { cloudinaryService } from '../services/cloudinaryService';
+import { storeStatsService } from '../services/storeStatsService';
 import { useAuthStore } from "../store";
 import { useResponsive } from "../utils/responsive";
 import { useTheme } from "../hooks/useTheme";
@@ -626,7 +625,7 @@ export const StoreDetailScreen: React.FC = () => {
             {/* Store Banner — 220px */}
             <View style={styles.storeBanner}>
               <Image
-                source={{ uri: storeData.bannerUrl }}
+                source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 800) }}
                 style={styles.bannerImage}
                 resizeMode="cover"
               />
@@ -637,7 +636,7 @@ export const StoreDetailScreen: React.FC = () => {
             <View style={styles.storeInfo}>
               <View style={styles.logoContainer}>
                 <Image
-                  source={{ uri: storeData.logoUrl }}
+                  source={{ uri: cloudinaryService.getOptimizedUrl(storeData.logoUrl, 800) }}
                   style={styles.storeLogo}
                 />
               </View>
@@ -750,7 +749,7 @@ export const StoreDetailScreen: React.FC = () => {
               >
                 {!!storeData.promoImageUrl && (
                   <Image
-                    source={{ uri: storeData.promoImageUrl }}
+                    source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
                     style={styles.promoImage}
                     resizeMode="cover"
                   />

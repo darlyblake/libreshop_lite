@@ -45,6 +45,7 @@ export { AdminCategoriesScreen } from './AdminCategoriesScreen';
 export { AdminSubscriptionsScreen } from './AdminSubscriptionsScreen';
 export { AdminPaymentsScreen } from './AdminPaymentsScreen';
 export { AdminAnalyticsScreen } from './AdminAnalyticsScreen';
+export { SellerAnalyticsScreen } from './SellerAnalyticsScreen';
 export { AdminFeaturedScreen } from './AdminFeaturedScreen';
 export { AdminReportsScreen } from './AdminReportsScreen';
 export { AdminAdministratorsScreen } from './AdminAdministratorsScreen';

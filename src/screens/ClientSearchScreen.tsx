@@ -36,10 +36,11 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useSearchStore } from '../store/searchStore';
 import { COLORS, SPACING, FONT_SIZE, RADIUS, SHADOWS } from '../config/theme';
 import { RootStackParamList } from '../navigation/types';
-import { productService, Store, Product } from '../lib/supabase';
-import { storeService } from '../lib/supabase';
+import { Store, Product } from '../lib/supabase';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
 import { SortTabs } from '../components/SortTabs';
-import { categoryService } from '../lib/categoryService';
+import { categoryService } from '../services/categoryService';
 import { errorHandler } from '../utils/errorHandler';
 
 const { width, height } = Dimensions.get('window');

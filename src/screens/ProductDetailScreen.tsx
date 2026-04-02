@@ -31,14 +31,11 @@ import { useCartStore } from "../store";
 import { useAuthStore } from "../store";
 import { useTheme } from "../hooks/useTheme";
 import { LikeButton, SkeletonLoader } from "../components";
-import {
-  productService,
-  reviewService,
-  storeService,
-  type Product,
-  type ProductReview,
-  type Store,
-} from "../lib/supabase";
+import { type Product, type ProductReview, type Store } from '../lib/supabase';
+import { productService } from '../services/productService';
+import { reviewService } from '../services/reviewService';
+import { cloudinaryService } from '../services/cloudinaryService';
+import { storeService } from '../services/storeService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -322,7 +319,7 @@ export const ProductDetailScreen: React.FC = () => {
             </View>
           ) : productData?.images?.[selectedImageIndex] ? (
             <Image
-              source={{ uri: productData.images[selectedImageIndex] }}
+              source={{ uri: cloudinaryService.getOptimizedUrl(productData.images[selectedImageIndex], 800) }}
               style={styles.mainImage}
               resizeMode="contain"
             />
@@ -381,7 +378,7 @@ export const ProductDetailScreen: React.FC = () => {
                 activeOpacity={0.85}
               >
                 <Image
-                  source={{ uri: item }}
+                  source={{ uri: cloudinaryService.getOptimizedUrl(item, 800) }}
                   style={styles.thumbImage}
                   resizeMode="contain"
                 />
@@ -405,7 +402,7 @@ export const ProductDetailScreen: React.FC = () => {
       >
         {productData.store.logoUrl ? (
           <Image
-            source={{ uri: productData.store.logoUrl }}
+            source={{ uri: cloudinaryService.getOptimizedUrl(productData.store.logoUrl, 800) }}
             style={styles.shopImg}
           />
         ) : (
@@ -899,7 +896,7 @@ export const ProductDetailScreen: React.FC = () => {
             renderItem={({ item }) => (
               <View style={{ width: SCREEN_WIDTH, height: SCREEN_HEIGHT }}>
                 <Image
-                  source={{ uri: item }}
+                  source={{ uri: cloudinaryService.getOptimizedUrl(item, 800) }}
                   style={styles.viewerImage}
                   resizeMode="contain"
                 />

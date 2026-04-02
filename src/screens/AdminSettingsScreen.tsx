@@ -17,8 +17,9 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
-import { settingsService } from '../lib/settingsService';
+import { settingsService } from '../services/settingsService';
 import { useEffect } from 'react';
+import { useSettingsStore } from '../store/settingsStore';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -41,8 +42,15 @@ export const AdminSettingsScreen: React.FC = () => {
     requireVerification: true,
     requireEmailConfirmation: true, // Nouveau réglage
   });
-  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [adminValues, setAdminValues] = useState({
+    whatsappNumber: '',
+    whatsappDisplay: '',
+    email: '',
+  });
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const updateAdminConfig = useSettingsStore(state => state.updateAdminConfig);
+  const adminConfig = useSettingsStore(state => state.adminConfig);
 
   // Charger les paramètres au montage
   useEffect(() => {
@@ -54,10 +62,12 @@ export const AdminSettingsScreen: React.FC = () => {
           ...storedSettings,
         }));
         
-        // Charger spécifiquement le numéro WhatsApp
-        if (storedSettings.whatsappNumber) {
-          setWhatsappNumber(storedSettings.whatsappNumber);
-        }
+        // Charger les valeurs admin
+        setAdminValues({
+          whatsappNumber: storedSettings.whatsappNumber || adminConfig.whatsappNumber,
+          whatsappDisplay: storedSettings.whatsappDisplay || adminConfig.whatsappDisplay,
+          email: storedSettings.adminEmail || adminConfig.email,
+        });
       } catch (e) {
         console.error('Error loading settings:', e);
       } finally {
@@ -167,24 +177,20 @@ export const AdminSettingsScreen: React.FC = () => {
     },
   ];
 
-  const saveWhatsappNumber = async () => {
-    const num = whatsappNumber.trim();
-    if (!num) {
-      Alert.alert('Erreur', "Le numéro WhatsApp ne peut pas être vide.");
-      return;
-    }
-    // Basic validation: allow digits, spaces, + and -
-    if (!/^\+?[0-9 \-]+$/.test(num)) {
-      Alert.alert('Erreur', 'Format de numéro invalide. Utilisez seulement chiffres et +.');
-      return;
-    }
-
+  const saveAdminContact = async () => {
+    setIsSaving(true);
     try {
-      await settingsService.updateSetting('whatsappNumber', num);
-      Alert.alert('Succès', `Numéro WhatsApp mis à jour: ${num}`);
+      await updateAdminConfig({
+        whatsappNumber: adminValues.whatsappNumber,
+        whatsappDisplay: adminValues.whatsappDisplay,
+        email: adminValues.email,
+      });
+      Alert.alert('Succès', 'Les informations de contact ont été mises à jour.');
     } catch (e) {
-      console.error('Error saving whatsapp number:', e);
-      Alert.alert('Erreur', 'Impossible de sauvegarder le numéro sur le serveur.');
+      console.error('Error saving admin contact:', e);
+      Alert.alert('Erreur', 'Impossible de sauvegarder les contacts.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -268,20 +274,58 @@ export const AdminSettingsScreen: React.FC = () => {
           {otherSettings.map((item, index) => renderSettingItem(item, index))}
         </Card>
 
-        {/* WhatsApp contact for admins */}
-        <Text style={styles.sectionTitle}>Contact WhatsApp</Text>
+        {/* Admin Contact Information */}
+        <Text style={styles.sectionTitle}>Contact Administrateur (WhatsApp & Support)</Text>
         <Card style={styles.section}>
-          <View style={styles.whatsappRow}>
-            <TextInput
-              style={styles.whatsappInput}
-              placeholder="Numéro WhatsApp"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="phone-pad"
-              value={whatsappNumber}
-              onChangeText={setWhatsappNumber}
-            />
-            <TouchableOpacity style={styles.whatsappButton} onPress={saveWhatsappNumber}>
-              <Text style={styles.whatsappButtonText}>Enregistrer</Text>
+          <View style={styles.contactForm}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Numéro WhatsApp (Format: 241...)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 24177619251"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="phone-pad"
+                value={adminValues.whatsappNumber}
+                onChangeText={(val) => setAdminValues(prev => ({ ...prev, whatsappNumber: val }))}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Numéro Affiché (Ex: +241 77...)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: +241 77 61-92-51"
+                placeholderTextColor={COLORS.textMuted}
+                value={adminValues.whatsappDisplay}
+                onChangeText={(val) => setAdminValues(prev => ({ ...prev, whatsappDisplay: val }))}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email de Support</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: support@libreshop.com"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="email-address"
+                value={adminValues.email}
+                onChangeText={(val) => setAdminValues(prev => ({ ...prev, email: val }))}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.saveButton, isSaving && { opacity: 0.7 }]} 
+              onPress={saveAdminContact}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color={COLORS.text} />
+              ) : (
+                <>
+                  <Ionicons name="save-outline" size={20} color={COLORS.text} />
+                  <Text style={styles.saveButtonText}>Enregistrer les contacts</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
         </Card>
@@ -409,6 +453,42 @@ const styles = StyleSheet.create({
   whatsappRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  contactForm: {
+    padding: SPACING.lg,
+  },
+  inputGroup: {
+    marginBottom: SPACING.md,
+  },
+  inputLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  input: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    color: COLORS.text,
+    fontSize: FONT_SIZE.md,
+  },
+  saveButton: {
+    backgroundColor: COLORS.accent,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  saveButtonText: {
+    color: COLORS.text,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.md,
   },
   whatsappInput: {
     flex: 1,

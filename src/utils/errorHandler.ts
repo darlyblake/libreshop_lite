@@ -38,20 +38,33 @@ class ErrorHandler {
    * Crée et gère une erreur de manière centralisée
    */
   handle(
-    error: Error | string,
+    error: any,
     context: string,
     category: ErrorCategory = ErrorCategory.SYSTEM,
     severity: ErrorSeverity = ErrorSeverity.MEDIUM,
     metadata?: Record<string, any>
   ): AppError {
+    let message = 'Unknown error';
+    let stack = undefined;
+
+    if (typeof error === 'string') {
+      message = error;
+    } else if (error instanceof Error) {
+      message = error.message;
+      stack = error.stack;
+    } else if (error && typeof error === 'object') {
+      message = error.message || String(error);
+      stack = error.stack;
+    }
+
     const appError: AppError = {
       id: this.generateId(),
-      message: typeof error === 'string' ? error : error.message,
+      message,
       category,
       severity,
       context,
       timestamp: new Date(),
-      stack: typeof error === 'object' ? error.stack : undefined,
+      stack,
       metadata,
     };
 
@@ -70,7 +83,7 @@ class ErrorHandler {
   /**
    * Gestion des erreurs réseau
    */
-  handleNetworkError(error: Error, context: string, metadata?: Record<string, any>): AppError {
+  handleNetworkError(error: any, context: string, metadata?: Record<string, any>): AppError {
     return this.handle(
       error,
       context,
@@ -83,7 +96,7 @@ class ErrorHandler {
   /**
    * Gestion des erreurs d'authentification
    */
-  handleAuthError(error: Error, context: string): AppError {
+  handleAuthError(error: any, context: string): AppError {
     return this.handle(
       error,
       context,
@@ -109,7 +122,7 @@ class ErrorHandler {
   /**
    * Gestion des erreurs de base de données
    */
-  handleDatabaseError(error: Error, context: string, query?: string): AppError {
+  handleDatabaseError(error: any, context: string, query?: string): AppError {
     return this.handle(
       error,
       context,
@@ -160,9 +173,9 @@ class ErrorHandler {
    */
   private reportError(error: AppError): void {
     // Implémenter ici l'envoi vers Sentry, LogRocket, etc.
-    // Pour l'instant, juste en développement
-    if (error.severity === ErrorSeverity.CRITICAL) {
-      errorHandler.handle(error, '🚨 Erreur critique détectée:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+    // Éviter la récursion infinie en ne reportant pas les erreurs système de bas niveau
+    if (error.severity === ErrorSeverity.CRITICAL && error.category !== ErrorCategory.SYSTEM) {
+      this.handle('🚨 Erreur critique détectée: ' + error.message, 'ErrorReporting', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
     }
   }
 
@@ -218,16 +231,16 @@ class ErrorHandler {
 export const errorHandler = new ErrorHandler();
 
 // Fonctions utilitaires pour une utilisation rapide
-export const handleNetworkError = (error: Error, context: string, metadata?: Record<string, any>) =>
+export const handleNetworkError = (error: any, context: string, metadata?: Record<string, any>) =>
   errorHandler.handleNetworkError(error, context, metadata);
 
-export const handleAuthError = (error: Error, context: string) =>
+export const handleAuthError = (error: any, context: string) =>
   errorHandler.handleAuthError(error, context);
 
 export const handleValidationError = (message: string, context: string, field?: string) =>
   errorHandler.handleValidationError(message, context, field);
 
-export const handleDatabaseError = (error: Error, context: string, query?: string) =>
+export const handleDatabaseError = (error: any, context: string, query?: string) =>
   errorHandler.handleDatabaseError(error, context, query);
 
 export default errorHandler;

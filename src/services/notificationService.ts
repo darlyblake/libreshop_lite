@@ -1,5 +1,5 @@
-import { supabase } from './supabase';
-
+import { supabase } from '../lib/supabase';
+import { Platform } from 'react-native';
 export interface Notification {
   id: string;
   user_id: string;
@@ -86,13 +86,17 @@ export const notificationService = {
 
   // Service interne pour envoyer au serveur Expo
   async sendPushNotification(userId: string, pushData: { title: string, body: string, data?: any }) {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
     try {
       // Récupérer le token du destinataire
       const { data: user, error } = await supabase!
         .from('users')
         .select('expo_push_token')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (error || !user?.expo_push_token) return;
 

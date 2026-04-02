@@ -16,15 +16,20 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuthStore } from '../store';
-import { productService, storeService, orderService, supabase, type Product, type Order } from '../lib/supabase';
+import { type Order } from '../lib/supabase';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
+import { orderService } from '../services/orderService';
+import { qrCodeService } from '../services/qrCodeService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 
@@ -35,6 +40,7 @@ type Product = {
   stock: number;
   category?: string;
   icon?: keyof typeof Ionicons.glyphMap;
+  reference?: string;
 };
 
 type CartItem = Product & {
@@ -43,9 +49,11 @@ type CartItem = Product & {
 
 export const SellerCaisseScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const { initialClientName, initialClientPhone } = route.params || {};
   const { width } = useWindowDimensions();
   const { user } = useAuthStore();
-  const [cartVisible, setCartVisible] = useState(true);
+  const [cartVisible, setCartVisible] = useState(false);
   const cartAnimation = useRef(new Animated.Value(0)).current;
 
   const isTablet = width >= 768;
@@ -68,6 +76,15 @@ export const SellerCaisseScreen = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [cashReceived, setCashReceived] = useState('');
+  const [showClientPicker, setShowClientPicker] = useState(false);
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+
+  // Initialiser le client si passé en paramètre
+  useEffect(() => {
+    if (initialClientName) setCustomerName(initialClientName);
+    if (initialClientPhone) setCustomerPhone(initialClientPhone);
+  }, [initialClientName, initialClientPhone]);
 
   const format = (v: number) => v.toLocaleString('fr-FR') + ' FCFA';
 
@@ -87,9 +104,9 @@ export const SellerCaisseScreen = () => {
         setStoreId(store.id);
         setStore(store);
         const data = await productService.getByStoreAvailable(store.id);
-        setProducts(data || []);
+        setProducts(data as Product[] || []);
       } catch (e) {
-        errorHandler.handleDatabaseError(e, 'Erreur chargement produits caisse');
+        errorHandler.handleDatabaseError(e as any, 'Erreur chargement produits caisse');
         Alert.alert('Erreur', 'Impossible de charger les produits');
         setProducts([]);
       } finally {
@@ -207,7 +224,8 @@ export const SellerCaisseScreen = () => {
     if (!storeId) return;
     const loadClients = async () => {
       try {
-        const orders = await orderService.getByStore(storeId, { includeUser: true });
+        const res = await orderService.getByStore(storeId, { includeUser: true });
+        const orders = res.orders || [];
         const map = new Map<string, {id: string, name: string, phone: string}>();
         (orders as any[]).forEach((o: any) => {
           const cPhone = String(o?.customer_phone || '').trim();
@@ -242,7 +260,7 @@ export const SellerCaisseScreen = () => {
 
   const categories = useMemo(() => {
     const cats = new Set(products.map(p => p.category).filter(Boolean));
-    return ['Tous', ...Array.from(cats)];
+    return ['Tous', ...Array.from(cats) as string[]];
   }, [products]);
 
   const filtered = useMemo(() => {
@@ -253,7 +271,8 @@ export const SellerCaisseScreen = () => {
     if (q) {
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(q) ||
-        p.category?.toLowerCase().includes(q)
+        p.category?.toLowerCase().includes(q) ||
+        p.reference?.toLowerCase().includes(q)
       );
     }
     
@@ -271,28 +290,38 @@ export const SellerCaisseScreen = () => {
 
   const renderProduct = ({ item, index }: { item: Product; index: number }) => {
     const stockColor = item.stock > 10 ? COLORS.success : item.stock > 0 ? COLORS.warning : COLORS.danger;
+    const cartItem = cart.find(i => i.id === item.id);
+    const quantity = cartItem ? cartItem.quantity : 0;
+    const isSelected = quantity > 0;
     
     return (
       <TouchableOpacity
         style={[
           styles.productCard,
-          { marginLeft: index % numColumns === 0 ? 0 : 8 }
+          { marginLeft: index % numColumns === 0 ? 0 : 8 },
+          isSelected && styles.productCardSelected
         ]}
         onPress={() => addToCart(item)}
         disabled={item.stock <= 0}
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={item.stock <= 0 ? [COLORS.border, COLORS.card] : [COLORS.card, COLORS.bg]}
+          colors={item.stock <= 0 ? [COLORS.border, COLORS.card] : isSelected ? [COLORS.info + '15', COLORS.card] : [COLORS.card, COLORS.bg]}
           style={styles.productGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
+          {isSelected && (
+            <View style={styles.quantityBadge}>
+              <Text style={styles.quantityBadgeText}>{quantity}</Text>
+            </View>
+          )}
+
           <View style={styles.productIcon}>
             <Ionicons 
-              name={item.icon || 'cube'} 
+              name={item.icon || (isSelected ? 'checkbox' : 'cube')} 
               size={32} 
-              color={item.stock <= 0 ? COLORS.textMuted : COLORS.info} 
+              color={item.stock <= 0 ? COLORS.textMuted : isSelected ? COLORS.info : COLORS.info + '80'} 
             />
           </View>
           
@@ -316,8 +345,8 @@ export const SellerCaisseScreen = () => {
             </View>
             
             {item.stock > 0 ? (
-              <View style={styles.addButton}>
-                <Ionicons name="add" size={20} color="white" />
+              <View style={[styles.addButton, isSelected && styles.addButtonSelected]}>
+                <Ionicons name={isSelected ? "add" : "add"} size={20} color="white" />
               </View>
             ) : null}
           </View>
@@ -432,12 +461,14 @@ export const SellerCaisseScreen = () => {
         quantity: item.quantity,
         price: item.price,
       }));
-      await supabase.from('order_items').insert(itemsPayload);
+      await orderService.createItems(itemsPayload);
 
       // Décrémenter le stock via le RPC
-      await supabase.rpc('process_order_after_payment', {
-        p_order_id: order.id,
-      });
+      await orderService.processPayment(order.id);
+
+      // Préchargement du QR code en base64 pour garantir son affichage dans le reçu
+      const orderUrl = qrCodeService.getOrderUrl(order.id);
+      const qrBase64 = await qrCodeService.getQrImageBase64(orderUrl, 100);
 
       // Génération du ticket format thermique (58/80mm)
       const html = `
@@ -502,7 +533,7 @@ export const SellerCaisseScreen = () => {
         </head>
         <body>
           <div class="center">
-            ${store?.logo_url ? `<img src="${store.logo_url}" class="logo" />` : ''}
+            
             <div class="store-name">${store?.name || 'BOUTIQUE'}</div>
             ${store?.address ? `<div class="header-info">${store.address}</div>` : ''}
             ${store?.phone ? `<div class="header-info">Tél: ${store.phone}</div>` : ''}
@@ -513,7 +544,7 @@ export const SellerCaisseScreen = () => {
           <div style="margin-bottom: 10px;">
             <div><span class="bold">Date :</span> ${new Date().toLocaleString('fr-FR')}</div>
             <div><span class="bold">Ticket N° :</span> ${order.id.slice(0, 8).toUpperCase()}</div>
-            <div><span class="bold">Caissier :</span> ${user?.user_metadata?.full_name || 'Admin'}</div>
+            <div><span class="bold">Caissier :</span> ${(user as any)?.user_metadata?.full_name || user?.email || 'Admin'}</div>
             ${customerName.trim() ? `<div><span class="bold">Client :</span> ${customerName.trim()}</div>` : ''}
           </div>
 
@@ -579,7 +610,7 @@ export const SellerCaisseScreen = () => {
           <div class="dashed-line"></div>
 
           <div class="center" style="margin-top: 20px;">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${order.id}&format=png" style="width: 80px; height: 80px; margin-bottom: 10px;" />
+            <img src="${qrBase64}" style="width: 80px; height: 80px; margin-bottom: 10px;" />
             <div class="bold" style="font-size: 14px;">MERCI ET A BIENTOT !</div>
             <div style="font-size: 10px; margin-top: 15px; color: #666;">Propulsé par LibreShop App</div>
           </div>
@@ -631,13 +662,34 @@ export const SellerCaisseScreen = () => {
       
       Alert.alert('Succès', 'Vente effectuée avec succès !');
     } catch (error) {
-      errorHandler.handleDatabaseError(error, 'Erreur finalisation caisse:');
+      errorHandler.handleDatabaseError(error as any, 'Erreur finalisation caisse:');
       Alert.alert('Erreur', 'Impossible de finaliser la vente');
       
       // Ensure Modal closes even if order errors out partially
       setShowCheckoutModal(false);
     }
   };
+
+  const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
+    if (!showCameraScanner) return;
+    
+    const q = data.trim().toLowerCase();
+    const match = products.find(p => p.reference?.toLowerCase() === q);
+    
+    if (match) {
+      addToCart(match);
+      setShowCameraScanner(false);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } else {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      Alert.alert('Non trouvé', `Aucun produit avec la référence ${data} n'a été trouvé.`);
+      setShowCameraScanner(false);
+    }
+  }, [showCameraScanner, products, addToCart]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -671,8 +723,11 @@ export const SellerCaisseScreen = () => {
           <TouchableOpacity style={styles.headerButton}>
             <Ionicons name="stats-chart" size={22} color={COLORS.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="person-outline" size={22} color={COLORS.textMuted} />
+          <TouchableOpacity 
+            style={[styles.headerButton, customerName ? { backgroundColor: COLORS.info + '20', borderRadius: 8, padding: 4, margin: -4 } : {}]}
+            onPress={() => setShowClientPicker(true)}
+          >
+            <Ionicons name={customerName ? "person" : "person-outline"} size={22} color={customerName ? COLORS.info : COLORS.textMuted} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -690,12 +745,40 @@ export const SellerCaisseScreen = () => {
             <View style={styles.searchWrapper}>
               <Ionicons name="search" size={20} color={COLORS.textMuted} />
               <TextInput
-                placeholder="Rechercher un produit..."
+                placeholder="Scanner ou rechercher..."
                 placeholderTextColor={COLORS.textMuted}
                 value={search}
                 onChangeText={setSearch}
                 style={styles.searchInput}
+                onSubmitEditing={() => {
+                  const q = search.trim().toLowerCase();
+                  if (q) {
+                    const match = products.find(p => p.reference?.toLowerCase() === q);
+                    if (match) {
+                      addToCart(match);
+                      setSearch('');
+                    } else if (filtered.length === 1) {
+                      addToCart(filtered[0]);
+                      setSearch('');
+                    }
+                  }
+                }}
               />
+              <TouchableOpacity 
+                style={{ marginLeft: 12, padding: 4 }}
+                onPress={async () => {
+                  if (!permission?.granted) {
+                    const status = await requestPermission();
+                    if (!status.granted) {
+                      Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
+                      return;
+                    }
+                  }
+                  setShowCameraScanner(true);
+                }}
+              >
+                <Ionicons name="barcode-outline" size={24} color={COLORS.info} />
+              </TouchableOpacity>
               {search !== '' ? (
                 <TouchableOpacity onPress={() => setSearch('')}>
                   <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
@@ -703,6 +786,22 @@ export const SellerCaisseScreen = () => {
               ) : null}
             </View>
           </View>
+
+          {/* Client sélectionné */}
+          {customerName ? (
+            <View style={styles.selectedClientBanner}>
+              <View style={styles.selectedClientInfo}>
+                <Ionicons name="person" size={16} color={COLORS.info} />
+                <Text style={styles.selectedClientText}>
+                  Client : <Text style={{ fontWeight: 'bold' }}>{customerName}</Text>
+                  {customerPhone ? ` (${customerPhone})` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => { setCustomerName(''); setCustomerPhone(''); }}>
+                <Ionicons name="close-circle" size={20} color={COLORS.danger} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           {/* Filtres catégories */}
           <ScrollableCategories
@@ -1021,6 +1120,119 @@ export const SellerCaisseScreen = () => {
           </KeyboardAvoidingView>
         </BlurView>
       </Modal>
+
+      {/* MODAL DE SÉLECTION DE CLIENT */}
+      <Modal
+        visible={showClientPicker}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowClientPicker(false)}
+      >
+        <TouchableOpacity 
+          style={[styles.modalOverlay, { justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.7)' }]} 
+          activeOpacity={1} 
+          onPress={() => setShowClientPicker(false)}
+        >
+          <View style={[styles.modalContent, { marginHorizontal: 20, borderRadius: 20, minHeight: 300, maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Attribuer à un client</Text>
+              <TouchableOpacity onPress={() => setShowClientPicker(false)}>
+                <Ionicons name="close" size={24} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={[styles.cashInput, { marginBottom: 15, fontSize: 14 }]}
+              placeholder="Rechercher par nom ou téléphone..."
+              placeholderTextColor="#9ca3af"
+              autoFocus
+              onChangeText={(text) => {
+                setCustomerName(text);
+                // Si on tape un truc qui n'est pas dans la liste, on laisse le nom tel quel
+              }}
+              value={customerName}
+            />
+
+            <FlatList
+              data={clients.filter(c => 
+                c.name.toLowerCase().includes(customerName.toLowerCase()) || 
+                c.phone.includes(customerName)
+              )}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={{ 
+                    padding: 16, 
+                    borderBottomWidth: 1, 
+                    borderBottomColor: COLORS.border,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => {
+                    setCustomerName(item.name);
+                    setCustomerPhone(item.phone);
+                    setShowClientPicker(false);
+                  }}
+                >
+                  <View>
+                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>{item.name}</Text>
+                    <Text style={{ color: COLORS.textMuted, fontSize: 12 }}>{item.phone}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ padding: 20, alignItems: 'center' }}>
+                  <Text style={{ color: COLORS.textMuted }}>Aucun client trouvé</Text>
+                  <TouchableOpacity 
+                    style={{ marginTop: 10, padding: 8, backgroundColor: COLORS.info + '20', borderRadius: 8 }}
+                    onPress={() => setShowClientPicker(false)}
+                  >
+                    <Text style={{ color: COLORS.info }}>Utiliser "{customerName}"</Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL SCANNER CAMÉRA */}
+      <Modal
+        visible={showCameraScanner}
+        animationType="slide"
+        onRequestClose={() => setShowCameraScanner(false)}
+      >
+        <View style={styles.cameraContainer}>
+          <CameraView
+            style={styles.camera}
+            onBarcodeScanned={handleBarcodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+            }}
+          >
+            <View style={styles.cameraOverlay}>
+              <View style={styles.cameraHeader}>
+                <TouchableOpacity 
+                  style={styles.closeCameraButton}
+                  onPress={() => setShowCameraScanner(false)}
+                >
+                  <Ionicons name="close" size={28} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.cameraTargetContainer}>
+                <View style={styles.cameraTarget} />
+              </View>
+
+              <View style={styles.cameraFooter}>
+                <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
+              </View>
+            </View>
+          </CameraView>
+        </View>
+      </Modal>
         </>
       )}
     </SafeAreaView>
@@ -1031,7 +1243,15 @@ export const SellerCaisseScreen = () => {
    COMPOSANT CATÉGORIES SCROLLABLE
 ====================== */
 
-const ScrollableCategories = ({ categories, selectedCategory, onSelectCategory }) => (
+const ScrollableCategories = ({ 
+  categories, 
+  selectedCategory, 
+  onSelectCategory 
+}: { 
+  categories: string[], 
+  selectedCategory: string | null, 
+  onSelectCategory: (cat: string | null) => void 
+}) => (
   <View style={styles.categoriesContainer}>
     <FlatList
       horizontal
@@ -1120,6 +1340,26 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 16,
     padding: 0,
+  },
+  selectedClientBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.info + '15',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: COLORS.info + '30',
+  },
+  selectedClientInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  selectedClientText: {
+    color: COLORS.text,
+    fontSize: 14,
   },
   categoriesContainer: {
     marginBottom: 20,
@@ -1211,6 +1451,32 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.info,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  addButtonSelected: {
+    backgroundColor: COLORS.success,
+  },
+  productCardSelected: {
+    borderColor: COLORS.info,
+    borderWidth: 2,
+  },
+  quantityBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: COLORS.info,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderWidth: 2,
+    borderColor: COLORS.card,
+  },
+  quantityBadgeText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   emptyState: {
     alignItems: 'center',
@@ -1524,5 +1790,56 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 16,
     fontSize: 16,
+  },
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  cameraHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: Platform.OS === 'ios' ? 40 : 20,
+  },
+  closeCameraButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraTargetContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraTarget: {
+    width: 250,
+    height: 150,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  cameraFooter: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  cameraHint: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
 });

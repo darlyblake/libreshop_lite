@@ -18,9 +18,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
-import { supabase, type Product } from '../lib/supabase';
-import { authService, orderService } from '../lib/supabase';
-import { userService } from '../lib/userService';
+import { type Product } from '../lib/supabase';
+import { authService } from '../services/authService';
+import { orderService } from '../services/orderService';
+import { userService } from '../services/userService';
 import { useAuthStore, useCartStore } from '../store';
 
 interface PaymentMethod {
@@ -125,12 +126,9 @@ export const PaymentScreen: React.FC = () => {
       if (!storeId) throw new Error('storeId manquant');
       let userId = user?.id;
       if (!userId) {
-        if (!supabase) throw new Error('Utilisateur non connecté');
-
         try {
-          const { data, error } = await supabase.auth.getUser();
-          if (error) throw error;
-          userId = data?.user?.id || undefined;
+          const userObj = await authService.getCurrentUser();
+          userId = userObj?.id || undefined;
         } catch {
           // ignore, will try anonymous sign-in below
         }
@@ -140,9 +138,9 @@ export const PaymentScreen: React.FC = () => {
           // In that case we must require an explicit login.
           try {
             await authService.signInAnonymously();
-            const { data } = await supabase.auth.getUser();
-            userId = data?.user?.id || undefined;
-          } catch (e) {
+            const userObj = await authService.getCurrentUser();
+            userId = userObj?.id || undefined;
+          } catch (e: any) {
             errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'failed to create guest session at payment time', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           }
         }
@@ -184,44 +182,34 @@ export const PaymentScreen: React.FC = () => {
               ? 'card'
               : 'mobile_money';
 
-          const { data: updatedOrder, error: updErr } = await supabase
-            .from('orders')
-            .update({ payment_status: 'paid', payment_method: paymentMethodDb, status: 'paid' })
-            .eq('id', existingOrderId)
-            .select('*')
-            .single();
-          if (updErr) throw updErr;
+          const updatedOrder = await orderService.update(existingOrderId, { payment_status: 'paid', payment_method: paymentMethodDb, status: 'paid' });
 
           // insert order_items if provided (best-effort)
           try {
-            if (supabase && Array.isArray(items) && items.length > 0) {
+            if (Array.isArray(items) && items.length > 0) {
               const rows = items.map((it: { product: Product; quantity: number }) => ({
                 order_id: existingOrderId,
                 product_id: it.product.id,
                 quantity: it.quantity,
                 price: it.product.price,
               }));
-              const { error } = await supabase.from('order_items').insert(rows);
-              if (error) console.warn('failed to insert order items for existing order', error);
+              await orderService.createItems(rows);
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn('order_items insert skipped for existing order', e);
           }
 
           // run RPC to decrement stock + notify seller
           try {
-            if (supabase) {
-              const { error } = await supabase.rpc('process_order_after_payment', { p_order_id: existingOrderId });
-              if (error) console.warn('process_order_after_payment failed for existing order', error);
-            }
-          } catch (e) {
+            await orderService.processPayment(existingOrderId);
+          } catch (e: any) {
             console.warn('process_order_after_payment skipped for existing order', e);
           }
 
           // client-side notification (best-effort)
           try {
-            const { storeService } = await import('../lib/supabase');
-            const { notificationService } = await import('../lib/notificationService');
+            const { storeService } = await import('../services/storeService');
+            const { notificationService } = await import('../services/notificationService');
             if (storeId) {
               const store = await storeService.getById(String(storeId));
               if (store?.user_id) {
@@ -235,7 +223,7 @@ export const PaymentScreen: React.FC = () => {
                 });
               }
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn('notification creation failed for existing order', e);
           }
 
@@ -243,10 +231,10 @@ export const PaymentScreen: React.FC = () => {
           try {
             if (Array.isArray(items) && items.length > 0) {
               for (const it of items) {
-                try { removeItem(it.product.id); } catch (e) { /* ignore */ }
+                try { removeItem(it.product.id); } catch (e: any) { /* ignore */ }
               }
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn('failed to remove items from cart after existing order payment', e);
           }
 
@@ -322,37 +310,31 @@ export const PaymentScreen: React.FC = () => {
 
         // Insert order items (best effort). If the table differs, we still continue to confirmation.
         try {
-          if (supabase) {
-            const rows = items.map((it: { product: Product; quantity: number }) => ({
-              order_id: created.id,
-              product_id: it.product.id,
-              quantity: it.quantity,
-              price: it.product.price,
-            }));
-            const { error } = await supabase.from('order_items').insert(rows);
-            if (error) errorHandler.handle(error, 'failed to insert order items', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-          }
-        } catch (e) {
+          const rows = items.map((it: { product: Product; quantity: number }) => ({
+            order_id: created.id,
+            product_id: it.product.id,
+            quantity: it.quantity,
+            price: it.product.price,
+          }));
+          await orderService.createItems(rows);
+        } catch (e: any) {
           errorHandler.handle(e, 'order_items insert skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
 
         // Decrement stock + notify seller (best effort)
         try {
-          if (supabase && created?.id) {
-            const { error } = await supabase.rpc('process_order_after_payment', {
-              p_order_id: created.id,
-            });
-            if (error) errorHandler.handle(error, 'process_order_after_payment failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+          if (created?.id) {
+            await orderService.processPayment(created.id);
           }
-        } catch (e) {
+        } catch (e: any) {
           errorHandler.handle(e, 'process_order_after_payment skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
 
         // Notification créée par le RPC process_order_after_payment, mais on en ajoute une côté client 
         // pour garantir une réception instantanée et fiable même si le RPC a un délai ou échoue.
         try {
-          const { storeService } = await import('../lib/supabase');
-          const { notificationService } = await import('../lib/notificationService');
+          const { storeService } = await import('../services/storeService');
+          const { notificationService } = await import('../services/notificationService');
           
           if (storeId) {
             const store = await storeService.getById(String(storeId));
@@ -370,7 +352,7 @@ export const PaymentScreen: React.FC = () => {
               });
             }
           }
-        } catch (e) {
+        } catch (e: any) {
           errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'notification creation failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
 

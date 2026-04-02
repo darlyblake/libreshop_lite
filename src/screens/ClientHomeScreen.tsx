@@ -27,17 +27,13 @@ import { StoreCard, ProductCard } from '../components';
 import { PWAInstallButton } from '../components/PWAInstallButton';
 import { SortTabs } from '../components/SortTabs';
 import { useResponsive } from '../utils/responsive';
-import {
-  storeService,
-  productService,
-  Store,
-  Product,
-  homeBannerService,
-  HomeBanner,
-  collectionService,
-  Collection,
-} from '../lib/supabase';
+import { Store, Product, HomeBanner, Collection } from '../lib/supabase';
+import { storeService } from '../services/storeService';
+import { productService } from '../services/productService';
+import { homeBannerService } from '../services/homeBannerService';
+import { collectionService } from '../services/collectionService';
 import { useCartStore } from '../store';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -232,7 +228,7 @@ export const ClientHomeScreen: React.FC = () => {
       >
         <Animated.View style={[styles.bannerCard, { transform: [{ scale }], opacity }]}>
           {item.image_url ? (
-            <Image source={{ uri: item.image_url }} style={styles.bannerImage} />
+            <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.image_url, 800) }} style={styles.bannerImage} />
           ) : null}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
@@ -522,7 +518,7 @@ export const ClientHomeScreen: React.FC = () => {
                       </View>
                     </View>
                     {promoBanners[0].image_url ? (
-                      <Image source={{ uri: promoBanners[0].image_url }} style={styles.promoImage} />
+                      <Image source={{ uri: cloudinaryService.getOptimizedUrl(promoBanners[0].image_url, 800) }} style={styles.promoImage} />
                     ) : null}
                   </LinearGradient>
                 </TouchableOpacity>

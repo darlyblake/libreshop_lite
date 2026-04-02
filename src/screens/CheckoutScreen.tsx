@@ -15,7 +15,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore, useCartStore } from '../store';
 import { genericStorage } from '../lib/storage';
-import { storeService } from '../lib/supabase';
+import { storeService } from '../services/storeService';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();

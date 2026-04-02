@@ -19,7 +19,9 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
-import { planService, storeService, supabase, type Plan } from '../lib/supabase';
+import { planService } from '../services/planService';
+import { adminService } from '../services/adminService';
+import { storeService } from '../services/storeService';
 
 interface StorePayment {
   id: string;
@@ -34,6 +36,7 @@ interface StorePayment {
   subscriptionEnd?: string;
   cashierActive: boolean;
   onlineStoreActive: boolean;
+  analyticsActive: boolean;
   productsLimit: number;
   revenue: number;
 }
@@ -47,30 +50,22 @@ export const AdminPaymentsScreen: React.FC = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
 
   const [stores, setStores] = useState<StorePayment[]>([]);
 
   const loadStores = async () => {
-    if (!supabase) return;
     setLoading(true);
     try {
-      const [storesRes, plansRes] = await Promise.all([
-        supabase
-          .from('stores')
-          .select(
-            'id,name,product_limit,subscription_plan,subscription_price,subscription_status,subscription_end,cashier_active,online_store_active,billing_status,last_payment_date,next_billing_date,users:users!stores_user_id_fkey(full_name)'
-          )
-          .order('created_at', { ascending: false }),
+      const [storesData, plansRes] = await Promise.all([
+        adminService.getPaymentsStores(),
         planService.getAll()
       ]);
-
-      if (storesRes.error) throw storesRes.error;
       
       setAvailablePlans(plansRes.filter(p => p.status !== 'inactive'));
 
       setStores(
-        (storesRes.data || []).map((s: any) => ({
+        (storesData || []).map((s: any) => ({
           id: String(s.id),
           storeName: String(s.name || ''),
           ownerName: String(s.users?.full_name || ''),
@@ -83,11 +78,12 @@ export const AdminPaymentsScreen: React.FC = () => {
           subscriptionEnd: s.subscription_end ? String(s.subscription_end) : undefined,
           cashierActive: Boolean(s.cashier_active ?? true),
           onlineStoreActive: Boolean(s.online_store_active ?? true),
+          analyticsActive: Boolean(s.analytics_active ?? true),
           productsLimit: Number(s.product_limit || 0),
           revenue: 0,
         }))
       );
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'load payments stores');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de charger les paiements');
@@ -180,8 +176,7 @@ export const AdminPaymentsScreen: React.FC = () => {
     }
   };
 
-  const toggleFeature = async (storeId: string, feature: 'cashier' | 'online' | 'subscription') => {
-    if (!supabase) return;
+  const toggleFeature = async (storeId: string, feature: 'cashier' | 'online' | 'analytics' | 'subscription') => {
 
     const store = stores.find(s => s.id === storeId);
     if (!store) return;
@@ -192,19 +187,14 @@ export const AdminPaymentsScreen: React.FC = () => {
         updates.cashier_active = !store.cashierActive;
       } else if (feature === 'online') {
         updates.online_store_active = !store.onlineStoreActive;
+      } else if (feature === 'analytics') {
+        updates.analytics_active = !store.analyticsActive;
       } else {
         // subscription flag is stored as subscription_status
         updates.subscription_status = store.subscriptionActive ? 'expired' : 'active';
       }
 
-      const { data, error } = await supabase
-        .from('stores')
-        .update(updates)
-        .eq('id', storeId)
-        .select('id,cashier_active,online_store_active,subscription_status')
-        .single();
-
-      if (error) throw error;
+      const data = await adminService.updateStoreBilling(storeId, updates);
 
       setStores(prev =>
         prev.map(s =>
@@ -213,6 +203,7 @@ export const AdminPaymentsScreen: React.FC = () => {
                 ...s,
                 cashierActive: (data as any)?.cashier_active ?? s.cashierActive,
                 onlineStoreActive: (data as any)?.online_store_active ?? s.onlineStoreActive,
+                analyticsActive: (data as any)?.analytics_active ?? s.analyticsActive,
                 subscriptionActive:
                   String((data as any)?.subscription_status || '').toLowerCase() === 'active' ||
                   String((data as any)?.subscription_status || '').toLowerCase() === 'trial',
@@ -220,7 +211,7 @@ export const AdminPaymentsScreen: React.FC = () => {
             : s
         )
       );
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'toggle feature');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de modifier la fonctionnalité');
@@ -231,7 +222,6 @@ export const AdminPaymentsScreen: React.FC = () => {
   };
 
   const upgradeSubscription = async (storeId: string, planId: string) => {
-    if (!supabase) return;
     try {
       setLoading(true);
       const updatedStore = await storeService.upgradeSubscription(storeId, planId);
@@ -262,7 +252,7 @@ export const AdminPaymentsScreen: React.FC = () => {
         Alert.alert('Upgrade effectué', `Offre changée en ${planName}`);
       }
       setShowUpgradeModal(false);
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'upgrade subscription');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de changer l\'offre');
@@ -275,20 +265,13 @@ export const AdminPaymentsScreen: React.FC = () => {
   };
 
   const handlePayment = async (storeId: string) => {
-    if (!supabase) return;
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const { data, error } = await supabase
-        .from('stores')
-        .update({ 
-          billing_status: 'paid', 
-          last_payment_date: today,
-          subscription_status: 'active' 
-        })
-        .eq('id', storeId)
-        .select('id,billing_status,last_payment_date,subscription_status')
-        .single();
-      if (error) throw error;
+      const data = await adminService.updateStoreBilling(storeId, {
+        billing_status: 'paid', 
+        last_payment_date: today,
+        subscription_status: 'active' 
+      });
       setStores(prev =>
         prev.map(s =>
           s.id === storeId
@@ -308,7 +291,7 @@ export const AdminPaymentsScreen: React.FC = () => {
       } else {
         Alert.alert('Paiement validé', 'Le paiement a été marqué comme reçu');
       }
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'mark payment paid');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('❌ Impossible de valider le paiement');
@@ -453,6 +436,18 @@ export const AdminPaymentsScreen: React.FC = () => {
                   onValueChange={() => toggleFeature(store.id, 'online')}
                   trackColor={{ false: COLORS.border, true: COLORS.success + '40' }}
                   thumbColor={store.onlineStoreActive ? COLORS.success : COLORS.textMuted}
+                />
+              </View>
+              <View style={styles.featureRow}>
+                <View style={styles.featureInfo}>
+                  <Ionicons name="bar-chart-outline" size={20} color={COLORS.accent} />
+                  <Text style={styles.featureLabel}>Analytique Détaillée</Text>
+                </View>
+                <Switch
+                  value={store.analyticsActive}
+                  onValueChange={() => toggleFeature(store.id, 'analytics')}
+                  trackColor={{ false: COLORS.border, true: COLORS.success + '40' }}
+                  thumbColor={store.analyticsActive ? COLORS.success : COLORS.textMuted}
                 />
               </View>
               <View style={styles.featureRow}>

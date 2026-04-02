@@ -14,8 +14,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { productService } from '../lib/supabase';
-import { cloudinaryService } from '../lib/cloudinaryService';
+import { productService } from '../services/productService';
+import { cloudinaryService } from '../services/cloudinaryService';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -267,7 +267,7 @@ export const SellerEditProductScreen: React.FC = () => {
         <View style={styles.imageGrid}>
           {images.map((image, index) => (
             <View key={index} style={styles.imageContainer}>
-              <Image source={{ uri: image }} style={styles.productImage} />
+              <Image source={{ uri: cloudinaryService.getOptimizedUrl(image, 800) }} style={styles.productImage} />
               <TouchableOpacity
                 style={styles.removeImageButton}
                 onPress={() => removeImage(index)}

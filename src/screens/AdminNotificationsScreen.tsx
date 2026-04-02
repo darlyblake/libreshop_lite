@@ -14,8 +14,9 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { Ionicons } from '@expo/vector-icons';
-import { notificationService } from '../lib/notificationService';
-import { supabase } from '../lib/supabase';
+import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
+// import { supabase } from '../lib/supabase'; // Removed unused import
 
 interface Notification {
   id: string;
@@ -79,9 +80,9 @@ export const AdminNotificationsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadNotifications = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
+    try {
+      const sessionData = await authService.getSession();
+      const userId = sessionData.session?.user?.id;
     if (!userId) {
       setNotifications([]);
       return;
@@ -97,6 +98,9 @@ export const AdminNotificationsScreen: React.FC = () => {
         read: Boolean(r.read),
       }))
     );
+    } catch (e: any) {
+      errorHandler.handleDatabaseError(e as any, 'load notifications');
+    }
   }, []);
 
   useEffect(() => {
@@ -114,7 +118,7 @@ export const AdminNotificationsScreen: React.FC = () => {
     try {
       await notificationService.markAsRead(id);
       setNotifications((prev) => prev.map((notif) => (notif.id === id ? { ...notif, read: true } : notif)));
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'mark notification as read');
     }
   };
@@ -123,19 +127,19 @@ export const AdminNotificationsScreen: React.FC = () => {
     try {
       await Promise.all(notifications.map((n) => notificationService.delete(n.id)));
       setNotifications([]);
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'clear notifications');
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
-      const { data } = await supabase!.auth.getSession();
-      const userId = data.session?.user?.id;
+      const sessionData = await authService.getSession();
+      const userId = sessionData.session?.user?.id;
       if (!userId) return;
       await notificationService.markAllAsRead(userId);
       setNotifications((prev) => prev.map((notif) => ({ ...notif, read: true })));
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'mark all as read');
     }
   };
@@ -155,7 +159,7 @@ export const AdminNotificationsScreen: React.FC = () => {
                 onPress={handleMarkAllAsRead}
                 activeOpacity={0.7}
               >
-                <Ionicons name="checkmark-all" size={18} color={COLORS.accent} />
+                <Ionicons name="checkmark-done" size={18} color={COLORS.accent} />
                 <Text style={styles.actionButtonText}>Lire tout</Text>
               </TouchableOpacity>
             )}

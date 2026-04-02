@@ -1,4 +1,6 @@
 import * as Print from 'expo-print';
+import { formatCurrency } from './currencyUtils';
+import { errorHandler } from './errorHandler';
 import * as Sharing from 'expo-sharing';
 import { Alert, Platform } from 'react-native';
 
@@ -24,9 +26,7 @@ interface OrderData {
   storePhone?: string;
 }
 
-const formatCurrency = (amount: number): string => {
-  return amount.toLocaleString('fr-FR') + ' FCA';
-};
+// Uses imported formatCurrency
 
 const formatDate = (dateStr: string): string => {
   try {
@@ -111,7 +111,7 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
           box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .header {
-          background: linear-gradient(135deg, COLORS.accent, COLORS.accent2);
+          background: linear-gradient(135deg, #4f46e5, #7c3aed);
           color: white;
           padding: 30px;
           text-align: center;
@@ -181,7 +181,7 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
         .grand-total {
           font-size: 20px;
           font-weight: 700;
-          color: COLORS.accent;
+          color: #4f46e5;
           border-top: 2px solid #ddd;
           padding-top: 12px;
           margin-top: 8px;
@@ -196,7 +196,7 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
         }
         .status-paid { background: #d1fae5; color: #065f46; }
         .status-pending { background: #fef3c7; color: #92400e; }
-        .status-shipped { background: #dbeafe; color: COLORS.info; }
+        .status-shipped { background: #dbeafe; color: #1e40af; }
         .status-delivered { background: #d1fae5; color: #065f46; }
         .status-cancelled { background: #fee2e2; color: #991b1b; }
         .footer {
@@ -290,12 +290,57 @@ const generateOrderInvoiceHTML = (order: OrderData): string => {
   `;
 };
 
+// Web-specific: print HTML in a hidden iframe instead of window.print()
+const printHTMLOnWeb = (html: string): void => {
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+    
+    // Wait for content to load then print
+    iframe.onload = () => {
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        // Clean up after print dialog closes
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 250);
+    };
+    
+    // Fallback if onload doesn't fire (already loaded)
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.print();
+      } catch (e) { /* already printed */ }
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch (e) { /* already removed */ }
+      }, 1000);
+    }, 500);
+  }
+};
+
 // Export order as PDF
 export const exportOrderToPDF = async (order: OrderData): Promise<void> => {
   try {
     const html = generateOrderInvoiceHTML(order);
     
-    // Generate PDF
+    if (Platform.OS === 'web') {
+      printHTMLOnWeb(html);
+      return;
+    }
+
+    // Native: Generate PDF file
     const { uri } = await Print.printToFileAsync({
       html,
       base64: false,
@@ -352,7 +397,7 @@ export const exportOrdersToPDF = async (
           body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 20px; }
           h1 { color: #333; margin-bottom: 20px; text-align: center; }
           table { width: 100%; border-collapse: collapse; }
-          th { background: COLORS.accent; color: white; padding: 12px; text-align: left; }
+          th { background: #4f46e5; color: white; padding: 12px; text-align: left; }
           td { padding: 12px; border-bottom: 1px solid #eee; }
           .status-badge {
             display: inline-block;
@@ -363,7 +408,7 @@ export const exportOrdersToPDF = async (
           }
           .status-pending { background: #fef3c7; color: #92400e; }
           .status-paid { background: #d1fae5; color: #065f46; }
-          .status-shipped { background: #dbeafe; color: COLORS.info; }
+          .status-shipped { background: #dbeafe; color: #1e40af; }
           .status-delivered { background: #d1fae5; color: #065f46; }
           .status-cancelled { background: #fee2e2; color: #991b1b; }
           .total-row { font-weight: 700; background: #f8f9fa; }
@@ -393,6 +438,11 @@ export const exportOrdersToPDF = async (
       </html>
     `;
 
+    if (Platform.OS === 'web') {
+      printHTMLOnWeb(html);
+      return;
+    }
+
     const { uri } = await Print.printToFileAsync({ html, base64: false });
     
     const isShareAvailable = await Sharing.isAvailableAsync();
@@ -415,4 +465,3 @@ export default {
   exportOrderToPDF,
   exportOrdersToPDF,
 };
-

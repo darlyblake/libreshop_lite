@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, StatusBar } from 'r
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { storeService } from '../lib/supabase';
+import { storeService } from '../services/storeService';
 
 export const BulkPaymentScreen: React.FC = () => {
   const navigation = useNavigation<any>();

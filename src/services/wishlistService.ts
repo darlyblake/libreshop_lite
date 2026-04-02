@@ -1,5 +1,5 @@
-import { supabase } from './supabase';
-import { Product } from './supabase';
+import { supabase } from '../lib/supabase';
+import { Product } from '../lib/supabase';
 
 export interface WishlistItem {
   id: string;
@@ -13,7 +13,7 @@ export const wishlistService = {
   async getByUser(userId: string): Promise<WishlistItem[]> {
     const { data, error } = await supabase!
       .from('wishlists')
-      .select('*, product:products(*)')
+      .select('*, product:products(*, store:stores(*))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (error) throw error;

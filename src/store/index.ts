@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, Store, Product, Order, OrderItem, authService } from '../lib/supabase';
+import { User, Store, Product, Order, OrderItem } from '../lib/supabase';
+import { authService } from '../services/authService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 
 // Auth Store

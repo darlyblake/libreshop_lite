@@ -14,8 +14,8 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { useAuthStore } from '../store';
-import { authService } from '../lib/supabase';
-import { userService } from '../lib/userService';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 

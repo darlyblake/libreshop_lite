@@ -22,11 +22,12 @@ import * as Linking from 'expo-linking';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
-import { planService, storeService } from '../lib/supabase';
-import { categoryService } from '../lib/categoryService';
-import { cloudinaryService } from '../lib/cloudinaryService';
-import { countryService, type Country } from '../lib/countryService';
-import { cityService, type City } from '../lib/cityService';
+import { planService } from '../services/planService';
+import { storeService } from '../services/storeService';
+import { categoryService } from '../services/categoryService';
+import { cloudinaryService } from '../services/cloudinaryService';
+import { countryService, type Country } from '../services/countryService';
+import { cityService, type City } from '../services/cityService';
 import { useAuthStore } from '../store';
 import { storeCreationDraftStorage } from '../lib/storage';
 import { Button } from '../components/Button';
@@ -363,7 +364,7 @@ export const SellerAddStoreScreen: React.FC = () => {
       <Text style={styles.sectionTitle}>📸 Médias</Text>
       <View style={styles.imagesContainer}>
         <TouchableOpacity style={styles.logoPicker} onPress={() => pickImage('logo')}>
-          {logoUri ? <Image source={{ uri: logoUri }} style={styles.logoImage} /> : (
+          {logoUri ? <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUri, 800) }} style={styles.logoImage} /> : (
             <View style={styles.logoPlaceholder}>
               <Ionicons name="camera" size={32} color={COLORS.accent} />
               <Text style={styles.logoPickerText}>Logo</Text>
@@ -371,7 +372,7 @@ export const SellerAddStoreScreen: React.FC = () => {
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.bannerPicker} onPress={() => pickImage('banner')}>
-          {bannerUri ? <Image source={{ uri: bannerUri }} style={styles.bannerImage} /> : (
+          {bannerUri ? <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUri, 800) }} style={styles.bannerImage} /> : (
             <View style={styles.bannerPlaceholder}>
               <Ionicons name="image-outline" size={32} color={COLORS.accent} />
               <Text style={styles.bannerPickerText}>Bannière</Text>
@@ -519,7 +520,7 @@ export const SellerAddStoreScreen: React.FC = () => {
         <LinearGradient colors={[COLORS.accent + '20', COLORS.bg]} style={styles.previewGradient}>
           <Text style={styles.previewTitle}>Aperçu Final</Text>
           <View style={styles.previewContent}>
-            {logoUri ? <Image source={{ uri: logoUri }} style={styles.previewLogo} /> : <View style={styles.previewLogoPlaceholder} />}
+            {logoUri ? <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUri, 800) }} style={styles.previewLogo} /> : <View style={styles.previewLogoPlaceholder} />}
             <View style={styles.previewInfo}>
               <Text style={styles.previewName}>{values.name || 'Ma Boutique'}</Text>
               <Text style={styles.previewCategory}>

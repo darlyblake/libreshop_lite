@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Button } from '../components';
-import { planService, storeService } from '../lib/supabase';
+import { planService } from '../services/planService';
+import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
 
 const { width } = Dimensions.get('window');

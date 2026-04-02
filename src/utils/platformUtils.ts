@@ -3,7 +3,8 @@
  * Safe to use in both web and React Native environments
  */
 
-import { Alert } from 'react-native';
+import { Alert, Platform, Linking } from 'react-native';
+import { errorHandler, ErrorCategory, ErrorSeverity } from './errorHandler';
 
 /**
  * Safe alert that works in both React Native and Web
@@ -19,10 +20,16 @@ export const showAlert = (title: string, message?: string) => {
       }
     } else {
       // React Native environment
-      Alert.alert(title, message || '');
-    }
+     const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
+  if (Platform.OS === 'web') {
+    alert(`${title}\n\n${messageStr}`);
+    return;
+  }
+  Alert.alert(title, messageStr);
+  errorHandler.handleDatabaseError(new Error(messageStr), 'Alert failed:');
+  }
   } catch (e) {
-    errorHandler.handleDatabaseError(title, message, 'Alert failed:');
+    errorHandler.handleDatabaseError(e, 'Alert failed', JSON.stringify({ title, message }));
   }
 };
 
@@ -49,7 +56,7 @@ export const showConfirm = (title: string, message?: string): Promise<boolean> =
         );
       }
     } catch (e) {
-      errorHandler.handleDatabaseError(title, message, 'Confirm failed:');
+      errorHandler.handleDatabaseError(e, 'Confirm failed', JSON.stringify({ title, message }));
       resolve(false);
     }
   });
@@ -71,7 +78,7 @@ export const openURL = (url: string, target = '_blank') => {
       });
     }
   } catch (e) {
-    errorHandler.handleDatabaseError(url, 'Open URL failed:');
+    errorHandler.handleDatabaseError(e, 'Open URL failed', url);
   }
 };
 

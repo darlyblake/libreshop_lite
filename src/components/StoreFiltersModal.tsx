@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Switch, TextInput, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { countryService } from '../lib/countryService';
-import { cityService } from '../lib/cityService';
+import { countryService } from '../services/countryService';
+import { cityService } from '../services/cityService';
 
 type Props = {
   visible: boolean;

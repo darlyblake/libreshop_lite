@@ -17,7 +17,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler } from '../utils/errorHandler';
 import { ProductCard } from '../components';
 import { SortTabs } from '../components/SortTabs';
-import { productService } from '../lib/supabase';
+import { productService } from '../services/productService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useResponsive } from '../utils/responsive';
 

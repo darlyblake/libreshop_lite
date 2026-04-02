@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { wishlistService, WishlistItem } from '../lib/wishlistService';
+import { wishlistService, WishlistItem } from '../services/wishlistService';
+import { errorHandler } from '../utils/errorHandler';
 
 interface WishlistState {
   items: WishlistItem[];

@@ -16,10 +16,12 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
-import { orderService } from '../lib/supabase';
-import { wishlistService } from '../lib/wishlistService';
+import { orderService } from '../services/orderService';
+import { wishlistService } from '../services/wishlistService';
 import { useTheme } from '../hooks/useTheme';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { cloudinaryService } from '../services/cloudinaryService';
+import { authService } from '../services/authService';
 
 const MENU_ITEMS = [
   { icon: 'person-outline', label: 'Informations personnelles', screen: '' },
@@ -119,12 +121,9 @@ export const ClientProfileScreen: React.FC = () => {
     }
     setVerifying(true);
     try {
-      const { supabase } = await import('../lib/supabase');
-      const { error } = await supabase!.auth.signInWithOtp({
+      await authService.signInWithOtp({
         phone: phoneNumber,
       });
-      
-      if (error) throw error;
       setRestoreStep(2);
     } catch (error: any) {
       errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Send OTP Error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
@@ -138,14 +137,11 @@ export const ClientProfileScreen: React.FC = () => {
     if (!otpCode.trim()) return;
     setVerifying(true);
     try {
-      const { supabase } = await import('../lib/supabase');
-      const { error } = await supabase!.auth.verifyOtp({
+      await authService.verifyOtp({
         phone: phoneNumber,
         token: otpCode,
         type: 'sms',
       });
-
-      if (error) throw error;
 
       Alert.alert('Succès', 'Votre historique a été restauré avec succès !');
       setShowRestoreModal(false);
@@ -379,7 +375,7 @@ export const ClientProfileScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
           {user?.avatar_url ? (
-            <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+            <Image source={{ uri: cloudinaryService.getOptimizedUrl(user.avatar_url, 800) }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Text style={styles.avatarInitials}>{getUserInitials()}</Text>

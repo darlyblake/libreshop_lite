@@ -34,14 +34,33 @@ LogBox.ignoreLogs([
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
   console.warn = (...args) => {
-    const msg = args[0];
+    const msg = String(args[0]);
     if (
-      typeof msg === 'string' &&
-      (msg.includes('pointerEvents is deprecated') || msg.includes('PushTokenManager'))
+      msg.includes('pointerEvents is deprecated') || 
+      msg.includes('PushTokenManager') ||
+      msg.includes('onStartShouldSetResponder') ||
+      msg.includes('onResponder') ||
+      msg.includes('transform-origin') ||
+      msg.includes('TouchableMixin')
     ) {
       return;
     }
     originalWarn(...args);
+  };
+
+  const originalError = console.error;
+  console.error = (...args) => {
+    const msg = String(args[0]);
+    if (
+      msg.includes('transform-origin') ||
+      msg.includes('onResponder') ||
+      msg.includes('onStartShouldSetResponder') ||
+      msg.includes('aria-hidden') ||
+      msg.includes('react-devtools')
+    ) {
+      return;
+    }
+    originalError(...args);
   };
 }
 
@@ -53,11 +72,8 @@ export default function App() {
     const handleDeepLink = async ({ url }: { url: string }) => {
       try {
         const parsed = Linking.parse(url);
-        console.log('Deep link parsed:', parsed);
-        
         if (parsed.path && parsed.path.includes('auth/callback')) {
           // Let the auth screens handle the callback
-          console.log('OAuth callback detected:', url);
         }
       } catch (error) {
         console.error('Error handling deep link:', error);

@@ -1,5 +1,5 @@
-import { supabase } from './supabase';
-import { User } from './supabase';
+import { supabase } from '../lib/supabase';
+import { User } from '../lib/supabase';
 
 export const userService = {
   async getProfile(userId: string): Promise<User> {

@@ -18,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/responsive';
 import AddUserModal, { UserData } from '../components/AddUserModal';
-import { orderService, storeService } from '../lib/supabase';
+import { orderService } from '../services/orderService';
+import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
 
 /* =========================
@@ -48,7 +49,6 @@ export const SellerClientsScreen: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'clients' | 'orders'>('clients');
   // (optional) keep reference for initial values if needed later
   const [newClient, setNewClient] = useState<UserData>({
     name: '',
@@ -78,18 +78,14 @@ export const SellerClientsScreen: React.FC = () => {
         setLoadingMore(true);
       }
       
-      console.log(`🔍 ${reset ? 'Chargement initial' : 'Chargement supplémentaire'} des clients pour le vendeur:`, user.id);
-      
       const store = await storeService.getByUser(user.id);
       if (!store?.id) {
-        console.log('❌ Aucune boutique trouvée pour le vendeur');
         setStoreId(null);
         setClients([]);
         setHasMore(false);
         return;
       }
       setStoreId(store.id);
-      console.log('🏪 Boutique trouvée:', store.id);
 
       // 🚀 Appel avec pagination cursor
       const orders = await orderService.getByStore(store.id, { 
@@ -98,16 +94,10 @@ export const SellerClientsScreen: React.FC = () => {
         cursor: reset ? undefined : cursor
       });
       
-      console.log('📦 Commandes brutes reçues:', orders);
-      
       // Gérer les deux formats de réponse
       const ordersData = (orders as any)?.orders || orders;
       const hasMoreData = (orders as any)?.hasMore !== undefined ? (orders as any).hasMore : true;
       const nextCursor = (orders as any)?.nextCursor || null;
-      
-      console.log('📋 Commandes traitées:', ordersData);
-      console.log('📊 Nombre de commandes:', Array.isArray(ordersData) ? ordersData.length : 'N/A');
-      console.log('🔄 hasMore:', hasMoreData, 'nextCursor:', nextCursor);
       
       const map = new Map<string, Client>();
 
@@ -147,7 +137,6 @@ export const SellerClientsScreen: React.FC = () => {
       });
 
       const newClients = Array.from(map.values());
-      console.log('👥 Clients générés:', newClients.length);
       
       // 🚀 Mettre à jour les états de pagination
       if (!reset) {
@@ -179,15 +168,12 @@ export const SellerClientsScreen: React.FC = () => {
     }
   }, [user?.id]);
 
-  // 🚀 Fonction pour charger plus de clients (scroll infini)
   const loadMoreClients = useCallback(async () => {
     if (!hasMore || loadingMore || loading) return;
-    console.log('🔄 Chargement de plus de clients...');
-    await loadClients(false, lastCursor);
+    await loadClients(false, lastCursor || undefined);
   }, [hasMore, loadingMore, loading, lastCursor, loadClients]);
 
   useEffect(() => {
-    console.log('🚀 Chargement initial des clients');
     loadClients();
   }, [loadClients]);
 
@@ -323,6 +309,19 @@ export const SellerClientsScreen: React.FC = () => {
           {/* ACTIONS */}
           <View style={styles.clientActions}>
             <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: COLORS.info + '20' }]}
+              onPress={() =>
+                navigation.navigate('SellerCaisse', {
+                  initialClientName: item.name,
+                  initialClientPhone: item.phone,
+                })
+              }
+            >
+              <Ionicons name="cart-outline" size={20} color={COLORS.info} />
+              <Text style={[styles.actionText, { color: COLORS.info }]}>Vendre</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={styles.actionButton}
               onPress={() =>
                 navigation.navigate('ClientDetail', {
@@ -398,42 +397,6 @@ export const SellerClientsScreen: React.FC = () => {
         initialData={newClient}
       />
 
-      {/* TABS */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            selectedTab === 'clients' && styles.tabActive,
-          ]}
-          onPress={() => setSelectedTab('clients')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              selectedTab === 'clients' && styles.tabTextActive,
-            ]}
-          >
-            Tous les clients
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            selectedTab === 'orders' && styles.tabActive,
-          ]}
-          onPress={() => setSelectedTab('orders')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              selectedTab === 'orders' && styles.tabTextActive,
-            ]}
-          >
-            Commandes récentes
-          </Text>
-        </TouchableOpacity>
-      </View>
 
       {/* SEARCH */}
       <View style={styles.searchContainer}>
@@ -455,8 +418,7 @@ export const SellerClientsScreen: React.FC = () => {
       </View>
 
       {/* CONTENT */}
-      {selectedTab === 'clients' ? (
-        <FlatList
+      <FlatList
           data={filteredClients}
           renderItem={renderClient}
           keyExtractor={(item) => item.id}
@@ -508,13 +470,6 @@ export const SellerClientsScreen: React.FC = () => {
             </View>
           }
         />
-      ) : (
-        <View style={styles.ordersContainer}>
-          <Text style={styles.emptyText}>
-            Fonctionnalité des commandes récentes bientôt disponible
-          </Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -553,33 +508,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-
-  tab: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-
-  tabActive: {
-    borderBottomColor: COLORS.accent,
-  },
-
-  tabText: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textSoft,
-    fontWeight: '500',
-  },
-
-  tabTextActive: {
-    color: COLORS.accent,
-  },
 
   searchContainer: {
     paddingHorizontal: SPACING.lg,
@@ -749,17 +677,5 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.accent,
     fontWeight: '500',
-  },
-
-  ordersContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  emptyText: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.textSoft,
-    textAlign: 'center',
   },
 });

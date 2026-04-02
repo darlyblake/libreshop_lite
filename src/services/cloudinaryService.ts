@@ -16,6 +16,17 @@ const guessMimeType = (uri: string) => {
 };
 
 export const cloudinaryService = {
+  getOptimizedUrl(url: string, width?: number): string {
+    if (!url || !url.includes('res.cloudinary.com')) return url;
+    // Don't optimize if already optimized or containing transformations
+    if (url.includes('/upload/q_auto') || url.includes('/upload/w_')) return url;
+    
+    const transforms = ['q_auto', 'f_auto'];
+    if (width) transforms.push(`w_${width}`);
+    
+    return url.replace('/upload/', `/upload/${transforms.join(',')}/`);
+  },
+
   async uploadImage(uri: string, opts?: { folder?: string }): Promise<string> {
     const cloudName = cloudinaryConfig?.cloudName;
     const uploadPreset = cloudinaryConfig?.uploadPreset;
@@ -62,6 +73,6 @@ export const cloudinaryService = {
     if (!url) {
       throw new Error('Cloudinary response missing secure_url');
     }
-    return url;
+    return cloudinaryService.getOptimizedUrl(url);
   },
 };

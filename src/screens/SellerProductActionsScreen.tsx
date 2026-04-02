@@ -19,10 +19,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { useAuthStore } from '../store';
-import { productService, Product } from '../lib/supabase';
+import { Product } from '../lib/supabase';
+import { productService } from '../services/productService';
 import { errorHandler } from '../utils/errorHandler';
 import { useTheme } from '../hooks/useTheme';
 import { useResponsive } from '../utils/useResponsive';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 type RouteParams = {
   productId: string;
@@ -33,8 +35,8 @@ export const SellerProductActionsScreen: React.FC = () => {
   const route = useRoute();
   const { productId } = (route.params as RouteParams) || {};
   const { user } = useAuthStore();
-  const { theme, getColor, spacing, radius, fontSize, isDesktop } = useTheme();
-  const { width: windowWidth } = useResponsive();
+  const { theme, getColor, spacing, radius, fontSize } = useTheme();
+  const { width: windowWidth, isDesktop } = useResponsive();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export const SellerProductActionsScreen: React.FC = () => {
       setProduct(data);
       setStats(productStats);
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'load product');
+      errorHandler.handleDatabaseError(e as Error, 'load product');
       Alert.alert('Erreur', 'Impossible de charger le produit');
       navigation.goBack();
     } finally {
@@ -87,7 +89,7 @@ export const SellerProductActionsScreen: React.FC = () => {
       setProduct((prev) => prev ? { ...prev, is_active: newState } : null);
       Alert.alert('Succès', `Produit ${newState ? 'activé' : 'désactivé'} avec succès`);
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'toggle active');
+      errorHandler.handleDatabaseError(e as Error, 'toggle active');
       Alert.alert('Erreur', "Impossible de modifier l'état du produit");
     } finally {
       setSaving(false);
@@ -112,7 +114,7 @@ export const SellerProductActionsScreen: React.FC = () => {
               Alert.alert('Succès', 'Produit supprimé');
               navigation.navigate('SellerProducts');
             } catch (e) {
-              errorHandler.handleDatabaseError(e, 'delete product');
+              errorHandler.handleDatabaseError(e as Error, 'delete product');
               Alert.alert('Erreur', 'Impossible de supprimer le produit');
             } finally {
               setSaving(false);
@@ -170,7 +172,7 @@ export const SellerProductActionsScreen: React.FC = () => {
                 { text: 'OK', onPress: () => navigation.navigate('SellerProducts') }
               ]);
             } catch (e) {
-              errorHandler.handleDatabaseError(e, 'duplicate product');
+              errorHandler.handleDatabaseError(e as Error, 'duplicate product');
               Alert.alert('Erreur', 'Impossible de dupliquer le produit');
             } finally {
               setSaving(false);
@@ -231,7 +233,11 @@ export const SellerProductActionsScreen: React.FC = () => {
       {/* Visual Header */}
       <View style={styles.headerContainer}>
         {firstImage ? (
-          <Image source={{ uri: firstImage }} style={styles.headerImage} />
+          <Image 
+            source={{ uri: cloudinaryService.getOptimizedUrl(firstImage, 800) }} 
+            style={styles.headerImage} 
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.headerImage, styles.imagePlaceholder]}>
             <Ionicons name="image-outline" size={60} color={getColor.textMuted} />
@@ -464,7 +470,7 @@ const styles = StyleSheet.create({
   retryButtonText: { color: '#FFF', fontWeight: '700' },
   
   headerContainer: { height: 280, width: '100%', position: 'relative' },
-  headerImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  headerImage: { width: '100%', height: '100%' },
   imagePlaceholder: { backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
   headerOverlay: { ...StyleSheet.absoluteFillObject },
   backButton: { position: 'absolute', left: 20, zIndex: 10, width: 45, height: 45, borderRadius: 25, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },

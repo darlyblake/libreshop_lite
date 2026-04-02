@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from '../lib/supabase';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { notificationService } from './notificationService';
 
@@ -62,7 +62,7 @@ export const productLikesService = {
         .select()
         .single();
       
-      if (error && error.code !== '23505' && error?.status !== 409) throw error;
+      if (error && error.code !== '23505' && (error as any)?.status !== 409) throw error;
       
       const likeData = data || { user_id: userId, product_id: productId } as ProductLike;
 
@@ -90,7 +90,7 @@ export const productLikesService = {
 
       return likeData;
     } catch (error: any) {
-      if (error?.code === '23505' || error?.status === 409) return { user_id: userId, product_id: productId } as any;
+      if (error?.code === '23505' || (error as any)?.status === 409) return { user_id: userId, product_id: productId } as any;
       errorHandler.handleDatabaseError(error, 'Error adding like:');
       throw error;
     }

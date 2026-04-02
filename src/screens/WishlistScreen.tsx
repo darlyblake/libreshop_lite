@@ -18,11 +18,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
-import { wishlistService } from '../lib/wishlistService';
-import { shopFollowService, ShopFollow } from '../lib/shopFollowService';
+import { wishlistService } from '../services/wishlistService';
+import { storeService, StoreFollower } from '../services/storeService';
 import { Product, Store } from '../lib/supabase';
-import { supabase } from '../lib/supabase';
 import { Button } from '../components/Button';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 const { width } = Dimensions.get('window');
 
@@ -37,7 +37,7 @@ interface WishlistItem {
   created_at: string;
 }
 
-interface FollowedStore extends ShopFollow {
+interface FollowedStore extends StoreFollower {
   store?: Store;
 }
 
@@ -58,34 +58,8 @@ export const WishlistScreen: React.FC = () => {
     
     try {
       const items = await wishlistService.getByUser(String(user.id));
-      
-      // Charger les détails des produits avec les boutiques
-      const itemsWithDetails = await Promise.all(
-        items.map(async (item: WishlistItem) => {
-          if (!item.product_id) return item;
-          
-          try {
-            const { data: product, error } = await supabase!
-              .from('products')
-              .select('*, store:stores(*)')
-              .eq('id', item.product_id)
-              .single();
-              
-            if (error) throw error;
-            
-            return {
-              ...item,
-              product: product || undefined
-            };
-          } catch (err) {
-            errorHandler.handle(`Erreur chargement produit ${item.product_id}:`, err, 'UnknownContext', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-            return item;
-          }
-        })
-      );
-      
-      setWishlistItems(itemsWithDetails.filter(item => item.product));
-    } catch (error) {
+      setWishlistItems(items as WishlistItem[]);
+    } catch (error: any) {
       errorHandler.handleDatabaseError(error, 'Error loading wishlist:');
       setWishlistItems([]);
     }
@@ -96,16 +70,9 @@ export const WishlistScreen: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      // Utiliser la table canonique store_followers au lieu de shop_follows
-      const { data, error } = await supabase!
-        .from('store_followers')
-        .select('*, store:stores(*)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setFollowedStores(data || []);
-    } catch (error) {
+      const data = await storeService.getFollowed(user.id);
+      setFollowedStores(data as FollowedStore[]);
+    } catch (error: any) {
       errorHandler.handleDatabaseError(error, 'Error loading followed shops:');
       setFollowedStores([]);
     }
@@ -121,7 +88,7 @@ export const WishlistScreen: React.FC = () => {
     try {
       await Promise.all([loadWishlist(), loadFollowedStores()]);
     } catch (error) {
-      errorHandler.handleDatabaseError(error, 'Error loading data:');
+      errorHandler.handleDatabaseError(error as any, 'Error loading data:');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -144,7 +111,7 @@ export const WishlistScreen: React.FC = () => {
       await wishlistService.remove(String(user.id), productId);
       setWishlistItems(prev => prev.filter(item => item.product_id !== productId));
       Alert.alert('✅ Succès', 'Produit retiré des favoris');
-    } catch (error) {
+    } catch (error: any) {
       errorHandler.handleDatabaseError(error, 'Error removing from wishlist:');
       Alert.alert('❌ Erreur', 'Impossible de retirer ce produit');
     } finally {
@@ -158,10 +125,10 @@ export const WishlistScreen: React.FC = () => {
     
     try {
       setUnfollowingStore(storeId);
-      await shopFollowService.removeFollow(String(user.id), storeId);
+      await storeService.removeFollow(String(user.id), storeId);
       setFollowedStores(prev => prev.filter(item => item.store_id !== storeId));
       Alert.alert('✅ Succès', 'Vous avez arrêté de suivre cette boutique');
-    } catch (error) {
+    } catch (error: any) {
       errorHandler.handleDatabaseError(error, 'Error unfollowing store:');
       Alert.alert('❌ Erreur', 'Impossible d\'arrêter de suivre cette boutique');
     } finally {
@@ -215,11 +182,9 @@ export const WishlistScreen: React.FC = () => {
       activeOpacity={0.7}
     >
       <Image 
-        source={{ 
-          uri: item.product?.images?.[0] || 
-               item.product?.image_url || 
-               'https://via.placeholder.com/400?text=Produit'
-        }} 
+        source={{ uri: cloudinaryService.getOptimizedUrl(item.product?.images?.[0] || 
+               (item.product as any)?.image_url || 
+               'https://via.placeholder.com/400?text=Produit', 800) }} 
         style={styles.productImage} 
       />
       <View style={styles.productInfo}>
@@ -240,7 +205,7 @@ export const WishlistScreen: React.FC = () => {
           )}
         </View>
         
-        {!item.product?.in_stock && (
+        {!((item.product as any)?.stock > 0) && (
           <View style={styles.outOfStockBadge}>
             <Text style={styles.outOfStockText}>Rupture de stock</Text>
           </View>
@@ -269,10 +234,8 @@ export const WishlistScreen: React.FC = () => {
       activeOpacity={0.7}
     >
       <Image
-        source={{ 
-          uri: follow.store?.logo_url || 
-               'https://via.placeholder.com/150?text=Boutique'
-        }}
+        source={{ uri: cloudinaryService.getOptimizedUrl(follow.store?.logo_url || 
+               'https://via.placeholder.com/150?text=Boutique', 800) }}
         style={styles.storeLogo}
       />
       <View style={styles.storeInfo}>
@@ -498,6 +461,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xxl,
+    paddingBottom: SPACING.lg,
   },
   headerTitle: {
     fontSize: FONT_SIZE.lg,

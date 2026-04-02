@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 interface CollectionOption {
   id: string;
@@ -316,7 +317,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 {newProduct.images.map((image, index) => (
                   <View key={index} style={styles.imageItem}>
                     <Image
-                      source={{ uri: image }}
+                      source={{ uri: cloudinaryService.getOptimizedUrl(image, 800) }}
                       style={styles.imagePreview}
                     />
                     <TouchableOpacity

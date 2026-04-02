@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { productService } from '../lib/supabase';
+import { productService } from '../services/productService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 
 interface SearchState {

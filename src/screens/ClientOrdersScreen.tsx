@@ -16,7 +16,8 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { Order, OrderItem, Product, Store, User, orderService } from '../lib/supabase';
+import { Order, OrderItem, Product, Store, User } from '../lib/supabase';
+import { orderService } from '../services/orderService';
 import { useAuthStore } from '../store';
 import * as Linking from 'expo-linking';
 

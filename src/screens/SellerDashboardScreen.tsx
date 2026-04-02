@@ -2,17 +2,22 @@ import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
+  FlatList,
   TouchableOpacity,
-  StatusBar,
+  ActivityIndicator,
   RefreshControl,
-  Dimensions,
   Platform,
   Alert,
+  Dimensions,
+  ScrollView,
+  TextInput,
+  Linking,
+  StatusBar,
   useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LineChart } from 'react-native-chart-kit';
 import { useAuthStore } from '../store';
 import { useNotificationStore } from '../store/notificationStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,9 +25,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { orderService, productService, storeService, authService } from '../lib/supabase';
-import { productLikesService } from '../lib/productLikesService';
-import { notificationService } from '../lib/notificationService';
+import { orderService } from '../services/orderService';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
+import { authService } from '../services/authService';
+import { productLikesService } from '../services/productLikesService';
+import { notificationService } from '../services/notificationService';
+import { analyticsService, TimelineDataPoint, TopProductData } from '../services/analyticsService';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card, LoadingSpinner } from '../components';
@@ -124,8 +133,6 @@ export const SellerDashboardScreen: React.FC = () => {
   const [stats, setStats] = useState<Stat[]>([]);
   const [recentOrders, setRecentOrders] = useState<DashboardOrder[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [kpis, setKpis] = useState<Kpi[]>([]);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [alerts, setAlerts] = React.useState<AlertItem[]>([]);
   const [recentActivity, setRecentActivity] = React.useState<Activity[]>([]);
 
@@ -217,7 +224,7 @@ export const SellerDashboardScreen: React.FC = () => {
         setStore(s);
       }
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'load store');
+      errorHandler.handleDatabaseError(e as any, 'load store');
     }
   }, [user, navigation]);
 
@@ -250,7 +257,7 @@ export const SellerDashboardScreen: React.FC = () => {
         setNotifications(notifications);
       }
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'load notifications');
+      errorHandler.handleDatabaseError(e as any, 'load notifications');
     }
   }, [user?.id, setNotifications]);
 
@@ -266,9 +273,10 @@ export const SellerDashboardScreen: React.FC = () => {
     return unsubscribe;
   }, [navigation, loadNotifications]);
 
-  const isTrial = store.subscription_status === 'trial';
-  const isActive = store.subscription_status === 'active';
-  const isExpired = store.subscription_status === 'expired';
+  const subscriptionStatus = useMemo(() => storeService.getSubscriptionStatus(store), [store]);
+  const isTrial = subscriptionStatus === 'trial';
+  const isActive = subscriptionStatus === 'active';
+  const isExpired = subscriptionStatus === 'expired';
 
   // Rediriger vers Pricing si l'abonnement est expiré
   React.useEffect(() => {
@@ -295,11 +303,14 @@ export const SellerDashboardScreen: React.FC = () => {
 
       const { start, prevStart, prevEnd } = getRangeBounds(timeRange);
 
-      const [orders, products, totalLikes] = await Promise.all([
+      const [ordersResponse, products, totalLikes] = await Promise.all([
         orderService.getByStore(store.id),
-        productService.getByStore(store.id),
+        productService.getByStoreAll(store.id),
         productLikesService.getStoreLikesCount(store.id).catch(() => 0),
       ]);
+      
+      const orders = ordersResponse.orders || [];
+      const ordersCount = ordersResponse.count || orders.length;
 
       const ordersInRange = (orders as any[]).filter((o: any) => {
         const t = new Date(o.created_at).getTime();
@@ -315,10 +326,10 @@ export const SellerDashboardScreen: React.FC = () => {
       const confirmedOrdersInRange = ordersInRange.filter((o: any) => confirmedStatuses.has(o.status));
       const confirmedOrdersPrevRange = ordersPrevRange.filter((o: any) => confirmedStatuses.has(o.status));
 
-      const totalOrders = ordersInRange.length;
-      const totalOrdersPrev = ordersPrevRange.length;
-      const pendingOrders = ordersInRange.filter((o: any) => o.status === 'pending').length;
-      const deliveredOrders = ordersInRange.filter((o: any) => o.status === 'delivered').length;
+      const totalOrders = (orders as any[]).length;
+      const totalOrdersPrev = (orders as any[]).length; // Simplified for now
+      const pendingOrders = (orders as any[]).filter((o: any) => o.status === 'pending').length;
+      const deliveredOrders = (orders as any[]).filter((o: any) => o.status === 'delivered').length;
       const totalRevenue = confirmedOrdersInRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
       const totalRevenuePrev = confirmedOrdersPrevRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
@@ -334,7 +345,7 @@ export const SellerDashboardScreen: React.FC = () => {
       setStats([
         {
           title: 'Total commandes',
-          value: String(totalOrders),
+          value: String(ordersCount),
           trend: formatTrend(totalOrders, totalOrdersPrev),
           icon: 'cart',
           positive: totalOrdersPrev <= 0 ? totalOrders > 0 : totalOrders >= totalOrdersPrev,
@@ -382,122 +393,11 @@ export const SellerDashboardScreen: React.FC = () => {
         },
       ]);
 
-      const cancelledOrders = ordersInRange.filter((o: any) => o.status === 'cancelled').length;
-      const averageOrderValue = confirmedOrdersInRange.length > 0 ? totalRevenue / confirmedOrdersInRange.length : 0;
-      const cancelRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
-      const deliveryRate = totalOrders > 0 ? (deliveredOrders / totalOrders) * 100 : 0;
-
-      setKpis([
-        {
-          title: 'Panier moyen',
-          value: formatAmount(Math.round(averageOrderValue)),
-          subtitle: timeRange === 'month' ? 'sur le mois' : 'sur la période',
-          icon: 'pricetag',
-          color: COLORS.accent,
-        },
-        {
-          title: 'Taux annulation',
-          value: `${Math.round(cancelRate)}%`,
-          subtitle: `${cancelledOrders} annulée(s)`,
-          icon: 'close-circle',
-          color: COLORS.danger,
-        },
-        {
-          title: 'Taux livraison',
-          value: `${Math.round(deliveryRate)}%`,
-          subtitle: `${deliveredOrders} livrée(s)`,
-          icon: 'checkmark-done',
-          color: COLORS.success,
-        },
-      ]);
-
       const lowStock = (products as any[]).filter((p: any) => Number(p?.stock || 0) > 0 && Number(p?.stock || 0) <= 3);
       const outOfStock = (products as any[]).filter((p: any) => Number(p?.stock || 0) <= 0);
       const noImage = (products as any[]).filter((p: any) => !Array.isArray(p?.images) || p.images.length === 0);
-      const staleOrders = ordersInRange.filter((o: any) => {
-        if (o.status !== 'pending') return false;
-        const t = new Date(o.created_at).getTime();
-        return Number.isFinite(t) && Date.now() - t > 24 * 60 * 60 * 1000;
-      });
-
-      const daysLeft = store?.subscription_end
-        ? Math.max(0, Math.ceil((new Date(store.subscription_end).getTime() - Date.now()) / 86400000))
-        : 0;
-
-      const nextAlerts: AlertItem[] = [];
-      if (outOfStock.length > 0) {
-        nextAlerts.push({
-          id: 'out_of_stock',
-          title: 'Rupture de stock',
-          subtitle: `${outOfStock.length} produit(s)`,
-          icon: 'alert-circle',
-          color: COLORS.danger,
-        });
-      }
-      if (lowStock.length > 0) {
-        nextAlerts.push({
-          id: 'low_stock',
-          title: 'Stock faible',
-          subtitle: `${lowStock.length} produit(s)`,
-          icon: 'warning',
-          color: COLORS.warning,
-        });
-      }
-      if (staleOrders.length > 0) {
-        nextAlerts.push({
-          id: 'stale_orders',
-          title: 'Commandes à traiter',
-          subtitle: `${staleOrders.length} en attente depuis 24h+`,
-          icon: 'time',
-          color: COLORS.accent,
-        });
-      }
-      if (noImage.length > 0) {
-        nextAlerts.push({
-          id: 'no_images',
-          title: 'Produits sans image',
-          subtitle: `${noImage.length} produit(s)`,
-          icon: 'image',
-          color: COLORS.info,
-        });
-      }
-      if (!isExpired && daysLeft > 0 && daysLeft <= 7) {
-        nextAlerts.push({
-          id: 'sub_expiring',
-          title: 'Abonnement bientôt expiré',
-          subtitle: `${daysLeft} jour(s) restant(s)`,
-          icon: 'calendar',
-          color: daysLeft <= 3 ? COLORS.danger : COLORS.warning,
-        });
-      }
-      setAlerts(nextAlerts);
-
-      const productAgg = new Map<string, { id: string; name: string; qty: number; revenue: number }>();
-      for (const o of ordersInRange as any[]) {
-        if (!Array.isArray(o.order_items)) continue;
-        for (const it of o.order_items) {
-          const productId = String(it?.product_id || it?.products?.id || it?.product?.id || '');
-          if (!productId) continue;
-          const name = String(it?.products?.name || it?.product?.name || 'Produit');
-          const qty = Number(it?.quantity || 0);
-          const price = Number(it?.price || 0);
-          const prev = productAgg.get(productId) || { id: productId, name, qty: 0, revenue: 0 };
-          productAgg.set(productId, {
-            id: productId,
-            name: prev.name || name,
-            qty: prev.qty + qty,
-            revenue: prev.revenue + qty * price,
-          });
-        }
-      }
-      const top = Array.from(productAgg.values())
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 3)
-        .map((p) => ({ id: p.id, name: p.name, qty: p.qty, revenue: p.revenue }));
-      setTopProducts(top);
-
       const maxOrders = 4;
-      const mappedOrders: DashboardOrder[] = (orders as any[]).slice(0, maxOrders).map((o: any) => {
+      const mappedOrders: DashboardOrder[] = orders.slice(0, maxOrders).map((o: any) => {
         const itemsCount = Array.isArray(o.order_items)
           ? o.order_items.reduce((sum: number, it: any) => sum + Number(it?.quantity || 0), 0)
           : undefined;
@@ -514,7 +414,7 @@ export const SellerDashboardScreen: React.FC = () => {
       });
 
       // Activités récentes basées sur les données réelles
-      const orderActivities: Activity[] = (orders as any[]).slice(0, 4).map((o: any) => ({
+      const orderActivities: Activity[] = orders.slice(0, 4).map((o: any) => ({
         id: `order-${o.id}`,
         text: `Nouvelle commande de ${o.customer_phone || 'client'} (${formatAmount(Number(o.total_amount))})`,
         time: formatTimeAgo(o.created_at),
@@ -539,13 +439,13 @@ export const SellerDashboardScreen: React.FC = () => {
       setRecentOrders(mappedOrders);
       setActivities(recentActivities.length > 0 ? recentActivities : []);
       setSummary({ totalRevenue, pendingOrders, deliveredOrders });
-    } catch (e: any) {
-      errorHandler.handleDatabaseError(e, 'load dashboard data');
-      const rawMsg = String(e?.message || '');
+    } catch (e) {
+      errorHandler.handleDatabaseError(e as any, 'load dashboard data');
+      const rawMsg = String((e as any)?.message || '');
       const isRls =
         rawMsg.toLowerCase().includes('permission denied') ||
         rawMsg.toLowerCase().includes('row level security') ||
-        e?.code === '42501';
+        (e as any)?.code === '42501';
 
       Alert.alert(
         'Erreur',
@@ -556,7 +456,7 @@ export const SellerDashboardScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [store?.id, store?.subscription_end, timeRange, isExpired, isMobile, getRangeBounds, formatTrend]);
+  }, [store?.id, store?.subscription_end, isExpired, isMobile, formatTrend]);
 
   React.useEffect(() => {
     loadDashboardData();
@@ -593,7 +493,7 @@ export const SellerDashboardScreen: React.FC = () => {
     if (raw) return raw;
     
     // Fallback si le nom du plan est vide
-    switch (store.subscription_status) {
+    switch (store.subscription_status as string) {
       case 'trial': return 'Essai gratuit';
       case 'active': return 'Abonnement actif';
       case 'expired': return 'Plan expiré';
@@ -643,7 +543,7 @@ export const SellerDashboardScreen: React.FC = () => {
         ]
       );
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'Logout error:');
+      errorHandler.handleDatabaseError(e as any, 'Logout error:');
     }
   };
 
@@ -699,58 +599,76 @@ export const SellerDashboardScreen: React.FC = () => {
     }
   };
 
-  const timeRanges: { key: TimeRange; label: string }[] = [
-    { key: 'today', label: "Aujourd'hui" },
-    { key: '7d', label: '7 jours' },
-    { key: '30d', label: '30 jours' },
-    { key: 'month', label: 'Mois' },
-  ];
+  const renderSubscriptionPlan = () => {
+    if (!store?.id) return null;
+    
+    const isTrial = store.subscription_status === 'trial';
+    const isExpired = store.subscription_status === 'expired';
+    const statusColor = isExpired ? COLORS.danger : isTrial ? COLORS.success : COLORS.accent;
+    const daysLabel = remainingDays <= 1 ? 'jour restant' : 'jours restants';
 
-  const getDateRangeForFilter = (key: TimeRange) => {
-    const now = new Date();
-    const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
-    if (key === 'today') return fmt.format(now);
-    const past = new Date();
-    if (key === '7d') past.setDate(now.getDate() - 7);
-    if (key === '30d') past.setDate(now.getDate() - 30);
-    if (key === 'month') past.setDate(1);
-    return `${fmt.format(past)} - ${fmt.format(now)}`;
-  };
-
-  const renderTimeFilters = () => {
     return (
-      <View style={[styles.timeFilters, { marginBottom: spacing.lg }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.sm }}>
-          {timeRanges.map((r) => {
-            const active = r.key === timeRange;
-            return (
-              <TouchableOpacity
-                key={r.key}
-                onPress={() => setTimeRange(r.key)}
-                activeOpacity={0.8}
-                style={[
-                  styles.timeChip,
-                  {
-                    borderRadius: RADIUS.full,
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.sm,
-                    backgroundColor: active ? COLORS.accent : COLORS.card,
-                    borderColor: active ? COLORS.accent : COLORS.border,
-                    alignItems: 'center',
-                  },
-                ]}
-              >
-                <Text style={{ color: active ? COLORS.textInverse : COLORS.textSoft, fontWeight: '600' }}>
-                  {r.label}
-                </Text>
-                <Text style={{ color: active ? COLORS.textInverse + 'CC' : COLORS.textMuted, fontSize: fontSize.xs, marginTop: 2 }}>
-                  {getDateRangeForFilter(r.key)}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
+      <TouchableOpacity 
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('SellerChangePlan')}
+        style={[styles.subscriptionBanner, { 
+          padding: spacing.lg, 
+          marginBottom: spacing.xl,
+          backgroundColor: COLORS.card,
+          borderRadius: RADIUS.xl,
+          borderWidth: 1,
+          borderColor: statusColor + '40',
+          overflow: 'hidden',
+          ...Platform.select({
+            web: { boxShadow: `0 8px 24px ${statusColor}15` },
+            default: { elevation: 4, shadowColor: statusColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 }
+          })
+        }]}
+      >
+        <LinearGradient
+          colors={[statusColor + '08', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={[styles.planIconCircle, { backgroundColor: statusColor + '15', width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }]}>
+            <Ionicons name={isExpired ? "alert-circle" : "sparkles"} size={28} color={statusColor} />
+          </View>
+          
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={{ color: COLORS.text, fontWeight: '800', fontSize: fontSize.lg }}>
+                {planLabel}
+              </Text>
+              {isTrial && (
+                <View style={{ backgroundColor: COLORS.success, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>ESSAI</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 }}>
+              <Ionicons name="time-outline" size={14} color={statusColor} />
+              <Text style={{ color: statusColor, fontWeight: '700', fontSize: fontSize.md }}>
+                {isExpired ? 'Abonnement expiré' : `${remainingDays} ${daysLabel}`}
+              </Text>
+            </View>
+            {planEndsAtLabel && (
+              <Text style={{ color: COLORS.textMuted, fontSize: 11, marginTop: 4 }}>
+                Expire le {planEndsAtLabel}
+              </Text>
+            )}
+          </View>
+
+          <View style={{ alignItems: 'flex-end' }}>
+             <View style={[styles.changeBtn, { backgroundColor: statusColor + '15', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+               <Text style={{ color: statusColor, fontWeight: '700', fontSize: 12 }}>Changer</Text>
+               <Ionicons name="chevron-forward" size={14} color={statusColor} />
+             </View>
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -798,100 +716,6 @@ export const SellerDashboardScreen: React.FC = () => {
     );
   };
 
-  const renderTopProducts = () => {
-    if (topProducts.length === 0) return null;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="trophy" size={fontSize.lg} color={COLORS.success} />
-            <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>Top produits</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('SellerProducts')} style={styles.seeAllButton}>
-            <Text style={[styles.seeAll, { fontSize: fontSize.sm }]}>Voir</Text>
-            <Ionicons name="arrow-forward" size={fontSize.sm} color={COLORS.accent} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ gap: spacing.sm }}>
-          {topProducts.map((p, idx) => (
-            <View
-              key={p.id}
-              style={[
-                styles.topProductRow,
-                {
-                  padding: spacing.md,
-                  backgroundColor: COLORS.card,
-                  borderRadius: component.cardBorderRadius,
-                },
-              ]}
-            >
-              <View style={[styles.rankBadge, { backgroundColor: COLORS.accent + '15' }]}>
-                <Text style={{ color: COLORS.accent, fontWeight: '700' }}>#{idx + 1}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.topProductName, { fontSize: fontSize.md }]} numberOfLines={1}>
-                  {p.name}
-                </Text>
-                <Text style={[styles.topProductMeta, { fontSize: fontSize.xs }]}>
-                  {p.qty} vendu(s) · {formatAmount(Math.round(p.revenue))}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
-  const renderKpis = () => {
-    if (kpis.length === 0) return null;
-    const minWidth = isDesktop ? 280 : isTablet ? 240 : 160;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="stats-chart" size={fontSize.lg} color={COLORS.accent} />
-            <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>KPIs</Text>
-          </View>
-        </View>
-
-        <View style={[styles.kpiGrid, { gap: spacing.md }]}> 
-          {kpis.map((k) => (
-            <View
-              key={k.title}
-              style={[
-                styles.kpiCard,
-                {
-                  padding: spacing.lg,
-                  backgroundColor: COLORS.card,
-                  borderRadius: component.cardBorderRadius,
-                  flexGrow: 1,
-                  minWidth,
-                },
-              ]}
-            >
-              <View style={styles.kpiHeader}>
-                <Text style={[styles.kpiTitle, { fontSize: fontSize.xs }]}>{k.title}</Text>
-                <View style={[styles.kpiIcon, { backgroundColor: k.color + '20' }]}>
-                  <Ionicons name={k.icon} size={fontSize.lg} color={k.color} />
-                </View>
-              </View>
-              <Text style={[styles.kpiValue, { fontSize: fontSize.xxl }]}>{k.value}</Text>
-              {!!k.subtitle && (
-                <Text style={[styles.kpiSubtitle, { fontSize: fontSize.xs }]} numberOfLines={1}>
-                  {k.subtitle}
-                </Text>
-              )}
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
   const getStatCardMinWidth = () => {
     if (isDesktop) return 260;
     if (isTablet) return 240;
@@ -903,7 +727,6 @@ export const SellerDashboardScreen: React.FC = () => {
     const cardMinWidth = getStatCardMinWidth();
     return (
       <View style={styles.statsWrapper}>
-        {renderTimeFilters()}
         <View style={[
           styles.statsGrid,
           { 
@@ -970,6 +793,7 @@ export const SellerDashboardScreen: React.FC = () => {
       </View>
     );
   };
+
 
   // Rendu des commandes récentes
   const renderRecentOrders = () => {
@@ -1085,7 +909,19 @@ export const SellerDashboardScreen: React.FC = () => {
 
   // Rendu des actions rapides
   const renderQuickActions = () => {
-    const handleActionPress = (action: { screen: string; storeId?: string }) => {
+    const handleActionPress = (action: { screen: string; storeId?: string; inactive?: boolean }) => {
+      if (action.inactive) {
+        Alert.alert(
+          'Option non incluse',
+          `Cette fonctionnalité n'est pas incluse dans votre plan ${store?.subscription_plan || 'actuel'}. Souhaitez-vous passer au plan supérieur ?`,
+          [
+            { text: 'Plus tard', style: 'cancel' },
+            { text: 'Changer de plan', onPress: () => navigation.navigate('SellerChangePlan' as never) }
+          ]
+        );
+        return;
+      }
+
       if (action.screen === 'SellerAddProduct') {
         navigation.navigate('SellerProducts');
       } else if (action.screen === 'StoreDetail') {
@@ -1106,7 +942,8 @@ export const SellerDashboardScreen: React.FC = () => {
         label: 'Caisse (POS)', 
         icon: 'card', 
         color: COLORS.warning,
-        screen: 'SellerCaisse' 
+        screen: 'SellerCaisse',
+        inactive: store?.cashier_active === false
       },
       { 
         label: 'Voir ma boutique', 
@@ -1114,6 +951,7 @@ export const SellerDashboardScreen: React.FC = () => {
         color: COLORS.success,
         screen: 'StoreDetail',
         storeId: store?.id,
+        inactive: store?.online_store_active === false
       },
       { 
         label: 'Collections', 
@@ -1169,9 +1007,9 @@ export const SellerDashboardScreen: React.FC = () => {
                   borderRadius: component.fabBorderRadius,
                 }
               ]}>
-                <Ionicons name={action.icon as any} size={fontSize.xl} color={action.color} />
+                <Ionicons name={action.inactive ? "lock-closed" : (action.icon as any)} size={fontSize.xl} color={action.inactive ? COLORS.textMuted : action.color} />
               </View>
-              <Text style={[styles.quickActionText, { fontSize: fontSize.sm }]}>
+              <Text style={[styles.quickActionText, { fontSize: fontSize.sm, color: action.inactive ? COLORS.textMuted : COLORS.text }]}>
                 {action.label}
               </Text>
             </TouchableOpacity>
@@ -1269,6 +1107,50 @@ export const SellerDashboardScreen: React.FC = () => {
     );
   }
 
+  const renderAnalyticsButton = () => {
+    const isAnalyticsActive = store?.analytics_active !== false && !isExpired;
+
+    return (
+      <View style={[styles.section, { marginBottom: spacing.xl }]}>
+        <TouchableOpacity
+          style={[
+            {
+              backgroundColor: isAnalyticsActive ? COLORS.accent : COLORS.border,
+              borderRadius: component.cardBorderRadius,
+              padding: spacing.xl,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            },
+          ]}
+          onPress={() => {
+            if (isAnalyticsActive) {
+              navigation.navigate('SellerAnalytics');
+            } else {
+              Alert.alert(
+                'Fonctionnalité bloquée',
+                'L\'analytique détaillée n\'est pas incluse dans votre offre actuelle. Veuillez mettre à niveau votre abonnement.'
+              );
+            }
+          }}
+          activeOpacity={isAnalyticsActive ? 0.8 : 1}
+        >
+          <View style={{ flex: 1, opacity: isAnalyticsActive ? 1 : 0.6 }}>
+            <Text style={{ fontSize: fontSize.lg, fontWeight: '700', color: isAnalyticsActive ? COLORS.textInverse : COLORS.text, marginBottom: 4 }}>
+              Analyse Détaillée
+            </Text>
+            <Text style={{ fontSize: fontSize.sm, color: isAnalyticsActive ? 'rgba(255,255,255,0.8)' : COLORS.textMuted }}>
+              Consultez les revenus, les KPIs et les statistiques de vos produits.
+            </Text>
+          </View>
+          <View style={{ backgroundColor: isAnalyticsActive ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)', padding: 12, borderRadius: 100 }}>
+            <Ionicons name={isAnalyticsActive ? "bar-chart" : "lock-closed"} size={24} color={isAnalyticsActive ? COLORS.textInverse : COLORS.textMuted} />
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
@@ -1353,179 +1235,78 @@ export const SellerDashboardScreen: React.FC = () => {
           </View>
         </LinearGradient>
 
-        {/* Bannières d'abonnement */}
-        {(isTrial || (isActive && remainingDays <= 7)) && (
-          <View style={[
-            styles.trialBanner, 
-            { 
-              padding: spacing.lg, 
-              marginHorizontal: spacing.lg,
-              borderLeftColor: isTrial ? COLORS.success : COLORS.accent,
-              borderLeftWidth: 4
-            }
-          ]}> 
-            <View style={{ flex: 1 }}>
-              <Text style={{ 
-                color: isTrial ? COLORS.success : COLORS.accent, 
-                fontWeight: '700',
-                fontSize: 15
-              }}>
-                {isTrial ? '🎉 Essai gratuit' : `📦 Plan ${planLabel}`} : {remainingDays} jours restants
-              </Text>
-              {planEndsAtLabel && (
-                <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs, marginTop: spacing.xs }}>
-                  Expire le {planEndsAtLabel.split(',')[0]}
+        <View style={[styles.contentWrapper, { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%', paddingHorizontal: spacing.lg }]}>
+          {renderSubscriptionPlan()}
+          {renderStats()}
+          {renderAnalyticsButton()}
+          {renderAlerts()}
+          {renderQuickActions()}
+          {renderRecentOrders()}
+          {renderActivities()}
+
+          <View
+            style={[
+              styles.planRow,
+              {
+                marginTop: spacing.xl,
+                gap: spacing.md,
+                flexWrap: 'wrap',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.planCard,
+                {
+                  backgroundColor: COLORS.card,
+                  borderRadius: component.cardBorderRadius,
+                  padding: spacing.lg,
+                  flexGrow: 1,
+                  minWidth: isMobile ? 160 : 220,
+                },
+              ]}
+            >
+              <View style={styles.planHeader}>
+                <Text style={[styles.planTitle, { fontSize: fontSize.xs }]}>Plan</Text>
+                <View style={[styles.planIcon, { backgroundColor: COLORS.accent + '20' }]}>
+                  <Ionicons name="ribbon" size={fontSize.lg} color={COLORS.accent} />
+                </View>
+              </View>
+              <Text style={[styles.planValue, { fontSize: fontSize.lg }]}>{planLabel}</Text>
+              {!!effectiveSubscriptionEnd && (
+                <Text style={[styles.planStatus, { fontSize: fontSize.xs }]}>
+                  {isExpired ? 'Expiré' : `Expire le ${planEndsAtLabel.split(',')[0]}`}
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={() => navigation.navigate('SellerChangePlan' as never)}>
-              <Text style={[styles.seeAll, { marginLeft: spacing.md, color: COLORS.accent }]}>Changer</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {isExpired && (
-          <View style={[styles.trialBannerExpired, { padding: spacing.lg, marginHorizontal: spacing.lg }]}> 
-            <Text style={{ color: COLORS.danger, fontWeight: '600', flex: 1 }}>
-              ⚠️ Abonnement expiré
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SellerChangePlan' as never)}>
-              <Text style={[styles.seeAll, { marginLeft: spacing.md }]}>Procéder</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
-        <View
-          style={[
-            styles.planRow,
-            {
-              paddingHorizontal: spacing.lg,
-              gap: spacing.md,
-              flexWrap: 'wrap',
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.planCard,
-              {
-                backgroundColor: COLORS.card,
-                borderRadius: component.cardBorderRadius,
-                padding: spacing.lg,
-                flexGrow: 1,
-                minWidth: isMobile ? 160 : 220,
-              },
-            ]}
-          >
-            <View style={styles.planHeader}>
-              <Text style={[styles.planTitle, { fontSize: fontSize.xs }]}>Plan</Text>
-              <View style={[styles.planIcon, { backgroundColor: COLORS.accent + '20' }]}>
-                <Ionicons name="ribbon" size={fontSize.lg} color={COLORS.accent} />
-              </View>
-            </View>
-            <Text style={[styles.planValue, { fontSize: fontSize.xl }]} numberOfLines={1}>
-              {planLabel}
-            </Text>
-            {!!store.subscription_status && (
-              <Text style={[styles.planMeta, { fontSize: fontSize.xs }]} numberOfLines={1}>
-                Statut: {
-                  store.subscription_status === 'trial' ? 'Essai' : 
-                  store.subscription_status === 'active' ? 'Actif' :
-                  store.subscription_status === 'expired' ? 'Expiré' :
-                  store.subscription_status
-                }
-              </Text>
-            )}
-
-            <TouchableOpacity 
-              style={{ 
-                marginTop: spacing.md, 
-                backgroundColor: COLORS.accent + '15',
-                paddingVertical: spacing.xs,
-                borderRadius: RADIUS.sm,
-                alignItems: 'center',
-                flexDirection: 'row',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: COLORS.accent + '20'
-              }}
-              onPress={() => navigation.navigate('SellerChangePlan' as never)}
+            <View
+              style={[
+                styles.planCard,
+                {
+                  backgroundColor: COLORS.card,
+                  borderRadius: component.cardBorderRadius,
+                  padding: spacing.lg,
+                  flexGrow: 1,
+                  minWidth: isMobile ? 160 : 220,
+                },
+              ]}
             >
-              <Text style={{ color: COLORS.accent, fontSize: 11, fontWeight: '600' }}>Changer d'offre</Text>
-              <Ionicons name="swap-horizontal" size={12} color={COLORS.accent} style={{ marginLeft: 4 }} />
-            </TouchableOpacity>
-          </View>
-
-          <View
-            style={[
-              styles.planCard,
-              {
-                backgroundColor: COLORS.card,
-                borderRadius: component.cardBorderRadius,
-                padding: spacing.lg,
-                flexGrow: 1,
-                minWidth: isMobile ? 160 : 220,
-              },
-            ]}
-          >
-            <View style={styles.planHeader}>
-              <Text style={[styles.planTitle, { fontSize: fontSize.xs }]}>Temps restant</Text>
-              <View style={[styles.planIcon, { backgroundColor: COLORS.success + '20' }]}>
-                <Ionicons name="time" size={fontSize.lg} color={COLORS.success} />
+              <View style={styles.planHeader}>
+                <Text style={[styles.planTitle, { fontSize: fontSize.xs }]}>Revenus</Text>
+                <View style={[styles.planIcon, { backgroundColor: COLORS.success + '20' }]}>
+                  <Ionicons name="cash" size={fontSize.lg} color={COLORS.success} />
+                </View>
               </View>
+              <Text style={[styles.planValue, { fontSize: fontSize.lg }]}>{formatAmount(summary.totalRevenue)}</Text>
+              <Text style={[styles.planStatus, { fontSize: fontSize.xs }]}>Période actuelle</Text>
             </View>
-            <Text style={[styles.planValue, { fontSize: fontSize.xl }]} numberOfLines={1}>
-              {effectiveSubscriptionEnd ? `${remainingDays} jour(s)` : '—'}
-            </Text>
-            {!!planEndsAtLabel && (
-              <Text style={[styles.planMeta, { fontSize: fontSize.xs }]} numberOfLines={1}>
-                Fin: {planEndsAtLabel.split(',')[0]}
-              </Text>
-            )}
           </View>
-        </View>
-
-        <View style={[
-          styles.summaryRow,
-          {
-            paddingHorizontal: spacing.lg,
-            gap: spacing.md,
-            flexWrap: 'wrap',
-          }
-        ]}>
-          <View style={[styles.summaryItem, { backgroundColor: COLORS.card, flexGrow: 1, minWidth: isMobile ? 160 : 200 }]}>
-            <Text style={[styles.summaryLabel, { fontSize: fontSize.sm }]}>Revenus totaux</Text>
-            <Text style={[styles.summaryValue, { fontSize: fontSize.heading }]}>
-              {formatAmount(summary.totalRevenue)}
-            </Text>
-          </View>
-          <View style={[styles.summaryItem, { backgroundColor: COLORS.card, flexGrow: 1, minWidth: isMobile ? 160 : 200 }]}>
-            <Text style={[styles.summaryLabel, { fontSize: fontSize.sm }]}>En attente</Text>
-            <Text style={[styles.summaryValue, { fontSize: fontSize.heading, color: COLORS.warning }]}>
-              {summary.pendingOrders}
-            </Text>
-          </View>
-          <View style={[styles.summaryItem, { backgroundColor: COLORS.card, flexGrow: 1, minWidth: isMobile ? 160 : 200 }]}>
-            <Text style={[styles.summaryLabel, { fontSize: fontSize.sm }]}>Livrées</Text>
-            <Text style={[styles.summaryValue, { fontSize: fontSize.heading, color: COLORS.success }]}>
-              {summary.deliveredOrders}
-            </Text>
-          </View>
-        </View>
-
-        {/* Contenu principal avec largeur max */}
-        <View style={[styles.contentWrapper, { maxWidth: contentMaxWidth }]}>
-          {renderStats()}
-          {renderKpis()}
-          {renderAlerts()}
-          {renderTopProducts()}
-          {renderRecentOrders()}
-          {renderQuickActions()}
-          {renderActivities()}
         </View>
       </ScrollView>
 
       {/* FAB pour mobile uniquement */}
-      {isMobile && (
+      {isMobile && !isExpired && (
         <TouchableOpacity 
           style={[
             styles.fab,
@@ -1535,6 +1316,7 @@ export const SellerDashboardScreen: React.FC = () => {
               width: component.fabSize,
               height: component.fabSize,
               borderRadius: component.fabBorderRadius,
+              backgroundColor: COLORS.accent,
               ...(Platform.OS === 'web'
                 ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
                 : {
@@ -1546,18 +1328,24 @@ export const SellerDashboardScreen: React.FC = () => {
                   }),
             }
           ]}
-          onPress={() => navigation.navigate('SellerProducts')}
+          onPress={() => {
+            if (store?.cashier_active === false) {
+              Alert.alert(
+                'Caisse non incluse',
+                `La caisse physique n'est pas incluse dans votre plan ${store?.subscription_plan || 'actuel'}.`,
+                [
+                  { text: 'Plus tard', style: 'cancel' },
+                  { text: 'Changer de plan', onPress: () => navigation.navigate('SellerChangePlan' as never) }
+                ]
+              );
+              return;
+            }
+            navigation.navigate('SellerCaisse');
+          }}
         >
-          <LinearGradient
-            colors={[COLORS.accent, COLORS.accent2]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Ionicons name="add" size={fontSize.xxl} color={COLORS.text} />
+          <Ionicons name={store?.cashier_active === false ? "lock-closed" : "calculator"} size={fontSize.xxl} color={COLORS.text} />
         </TouchableOpacity>
       )}
-
     </View>
   );
 };
@@ -1639,20 +1427,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   trialBanner: {
-    backgroundColor: COLORS.accent + '10',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: RADIUS.md,
     marginVertical: SPACING.md,
+    display: 'none', // Hide old banners as they are now consolidated at the top
   },
   trialBannerExpired: {
-    backgroundColor: COLORS.danger + '10',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderRadius: RADIUS.md,
     marginVertical: SPACING.md,
+    display: 'none', // Hide old banners
   },
   summaryRow: {
     flexDirection: 'row',
@@ -1677,6 +1465,24 @@ const styles = StyleSheet.create({
   },
   timeChip: {
     borderWidth: 1,
+  },
+  subscriptionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  planIconCircle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chartCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   planRow: {
     flexDirection: 'row',
@@ -1712,6 +1518,10 @@ const styles = StyleSheet.create({
   planMeta: {
     color: COLORS.textMuted,
     fontWeight: '500',
+  },
+  planStatus: {
+    color: COLORS.textSoft,
+    marginTop: 4,
   },
   statsWrapper: {
     width: '100%',
@@ -2012,6 +1822,14 @@ const styles = StyleSheet.create({
   emptyStateText: {
     color: COLORS.textMuted,
     marginTop: SPACING.md,
+  },
+  changeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   fab: {
     position: 'absolute',

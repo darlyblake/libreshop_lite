@@ -12,7 +12,9 @@ import {
   Switch,
   Platform,
 } from 'react-native';
-import { planService, supabase } from '../lib/supabase';
+import { type Plan } from '../lib/supabase';
+import { authService } from '../services/authService';
+import { planService } from '../services/planService';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
@@ -31,6 +33,7 @@ interface Subscription {
   productLimit?: number;       // nombre max de produits
   hasCaisse?: boolean;         // vente physique active
   hasOnlineStore?: boolean;    // boutique en ligne
+  hasAnalytics?: boolean;      // analytique détaillée
   features: string[];
   userCount: number;
   status: 'active' | 'inactive' | 'trial';
@@ -51,7 +54,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       if (typeof document !== 'undefined' && document.activeElement) {
         (document.activeElement as HTMLElement | null)?.blur?.();
       }
-    } catch (e) {
+    } catch (e: any) {
       // Expected in React Native mobile - silently ignore
     }
   };
@@ -76,6 +79,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
             productLimit: p.product_limit,
             hasCaisse: p.has_caisse,
             hasOnlineStore: p.has_online_store,
+            hasAnalytics: p.has_analytics,
             features: p.features || [],
             userCount: 0,
             status: p.status === 'inactive' ? 'inactive' : 'active',
@@ -83,7 +87,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
             createdAt: p.created_at || '',
           }))
         );
-      } catch (err) {
+      } catch (err: any) {
         errorHandler.handleDatabaseError(err, 'fetch plans');
       }
     };
@@ -118,6 +122,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
   const [newProductLimit, setNewProductLimit] = useState('');
   const [newHasCaisse, setNewHasCaisse] = useState(false);
   const [newHasOnlineStore, setNewHasOnlineStore] = useState(false);
+  const [newHasAnalytics, setNewHasAnalytics] = useState(false);
   const [newFeatures, setNewFeatures] = useState('');
   const [newTrialDays, setNewTrialDays] = useState('');
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
@@ -129,12 +134,16 @@ export const AdminSubscriptionsScreen: React.FC = () => {
     setNewDuration('');
     setNewFeatures('');
     setNewTrialDays('');
+    setNewHasCaisse(false);
+    setNewHasOnlineStore(false);
+    setNewHasAnalytics(false);
     setAddModalVisible(true);
   };
   const closeAddModal = () => {
     blurActiveElement();
     setAddModalVisible(false);
     setEditingSubscription(null);
+    setNewHasAnalytics(false);
   };
 
   const closeStatsModal = () => {
@@ -158,21 +167,14 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       return;
     }
 
-    // Diagnostic RLS: si on n'a pas de session, Supabase est en rôle anon -> INSERT souvent bloqué.
+    // Diagnostic check removed as we use centralized services now
     try {
-      if (supabase) {
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) {
-          errorHandler.handle(new Error('[plans] No Supabase session (anon). INSERT/UPDATE may be blocked by RLS.'), 'AdminSubscriptions', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-        } else {
-          const sUser: any = data.session.user;
-          const email = sUser?.email;
-          const uid = sUser?.id;
-          const role = sUser?.user_metadata?.role || sUser?.app_metadata?.role;
-        }
+      const sessionData = await authService.getSession();
+      if (!sessionData.session) {
+        console.warn('[plans] No active session.');
       }
-    } catch (e) {
-      errorHandler.handle(e, '[plans] Unable to read auth session', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+    } catch (e: any) {
+      console.warn('[plans] Unable to read auth session', e);
     }
 
     const featuresArr = newFeatures
@@ -191,6 +193,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         productLimit: parseInt(newProductLimit) || undefined,
         hasCaisse: newHasCaisse,
         hasOnlineStore: newHasOnlineStore,
+        hasAnalytics: newHasAnalytics,
         features: featuresArr,
       };
       try {
@@ -203,6 +206,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
           product_limit: updated.productLimit,
           has_caisse: updated.hasCaisse,
           has_online_store: updated.hasOnlineStore,
+          has_analytics: updated.hasAnalytics,
           features: updated.features,
         });
 
@@ -224,7 +228,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         } else {
           Alert.alert('Abonnement modifié', `${updated.name} a été mis à jour.`);
         }
-      } catch (e) {
+      } catch (e: any) {
         errorHandler.handleDatabaseError(e, 'update plan');
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           showAlert('❌ Impossible de mettre à jour le plan');
@@ -245,6 +249,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       productLimit: parseInt(newProductLimit) || undefined,
       hasCaisse: newHasCaisse,
       hasOnlineStore: newHasOnlineStore,
+      hasAnalytics: newHasAnalytics,
       features: featuresArr,
       userCount: 0,
       status: 'active',
@@ -261,6 +266,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         product_limit: newSub.productLimit,
         has_caisse: newSub.hasCaisse,
         has_online_store: newSub.hasOnlineStore,
+        has_analytics: newSub.hasAnalytics,
         features: newSub.features,
       };
       Alert.alert('Création', 'Envoi du plan à Supabase...');
@@ -274,10 +280,11 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       setNewProductLimit('');
       setNewHasCaisse(false);
       setNewHasOnlineStore(false);
+      setNewHasAnalytics(false);
       setNewFeatures('');
       setNewTrialDays('');
       Alert.alert('Abonnement ajouté', `${newSub.name} a été créé.`);
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'create plan');
       if ((e as any)?.code === '42501') {
         Alert.alert(
@@ -321,6 +328,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         setNewProductLimit(subscription.productLimit ? String(subscription.productLimit) : '');
         setNewHasCaisse(!!subscription.hasCaisse);
         setNewHasOnlineStore(!!subscription.hasOnlineStore);
+        setNewHasAnalytics(!!subscription.hasAnalytics);
         setNewFeatures(subscription.features.join(', '));
         break;
       case 'toggle':
@@ -341,7 +349,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                     : s
                 )
               );
-            } catch (e) {
+            } catch (e: any) {
               errorHandler.handleDatabaseError(e, 'toggle plan');
               showAlert('❌ Impossible de modifier le statut');
             }
@@ -369,7 +377,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                         : s
                     )
                   );
-                } catch (e) {
+                } catch (e: any) {
                   errorHandler.handleDatabaseError(e, 'toggle plan');
                   Alert.alert('Erreur', 'Impossible de modifier le statut');
                 }
@@ -393,7 +401,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
             try {
               await planService.delete(subscription.id);
               setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
-            } catch (e) {
+            } catch (e: any) {
               errorHandler.handleDatabaseError(e, 'delete plan');
               showAlert('❌ Impossible de supprimer le plan');
             }
@@ -411,7 +419,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 try {
                   await planService.delete(subscription.id);
                   setSubscriptions(prev => prev.filter(s => s.id !== subscription.id));
-                } catch (e) {
+                } catch (e: any) {
                   errorHandler.handleDatabaseError(e, 'delete plan');
                   Alert.alert('Erreur', 'Impossible de supprimer le plan');
                 }
@@ -467,7 +475,11 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 <Ionicons name="close" size={22} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            <View style={styles.addModalBody}>
+            <ScrollView 
+              style={styles.addModalBody}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: SPACING.xl }}
+            >
               <TextInput
                 placeholder="Nom"
                 placeholderTextColor={COLORS.textMuted}
@@ -524,29 +536,54 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 keyboardType="numeric"
               />
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
-                <Text style={{ color: COLORS.text, flex: 1 }}>Caisse physique</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Caisse physique</Text>
+                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Autoriser les ventes comptant</Text>
+                </View>
                 <Switch
                   value={newHasCaisse}
                   onValueChange={setNewHasCaisse}
+                  trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
+                  thumbColor={newHasCaisse ? COLORS.accent : '#f4f3f4'}
                 />
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
-                <Text style={{ color: COLORS.text, flex: 1 }}>Boutique en ligne</Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Boutique en ligne</Text>
+                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Activer la vitrine e-commerce</Text>
+                </View>
                 <Switch
                   value={newHasOnlineStore}
                   onValueChange={setNewHasOnlineStore}
+                  trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
+                  thumbColor={newHasOnlineStore ? COLORS.accent : '#f4f3f4'}
                 />
               </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Analytiques Pro</Text>
+                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Statistiques détaillées du marché</Text>
+                </View>
+                <Switch
+                  value={newHasAnalytics}
+                  onValueChange={setNewHasAnalytics}
+                  trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
+                  thumbColor={newHasAnalytics ? COLORS.accent : '#f4f3f4'}
+                />
+              </View>
+
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.modalActionButton} onPress={closeAddModal}>
                   <Text style={styles.modalActionText}>Annuler</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.modalActionButton, { backgroundColor: COLORS.accent }]} onPress={submitSubscription}>
-                  <Text style={[styles.modalActionText, { color: COLORS.text }]}>{editingSubscription ? 'Mettre à jour' : 'Créer'}</Text>
+                  <Text style={[styles.modalActionText, { color: COLORS.white }]}>{editingSubscription ? 'Mettre à jour' : 'Créer'}</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -578,6 +615,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                   {statsSubscription.productLimit !== undefined && <Text style={styles.statLine}>Limite produits: {statsSubscription.productLimit || '∞'}</Text>}
                   <Text style={styles.statLine}>Caisse physique: {statsSubscription.hasCaisse ? 'Oui' : 'Non'}</Text>
                   <Text style={styles.statLine}>Boutique en ligne: {statsSubscription.hasOnlineStore ? 'Oui' : 'Non'}</Text>
+                  <Text style={styles.statLine}>Analytique détaillée: {statsSubscription.hasAnalytics ? 'Oui' : 'Non'}</Text>
                 </>
               ) : null}
             </View>

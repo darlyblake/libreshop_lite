@@ -21,8 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { shopFollowService } from '../lib/shopFollowService';
-import { authService } from '../lib/supabase';
+import { storeService } from '../services/storeService';
+import { authService } from '../services/authService';
 import { useAuthStore } from '../store';
 
 interface FollowButtonProps {
@@ -147,8 +147,8 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   const loadFollowData = useCallback(async (): Promise<void> => {
     try {
       const [isFollowing, count] = await Promise.all([
-        shopFollowService.isFollowing(effectiveUserId!, storeId),
-        shopFollowService.getFollowersCount(storeId),
+        storeService.isFollowing(effectiveUserId!, storeId),
+        storeService.getFollowersCount(storeId),
       ]);
       setFollowing(isFollowing);
       setFollowerCount(count);
@@ -240,7 +240,7 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
     runOnJS(triggerHaptic)(newFollowing ? 'success' : 'light');
 
     try {
-      const result = await shopFollowService.toggleFollow(effectiveUserId, storeId);
+      const result = await storeService.toggleFollow(effectiveUserId, storeId);
       
       // Vérifier la cohérence
       if (result !== newFollowing) {
@@ -248,7 +248,7 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
         await loadFollowData();
       } else {
         // Mettre à jour le compteur
-        const count = await shopFollowService.getFollowersCount(storeId);
+        const count = await storeService.getFollowersCount(storeId);
         setFollowerCount(count);
       }
       

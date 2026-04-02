@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { BackToDashboard } from '../components/BackToDashboard';
-import { supabase } from '../lib/supabase';
+import { countryService } from '../services/countryService';
 
 type Country = {
   id: string;
@@ -37,10 +37,8 @@ export const AdminCountriesScreen: React.FC = () => {
 
   const loadCountries = async () => {
     try {
-      if (!supabase) throw new Error('Supabase not initialized');
-      const { data, error } = await supabase.from('countries').select('*').order('name', { ascending: true });
-      if (error) throw error;
-      setCountries((data || []) as Country[]);
+      const data = await countryService.getAll();
+      setCountries(data);
     } catch (e: any) {
       Alert.alert('Erreur', e.message || 'Impossible de charger les pays.');
     }
@@ -78,7 +76,6 @@ export const AdminCountriesScreen: React.FC = () => {
 
   const save = async () => {
     try {
-      if (!supabase) throw new Error('Supabase not initialized');
       const n = name.trim();
       const c = code.trim().toUpperCase();
       if (!n) {
@@ -91,11 +88,9 @@ export const AdminCountriesScreen: React.FC = () => {
       }
 
       if (editing) {
-        const { error } = await supabase.from('countries').update({ name: n, code: c }).eq('id', editing.id);
-        if (error) throw error;
+        await countryService.update(editing.id, n, c);
       } else {
-        const { error } = await supabase.from('countries').insert({ name: n, code: c });
-        if (error) throw error;
+        await countryService.create(n, c);
       }
 
       setModalVisible(false);
@@ -116,9 +111,7 @@ export const AdminCountriesScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (!supabase) throw new Error('Supabase not initialized');
-              const { error } = await supabase.from('countries').delete().eq('id', country.id);
-              if (error) throw error;
+              await countryService.delete(country.id);
               await loadCountries();
             } catch (e: any) {
               Alert.alert('Erreur', e.message || 'Impossible de supprimer.');

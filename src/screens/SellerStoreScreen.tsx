@@ -19,13 +19,18 @@ import * as Linking from 'expo-linking';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { cloudinaryService } from '../lib/cloudinaryService';
-import { orderService, productService, storeService, type Store, authService } from '../lib/supabase';
+import { cloudinaryService } from '../services/cloudinaryService';
+import { type Store } from '../lib/supabase';
+import { orderService } from '../services/orderService';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
+import { authService } from '../services/authService';
 import { useAuthStore } from '../store';
 import { useCategoryStore } from '../store/categoryStore';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useTheme } from '../hooks/useTheme';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { qrCodeService } from '../services/qrCodeService';
 
 /* =========================
    TYPES & MOCK DATA
@@ -86,6 +91,7 @@ export const SellerStoreScreen: React.FC = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const tabs = useMemo(
     () => [
@@ -201,14 +207,14 @@ export const SellerStoreScreen: React.FC = () => {
         logo_url: logoUrl,
         banner_url: bannerUrl,
         promo_enabled: Boolean(next.promoEnabled),
-        promo_title: next.promoTitle || null,
-        promo_subtitle: next.promoSubtitle || null,
-        promo_image_url: promoImageUrl || null,
-        promo_target_type: next.promoTargetType || null,
-        promo_target_id: next.promoTargetId || null,
-        promo_target_url: next.promoTargetUrl || null,
-        tax_rate: next.taxRate || null,
-        shipping_price: next.shippingPrice || null,
+        promo_title: next.promoTitle || undefined,
+        promo_subtitle: next.promoSubtitle || undefined,
+        promo_image_url: promoImageUrl || undefined,
+        promo_target_type: next.promoTargetType || undefined,
+        promo_target_id: next.promoTargetId || undefined,
+        promo_target_url: next.promoTargetUrl || undefined,
+        tax_rate: next.taxRate || undefined,
+        shipping_fee: next.shippingPrice || undefined,
       });
 
       setShowEditModal(false);
@@ -260,10 +266,7 @@ export const SellerStoreScreen: React.FC = () => {
 
   const handleShowQrLink = () => {
     if (!storePublicUrl) return;
-    Alert.alert('Lien boutique', storePublicUrl, [
-      { text: 'Fermer', style: 'cancel' },
-      { text: 'Partager', onPress: handleShareStore },
-    ]);
+    setShowQrModal(true);
   };
 
   const handleQuickImageUpdate = async (type: 'logoUrl' | 'bannerUrl') => {
@@ -474,7 +477,7 @@ export const SellerStoreScreen: React.FC = () => {
               </ScrollView>
 
               <Text style={styles.modalLabel}>Logo</Text>
-              {form.logoUrl && <Image source={{ uri: form.logoUrl }} style={styles.modalPreview} />}
+              {form.logoUrl && <Image source={{ uri: cloudinaryService.getOptimizedUrl(form.logoUrl, 800) }} style={styles.modalPreview} />}
               <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('logoUrl')}><Text style={styles.modalImageButtonText}>Changer le logo</Text></TouchableOpacity>
 
               <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('bannerUrl')}><Text style={styles.modalImageButtonText}>Changer la bannière</Text></TouchableOpacity>
@@ -538,7 +541,7 @@ export const SellerStoreScreen: React.FC = () => {
           <>
             <View style={styles.bannerContainer}>
               <TouchableOpacity onPress={() => handleQuickImageUpdate('bannerUrl')} activeOpacity={0.8}>
-                <Image source={{ uri: storeData.bannerUrl || 'https://picsum.photos/800' }} style={styles.banner} />
+                <Image source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl || 'https://picsum.photos/800', 800) }} style={styles.banner} />
                 <View style={styles.bannerOverlay} />
                 <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 15, padding: 6 }}>
                   <Ionicons name="camera" size={16} color="white" />
@@ -546,7 +549,7 @@ export const SellerStoreScreen: React.FC = () => {
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.logoContainer} onPress={() => handleQuickImageUpdate('logoUrl')} activeOpacity={0.8}>
-                <Image source={{ uri: storeData.logoUrl || 'https://picsum.photos/200' }} style={styles.logo} />
+                <Image source={{ uri: cloudinaryService.getOptimizedUrl(storeData.logoUrl || 'https://picsum.photos/200', 800) }} style={styles.logo} />
                 <View style={{ position: 'absolute', bottom: -5, right: -5, backgroundColor: getColor.accent, borderRadius: 15, padding: 4, borderWidth: 2, borderColor: getColor.bg }}>
                   <Ionicons name="camera" size={14} color="white" />
                 </View>
@@ -655,6 +658,41 @@ export const SellerStoreScreen: React.FC = () => {
                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setShowSignOutModal(false)}><Text style={styles.cancelText}>Annuler</Text></TouchableOpacity>
                <TouchableOpacity style={[styles.button, styles.signOutConfirmButton]} onPress={confirmSignOut}><Text style={styles.submitText}>Quitter</Text></TouchableOpacity>
              </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* QR Code boutique */}
+      <Modal visible={showQrModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { alignItems: 'center', paddingVertical: 30 }]}>
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 15, right: 15 }}
+              onPress={() => setShowQrModal(false)}
+            >
+              <Ionicons name="close" size={24} color={getColor.textMuted} />
+            </TouchableOpacity>
+
+            <Ionicons name="qr-code-outline" size={32} color={getColor.accent} style={{ marginBottom: 12 }} />
+            <Text style={[styles.modalTitle, { marginBottom: 20 }]}>QR Code de votre boutique</Text>
+
+            {store?.slug ? (
+              <Image
+                source={{ uri: qrCodeService.getQrImageUrl(qrCodeService.getStoreUrl(store.slug), 200) }}
+                style={{ width: 200, height: 200, marginBottom: 20 }}
+              />
+            ) : null}
+
+            <Text style={{ color: getColor.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 20 }}>
+              {storePublicUrl}
+            </Text>
+
+            <TouchableOpacity
+              style={[styles.button, styles.submitButton, { width: '100%' }]}
+              onPress={() => { setShowQrModal(false); handleShareStore(); }}
+            >
+              <Text style={styles.submitText}>Partager le lien</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>

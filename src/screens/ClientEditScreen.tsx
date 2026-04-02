@@ -16,7 +16,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { orderService, storeService, supabase } from '../lib/supabase';
+import { orderService } from '../services/orderService';
+import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
 
 interface RouteParams {
@@ -86,7 +87,7 @@ export const ClientEditScreen: React.FC = () => {
       if (!store?.id) { setLoading(false); return; }
       setStoreId(store.id);
 
-      const allOrders: any[] = await orderService.getByStore(store.id);
+      const { orders: allOrders } = await orderService.getByStore(store.id);
 
       // Find orders matching this clientId (phone)
       const clientOrders = allOrders.filter((o: any) => {
@@ -138,7 +139,6 @@ export const ClientEditScreen: React.FC = () => {
 
     setSaving(true);
     try {
-      if (!supabase) throw new Error('Supabase non initialisé');
 
       if (orderIds.length === 0) {
         Alert.alert('Aucune commande', 'Aucune commande trouvée pour ce client.');
@@ -146,16 +146,13 @@ export const ClientEditScreen: React.FC = () => {
       }
 
       // Bulk-update all orders for this client
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          customer_name:  form.name.trim(),
-          customer_phone: form.phone.trim(),
-          ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
-        })
-        .in('id', orderIds);
+      const results = await orderService.updateMetadata(orderIds, {
+        customer_name:  form.name.trim(),
+        customer_phone: form.phone.trim(),
+        ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
+      });
 
-      if (error) throw error;
+      if (!results) throw new Error('Échec de la mise à jour');
 
       Alert.alert(
         'Succès ✓',

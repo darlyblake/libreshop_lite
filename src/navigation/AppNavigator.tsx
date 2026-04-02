@@ -14,11 +14,14 @@ import { RootStackParamList, ClientTabParamList, SellerTabParamList, UserRole, N
 import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
 import { useAuthStore } from '../store';
 import { sessionStorage } from '../lib/storage';
-import { authService, storeService, supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { authService } from '../services/authService';
+import { storeService } from '../services/storeService';
 import { useNotificationStore } from '../store/notificationStore';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useTheme } from '../hooks/useTheme';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useSettingsStore } from '../store/settingsStore';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const ClientTab = createBottomTabNavigator<ClientTabParamList>();
@@ -38,7 +41,7 @@ const linking = {
     screens: {
       Landing: '',
       SellerEmailConfirm: 'auth/confirm',
-      StoreDetail: 'store/:slug',
+      StoreDetail: 'store/:slug?',
       ProductDetail: 'product/:productId',
     },
   },
@@ -119,15 +122,11 @@ const useSubscriptionCheck = () => {
           return false; // Nouveau vendeur
         }
 
-        // Vérification du statut
-        if (store.subscription_status === 'expired' || store.subscription_status === 'cancelled') {
+        // Vérification du statut via le service centralisé
+        const status = storeService.getSubscriptionStatus(store);
+        
+        if (status === 'expired' || status === 'cancelled') {
           return true;
-        }
-
-        // Vérification de la date
-        if (store.subscription_end) {
-          const isExpired = new Date(store.subscription_end) < new Date();
-          if (isExpired) return true;
         }
 
         return false;
@@ -307,7 +306,13 @@ export const AppNavigator: React.FC = () => {
   const { theme, getColor: COLORS } = useTheme();
   const { playNotificationSound } = useNotificationSound();
   const { checkSubscription } = useSubscriptionCheck();
+  const loadAppSettings = useSettingsStore((state) => state.loadSettings);
   
+  // Charger les paramètres de l'application au démarrage
+  useEffect(() => {
+    loadAppSettings();
+  }, [loadAppSettings]);
+
   // Enregistrement des notifications push
   usePushNotifications(user?.id);
 
@@ -318,7 +323,7 @@ export const AppNavigator: React.FC = () => {
     const channel = supabase
       .channel(`notifications:${user.id}`)
       .on(
-        'postgres_changes',
+        'postgres_changes' as any,
         {
           event: 'INSERT',
           schema: 'public',
@@ -338,7 +343,9 @@ export const AppNavigator: React.FC = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel).catch(() => {});
+      if (supabase) {
+        supabase.removeChannel(channel).catch(() => {});
+      }
     };
   }, [user?.id, addNotification, playNotificationSound]);
 
@@ -370,7 +377,7 @@ export const AppNavigator: React.FC = () => {
     const interval = setInterval(async () => {
       try {
         // Check if there are new unread notifications
-        const { notificationService } = await import('../lib/notificationService');
+        const { notificationService } = await import('../services/notificationService');
         const count = await notificationService.getUnreadCount(user.id);
         
         if (count > unreadCountRef.current) {
@@ -406,7 +413,7 @@ export const AppNavigator: React.FC = () => {
         if (session?.user) {
           const userData = await authService.getCurrentUser();
           if (userData) {
-            setUser(userData);
+            setUser(userData as any);
             setSession(session);
             
             const role = (userData as any)?.user_metadata?.role || (userData as any)?.app_metadata?.role;
@@ -460,7 +467,7 @@ export const AppNavigator: React.FC = () => {
             return;
           }
 
-          setUser(session.user);
+          setUser(session.user as any);
           setSession(session);
 
           const role = (session.user as any)?.user_metadata?.role || 
@@ -557,6 +564,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerProductActions" component={Screens.SellerProductActionsScreen} />
         <Stack.Screen name="SellerSale" component={Screens.SellerSaleScreen} />
         <Stack.Screen name="SellerRestock" component={Screens.SellerRestockScreen} />
+        <Stack.Screen name="SellerAnalytics" component={Screens.SellerAnalyticsScreen} />
         
         {/* Routes admin */}
         <Stack.Screen name="AdminSettings" component={Screens.AdminSettingsScreen} />

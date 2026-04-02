@@ -16,11 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Button, Input } from '../components';
-import { authService, storeService, supabase } from '../lib/supabase';
-import { userService } from '../lib/userService';
+// import { supabase } from '../lib/supabase'; // Removed unused import
+import { authService } from '../services/authService';
+import { storeService } from '../services/storeService';
+import { userService } from '../services/userService';
 import { sessionStorage } from '../lib/storage';
 import { useAuthStore } from '../store';
-import { settingsService } from '../lib/settingsService';
+import { settingsService } from '../services/settingsService';
 
 export const SellerAuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -43,7 +45,7 @@ export const SellerAuthScreen: React.FC = () => {
       try {
         const val = await settingsService.getSetting('requireEmailConfirmation', true);
         setRequireEmailConfirmation(val);
-      } catch (e) {
+      } catch (e: any) {
         console.error('Error loading requireEmailConfirmation setting:', e);
       }
     };
@@ -103,7 +105,7 @@ export const SellerAuthScreen: React.FC = () => {
             await AsyncStorage.removeItem('@libreshop_auth_rate_limit');
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         errorHandler.handle(e, 'Error checking rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       }
     };
@@ -259,7 +261,7 @@ export const SellerAuthScreen: React.FC = () => {
           setSession(res.session);
           try {
             await userService.getOrCreateProfile(user.id);
-          } catch (e) {
+          } catch (e: any) {
             errorHandler.handle(e, 'could not create seller profile row', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           }
           navigation.replace('SellerAddStore');
@@ -358,8 +360,8 @@ export const SellerAuthScreen: React.FC = () => {
       // Get the redirect URL for deep linking
       const redirectUrl = Linking.createURL('auth/callback');
       
-      // Initiate Google OAuth in Supabase
-      const { data, error } = await supabase!.auth.signInWithOAuth({
+      // Initiate Google OAuth in authService
+      await authService.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
@@ -392,14 +394,9 @@ export const SellerAuthScreen: React.FC = () => {
       if (url.includes('auth/callback')) {
         // OAuth redirect detected
         try {
-          // The session should be automatically set by Supabase
-          const { data: { user }, error } = await supabase!.auth.getUser();
+          // The user should be automatically set by Supabase
+          const user = await authService.getCurrentUser();
           
-          if (error) {
-            errorHandler.handle(error, 'Error getting user after OAuth:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-            return;
-          }
-
           if (user) {
             const role = (user.user_metadata as any)?.role || 'client';
             await sessionStorage.saveUserRole(role);
@@ -407,7 +404,8 @@ export const SellerAuthScreen: React.FC = () => {
             setUser(user as any);
             
             // Get the session
-            const { data: { session } } = await supabase!.auth.getSession();
+            const sessionData = await authService.getSession();
+            const session = sessionData.session;
             setSession(session);
 
             // Try to create/get profile for sellers
@@ -434,7 +432,7 @@ export const SellerAuthScreen: React.FC = () => {
               navigation.replace('ClientTabs');
             }
           }
-        } catch (err) {
+        } catch (err: any) {
           errorHandler.handleDatabaseError(err, 'Error handling OAuth redirect:');
           setError('❌ Erreur lors du traitement de la connexion Google');
         }

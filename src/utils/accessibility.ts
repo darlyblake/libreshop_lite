@@ -3,7 +3,8 @@
  * Support haute visibilité, daltonisme, lecteurs d'écran
  */
 
-import { ColorPalette, Theme } from '../config/theme';
+import { ColorPalette } from '../config/colors';
+import { Theme } from '../config/theme_new';
 
 export interface AccessibleColors {
   highContrast: {

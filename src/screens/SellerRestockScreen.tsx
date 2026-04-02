@@ -15,7 +15,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { productService, Product, restockService } from '../lib/supabase';
+import { Product } from '../lib/supabase';
+import { productService } from '../services/productService';
+import { restockService } from '../services/restockService';
 import { Button } from '../components/Button';
 import { DatePickerInput } from '../components/DatePickerInput';
 

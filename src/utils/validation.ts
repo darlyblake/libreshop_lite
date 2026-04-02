@@ -40,7 +40,7 @@ export const PATTERNS = {
 };
 
 // Messages d'erreur par défaut
-export const ERROR_MESSAGES = {
+export const ERROR_MESSAGES: Record<string, string | ((...args: any[]) => string)> = {
   required: 'Ce champ est obligatoire',
   minLength: (min: number) => `Ce champ doit contenir au moins ${min} caractères`,
   maxLength: (max: number) => `Ce champ ne peut pas dépasser ${max} caractères`,
@@ -76,7 +76,8 @@ export class FormValidator {
 
     // Validation required
     if (rule.required && (!value || value.toString().trim() === '')) {
-      return this.customMessages[field] || ERROR_MESSAGES.required;
+      const msg = this.customMessages[field] || ERROR_MESSAGES.required;
+      return typeof msg === 'function' ? msg() : msg;
     }
 
     // Si le champ est vide et non requis, pas d'autres validations
@@ -88,27 +89,32 @@ export class FormValidator {
 
     // Validation minLength
     if (rule.minLength && stringValue.length < rule.minLength) {
-      return this.customMessages[`${field}_minLength`] || ERROR_MESSAGES.minLength(rule.minLength);
+      const msg = this.customMessages[`${field}_minLength`] || ERROR_MESSAGES.minLength;
+      return typeof msg === 'function' ? msg(rule.minLength) : msg;
     }
 
     // Validation maxLength
     if (rule.maxLength && stringValue.length > rule.maxLength) {
-      return this.customMessages[`${field}_maxLength`] || ERROR_MESSAGES.maxLength(rule.maxLength);
+      const msg = this.customMessages[`${field}_maxLength`] || ERROR_MESSAGES.maxLength;
+      return typeof msg === 'function' ? msg(rule.maxLength) : msg;
     }
 
     // Validation pattern
     if (rule.pattern && !rule.pattern.test(stringValue)) {
       const patternName = this.getPatternName(rule.pattern);
-      return this.customMessages[`${field}_pattern`] || ERROR_MESSAGES[patternName] || 'Format invalide';
+      const msg = this.customMessages[`${field}_pattern`] || ERROR_MESSAGES[patternName] || 'Format invalide';
+      return typeof msg === 'function' ? msg() : msg;
     }
 
     // Validation numérique
     if (typeof value === 'number') {
       if (rule.min !== undefined && value < rule.min) {
-        return this.customMessages[`${field}_min`] || ERROR_MESSAGES.min(rule.min);
+        const msg = this.customMessages[`${field}_min`] || ERROR_MESSAGES.min;
+        return typeof msg === 'function' ? msg(rule.min) : msg;
       }
       if (rule.max !== undefined && value > rule.max) {
-        return this.customMessages[`${field}_max`] || ERROR_MESSAGES.max(rule.max);
+        const msg = this.customMessages[`${field}_max`] || ERROR_MESSAGES.max;
+        return typeof msg === 'function' ? msg(rule.max) : msg;
       }
     }
 
@@ -155,27 +161,27 @@ export class FormValidator {
 
 // Fonctions utilitaires de validation
 export const validateEmail = (email: string): string | null => {
-  if (!email || email.trim() === '') return ERROR_MESSAGES.required;
-  if (!PATTERNS.email.test(email)) return ERROR_MESSAGES.email;
+  if (!email || email.trim() === '') return ERROR_MESSAGES.required as string;
+  if (!PATTERNS.email.test(email)) return ERROR_MESSAGES.email as string;
   return null;
 };
 
 export const validatePhone = (phone: string): string | null => {
   if (!phone || phone.trim() === '') return null; // Phone is optional
-  if (!PATTERNS.phone.test(phone)) return ERROR_MESSAGES.phone;
+  if (!PATTERNS.phone.test(phone)) return ERROR_MESSAGES.phone as string;
   return null;
 };
 
 export const validatePassword = (password: string): string | null => {
-  if (!password || password.trim() === '') return ERROR_MESSAGES.required;
-  if (!PATTERNS.password.test(password)) return ERROR_MESSAGES.password;
+  if (!password || password.trim() === '') return ERROR_MESSAGES.required as string;
+  if (!PATTERNS.password.test(password)) return ERROR_MESSAGES.password as string;
   return null;
 };
 
 export const validatePrice = (price: string | number): string | null => {
   const value = typeof price === 'string' ? price : price.toString();
-  if (!value || value.trim() === '') return ERROR_MESSAGES.required;
-  if (!PATTERNS.price.test(value)) return ERROR_MESSAGES.price;
+  if (!value || value.trim() === '') return ERROR_MESSAGES.required as string;
+  if (!PATTERNS.price.test(value)) return ERROR_MESSAGES.price as string;
   const numValue = parseFloat(value);
   if (numValue <= 0) return 'Le prix doit être supérieur à 0';
   if (numValue > 999999) return 'Le prix ne peut pas dépasser 999999';
@@ -183,20 +189,20 @@ export const validatePrice = (price: string | number): string | null => {
 };
 
 export const validateSlug = (slug: string): string | null => {
-  if (!slug || slug.trim() === '') return ERROR_MESSAGES.required;
-  if (!PATTERNS.slug.test(slug)) return ERROR_MESSAGES.slug;
+  if (!slug || slug.trim() === '') return ERROR_MESSAGES.required as string;
+  if (!PATTERNS.slug.test(slug)) return ERROR_MESSAGES.slug as string;
   return null;
 };
 
 export const validateName = (name: string): string | null => {
-  if (!name || name.trim() === '') return ERROR_MESSAGES.required;
-  if (!PATTERNS.name.test(name)) return ERROR_MESSAGES.name;
+  if (!name || name.trim() === '') return ERROR_MESSAGES.required as string;
+  if (!PATTERNS.name.test(name)) return ERROR_MESSAGES.name as string;
   return null;
 };
 
 export const validateReference = (reference: string): string | null => {
   if (!reference || reference.trim() === '') return null; // Optional
-  if (!PATTERNS.reference.test(reference)) return ERROR_MESSAGES.reference;
+  if (!PATTERNS.reference.test(reference)) return ERROR_MESSAGES.reference as string;
   return null;
 };
 

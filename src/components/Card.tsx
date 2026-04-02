@@ -9,6 +9,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 interface CardProps {
   children: React.ReactNode;
@@ -67,7 +68,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({
     <TouchableOpacity style={styles.storeCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.storeImageContainer}>
         {logoUrl ? (
-          <Image source={{ uri: logoUrl }} style={styles.storeImage} />
+          <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={styles.storeImage} />
         ) : (
           <View style={styles.storeImagePlaceholder}>
             <Text style={styles.storeImagePlaceholderText}>
@@ -116,7 +117,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.productImageContainer}>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.productImage} resizeMode="cover" />
+          <Image source={{ uri: cloudinaryService.getOptimizedUrl(imageUrl, 400) }} style={styles.productImage} resizeMode="cover" />
         ) : (
           <View style={styles.productImagePlaceholder}>
             <Text style={styles.productImagePlaceholderText}>📦</Text>

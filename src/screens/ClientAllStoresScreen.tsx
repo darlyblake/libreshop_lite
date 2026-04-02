@@ -28,8 +28,11 @@ import Animated, {
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import StoreFiltersModal from '../components/StoreFiltersModal';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { storeService, storeStatsService, Store, StoreStats } from '../lib/supabase';
+import { Store, StoreStats } from '../lib/supabase';
+import { storeService } from '../services/storeService';
+import { storeStatsService } from '../services/storeStatsService';
 import { useResponsive } from '../utils/responsive';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -119,7 +122,7 @@ export const ClientAllStoresScreen: React.FC = () => {
           return next;
         });
       }
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'ClientAllStoresScreen loadStores error');
       setError('Impossible de charger les boutiques');
     } finally {
@@ -152,7 +155,7 @@ export const ClientAllStoresScreen: React.FC = () => {
       paddingBottom: SPACING.xxl + insets.bottom,
     },
     columnWrapper: {
-      justifyContent: 'space-between',
+      justifyContent: 'space-between' as const,
       marginBottom: SPACING.md,
     },
     cardWidth: (SCREEN_WIDTH - (SPACING.lg * 2) - (SPACING.md * (numColumns - 1))) / numColumns,
@@ -167,7 +170,7 @@ export const ClientAllStoresScreen: React.FC = () => {
 
     // apply modal filters
     if (filters.deliveryOnly) {
-      storesList = storesList.filter((s) => (s.shipping_price || 0) > 0);
+      storesList = storesList.filter((s) => (s.shipping_fee || 0) > 0);
     }
     if (typeof filters.minRating === 'number' && filters.minRating > 0) {
       storesList = storesList.filter((s) => {
@@ -240,7 +243,7 @@ export const ClientAllStoresScreen: React.FC = () => {
           >
             <View style={styles.storeMedia}>
               {bannerUrl ? (
-                <Image source={{ uri: bannerUrl }} style={styles.storeBanner} resizeMode="cover" />
+                <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 800) }} style={styles.storeBanner} resizeMode="cover" />
               ) : (
                 <LinearGradient
                   colors={[COLORS.accent + '40', COLORS.accent + '10']}
@@ -250,7 +253,7 @@ export const ClientAllStoresScreen: React.FC = () => {
 
               <View style={styles.storeLogoWrap}>
                 {logoUrl ? (
-                  <Image source={{ uri: logoUrl }} style={styles.storeLogo} />
+                  <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 800) }} style={styles.storeLogo} />
                 ) : (
                   <View style={styles.storeLogoPlaceholder}>
                     <Ionicons name="storefront" size={20} color={COLORS.accent} />
@@ -296,10 +299,10 @@ export const ClientAllStoresScreen: React.FC = () => {
                   </Text>
                 </View>
 
-                {stats?.total_products > 0 && (
+                {(stats as any)?.total_products > 0 && (
                   <View style={styles.productsCount}>
                     <Ionicons name="cube-outline" size={12} color={COLORS.textMuted} />
-                    <Text style={styles.productsCountText}>{stats.total_products}</Text>
+                    <Text style={styles.productsCountText}>{(stats as any).total_products}</Text>
                   </View>
                 )}
               </View>
@@ -366,7 +369,7 @@ export const ClientAllStoresScreen: React.FC = () => {
                 <Text style={styles.subtitle}>Découvrez nos vendeurs partenaires</Text>
               </View>
 
-                  <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilters(true)}>
+              <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilters(true)}>
                 <Ionicons name="options-outline" size={22} color="white" />
               </TouchableOpacity>
             </View>
@@ -427,7 +430,7 @@ export const ClientAllStoresScreen: React.FC = () => {
               <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
               <Text style={styles.errorTitle}>Oups !</Text>
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={loadStores}>
+              <TouchableOpacity style={styles.retryButton} onPress={() => loadStores(true)}>
                 <Text style={styles.retryButtonText}>Réessayer</Text>
               </TouchableOpacity>
             </View>

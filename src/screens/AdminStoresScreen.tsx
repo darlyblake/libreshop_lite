@@ -16,7 +16,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../config/theme';
-import { supabase } from '../lib/supabase';
+import { adminService } from '../services/adminService';
 
 export const AdminStoresScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -30,46 +30,10 @@ export const AdminStoresScreen: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
 
   const loadStores = async () => {
-    if (!supabase) return;
     setLoading(true);
     try {
-      // Join with users to display owner info
-      const { data, error } = await supabase
-        .from('stores')
-        .select('id,user_id,name,slug,description,category,status,subscription_plan,subscription_start,subscription_end,subscription_status,product_limit,visible,created_at,users:users!stores_user_id_fkey(id,email,full_name,phone)')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setStores(
-        (data || []).map((s: any) => ({
-          id: String(s.id),
-          user_id: String(s.user_id),
-          name: String(s.name || ''),
-          slug: String(s.slug || ''),
-          description: s.description || '',
-          category: String(s.category || ''),
-          status: String(s.status || 'active'),
-          address: '-',
-          plan: s.subscription_plan || '-',
-          subStart: s.subscription_start ? String(s.subscription_start) : '-',
-          subEnd: s.subscription_end ? String(s.subscription_end) : '-',
-          subStatus: s.subscription_status || '-',
-          productLimit: s.product_limit ?? undefined,
-          visible: s.visible ?? true,
-          joinDate: s.created_at ? String(s.created_at) : '-',
-          owner: s.users?.full_name || '-',
-          email: s.users?.email || '-',
-          phone: s.users?.phone || '-',
-          // placeholders (can be wired later to real orders/products)
-          revenue: 0,
-          orders: 0,
-          rating: 0,
-          products: 0,
-          productList: [],
-          orderList: [],
-        }))
-      );
+      const formattedStores = await adminService.getStoresWithDetails();
+      setStores(formattedStores);
     } catch (e) {
       errorHandler.handleDatabaseError(e, 'load stores');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -156,15 +120,8 @@ export const AdminStoresScreen: React.FC = () => {
   };
 
   const updateStoreStatus = async (storeId: string, nextStatus: 'active' | 'suspended' | 'pending') => {
-    if (!supabase) return;
     try {
-      const { data, error } = await supabase
-        .from('stores')
-        .update({ status: nextStatus })
-        .eq('id', storeId)
-        .select('id,status')
-        .single();
-      if (error) throw error;
+      const data = await adminService.updateStoreStatus(storeId, nextStatus);
       setStores(prev => prev.map(s => (s.id === storeId ? { ...s, status: (data as any)?.status || nextStatus } : s)));
       if (selectedStore?.id === storeId) {
         setSelectedStore((prev: any) => ({ ...prev, status: (data as any)?.status || nextStatus }));
@@ -180,10 +137,8 @@ export const AdminStoresScreen: React.FC = () => {
   };
 
   const deleteStore = async (storeId: string) => {
-    if (!supabase) return;
     try {
-      const { error } = await supabase.from('stores').delete().eq('id', storeId);
-      if (error) throw error;
+      await adminService.deleteStore(storeId);
       setStores(prev => prev.filter(s => s.id !== storeId));
       if (selectedStore?.id === storeId) {
         setIsModalVisible(false);

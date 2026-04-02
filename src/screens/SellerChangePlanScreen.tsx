@@ -15,9 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { ADMIN_CONFIG } from '../config/admin';
-import { planService, storeService, type Plan } from '../lib/supabase';
+import { type Plan } from '../lib/supabase';
+import { planService } from '../services/planService';
+import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
 import { errorHandler } from '../utils/errorHandler';
+import { useSettingsStore } from '../store/settingsStore';
 
 export const SellerChangePlanScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -26,6 +29,7 @@ export const SellerChangePlanScreen: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [fullPlans, setFullPlans] = useState<Plan[]>([]);
   const [store, setStore] = useState<any>(null);
+  const adminConfig = useSettingsStore(state => state.adminConfig);
 
   useEffect(() => {
     loadData();
@@ -69,9 +73,7 @@ export const SellerChangePlanScreen: React.FC = () => {
       }
     }
 
-    if (__DEV__) {
-      console.log(`[SellerProrata] Status: ${currentStatus}, Plan: ${planName}, End: ${endValue}, Price: ${currentPrice}`);
-    }
+    // Debug log moved to loadData to avoid firing per-plan per-render
 
     // Allow both active and trial to get prorata
     if (!endValue || (currentStatus !== 'active' && currentStatus !== 'trial')) {
@@ -97,23 +99,12 @@ export const SellerChangePlanScreen: React.FC = () => {
 
   const handleSelectPlan = (plan: Plan) => {
     const proratedPrice = calculateProrata(plan.price);
-
-    Alert.alert(
-      'Confirmer le choix',
-      `Vous avez choisi le plan ${plan.name}.\n\nMontant à régler (avec prorata) : ${proratedPrice.toLocaleString()} FCFA\n\nVoulez-vous contacter l'administrateur pour l'activation ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Contacter Admin', 
-          onPress: () => contactAdmin(plan, proratedPrice) 
-        }
-      ]
-    );
+    contactAdmin(plan, proratedPrice);
   };
 
   const contactAdmin = (plan: Plan, price: number) => {
-    const adminPhoneNumber = ADMIN_CONFIG.WHATSAPP_NUMBER;
-    const message = `Bonjour Admin LibreShop, je souhaite passer au plan ${plan.name} pour ma boutique ${store?.name || ''}.\n\nMontant calculé : ${price.toLocaleString()} FCFA.\nMon email : ${user?.email}`;
+    const adminPhoneNumber = adminConfig.whatsappNumber;
+    const message = `Bonjour Admin LibreShop 👋\n\nJe souhaite passer au plan *${plan.name}* pour ma boutique.\n\n📦 *Infos Boutique:*\n• Nom: ${store?.name || 'N/A'}\n• ID: ${store?.id || 'N/A'}\n\n💳 *Détails Offre:*\n• Nouvelle offre: ${plan.name}\n• Montant à régler: *${price.toLocaleString()} FCFA*\n\n📧 *Contact:*\n• Email: ${user?.email || 'N/A'}\n\nMerci!`;
     
     const encodedMessage = encodeURIComponent(message);
     const url = Platform.select({

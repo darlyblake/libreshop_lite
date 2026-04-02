@@ -16,9 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useCartStore, useAuthStore } from '../store';
-import { storeService, orderService, supabase } from '../lib/supabase';
-import { userService } from '../lib/userService';
-import { notificationService } from '../lib/notificationService';
+import { storeService } from '../services/storeService';
+import { orderService } from '../services/orderService';
+import { userService } from '../services/userService';
+import { notificationService } from '../services/notificationService';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 export const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -73,7 +75,7 @@ export const CartScreen: React.FC = () => {
           setStore(null);
           setStoresData([]);
         }
-      } catch (e) {
+      } catch (e: any) {
         errorHandler.handle(e, 'load store for cart', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
         if (mounted) setLoadingStore(false);
@@ -91,7 +93,7 @@ export const CartScreen: React.FC = () => {
   const renderCartItem = (item: (typeof items)[number]) => (
     <View key={item.product.id} style={styles.cartItem}>
       {item.product.images?.[0] ? (
-        <Image source={{ uri: item.product.images[0] }} style={styles.itemImage} />
+        <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 800) }} style={styles.itemImage} />
       ) : (
         <View style={styles.itemImagePlaceholder}>
           <Ionicons name="image-outline" size={28} color={COLORS.textMuted} />
@@ -222,17 +224,17 @@ export const CartScreen: React.FC = () => {
             <Text style={styles.summaryValue}>{subtotal.toLocaleString()} FCA</Text>
           </View>
           
-          {taxRate > 0 && (
+          {aggregatedTax > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>TVA ({taxRate}%)</Text>
-              <Text style={styles.summaryValue}>{taxAmount.toLocaleString()} FCA</Text>
+              <Text style={styles.summaryLabel}>TVA Totale</Text>
+              <Text style={styles.summaryValue}>{aggregatedTax.toLocaleString()} FCA</Text>
             </View>
           )}
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Livraison</Text>
             <Text style={styles.summaryValue}>
-              {loadingStore ? '...' : shippingPrice > 0 ? `${shippingPrice.toLocaleString()} FCA` : 'Gratuite'}
+              {loadingStore ? '...' : aggregatedShipping > 0 ? `${aggregatedShipping.toLocaleString()} FCA` : 'Gratuite'}
             </Text>
           </View>
           
@@ -240,7 +242,7 @@ export const CartScreen: React.FC = () => {
           
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>Total TTC</Text>
-            <Text style={styles.totalValue}>{total.toLocaleString()} FCA</Text>
+            <Text style={styles.totalValue}>{grandTotal.toLocaleString()} FCA</Text>
           </View>
         </View>
 
@@ -300,78 +302,40 @@ export const CartScreen: React.FC = () => {
                 phone: user.whatsapp_number || user.phone || '',
               });
 
-              // group items by store id
-              const groups: Record<string, any[]> = {};
-              for (const it of items) {
-                const sid = (it.product as any)?.store_id || 'unknown';
-                groups[sid] = groups[sid] || [];
-                groups[sid].push(it);
-              }
+              // Prepare metadata for order creation
+              const userMetadata = {
+                full_name: user.full_name || 'Client',
+                phone: user.whatsapp_number || user.phone || '',
+                address: (user as any)?.address || null,
+              };
 
-              const createdOrders: any[] = [];
+              // Map groups to include computed tax/shipping for the service
+              const groupsForService: Record<string, any[]> = {};
               for (const [sid, group] of Object.entries(groups)) {
-                const storeIdForOrder = sid === 'unknown' ? null : sid;
+                const storeInfo = storesData.find(s => s?.id === sid);
                 const subtotalByStore = group.reduce((s: number, i: any) => s + (i.product.price || 0) * (i.quantity || 0), 0);
                 const tax = storeInfo?.tax_rate ? Math.round(subtotalByStore * (storeInfo.tax_rate / 100)) : 0;
                 const shipping = storeInfo?.shipping_price || 0;
-                const totalForOrder = subtotalByStore + tax + shipping;
-
-                const baseOrderPayload: any = {
-                  user_id: String(user.id),
-                  store_id: storeIdForOrder,
-                  total_amount: Number(totalForOrder),
-                  status: 'pending',
-                  payment_method: 'cash_on_delivery',
-                  payment_status: 'pending',
-                  shipping_address: user?.address || null,
-                  customer_phone: user?.whatsapp_number || user?.phone || null,
-                  notes: null,
-                  // include breakdown for server/UI convenience
-                  delivery_fee: shipping,
+                
+                groupsForService[sid] = group.map((it: any) => ({
+                  ...it,
                   tax_amount: tax,
-                };
-
-                let created: any;
-                try {
-                  created = await orderService.create({ ...baseOrderPayload, customer_name: user?.full_name });
-                } catch (e: any) {
-                  const msg = String(e?.message || '').toLowerCase();
-                  const isSchemaCacheIssue = msg.includes('schema') && msg.includes('cache') && msg.includes('customer_name');
-                  const isMissingColumnIssue = msg.includes('column') && msg.includes('customer_name');
-                  if (isSchemaCacheIssue || isMissingColumnIssue) {
-                    created = await orderService.create(baseOrderPayload);
-                  } else {
-                    throw e;
-                  }
-                }
-
-                // insert order_items
-                try {
-                  if (supabase && created?.id) {
-                    const rows = group.map((it: any) => ({
-                      order_id: created.id,
-                      product_id: it.product.id,
-                      quantity: it.quantity,
-                      price: it.product.price,
-                    }));
-                    const { error } = await supabase.from('order_items').insert(rows);
-                    if (error) errorHandler.handle(error, 'failed to insert order items', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-                  }
-                } catch (e) {
-                  errorHandler.handle(e, 'order_items insert skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-                }
-
-                // keep order in pending state and do NOT run post-processing here.
-                // Payment will trigger the RPC and notifications per-order.
-                createdOrders.push(created);
+                  delivery_fee: shipping
+                }));
               }
 
-              // navigate to the bulk payment flow so the user can pay each order separately
+              const createdOrders = await orderService.createBulkOrders(
+                String(user.id),
+                groupsForService,
+                userMetadata
+              );
+
+              // navigate to the bulk payment flow
               navigation.navigate('BulkPayment', {
                 createdOrders,
-                groups,
+                groups: groupsForService,
               });
-            } catch (e) {
+            } catch (e: any) {
               errorHandler.handle(e, 'bulk create orders failed', ErrorCategory.SYSTEM, ErrorSeverity.HIGH);
               Alert.alert('Erreur', 'La création des commandes a échoué. Réessayez.');
             } finally {

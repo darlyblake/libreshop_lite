@@ -15,7 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { productService, Product } from '../lib/supabase';
+import { Product } from '../lib/supabase';
+import { productService } from '../services/productService';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { DatePickerInput } from '../components/DatePickerInput';
@@ -68,8 +69,8 @@ export const SellerSaleScreen: React.FC = () => {
   }, [productId, navigation]);
 
   const calculateDiscountPrice = (percent: string) => {
-    const price = parseFloat(product?.price || '0');
-    const percent_val = parseFloat(percent);
+    const price = Number(product?.price || 0);
+    const percent_val = Number(percent);
     if (price && percent_val) {
       const discounted = price - (price * percent_val) / 100;
       setSalePrice(Math.round(discounted).toString());

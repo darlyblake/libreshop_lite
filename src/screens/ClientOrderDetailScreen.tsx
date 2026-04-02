@@ -12,12 +12,14 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
-import { Order, OrderItem, Product, Store, orderService } from '../lib/supabase';
+import { Order, OrderItem, Product, Store } from '../lib/supabase';
+import { orderService } from '../services/orderService';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 type RouteProps = RouteProp<RootStackParamList, 'ClientOrderDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -233,7 +235,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
               <View style={styles.itemImage}>
                 {productImage ? (
                   <Image
-                    source={{ uri: productImage }}
+                    source={{ uri: cloudinaryService.getOptimizedUrl(productImage, 800) }}
                     style={{ width: '100%', height: '100%', borderRadius: 8 }}
                   />
                 ) : (

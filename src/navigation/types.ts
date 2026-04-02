@@ -17,6 +17,7 @@ export type RootStackParamList = {
   AdminFeatured: undefined;
   AdminReports: undefined;
   AdminAnalytics: undefined;
+  SellerAnalytics: undefined;
   AdminProfile: undefined;
   AdminActivity: undefined;
   AdminRevenueDetails: undefined;
@@ -28,6 +29,7 @@ export type RootStackParamList = {
   AdminBanners: undefined;
   AdminBannerForm: { bannerId?: string };
   Payment: { amount?: number; orderId?: string };
+  BulkPayment: { orders?: any[] };
   ClientTabs: NavigatorScreenParams<ClientTabParamList>;
   SellerTabs: NavigatorScreenParams<SellerTabParamList>;
   StoreDetail: { storeId?: string; slug?: string };
@@ -36,17 +38,30 @@ export type RootStackParamList = {
   Checkout: undefined;
   Confirmation: undefined;
   Wishlist: undefined;
+  SellerDashboard: undefined;
+  SellerProducts: undefined;
+  SellerOrders: undefined;
+  SellerCollection: undefined;
+  SellerClients: undefined;
+  SellerStore: undefined;
   SellerCaisse: undefined;
   SellerAddProduct: undefined;
   SellerEditProduct: { productId: string };
   SellerAddStore: undefined;
+  ClientHome: undefined;
   ClientSearch: undefined;
   ClientAllStores: undefined;
   ClientAllProducts: undefined;
+  ClientDetail: { clientId: string };
+  ClientOrders: undefined;
+  ClientOrderDetail: { orderId: string };
+  ClientEdit: { userId: string };
   SellerEditCollection: { collectionId: string };
   SellerCollectionProducts: { collectionId: string };
   SellerOrderDetail: { orderId: string };
-  ClientOrderDetail: { orderId: string };
+  SellerProductActions: { productId: string };
+  SellerSale: { productId: string };
+  SellerRestock: { productId: string };
   Notifications: undefined;
   Features: undefined;
   Pricing: undefined;
@@ -55,6 +70,7 @@ export type RootStackParamList = {
 
 export type ClientTabParamList = {
   ClientHome: undefined;
+  ClientOrders: undefined;
   ClientSearch: undefined;
   Wishlist: undefined;
   ClientProfile: undefined;

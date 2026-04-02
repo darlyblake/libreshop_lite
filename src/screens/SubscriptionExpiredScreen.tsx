@@ -20,19 +20,12 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { ADMIN_CONFIG } from '../config/admin';
 import { Button } from '../components';
-import { supabase, authService } from '../lib/supabase';
+import { authService } from '../services/authService';
+import { storeService } from '../services/storeService';
+import { Plan, planService } from '../services/planService';
+import { useSettingsStore } from '../store/settingsStore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionExpired'>;
-
-interface Plan {
-  id: string;
-  name: string;
-  price: number;
-  duration_days: number;
-  features: string[];
-  is_free: boolean;
-  status: string;
-}
 
 interface Store {
   id: string;
@@ -48,6 +41,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
   const [freePlanUsed, setFreePlanUsed] = React.useState(false);
   const [signingOut, setSigningOut] = React.useState(false);
   const [selectedPlan, setSelectedPlan] = React.useState<string | null>(null);
+  const adminConfig = useSettingsStore(state => state.adminConfig);
 
   // Animations
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -75,88 +69,48 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
       console.log('🔍 SubscriptionExpired: Début chargement des données');
 
       // 1. Vérifier l'utilisateur
-      const {
-        data: { user },
-      } = await supabase!.auth.getUser();
+      const user = await authService.getCurrentUser();
       if (!user) {
         console.error('❌ SubscriptionExpired: Aucun utilisateur trouvé');
-        // Rediriger vers la page de connexion si pas d'utilisateur
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Landing' }],
-        });
+        navigation.reset({ index: 0, routes: [{ name: 'Landing' }] });
         return;
       }
       setUserId(user.id);
       console.log('✅ SubscriptionExpired: Utilisateur trouvé', user.id);
 
       // 2. Récupérer la boutique de l'utilisateur
-      const { data: storeData, error: storeError } = await supabase!
-        .from('stores')
-        .select('id, name, user_id, subscription_status, subscription_end')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (storeError) {
-        console.error('❌ SubscriptionExpired: Erreur chargement store', storeError);
-        throw storeError;
-      }
-
-      if (storeData) {
-        // Si la boutique est déjà réactivée (ex: par l'admin), on redirige vers le dashboard
-        if (storeData.subscription_status !== 'expired' && storeData.subscription_status !== 'cancelled') {
-          const isDateExpired = storeData.subscription_end && new Date(storeData.subscription_end) < new Date();
-          if (!isDateExpired) {
-            console.log('✅ SubscriptionExpired: Boutique réactivée, redirection...');
-            navigation.replace('SellerTabs');
-            return;
-          }
-        }
-      }
+      const storeData = await storeService.getByUser(user.id);
       
-      if (!storeData) {
-        console.log('ℹ️ SubscriptionExpired: Aucune boutique trouvée');
-        // Ne pas throw d'erreur, juste continuer sans store
+      if (storeData) {
+        if (storeService.isSubscriptionActive(storeData)) {
+          console.log('✅ SubscriptionExpired: Boutique réactivée, redirection...');
+          navigation.replace('SellerTabs', { screen: 'SellerDashboard' } as any);
+          return;
+        }
       }
       setStore(storeData);
       console.log('✅ SubscriptionExpired: Store trouvé', storeData);
 
       // 3. Récupérer les plans actifs
-      const { data: plansData, error: plansError } = await supabase!
-        .from('plans')
-        .select('id, name, price, duration_days, features, is_free, status')
-        .eq('status', 'active')
-        .order('price', { ascending: true });
-
-      if (plansError) {
-        console.error('❌ SubscriptionExpired: Erreur chargement plans', plansError);
-        throw plansError;
-      }
-      setPlans(plansData || []);
-      console.log('✅ SubscriptionExpired: Plans chargés', plansData?.length, 'plans');
+      const plansData = await planService.getAll();
+      const activePlans = (plansData || []).filter(p => p.status === 'active');
+      setPlans(activePlans as Plan[]);
+      console.log('✅ SubscriptionExpired: Plans chargés', activePlans.length);
 
       // 4. Vérifier si le plan gratuit a été utilisé
-      if (storeData && plansData) {
-        const freePlan = plansData.find((p) => p.is_free);
-        if (freePlan) {
-          const { data: subscriptionHistory } = await supabase!
-            .from('subscriptions')
-            .select('id')
-            .eq('store_id', storeData.id)
-            .eq('plan_id', freePlan.id)
-            .limit(1);
-
-          if (subscriptionHistory && subscriptionHistory.length > 0) {
-            setFreePlanUsed(true);
-            console.log('✅ SubscriptionExpired: Plan gratuit déjà utilisé');
-          }
+      if (storeData && activePlans.length > 0) {
+        const freePlan = activePlans.find((p) => p.is_free);
+        if (freePlan && freePlan.id) {
+          const used = await planService.checkFreePlanUsed(storeData.id, freePlan.id);
+          setFreePlanUsed(used);
+          if (used) console.log('✅ SubscriptionExpired: Plan gratuit déjà utilisé');
         }
       }
       
       console.log('✅ SubscriptionExpired: Données chargées avec succès');
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ SubscriptionExpired: Erreur générale', error);
-      errorHandler.handleDatabaseError(error as Error, 'Error loading data:');
+      errorHandler.handleDatabaseError(error, 'loadData');
       
       // Afficher un message plus utile
       Alert.alert(
@@ -184,8 +138,8 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
         index: 0,
         routes: [{ name: 'Landing' }],
       });
-    } catch (error) {
-      errorHandler.handleDatabaseError(error as Error, 'Sign out error:');
+    } catch (error: any) {
+      errorHandler.handleDatabaseError(error, 'Sign out error:');
       Alert.alert('Erreur', 'Impossible de se déconnecter');
     } finally {
       setSigningOut(false);
@@ -200,8 +154,8 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
     // Petit délai pour l'animation
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    const adminPhoneNumber = ADMIN_CONFIG.WHATSAPP_NUMBER;
-    const message = `Bonjour 👋\n\nJe souhaite activer le plan "${plan.name}" pour ma boutique.\n\n📦 Infos:\n• Boutique: ${store.name}\n• Plan: ${plan.name}\n• Prix: ${plan.price}€\n• Durée: ${plan.duration_days} jours\n\nMerci!`;
+    const adminPhoneNumber = adminConfig.whatsappNumber;
+    const message = `Bonjour 👋\n\nJe souhaite activer le plan "${plan.name}" pour ma boutique.\n\n📦 Infos:\n• Boutique: ${store.name}\n• Plan: ${plan.name}\n• Prix: ${plan.price} FCFA\n• Durée: ${plan.duration_days} jours\n\nMerci!`;
 
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = Platform.select({
@@ -223,11 +177,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-      minimumFractionDigits: 0,
-    }).format(price);
+    return price.toLocaleString('fr-FR') + ' FCFA';
   };
 
   if (isLoading) {
@@ -514,7 +464,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
             Besoin d'aide ?{' '}
             <Text 
               style={styles.supportLink}
-              onPress={() => Linking.openURL(`https://wa.me/${ADMIN_CONFIG.WHATSAPP_NUMBER}`)}
+              onPress={() => Linking.openURL(`https://wa.me/${adminConfig.whatsappNumber}`)}
             >
               Contactez-nous
             </Text>

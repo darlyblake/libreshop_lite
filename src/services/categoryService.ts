@@ -1,6 +1,6 @@
-import { supabase } from './supabase';
+import { supabase } from '../lib/supabase';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { Category } from './supabase';
+import { Category } from '../lib/supabase';
 
 // Category Service
 export const categoryService = {

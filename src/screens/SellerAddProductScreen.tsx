@@ -13,8 +13,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
-import { collectionService, productService, storeService, type Collection } from '../lib/supabase';
-import { cloudinaryService } from '../lib/cloudinaryService';
+import { type Collection } from '../lib/supabase';
+import { collectionService } from '../services/collectionService';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
+import { cloudinaryService } from '../services/cloudinaryService';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';

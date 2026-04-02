@@ -18,8 +18,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { productLikesService } from '../lib/productLikesService';
-import { authService } from '../lib/supabase';
+import { productLikesService } from '../services/productLikesService';
+import { authService } from '../services/authService';
 import { useAuthStore } from '../store';
 
 interface LikeButtonProps {

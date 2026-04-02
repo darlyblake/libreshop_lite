@@ -15,12 +15,13 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { Order, OrderItem, Product } from '../lib/supabase';
-import { orderService } from '../lib/supabase';
+import { orderService } from '../services/orderService';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { cloudinaryService } from '../services/cloudinaryService';
 
 type RouteProps = RouteProp<RootStackParamList, 'SellerOrderDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -83,7 +84,6 @@ export const SellerOrderDetailScreen: React.FC = () => {
       if (!orderId) throw new Error('orderId manquant');
       await orderService.updateStatus(orderId, newStatus);
       setOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
-      Alert.alert('Succès', 'Statut de la commande mis à jour');
     } catch (error) {
       errorHandler.handleDatabaseError(error, 'Error updating order:');
       Alert.alert('Erreur', 'Impossible de mettre à jour le statut');
@@ -216,7 +216,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
         {order.order_items.map((item) => (
           <View key={item.id} style={styles.itemContainer}>
             <Image 
-              source={{ uri: item.product?.images && item.product.images.length > 0 ? item.product.images[0] : 'https://picsum.photos/200' }} 
+              source={{ uri: cloudinaryService.getOptimizedUrl(item.product?.images && item.product.images.length > 0 ? item.product.images[0] : 'https://picsum.photos/200', 800) }} 
               style={styles.itemImage}
             />
             <View style={styles.itemInfo}>

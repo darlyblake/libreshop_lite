@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Category } from '../lib/supabase';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { categoryService } from '../lib/categoryService';
+import { categoryService } from '../services/categoryService';
 
 interface CategoryState {
   categories: Category[];

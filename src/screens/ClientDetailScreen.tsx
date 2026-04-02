@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { orderService, storeService } from '../lib/supabase';
+import { orderService } from '../services/orderService';
+import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
 
 interface RouteParams {

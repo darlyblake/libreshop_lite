@@ -12,6 +12,7 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { LineChart } from 'react-native-chart-kit';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -23,8 +24,10 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { RootStackParamList } from '../navigation/types';
 import { Card } from '../components/Card';
 import { LoadingSpinner } from '../components/LoadingSpinner';
-import { supabase } from '../lib/supabase';
-import { notificationService } from '../lib/notificationService';
+import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
+import { adminService } from '../services/adminService';
+import { analyticsService, TimelineDataPoint, TopStoreData } from '../services/analyticsService';
 import { useAuthStore } from '../store';
 
 const { width } = Dimensions.get('window');
@@ -70,160 +73,40 @@ export const AdminDashboardScreen: React.FC = () => {
     pendingOrders: 0,
     pendingPayments: 0,
   });
+  const [revenueTimeline, setRevenueTimeline] = useState<TimelineDataPoint[]>([]);
+  const [topStores, setTopStores] = useState<TopStoreData[]>([]);
 
   const loadStats = useCallback(async () => {
-    if (!supabase) return;
     setLoading(true);
     try {
-      const [
-        usersRes,
-        storesRes,
-        ordersRes,
-        pendingOrdersRes,
-        activeSubscriptionsRes,
-        pendingPaymentsRes,
-        overduePaymentsRes,
-        paidStoresRes,
-      ] = await Promise.all([
-        supabase.from('users').select('id', { head: true, count: 'exact' }),
-        supabase.from('stores').select('id', { head: true, count: 'exact' }),
-        supabase.from('orders').select('id', { head: true, count: 'exact' }),
-        supabase.from('orders').select('id', { head: true, count: 'exact' }).eq('status', 'pending'),
-        supabase
-          .from('stores')
-          .select('id', { head: true, count: 'exact' })
-          .in('subscription_status', ['active', 'trial']),
-        supabase.from('stores').select('id', { head: true, count: 'exact' }).eq('billing_status', 'pending'),
-        supabase.from('stores').select('id', { head: true, count: 'exact' }).eq('billing_status', 'overdue'),
-        supabase.from('stores').select('subscription_price').eq('billing_status', 'paid'),
+      const [newStats, newTimeline, newTopStores] = await Promise.all([
+        adminService.getDashboardStats(),
+        analyticsService.getGlobalRevenueTimeline(7),
+        analyticsService.getTopStores(3),
       ]);
-
-      if (usersRes.error) throw usersRes.error;
-      if (storesRes.error) throw storesRes.error;
-      if (ordersRes.error) throw ordersRes.error;
-      if (pendingOrdersRes.error) throw pendingOrdersRes.error;
-      if (activeSubscriptionsRes.error) throw activeSubscriptionsRes.error;
-      if (pendingPaymentsRes.error) throw pendingPaymentsRes.error;
-      if (overduePaymentsRes.error) throw overduePaymentsRes.error;
-      if (paidStoresRes.error) throw paidStoresRes.error;
-
-      const paidRevenue = (paidStoresRes.data || []).reduce((acc: number, row: any) => {
-        const v = Number(row?.subscription_price || 0);
-        return acc + (Number.isFinite(v) ? v : 0);
-      }, 0);
-
-      const pendingPayments = (pendingPaymentsRes.count || 0) + (overduePaymentsRes.count || 0);
-
-      setStats({
-        totalUsers: usersRes.count || 0,
-        totalStores: storesRes.count || 0,
-        totalOrders: ordersRes.count || 0,
-        totalRevenue: paidRevenue,
-        activeSubscriptions: activeSubscriptionsRes.count || 0,
-        pendingOrders: pendingOrdersRes.count || 0,
-        pendingPayments,
-      });
+      setStats(newStats);
+      setRevenueTimeline(newTimeline);
+      setTopStores(newTopStores);
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'load dashboard stats');
+      errorHandler.handleDatabaseError(e as any, 'load dashboard stats');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [adminService, analyticsService]); // Added dependencies for clarity, though not strictly required if they are stable constants
 
   const loadRecentActivity = useCallback(async () => {
-    if (!supabase) return;
     try {
-      const [usersRes, storesRes, ordersRes, notificationsRes] = await Promise.all([
-        supabase.from('users').select('full_name,created_at').order('created_at', { ascending: false }).limit(5),
-        supabase.from('stores').select('name,created_at').order('created_at', { ascending: false }).limit(5),
-        supabase
-          .from('orders')
-          .select('total_amount,created_at')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        supabase.from('notifications').select('title,type,created_at').order('created_at', { ascending: false }).limit(5),
-      ]);
-
-      if (usersRes.error) throw usersRes.error;
-      if (storesRes.error) throw storesRes.error;
-      if (ordersRes.error) throw ordersRes.error;
-      const notificationsMissing =
-        (notificationsRes as any)?.error?.code === 'PGRST205' ||
-        String((notificationsRes as any)?.error?.message || '').toLowerCase().includes('could not find the table');
-      if (notificationsRes.error && !notificationsMissing) throw notificationsRes.error;
-
-      const items: Array<Activity & { _createdAt: string }> = [];
-
-      (usersRes.data || []).forEach((u: any, idx: number) => {
-        const createdAt = String(u?.created_at || '');
-        items.push({
-          id: `user-${idx}-${createdAt}`,
-          type: 'user',
-          message: 'Nouvel utilisateur inscrit',
-          time: createdAt ? new Date(createdAt).toLocaleString() : '',
-          user: String(u?.full_name || ''),
-          _createdAt: createdAt,
-        });
-      });
-
-      (storesRes.data || []).forEach((s: any, idx: number) => {
-        const createdAt = String(s?.created_at || '');
-        items.push({
-          id: `store-${idx}-${createdAt}`,
-          type: 'store',
-          message: 'Nouvelle boutique créée',
-          time: createdAt ? new Date(createdAt).toLocaleString() : '',
-          user: String(s?.name || ''),
-          _createdAt: createdAt,
-        });
-      });
-
-      (ordersRes.data || []).forEach((o: any, idx: number) => {
-        const createdAt = String(o?.created_at || '');
-        items.push({
-          id: `order-${idx}-${createdAt}`,
-          type: 'order',
-          message: 'Nouvelle commande passée',
-          time: createdAt ? new Date(createdAt).toLocaleString() : '',
-          amount: Number(o?.total_amount || 0),
-          _createdAt: createdAt,
-        });
-      });
-
-      if (!notificationsMissing) {
-        (notificationsRes.data || []).forEach((n: any, idx: number) => {
-          const createdAt = String(n?.created_at || '');
-          const notifType = String(n?.type || 'system');
-          const activityType: Activity['type'] =
-            notifType === 'payment'
-              ? 'payment'
-              : notifType === 'order'
-                ? 'order'
-                : notifType === 'system'
-                  ? 'subscription'
-                  : 'payment';
-          items.push({
-            id: `notif-${idx}-${createdAt}`,
-            type: activityType,
-            message: String(n?.title || 'Notification'),
-            time: createdAt ? new Date(createdAt).toLocaleString() : '',
-            _createdAt: createdAt,
-          });
-        });
-      }
-
-      items.sort((a, b) => String(b._createdAt).localeCompare(String(a._createdAt)));
-      setRecentActivity(items.slice(0, 5).map(({ _createdAt, ...rest }) => rest));
+      const items = await adminService.getRecentActivity();
+      setRecentActivity(items);
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'load recent activity');
+      errorHandler.handleDatabaseError(e as any, 'load recent activity');
     }
   }, []);
 
   const loadUnreadNotifications = useCallback(async () => {
-    if (!supabase) return;
     try {
-      const { data } = await supabase.auth.getSession();
-      const s = data.session;
+      const sessionData = await authService.getSession();
+      const s = sessionData.session;
       const userId = s?.user?.id;
       if (!userId) {
         setUnreadNotifications(0);
@@ -240,16 +123,31 @@ export const AdminDashboardScreen: React.FC = () => {
         }
         throw err;
       }
-    } catch (e) {
+    } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'load unread notifications');
     }
   }, []);
 
-  // Chart data (simplifié pour éviter les erreurs d'import)
-  const revenueData = {
-    labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
-    values: [4500000, 5200000, 4800000, 6100000, 5900000, 7200000, 6800000],
-  };
+  // Chart data processed for react-native-chart-kit
+  const chartData = useMemo(() => {
+    if (revenueTimeline.length === 0) {
+      return {
+        labels: ['-'],
+        datasets: [{ data: [0] }]
+      };
+    }
+    
+    return {
+      labels: revenueTimeline.map(d => {
+        const date = new Date(d.date);
+        const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+        return days[date.getDay()];
+      }),
+      datasets: [{
+        data: revenueTimeline.map(d => d.revenue / 1000) // in k FCFA
+      }]
+    };
+  }, [revenueTimeline]);
 
   const distributionData = [
     {
@@ -463,12 +361,8 @@ export const AdminDashboardScreen: React.FC = () => {
       let mounted = true;
       const load = async () => {
         try {
-          if (!supabase) {
-            if (mounted) setConnectionLabel('Supabase: non initialisé');
-            return;
-          }
-          const { data } = await supabase.auth.getSession();
-          const s = data.session;
+          const sessionData = await authService.getSession();
+          const s = sessionData.session;
           const email = s?.user?.email || (user as any)?.email;
           const role = (s?.user as any)?.user_metadata?.role || (user as any)?.user_metadata?.role;
           if (!s) {
@@ -622,19 +516,68 @@ export const AdminDashboardScreen: React.FC = () => {
       <Animated.View entering={SlideInRight.delay(400)}>
         <Card style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Revenus hebdomadaires</Text>
+            <Text style={styles.chartTitle}>Revenus hebdomadaires (k FCFA)</Text>
             <TouchableOpacity onPress={goToRevenueDetails}>
               <Text style={styles.chartLink}>Voir détails</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.simpleChart}>
-            <View style={styles.chartBar}>
-              <View style={[styles.barSegment, { backgroundColor: COLORS.accent, width: '70%' }]} />
+          {revenueTimeline.length > 0 ? (
+            <LineChart
+              data={chartData}
+              width={CHART_WIDTH}
+              height={220}
+              chartConfig={{
+                backgroundColor: COLORS.card,
+                backgroundGradientFrom: COLORS.card,
+                backgroundGradientTo: COLORS.card,
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(138, 43, 226, ${opacity})`, // COLORS.accent
+                labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity * 0.6})`,
+                style: {
+                  borderRadius: 16,
+                },
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: COLORS.accent,
+                },
+              }}
+              bezier
+              style={{
+                marginVertical: 8,
+                borderRadius: RADIUS.md,
+              }}
+            />
+          ) : (
+            <View style={[styles.simpleChart, { height: 220, justifyContent: 'center' }]}>
+              <Text style={styles.chartLabel}>Aucune donnée disponible</Text>
             </View>
-            <Text style={styles.chartLabel}>7.0M FCFA cette semaine</Text>
-          </View>
+          )}
         </Card>
       </Animated.View>
+
+      {/* Top Stores List */}
+      {topStores.length > 0 && (
+        <Animated.View entering={SlideInRight.delay(450)}>
+          <Card style={styles.topStoresCard}>
+            <Text style={styles.chartTitle}>Meilleures Boutiques (30j)</Text>
+            {topStores.map((store, index) => (
+              <View key={store.store_id} style={[styles.topStoreItem, index < topStores.length - 1 && styles.activityBorder]}>
+                <View style={styles.topStoreRank}>
+                  <Text style={styles.rankText}>{index + 1}</Text>
+                </View>
+                <View style={styles.topStoreInfo}>
+                  <Text style={styles.topStoreName} numberOfLines={1}>{store.store_name}</Text>
+                  <Text style={styles.topStoreRevenue}>{(store.total_revenue / 1000).toFixed(0)} k FCFA</Text>
+                </View>
+                <TouchableOpacity onPress={() => navigation.navigate('AdminStores')}>
+                  <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </Card>
+        </Animated.View>
+      )}
 
       {/* Distribution - Version simplifiée */}
       <Animated.View entering={SlideInRight.delay(500)}>
@@ -1081,5 +1024,43 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.accent,
     fontWeight: '500',
+  },
+  topStoresCard: {
+    marginHorizontal: SPACING.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  topStoreItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+  },
+  topStoreRank: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: `${COLORS.accent}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  rankText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.accent,
+  },
+  topStoreInfo: {
+    flex: 1,
+  },
+  topStoreName: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  topStoreRevenue: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.success,
+    fontWeight: '600',
   },
 });

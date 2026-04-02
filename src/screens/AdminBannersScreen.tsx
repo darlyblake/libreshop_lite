@@ -17,7 +17,8 @@ import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
-import { homeBannerService, HomeBanner } from '../lib/supabase';
+import { HomeBanner } from '../lib/supabase';
+import { homeBannerService } from '../services/homeBannerService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;

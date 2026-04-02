@@ -11,6 +11,7 @@ import {
   FlatList,
   StatusBar,
   TextInput,
+  Linking,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +21,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
-import { orderService, storeService } from '../lib/supabase';
+import { orderService } from '../services/orderService';
+import { storeService } from '../services/storeService';
 import { exportOrdersToPDF, exportOrderToPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
 
@@ -37,7 +39,7 @@ interface Order {
   phone: string;
   items: OrderItem[];
   total: number;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'accepted' | 'paid' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
   date: string;
   paymentMethod: string;
   paymentStatus?: 'pending' | 'paid' | 'failed';
@@ -60,6 +62,7 @@ const formatTimeAgo = (isoDate?: string) => {
 const FILTERS = [
   { id: 'all', label: 'Tous', icon: 'apps-outline' },
   { id: 'pending', label: 'En attente', icon: 'time-outline' },
+  { id: 'accepted', label: 'Acceptées', icon: 'checkbox-outline' },
   { id: 'paid', label: 'Payées', icon: 'checkmark-circle-outline' },
   { id: 'shipped', label: 'Expédiées', icon: 'cube-outline' },
   { id: 'delivered', label: 'Livrées', icon: 'checkmark-done-outline' },
@@ -69,10 +72,12 @@ const FILTERS = [
 const getStatusColor = (status: Order['status']) => {
   switch (status) {
     case 'pending': return COLORS.warning;
-    case 'paid': return COLORS.accent;
-    case 'shipped': return COLORS.accent2;
+    case 'accepted': return COLORS.accent;
+    case 'paid': return COLORS.accent2;
+    case 'shipped': return COLORS.primary;
     case 'delivered': return COLORS.success;
     case 'cancelled': return COLORS.danger;
+    case 'refunded': return COLORS.textMuted;
     default: return COLORS.textMuted;
   }
 };
@@ -80,10 +85,12 @@ const getStatusColor = (status: Order['status']) => {
 const getStatusLabel = (status: Order['status']) => {
   switch (status) {
     case 'pending': return 'En attente';
+    case 'accepted': return 'Acceptée';
     case 'paid': return 'Payée';
     case 'shipped': return 'Expédiée';
     case 'delivered': return 'Livrée';
     case 'cancelled': return 'Annulée';
+    case 'refunded': return 'Remboursée';
     default: return status;
   }
 };
@@ -149,12 +156,12 @@ export const SellerOrdersScreen: React.FC = () => {
   // 🚀 Fonction de chargement optimisée avec cursor pagination
   const loadOrders = React.useCallback(async (reset = true) => {
     if (!user?.id) {
-      console.log('❌ Aucun utilisateur connecté');
+
       return;
     }
     
     try {
-      console.log('🔄 Début du chargement optimisé...');
+
       
       if (reset) {
         setLoading(true);
@@ -168,28 +175,28 @@ export const SellerOrdersScreen: React.FC = () => {
       
       const store = await storeService.getByUser(user.id);
       if (!store?.id) {
-        console.log('❌ Aucune boutique trouvée pour l\'utilisateur:', user.id);
+
         setStoreId(null);
         setOrders([]);
         setHasMore(false);
         return;
       }
       
-      console.log('🏪 Boutique trouvée:', store.id);
+
       setStoreId(store.id);
 
       // 🎯 Requête optimisée avec cursor et filtres
       const result = await orderService.getByStore(store.id, {
         limit: 20,
-        cursor: reset ? undefined : nextCursor,
+        cursor: (reset ? undefined : nextCursor) || undefined,
         status: selectedFilter !== 'all' ? selectedFilter : undefined,
         search: searchQuery || undefined,
       });
 
-      console.log(`📦 Données reçues: ${result.count} commandes, hasMore: ${result.hasMore}`);
+
       
       if (!result.orders || result.orders.length === 0) {
-        console.log('📭 Plus de commandes disponibles');
+
         setHasMore(false);
         return;
       }
@@ -221,7 +228,7 @@ export const SellerOrdersScreen: React.FC = () => {
         };
       });
 
-      console.log('📊 Commandes mappées:', mapped.length);
+
 
       // 🚀 Mise à jour optimisée de l'état
       if (reset) {
@@ -236,7 +243,7 @@ export const SellerOrdersScreen: React.FC = () => {
       setIsInitialLoad(false);
       
       if (!result.hasMore) {
-        console.log('📭 Toutes les commandes ont été chargées');
+
       }
       
     } catch (e: any) {
@@ -248,20 +255,20 @@ export const SellerOrdersScreen: React.FC = () => {
       setLoading(false);
       setLoadingMore(false);
       setRefreshing(false);
-      console.log('🏁 Fin du chargement optimisé');
+
     }
   }, [user?.id, nextCursor, selectedFilter, searchQuery]);
 
   // 🚀 Chargement infini optimisé
   const loadMoreOrders = async () => {
     if (!hasMore || loadingMore || loading || isInitialLoad) return;
-    console.log('🔄 Chargement infini de plus de commandes...');
+
     await loadOrders(false);
   };
 
   // 🔄 Refresh manuel optimisé
   const onRefresh = React.useCallback(() => {
-    console.log('🔄 Refresh manuel déclenché');
+
     setRefreshing(true);
     loadOrders(true);
   }, [loadOrders]);
@@ -269,7 +276,7 @@ export const SellerOrdersScreen: React.FC = () => {
   // 🎯 Recherche optimisée avec debounce
   React.useEffect(() => {
     const timeoutId = setTimeout(() => {
-      console.log('🔍 Recherche optimisée pour:', searchQuery);
+
       loadOrders(true);
     }, 300); // Debounce de 300ms
 
@@ -278,13 +285,13 @@ export const SellerOrdersScreen: React.FC = () => {
 
   // 🎯 Filtre optimisé
   React.useEffect(() => {
-    console.log('🎯 Filtre changé vers:', selectedFilter);
+
     loadOrders(true);
   }, [selectedFilter]);
 
   // 🚀 Chargement initial
   React.useEffect(() => {
-    console.log('🚀 Chargement initial de la page');
+
     loadOrders();
   }, []);
 
@@ -298,37 +305,31 @@ export const SellerOrdersScreen: React.FC = () => {
   }), [orders]);
 
   const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
-    console.log('=== DÉBUT DEBUG ===');
-    console.log('handleStatusChange appelé avec:', { orderId, newStatus });
     
     const actionText = newStatus === 'cancelled' ? 'annuler' : 
                      newStatus === 'paid' ? 'accepter' : 
                      newStatus === 'shipped' ? 'marquer comme expédiée' : 
                      newStatus === 'delivered' ? 'marquer comme livrée' : 'mettre à jour';
     
-    console.log('actionText:', actionText);
-    console.log('🔥 EXÉCUTION DIRECTE SANS CONFIRMATION');
-    
     try {
-      console.log('1️⃣ setUpdatingOrderId...');
       setUpdatingOrderId(orderId);
       
-      // 🚀 Mise à jour optimisée après changement de statut
+      let res;
       if (newStatus === 'cancelled') {
-        // Suppression optimiste
+        res = await orderService.cancelOrderRobust(orderId);
         setOrders(prev => prev.filter(order => order.id !== orderId));
+      } else if (newStatus === 'accepted') {
+        res = await orderService.acceptOrder(orderId, false);
+        setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: 'accepted' } : order));
+      } else if (newStatus === 'paid') {
+        res = await orderService.confirmOrderPayment(orderId);
+        setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: 'paid', paymentStatus: 'paid' } : order));
       } else {
-        // Mise à jour optimiste
-        setOrders(prev => prev.map(order => 
-          order.id === orderId ? { ...order, status: newStatus } : order
-        ));
+        res = await orderService.updateStatus(orderId, newStatus);
+        setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
       }
       
-      await orderService.updateStatus(orderId, newStatus);
-      Alert.alert('Succès', `Commande ${actionText} avec succès`);
-      
       // 🚀 Pas de rechargement complet - juste une mise à jour locale optimisée
-      console.log('✅ Mise à jour locale effectuée, pas de rechargement réseau');
       
     } catch (e: any) {
       console.error('❌ ERREUR CAPTURÉE:', e);
@@ -337,10 +338,7 @@ export const SellerOrdersScreen: React.FC = () => {
       Alert.alert('Erreur', `Impossible de ${actionText} la commande: ${e?.message || 'Erreur inconnue'}`);
     } finally {
       setUpdatingOrderId(null);
-      console.log('=== FIN ACTION ===');
     }
-    
-    console.log('=== FIN DEBUG ===');
   };
 
   const handleContactCustomer = (phone: string, customer: string, total: number) => {
@@ -348,7 +346,7 @@ export const SellerOrdersScreen: React.FC = () => {
     const message = `Bonjour ${customer}, concernant votre commande de ${total.toLocaleString()} FCFA sur LibreShop.`;
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
     
-    Linking.canOpenURL(url).then(supported => {
+    Linking.canOpenURL(url).then((supported: boolean) => {
       if (supported) Linking.openURL(url);
       else Alert.alert('Contacter', `Appeler le ${phone}`);
     }).catch(() => {
@@ -402,7 +400,7 @@ export const SellerOrdersScreen: React.FC = () => {
     const paymentStatusColor = getPaymentStatusColor(order.paymentStatus);
 
     return (
-      <TouchableOpacity 
+      <View 
         key={order.id} 
         style={[
           styles.orderCard,
@@ -413,208 +411,223 @@ export const SellerOrdersScreen: React.FC = () => {
             borderRadius: component.cardBorderRadius,
           }
         ]}
-        onPress={() => navigation.navigate('SellerOrderDetail', { orderId: order.id })}
-        activeOpacity={0.7}
       >
-        <LinearGradient
-          colors={[statusColor + '10', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.orderGradient}
-        />
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('SellerOrderDetail', { orderId: order.id })}
+          activeOpacity={0.7}
+        >
+          <LinearGradient
+            colors={[statusColor + '10', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.orderGradient}
+          />
 
-        <View style={styles.orderHeader}>
-          <View style={styles.orderHeaderLeft}>
-            <Text style={[styles.orderId, { fontSize: fontSize.sm }]}>
-              {order.id}
-            </Text>
-            <View style={styles.orderDate}>
-              <Ionicons name="time-outline" size={fontSize.xs} color={COLORS.textMuted} />
-              <Text style={[styles.dateText, { fontSize: fontSize.xs }]}>
-                {order.date}
+          <View style={styles.orderHeader}>
+            <View style={styles.orderHeaderLeft}>
+              <Text style={[styles.orderId, { fontSize: fontSize.sm }]}>
+                #{order.id.slice(0, 8).toUpperCase()}
+              </Text>
+              <View style={styles.orderDate}>
+                <Ionicons name="time-outline" size={fontSize.xs} color={COLORS.textMuted} />
+                <Text style={[styles.dateText, { fontSize: fontSize.xs }]}>
+                  {order.date}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + '20' }
+            ]}>
+              <Ionicons 
+                name={
+                  order.status === 'pending' ? 'time' :
+                  order.status === 'accepted' ? 'checkbox' :
+                  order.status === 'paid' ? 'checkmark-circle' :
+                  order.status === 'shipped' ? 'cube' :
+                  order.status === 'delivered' ? 'checkmark-done' : 'close-circle'
+                } 
+                size={fontSize.xs} 
+                color={statusColor} 
+              />
+              <Text style={[
+                styles.statusText,
+                { fontSize: fontSize.xs, color: statusColor }
+              ]}>
+                {getStatusLabel(order.status)}
               </Text>
             </View>
           </View>
-          
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: statusColor + '20' }
-          ]}>
-            <Ionicons 
-              name={
-                order.status === 'pending' ? 'time' :
-                order.status === 'paid' ? 'checkmark-circle' :
-                order.status === 'shipped' ? 'cube' :
-                order.status === 'delivered' ? 'checkmark-done' : 'close-circle'
-              } 
-              size={fontSize.xs} 
-              color={statusColor} 
-            />
-            <Text style={[
-              styles.statusText,
-              { fontSize: fontSize.xs, color: statusColor }
-            ]}>
-              {getStatusLabel(order.status)}
-            </Text>
-          </View>
-        </View>
 
-        <View style={styles.customerSection}>
-          <View style={styles.customerInfo}>
+          <View style={styles.customerSection}>
+            <View style={styles.customerInfo}>
+              <View style={[
+                styles.customerAvatar,
+                { backgroundColor: statusColor + '30' }
+              ]}>
+                <Text style={[styles.avatarText, { fontSize: fontSize.md }]}>
+                  {order.customer.charAt(0)}
+                </Text>
+              </View>
+              
+              <View style={styles.customerDetails}>
+                <Text style={[styles.customerName, { fontSize: fontSize.md }]}>
+                  {order.customer}
+                </Text>
+                <TouchableOpacity 
+                  style={styles.phoneRow}
+                  onPress={() => handleContactCustomer(order.phone, order.customer, order.total)}
+                >
+                  <Ionicons name="logo-whatsapp" size={fontSize.sm} color={COLORS.success} />
+                  <Text style={[styles.phoneText, { fontSize: fontSize.sm }]}>
+                    {order.phone}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
             <View style={[
-              styles.customerAvatar,
-              { backgroundColor: statusColor + '30' }
+              styles.paymentBadge,
+              { backgroundColor: paymentStatusColor + '20' }
             ]}>
-              <Text style={[styles.avatarText, { fontSize: fontSize.md }]}>
-                {order.customer.split(' ').map((n: string) => n[0]).join('')}
+              <Ionicons 
+                name={order.paymentStatus === 'paid' ? 'cash' : 'alert-circle'} 
+                size={fontSize.xs} 
+                color={paymentStatusColor} 
+              />
+              <Text style={[
+                styles.paymentText,
+                { fontSize: fontSize.xs, color: paymentStatusColor }
+              ]}>
+                {getPaymentStatusLabel(order.paymentStatus)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.itemsSection}>
+            <Text style={[styles.itemsTitle, { fontSize: fontSize.sm }]}>
+              Articles ({order.items.length})
+            </Text>
+            <View style={styles.itemsList}>
+              {order.items.slice(0, 2).map((item, index) => (
+                <View key={index} style={styles.itemRow}>
+                  <Text style={[styles.itemName, { fontSize: fontSize.sm }]} numberOfLines={1}>
+                    • {item.name}
+                  </Text>
+                  {item.quantity && item.quantity > 1 && (
+                    <Text style={[styles.itemQuantity, { fontSize: fontSize.xs }]}>
+                      x{item.quantity}
+                    </Text>
+                  )}
+                </View>
+              ))}
+              {order.items.length > 2 && (
+                <Text style={[styles.itemQuantity, { fontSize: fontSize.xs, marginTop: 2 }]}>
+                  + {order.items.length - 2} autres articles
+                </Text>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.orderFooter}>
+            <View style={styles.paymentMethod}>
+              <Ionicons 
+                name={order.paymentMethod === 'Mobile Money' ? 'phone-portrait' : 'cash'} 
+                size={fontSize.sm} 
+                color={COLORS.textMuted} 
+              />
+              <Text style={[styles.paymentMethodText, { fontSize: fontSize.xs }]}>
+                {order.paymentMethod}
               </Text>
             </View>
             
-            <View style={styles.customerDetails}>
-              <Text style={[styles.customerName, { fontSize: fontSize.md }]}>
-                {order.customer}
-              </Text>
-              <TouchableOpacity 
-                style={styles.phoneRow}
-                onPress={() => handleContactCustomer(order.phone, order.customer, order.total)}
-              >
-                <Ionicons name="logo-whatsapp" size={fontSize.sm} color={COLORS.success} />
-                <Text style={[styles.phoneText, { fontSize: fontSize.sm }]}>
-                  {order.phone}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={[
-            styles.paymentBadge,
-            { backgroundColor: paymentStatusColor + '20' }
-          ]}>
-            <Ionicons 
-              name={order.paymentStatus === 'paid' ? 'cash' : 'alert-circle'} 
-              size={fontSize.xs} 
-              color={paymentStatusColor} 
-            />
-            <Text style={[
-              styles.paymentText,
-              { fontSize: fontSize.xs, color: paymentStatusColor }
-            ]}>
-              {getPaymentStatusLabel(order.paymentStatus)}
+            <Text style={[styles.totalValue, { fontSize: fontSize.lg }]}>
+              {order.total?.toLocaleString() || '0'} F
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.itemsSection}>
-          <Text style={[styles.itemsTitle, { fontSize: fontSize.sm }]}>
-            Articles ({order.items.length})
-          </Text>
-          <View style={styles.itemsList}>
-            {order.items.map((item, index) => (
-              <View key={index} style={styles.itemRow}>
-                <Text style={[styles.itemName, { fontSize: fontSize.sm }]}>
-                  • {item.name}
-                </Text>
-                {item.quantity && item.quantity > 1 && (
-                  <Text style={[styles.itemQuantity, { fontSize: fontSize.xs }]}>
-                    x{item.quantity}
-                  </Text>
-                )}
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.orderFooter}>
-          <View style={styles.paymentMethod}>
-            <Ionicons 
-              name={order.paymentMethod === 'Mobile Money' ? 'phone-portrait' : 'cash'} 
-              size={fontSize.sm} 
-              color={COLORS.textMuted} 
-            />
-            <Text style={[styles.paymentMethodText, { fontSize: fontSize.xs }]}>
-              {order.paymentMethod}
-            </Text>
-          </View>
-          
-          <Text style={[styles.totalValue, { fontSize: fontSize.lg }]}>
-            {order.total?.toLocaleString() || '0'} FCA
-          </Text>
-        </View>
-
-        {/* Actions pour les commandes en attente */}
-        {order.status === 'pending' && (
-          <View style={styles.actionButtons}>
+        {/* Actions dynamiques selon le statut */}
+        <View style={styles.actionButtons}>
+          {/* TOUJOURS possible d'annuler si pas livré */}
+          {['pending', 'accepted', 'paid', 'shipped'].includes(order.status) && (
             <TouchableOpacity 
-              style={[styles.actionButton, styles.rejectButton]}
-              onPress={() => {
-                console.log('🔥 BOUTON SUPPRIMER CLIQUÉ');
-                console.log('🔥 order.id:', order.id);
-                handleStatusChange(order.id, 'cancelled');
-              }}
+              style={[styles.actionButton, styles.rejectButton, { flex: 0.4 }]}
+              onPress={() => handleStatusChange(order.id, 'cancelled')}
               disabled={updatingOrderId === order.id}
             >
-              {updatingOrderId === order.id ? (
-                <Text style={[styles.rejectButtonText, { fontSize: fontSize.sm }]}>
-                  Traitement...
-                </Text>
-              ) : (
-                <>
-                  <Ionicons name="trash" size={fontSize.md} color={COLORS.danger} />
-                  <Text style={[styles.rejectButtonText, { fontSize: fontSize.sm }]}>
-                    Supprimer
-                  </Text>
-                </>
-              )}
+              <Ionicons name="close-circle" size={fontSize.md} color={COLORS.danger} />
+              <Text style={[styles.rejectButtonText, { fontSize: fontSize.sm }]}>Annuler</Text>
             </TouchableOpacity>
-            
+          )}
+
+          {/* Boutons Spécifiques */}
+          {order.status === 'pending' && (
             <TouchableOpacity 
               style={[styles.actionButton, styles.confirmButton]}
-              onPress={() => {
-                console.log('🔥 BOUTON ACCEPTER CLIQUÉ');
-                console.log('🔥 order.id:', order.id);
-                handleStatusChange(order.id, 'paid');
-              }}
+              onPress={() => handleStatusChange(order.id, 'accepted')}
               disabled={updatingOrderId === order.id}
             >
-              {updatingOrderId === order.id ? (
-                <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>
-                  Traitement...
-                </Text>
-              ) : (
-                <>
-                  <LinearGradient
-                    colors={[COLORS.accent, COLORS.accent2]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.confirmGradient}
-                  />
-                  <Ionicons name="checkmark-circle" size={fontSize.md} color={COLORS.text} />
-                  <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>
-                    Accepter
-                  </Text>
-                </>
-              )}
+              <LinearGradient
+                colors={[COLORS.accent, COLORS.accent2]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.confirmGradient}
+              />
+              <Ionicons name="checkmark-circle" size={fontSize.md} color={COLORS.text} />
+              <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>Accepter</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
 
-        {/* Actions pour les commandes expédiées */}
-        {order.status === 'paid' && (
-          <TouchableOpacity 
-            style={[styles.shippedButton]}
-            onPress={() => handleStatusChange(order.id, 'shipped')}
-          >
-            <Ionicons name="cube" size={fontSize.md} color={COLORS.accent} />
-            <Text style={[styles.shippedButtonText, { fontSize: fontSize.sm }]}>
-              Marquer comme expédiée
-            </Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+          {order.status === 'accepted' && (
+            <>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: COLORS.success }]}
+                onPress={() => handleStatusChange(order.id, 'paid')}
+                disabled={updatingOrderId === order.id}
+              >
+                <Ionicons name="cash" size={fontSize.md} color={COLORS.text} />
+                <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>Payée</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: COLORS.primary }]}
+                onPress={() => handleStatusChange(order.id, 'shipped')}
+                disabled={updatingOrderId === order.id}
+              >
+                <Ionicons name="cube" size={fontSize.md} color={COLORS.text} />
+                <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>Expédier</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {(order.status === 'paid') && (
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: COLORS.primary }]}
+              onPress={() => handleStatusChange(order.id, 'shipped')}
+              disabled={updatingOrderId === order.id}
+            >
+              <Ionicons name="cube" size={fontSize.md} color={COLORS.text} />
+              <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>Expédier</Text>
+            </TouchableOpacity>
+          )}
+
+          {order.status === 'shipped' && (
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: COLORS.success }]}
+              onPress={() => handleStatusChange(order.id, 'delivered')}
+              disabled={updatingOrderId === order.id}
+            >
+              <Ionicons name="checkmark-done" size={fontSize.md} color={COLORS.text} />
+              <Text style={[styles.confirmButtonText, { fontSize: fontSize.sm }]}>Livrée</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     );
   };
 
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: COLORS.bg,
@@ -1007,7 +1020,7 @@ export const SellerOrdersScreen: React.FC = () => {
       color: COLORS.text,
       fontWeight: '600',
     },
-  });
+  }), [spacing, fontSize, component]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

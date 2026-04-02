@@ -21,13 +21,11 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { useResponsive } from '../utils/useResponsive';
 import AddCollectionModal, { NewCollectionData } from '../components/AddCollectionModal';
 import { useAuthStore } from '../store';
-import { categoryService } from '../lib/categoryService';
-import {
-  collectionService,
-  productService,
-  storeService,
-  type Category,
-} from '../lib/supabase';
+import { categoryService } from '../services/categoryService';
+import { type Category } from '../lib/supabase';
+import { collectionService } from '../services/collectionService';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
 
 type UiCollection = {
   id: string;

@@ -13,7 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotificationStore, Notification } from '../store/notificationStore';
-import { notificationService } from '../lib/notificationService';
+import { notificationService } from '../services/notificationService';
 import { useAuthStore, useStoreStore } from '../store';
 import { NotificationItem } from '../components/NotificationItem';
 import { EmptyState } from '../components/EmptyState';

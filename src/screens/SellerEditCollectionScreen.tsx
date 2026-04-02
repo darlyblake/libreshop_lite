@@ -14,7 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { collectionService, productService, type Product } from '../lib/supabase';
+import { type Product } from '../lib/supabase';
+import { collectionService } from '../services/collectionService';
+import { productService } from '../services/productService';
 
 export const SellerEditCollectionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
