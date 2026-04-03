@@ -67,7 +67,11 @@
       "build": {
         "babel": {
           "include": [
-            "node_modules/react-native-web"
+            "node_modules/react-native-web",
+            "node_modules/victory-native",
+            "node_modules/@shopify/react-native-skia",
+            "node_modules/react-native-reanimated",
+            "node_modules/react-native-gesture-handler"
           ]
         }
       }

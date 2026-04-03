@@ -91,11 +91,14 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   const [likeCount, setLikeCount] = useState(initialCount);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const isProcessingRef = React.useRef(false);
 
   // Valeurs partagées pour les animations
   const scale = useSharedValue(1);
   const heartScale = useSharedValue(1);
   const opacity = useSharedValue(1);
+
 
   const sizeConfig = React.useMemo(() => getSizeConfig(SPACING)[size], [SPACING, size]);
 
@@ -196,8 +199,9 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
       }
     }
 
-    if (loading || disabled) return;
+    if (isProcessingRef.current || disabled) return;
 
+    isProcessingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -250,6 +254,7 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
         `Impossible d'effectuer cette action: ${error instanceof Error ? error.message : 'Erreur inconnue'}`
       );
     } finally {
+      isProcessingRef.current = false;
       setLoading(false);
     }
   }, [effectiveUserId, productId, liked, likeCount, loading, disabled]);

@@ -1,0 +1,467 @@
+scripts/createAdmin.ts(1,10): error TS2305: Module '"../src/lib/supabase"' has no exported member 'authService'.
+src/components/AddProductModal.tsx(189,23): error TS2339: Property 'modalOverlay' does not exist on type '{}'.
+src/components/AddProductModal.tsx(191,29): error TS2339: Property 'modalContent' does not exist on type '{}'.
+src/components/AddProductModal.tsx(192,31): error TS2339: Property 'modalHeader' does not exist on type '{}'.
+src/components/AddProductModal.tsx(193,33): error TS2339: Property 'modalTitle' does not exist on type '{}'.
+src/components/AddProductModal.tsx(195,29): error TS2339: Property 'closeButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(204,27): error TS2339: Property 'modalBody' does not exist on type '{}'.
+src/components/AddProductModal.tsx(207,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(208,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(209,48): error TS2339: Property 'required' does not exist on type '{}'.
+src/components/AddProductModal.tsx(211,47): error TS2339: Property 'selectInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(219,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(220,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(221,52): error TS2339: Property 'required' does not exist on type '{}'.
+src/components/AddProductModal.tsx(224,31): error TS2339: Property 'input' does not exist on type '{}'.
+src/components/AddProductModal.tsx(234,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(235,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(236,42): error TS2339: Property 'required' does not exist on type '{}'.
+src/components/AddProductModal.tsx(239,31): error TS2339: Property 'input' does not exist on type '{}'.
+src/components/AddProductModal.tsx(250,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(251,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(253,31): error TS2339: Property 'input' does not exist on type '{}'.
+src/components/AddProductModal.tsx(265,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(266,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(268,31): error TS2339: Property 'input' does not exist on type '{}'.
+src/components/AddProductModal.tsx(279,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(280,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(281,35): error TS2339: Property 'stockRow' does not exist on type '{}'.
+src/components/AddProductModal.tsx(282,49): error TS2339: Property 'stockButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(285,37): error TS2339: Property 'stockValue' does not exist on type '{}'.
+src/components/AddProductModal.tsx(286,49): error TS2339: Property 'stockButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(292,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(293,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(295,32): error TS2339: Property 'input' does not exist on type '{}'.
+src/components/AddProductModal.tsx(295,46): error TS2339: Property 'textArea' does not exist on type '{}'.
+src/components/AddProductModal.tsx(308,33): error TS2339: Property 'modalInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(309,35): error TS2339: Property 'inputLabel' does not exist on type '{}'.
+src/components/AddProductModal.tsx(315,47): error TS2339: Property 'imagesContainer' does not exist on type '{}'.
+src/components/AddProductModal.tsx(318,51): error TS2339: Property 'imageItem' does not exist on type '{}'.
+src/components/AddProductModal.tsx(321,37): error TS2339: Property 'imagePreview' does not exist on type '{}'.
+src/components/AddProductModal.tsx(324,37): error TS2339: Property 'removeImageButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(334,35): error TS2339: Property 'addImageButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(338,41): error TS2339: Property 'addImageText' does not exist on type '{}'.
+src/components/AddProductModal.tsx(345,31): error TS2339: Property 'modalActions' does not exist on type '{}'.
+src/components/AddProductModal.tsx(347,30): error TS2339: Property 'modalButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(347,50): error TS2339: Property 'cancelButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(350,35): error TS2339: Property 'cancelButtonText' does not exist on type '{}'.
+src/components/AddProductModal.tsx(353,30): error TS2339: Property 'modalButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(353,50): error TS2339: Property 'confirmButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(356,35): error TS2339: Property 'confirmButtonText' does not exist on type '{}'.
+src/components/AddProductModal.tsx(368,29): error TS2339: Property 'pickerOverlay' does not exist on type '{}'.
+src/components/AddProductModal.tsx(369,31): error TS2339: Property 'pickerContent' does not exist on type '{}'.
+src/components/AddProductModal.tsx(370,33): error TS2339: Property 'pickerHeader' does not exist on type '{}'.
+src/components/AddProductModal.tsx(371,35): error TS2339: Property 'pickerTitle' does not exist on type '{}'.
+src/components/AddProductModal.tsx(377,33): error TS2339: Property 'pickerSearchRow' does not exist on type '{}'.
+src/components/AddProductModal.tsx(380,31): error TS2339: Property 'pickerSearchInput' does not exist on type '{}'.
+src/components/AddProductModal.tsx(389,39): error TS2339: Property 'pickerList' does not exist on type '{}'.
+src/components/AddProductModal.tsx(391,37): error TS2339: Property 'pickerEmpty' does not exist on type '{}'.
+src/components/AddProductModal.tsx(392,39): error TS2339: Property 'pickerEmptyText' does not exist on type '{}'.
+src/components/AddProductModal.tsx(400,38): error TS2339: Property 'pickerItem' does not exist on type '{}'.
+src/components/AddProductModal.tsx(400,69): error TS2339: Property 'pickerItemSelected' does not exist on type '{}'.
+src/components/AddProductModal.tsx(404,43): error TS2339: Property 'pickerItemLeft' does not exist on type '{}'.
+src/components/AddProductModal.tsx(405,46): error TS2339: Property 'radioOuter' does not exist on type '{}'.
+src/components/AddProductModal.tsx(405,77): error TS2339: Property 'radioOuterSelected' does not exist on type '{}'.
+src/components/AddProductModal.tsx(406,59): error TS2339: Property 'radioInner' does not exist on type '{}'.
+src/components/AddProductModal.tsx(408,45): error TS2339: Property 'pickerItemText' does not exist on type '{}'.
+src/components/AddProductModal.tsx(423,33): error TS2339: Property 'pickerActions' does not exist on type '{}'.
+src/components/AddProductModal.tsx(425,32): error TS2339: Property 'pickerButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(425,53): error TS2339: Property 'pickerCancelButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(428,37): error TS2339: Property 'pickerCancelText' does not exist on type '{}'.
+src/components/AddProductModal.tsx(431,32): error TS2339: Property 'pickerButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(431,53): error TS2339: Property 'pickerConfirmButton' does not exist on type '{}'.
+src/components/AddProductModal.tsx(441,37): error TS2339: Property 'pickerConfirmText' does not exist on type '{}'.
+src/components/BackToDashboard.tsx(21,21): error TS2339: Property 'button' does not exist on type '{}'.
+src/components/Badge.tsx(78,11): error TS2322: Type 'string' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1339 more ... | undefined'.
+src/components/Button.tsx(65,24): error TS2322: Type 'string' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1339 more ... | undefined'.
+src/components/Card.tsx(32,22): error TS2339: Property 'card' does not exist on type '{}'.
+src/components/Card.tsx(68,37): error TS2339: Property 'storeCard' does not exist on type '{}'.
+src/components/Card.tsx(69,27): error TS2339: Property 'storeImageContainer' does not exist on type '{}'.
+src/components/Card.tsx(71,98): error TS2339: Property 'storeImage' does not exist on type '{}'.
+src/components/Card.tsx(73,31): error TS2339: Property 'storeImagePlaceholder' does not exist on type '{}'.
+src/components/Card.tsx(74,33): error TS2339: Property 'storeImagePlaceholderText' does not exist on type '{}'.
+src/components/Card.tsx(80,27): error TS2339: Property 'storeName' does not exist on type '{}'.
+src/components/Card.tsx(81,27): error TS2339: Property 'storeCategory' does not exist on type '{}'.
+src/components/Card.tsx(82,43): error TS2339: Property 'storeDescription' does not exist on type '{}'.
+src/components/Card.tsx(84,29): error TS2339: Property 'badge' does not exist on type '{}'.
+src/components/Card.tsx(85,31): error TS2339: Property 'badgeText' does not exist on type '{}'.
+src/components/Card.tsx(117,37): error TS2339: Property 'productCard' does not exist on type '{}'.
+src/components/Card.tsx(118,27): error TS2339: Property 'productImageContainer' does not exist on type '{}'.
+src/components/Card.tsx(120,99): error TS2339: Property 'productImage' does not exist on type '{}'.
+src/components/Card.tsx(122,31): error TS2339: Property 'productImagePlaceholder' does not exist on type '{}'.
+src/components/Card.tsx(123,33): error TS2339: Property 'productImagePlaceholderText' does not exist on type '{}'.
+src/components/Card.tsx(127,31): error TS2339: Property 'promoBadge' does not exist on type '{}'.
+src/components/Card.tsx(128,33): error TS2339: Property 'promoBadgeText' does not exist on type '{}'.
+src/components/Card.tsx(132,27): error TS2339: Property 'productName' does not exist on type '{}'.
+src/components/Card.tsx(133,27): error TS2339: Property 'priceContainer' does not exist on type '{}'.
+src/components/Card.tsx(134,29): error TS2339: Property 'productPrice' does not exist on type '{}'.
+src/components/Card.tsx(136,31): error TS2339: Property 'productComparePrice' does not exist on type '{}'.
+src/components/CategoryCard.tsx(37,22): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/CategoryCard.tsx(41,27): error TS2339: Property 'iconContainer' does not exist on type '{}'.
+src/components/CategoryCard.tsx(48,27): error TS2339: Property 'name' does not exist on type '{}'.
+src/components/CategoryCard.tsx(52,29): error TS2339: Property 'count' does not exist on type '{}'.
+src/components/Chart.tsx(27,26): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/Chart.tsx(28,37): error TS2339: Property 'title' does not exist on type '{}'.
+src/components/Chart.tsx(29,51): error TS2339: Property 'value' does not exist on type '{}'.
+src/components/Chart.tsx(30,40): error TS2339: Property 'subtitle' does not exist on type '{}'.
+src/components/EmptyState.tsx(33,26): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/EmptyState.tsx(34,27): error TS2339: Property 'iconContainer' does not exist on type '{}'.
+src/components/EmptyState.tsx(37,27): error TS2339: Property 'title' does not exist on type '{}'.
+src/components/EmptyState.tsx(38,43): error TS2339: Property 'description' does not exist on type '{}'.
+src/components/EmptyState.tsx(43,25): error TS2339: Property 'button' does not exist on type '{}'.
+src/components/Footer.tsx(32,26): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/Footer.tsx(33,27): error TS2339: Property 'links' does not exist on type '{}'.
+src/components/Footer.tsx(38,27): error TS2339: Property 'link' does not exist on type '{}'.
+src/components/Footer.tsx(40,33): error TS2339: Property 'linkText' does not exist on type '{}'.
+src/components/Footer.tsx(44,27): error TS2339: Property 'brand' does not exist on type '{}'.
+src/components/Footer.tsx(46,29): error TS2339: Property 'brandText' does not exist on type '{}'.
+src/components/Header.tsx(37,26): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/Header.tsx(37,59): error TS2339: Property 'transparent' does not exist on type '{}'.
+src/components/Header.tsx(42,27): error TS2339: Property 'content' does not exist on type '{}'.
+src/components/Header.tsx(44,43): error TS2339: Property 'backButton' does not exist on type '{}'.
+src/components/Header.tsx(48,31): error TS2339: Property 'logoContainer' does not exist on type '{}'.
+src/components/Header.tsx(49,33): error TS2339: Property 'logo' does not exist on type '{}'.
+src/components/Header.tsx(53,39): error TS2339: Property 'title' does not exist on type '{}'.
+src/components/Header.tsx(56,31): error TS2339: Property 'rightAction' does not exist on type '{}'.
+src/components/Header.tsx(58,31): error TS2339: Property 'placeholder' does not exist on type '{}'.
+src/components/Modal.tsx(45,29): error TS2339: Property 'overlay' does not exist on type '{}'.
+src/components/Modal.tsx(47,34): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/Modal.tsx(48,35): error TS2339: Property 'header' does not exist on type '{}'.
+src/components/Modal.tsx(49,47): error TS2339: Property 'title' does not exist on type '{}'.
+src/components/Modal.tsx(50,67): error TS2339: Property 'closeButton' does not exist on type '{}'.
+src/components/Modal.tsx(54,35): error TS2339: Property 'content' does not exist on type '{}'.
+src/components/NotificationItem.tsx(72,16): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/NotificationItem.tsx(73,38): error TS2339: Property 'unread' does not exist on type '{}'.
+src/components/NotificationItem.tsx(78,28): error TS2339: Property 'iconContainer' does not exist on type '{}'.
+src/components/NotificationItem.tsx(85,27): error TS2339: Property 'content' does not exist on type '{}'.
+src/components/NotificationItem.tsx(86,29): error TS2339: Property 'title' does not exist on type '{}'.
+src/components/NotificationItem.tsx(89,29): error TS2339: Property 'body' does not exist on type '{}'.
+src/components/NotificationItem.tsx(92,29): error TS2339: Property 'date' does not exist on type '{}'.
+src/components/NotificationItem.tsx(96,50): error TS2339: Property 'unreadDot' does not exist on type '{}'.
+src/components/OrderCard.tsx(24,14): error TS2304: Cannot find name 'COLORS'.
+src/components/OrderCard.tsx(26,14): error TS2304: Cannot find name 'COLORS'.
+src/components/OrderCard.tsx(28,14): error TS2304: Cannot find name 'COLORS'.
+src/components/OrderCard.tsx(30,14): error TS2304: Cannot find name 'COLORS'.
+src/components/OrderCard.tsx(32,14): error TS2304: Cannot find name 'COLORS'.
+src/components/OrderCard.tsx(34,14): error TS2304: Cannot find name 'COLORS'.
+src/components/OrderCard.tsx(81,22): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/OrderCard.tsx(85,27): error TS2339: Property 'header' does not exist on type '{}'.
+src/components/OrderCard.tsx(87,31): error TS2339: Property 'orderId' does not exist on type '{}'.
+src/components/OrderCard.tsx(88,45): error TS2339: Property 'storeName' does not exist on type '{}'.
+src/components/OrderCard.tsx(92,20): error TS2339: Property 'statusBadge' does not exist on type '{}'.
+src/components/OrderCard.tsx(96,32): error TS2339: Property 'statusText' does not exist on type '{}'.
+src/components/OrderCard.tsx(102,27): error TS2339: Property 'details' does not exist on type '{}'.
+src/components/OrderCard.tsx(103,29): error TS2339: Property 'detailRow' does not exist on type '{}'.
+src/components/OrderCard.tsx(105,31): error TS2339: Property 'detailText' does not exist on type '{}'.
+src/components/OrderCard.tsx(108,31): error TS2339: Property 'detailRow' does not exist on type '{}'.
+src/components/OrderCard.tsx(110,33): error TS2339: Property 'detailText' does not exist on type '{}'.
+src/components/OrderCard.tsx(115,29): error TS2339: Property 'detailRow' does not exist on type '{}'.
+src/components/OrderCard.tsx(117,31): error TS2339: Property 'detailText' does not exist on type '{}'.
+src/components/OrderCard.tsx(123,27): error TS2339: Property 'footer' does not exist on type '{}'.
+src/components/OrderCard.tsx(124,29): error TS2339: Property 'viewDetails' does not exist on type '{}'.
+src/components/PWAInstallButton.tsx(130,62): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/components/ProductQuantity.tsx(35,26): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/ProductQuantity.tsx(37,24): error TS2339: Property 'button' does not exist on type '{}'.
+src/components/ProductQuantity.tsx(37,55): error TS2339: Property 'buttonDisabled' does not exist on type '{}'.
+src/components/ProductQuantity.tsx(47,27): error TS2339: Property 'valueContainer' does not exist on type '{}'.
+src/components/ProductQuantity.tsx(48,29): error TS2339: Property 'value' does not exist on type '{}'.
+src/components/ProductQuantity.tsx(51,24): error TS2339: Property 'button' does not exist on type '{}'.
+src/components/ProductQuantity.tsx(51,55): error TS2339: Property 'buttonDisabled' does not exist on type '{}'.
+src/components/ProgressBar.tsx(19,40): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ProgressBar.tsx(22,70): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ProgressBar.tsx(44,5): error TS2345: Argument of type '{ container: { borderRadius: number; overflow: "hidden"; }; progress: { height: "100%"; borderRadius: number; transition: string; }; }' is not assignable to parameter of type '{ container: { borderRadius: number; overflow: "hidden"; }; progress: { height: "100%"; borderRadius: number; transition: string; }; } & NamedStyles<any>'.
+  Property 'progress' is incompatible with index signature.
+    Object literal may only specify known properties, and 'transition' does not exist in type 'ViewStyle | TextStyle | ImageStyle'.
+src/components/SearchBar.tsx(47,26): error TS2339: Property 'container' does not exist on type '{}'.
+src/components/SearchBar.tsx(52,23): error TS2339: Property 'icon' does not exist on type '{}'.
+src/components/SearchBar.tsx(55,23): error TS2339: Property 'input' does not exist on type '{}'.
+src/components/SearchBar.tsx(67,63): error TS2339: Property 'clearButton' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(39,37): error TS2339: Property 'statsContainer' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(41,21): error TS2339: Property 'filtersScrollView' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(47,20): error TS2339: Property 'statCard' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(48,48): error TS2339: Property 'statCardActive' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(54,31): error TS2339: Property 'statIconContainer' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(64,24): error TS2339: Property 'statValue' does not exist on type '{}'.
+src/components/SellerFiltersRow.tsx(72,24): error TS2339: Property 'statLabel' does not exist on type '{}'.
+src/components/ThemeDashboard.tsx(9,10): error TS2724: '"../hooks/useIntegratedTheme"' has no exported member named 'useIntegratedTheme'. Did you mean 'useIntegratedCloudTheme'?
+src/components/ThemeDashboard.tsx(83,57): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(87,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(89,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(92,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(98,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(101,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(107,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(118,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(129,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(130,56): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(135,65): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(144,65): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(153,65): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(167,57): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(171,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(172,56): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(177,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(180,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(185,74): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(185,99): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(190,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(193,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(199,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(202,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(207,26): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(212,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(215,60): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(222,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(238,57): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(242,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(243,56): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(248,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(251,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(257,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(260,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(266,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(269,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(275,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(287,61): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(288,58): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(293,65): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(296,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(299,71): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(305,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(317,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(330,57): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(334,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(335,56): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(340,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(351,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(354,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(363,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(366,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(373,56): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(376,56): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(384,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(396,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(397,61): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(399,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(412,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(412,87): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(413,38): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(420,64): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDashboard.tsx(441,64): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(17,68): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(19,52): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(22,55): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(29,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(30,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(34,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(37,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(40,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(43,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(46,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(49,67): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(56,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(57,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(60,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(63,52): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(66,55): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(69,51): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(72,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(78,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(79,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(83,95): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(84,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(86,95): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(87,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(89,95): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(90,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(92,95): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(93,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(95,95): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(96,63): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(102,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(103,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(108,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(117,54): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(119,52): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(120,52): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(125,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(126,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(130,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(140,62): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(141,59): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(144,51): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(147,51): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(150,51): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/components/ThemeDemo.tsx(153,51): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/config/theme_new.ts(85,7): error TS2322: Type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+  Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+    Property 'xxxl' is missing in type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; }' but required in type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+src/config/theme_new.ts(86,7): error TS2322: Type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }'.
+  Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }'.
+    Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; }' is missing the following properties from type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }': xxxl, title, display
+src/config/theme_new.ts(103,7): error TS2322: Type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+  Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+    Property 'xxxl' is missing in type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; }' but required in type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+src/config/theme_new.ts(104,7): error TS2322: Type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }'.
+  Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }'.
+    Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; }' is missing the following properties from type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }': xxxl, title, display
+src/config/theme_new.ts(114,5): error TS2322: Type '{ background: { primary: string; secondary: string; tertiary: string; }; text: { primary: string; secondary: string; tertiary: string; }; primary: { 50: string; 100: string; 200: string; 300: string; 400: string; ... 4 more ...; 900: string; }; ... 5 more ...; colorBlind: { ...; }; }' is not assignable to type '{ primary: { 50: string; 100: string; 200: string; 300: string; 400: string; 500: string; 600: string; 700: string; 800: string; 900: string; }; background: { primary: string; secondary: string; tertiary: string; }; ... 6 more ...; colorBlind: { ...; }; }'.
+  Types of property 'text' are incompatible.
+    Type '{ primary: string; secondary: string; tertiary: string; }' is missing the following properties from type '{ primary: string; secondary: string; tertiary: string; inverse: string; disabled: string; }': inverse, disabled
+src/config/theme_new.ts(121,7): error TS2322: Type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+  Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+    Property 'xxxl' is missing in type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; }' but required in type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; }'.
+src/config/theme_new.ts(122,7): error TS2322: Type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '(width: number) => { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }'.
+  Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; } | { ...; } | { ...; }' is not assignable to type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }'.
+    Type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; }' is missing the following properties from type '{ xs: number; sm: number; md: number; lg: number; xl: number; xxl: number; xxxl: number; title: number; display: number; }': xxxl, title, display
+src/hooks/useCloudTheme.ts(9,28): error TS2307: Cannot find module '@react-native-community/netinfo' or its corresponding type declarations.
+src/hooks/useCloudTheme.ts(63,22): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(76,40): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(78,53): error TS2339: Property 'isDark' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(80,59): error TS2339: Property 'isLight' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(101,55): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(101,72): error TS2339: Property 'isDark' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(101,86): error TS2339: Property 'isLight' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(159,22): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useCloudTheme.ts(163,13): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(11,28): error TS2307: Cannot find module '@react-native-community/netinfo' or its corresponding type declarations.
+src/hooks/useIntegratedTheme.ts(91,20): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(102,21): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(274,36): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(275,20): error TS2345: Argument of type '"light" | "dark" | "amoled"' is not assignable to parameter of type 'ThemeMode'.
+  Type '"amoled"' is not assignable to type 'ThemeMode'.
+src/hooks/useIntegratedTheme.ts(282,13): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(308,22): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(312,13): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(365,22): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(400,38): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useIntegratedTheme.ts(404,20): error TS2345: Argument of type '"light" | "dark" | "amoled"' is not assignable to parameter of type 'ThemeMode'.
+  Type '"amoled"' is not assignable to type 'ThemeMode'.
+src/hooks/useResponsiveTheme.ts(36,30): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/hooks/useResponsiveTheme.ts(45,30): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/hooks/useResponsiveTheme.ts(56,20): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/hooks/useResponsiveTheme.ts(64,30): error TS2339: Property 'getColor' does not exist on type 'Theme'.
+src/hooks/useSmartTheme.ts(96,34): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useSmartTheme.ts(103,55): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/hooks/useSmartTheme.ts(108,30): error TS2339: Property 'themeName' does not exist on type 'Theme'.
+src/lib/storage.ts(18,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(30,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(40,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(48,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(56,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(68,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(77,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(103,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(112,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(121,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(132,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(141,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(153,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(162,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(171,7): error TS2304: Cannot find name 'errorHandler'.
+src/lib/storage.ts(179,7): error TS2304: Cannot find name 'errorHandler'.
+src/navigation/AppNavigator.tsx(595,23): error TS2322: Type '"AgentChat"' is not assignable to type 'keyof RootStackParamList'.
+src/navigation/AppNavigator.tsx(596,23): error TS2322: Type '"AdminAgentChat"' is not assignable to type 'keyof RootStackParamList'.
+src/screens/AdminAPKUpdatesScreen.tsx(253,21): error TS2322: Type '"power" | "power-off"' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1339 more ... | undefined'.
+  Type '"power-off"' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1339 more ... | undefined'.
+src/screens/AdminAPKUpdatesScreen.tsx(270,21): error TS2322: Type '"lock" | "lock-open"' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1339 more ... | undefined'.
+  Type '"lock"' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1339 more ... | undefined'.
+src/screens/AdminBannersScreen.tsx(217,46): error TS2345: Argument of type 'string' is not assignable to parameter of type '{ name: "Features"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | { name: "Pricing"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | ... 59 more ... | { ...; }'.
+src/screens/AdminDashboardScreen.tsx(606,50): error TS2769: No overload matches this call.
+  Argument of type '["AdminSettings" | "AdminUsers" | "AdminStores" | "AdminCategories" | "AdminSubscriptions" | "AdminPayments" | "AdminAdministrators" | "AdminFeatured" | "AdminReports" | ... 5 more ... | "AdminAgentChat"]' is not assignable to parameter of type '[screen: "Features", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | [screen: "Pricing", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | ... 59 more ... | [screen: ...]'.
+    Type '["AdminSettings" | "AdminUsers" | "AdminStores" | "AdminCategories" | "AdminSubscriptions" | "AdminPayments" | "AdminAdministrators" | "AdminFeatured" | "AdminReports" | ... 5 more ... | "AdminAgentChat"]' is not assignable to type '[screen: "AdminSettings", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | [screen: "AdminUsers", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | ... 11 more ... | [screen: ...]'.
+      Type '["AdminSettings" | "AdminUsers" | "AdminStores" | "AdminCategories" | "AdminSubscriptions" | "AdminPayments" | "AdminAdministrators" | "AdminFeatured" | "AdminReports" | ... 5 more ... | "AdminAgentChat"]' is not assignable to type '[screen: "AdminBanners", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined]'.
+        Type at position 0 in source is not compatible with type at position 0 in target.
+          Type '"AdminSettings" | "AdminUsers" | "AdminStores" | "AdminCategories" | "AdminSubscriptions" | "AdminPayments" | "AdminAdministrators" | "AdminFeatured" | "AdminReports" | "AdminAnalytics" | ... 4 more ... | "AdminAgentChat"' is not assignable to type '"AdminBanners"'.
+            Type '"AdminSettings"' is not assignable to type '"AdminBanners"'.
+  Overload 2 of 2, '(options: { name: "Features"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | { name: "Pricing"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | ... 59 more ... | { ...; }): void', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type '{ name: "Features"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | { name: "Pricing"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | ... 59 more ... | { ...; }'.
+      Type 'string' is not assignable to type '{ name: "Features"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | { name: "Pricing"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | ... 59 more ... | { ...; }'.
+src/screens/AdminSendNotificationScreen.tsx(42,11): error TS7034: Variable 'recipients' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/screens/AdminSendNotificationScreen.tsx(51,36): error TS7005: Variable 'recipients' implicitly has an 'any[]' type.
+src/screens/AdminStoresScreen.backup.tsx(466,15): error TS2322: Type '"danger" | "success" | "warning"' is not assignable to type 'BadgeVariant | undefined'.
+  Type '"danger"' is not assignable to type 'BadgeVariant | undefined'.
+src/screens/CheckoutScreen.tsx(77,66): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(86,79): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/screens/CheckoutScreen.tsx(93,40): error TS7006: Parameter 'it' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(285,41): error TS7006: Parameter 'item' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(312,69): error TS7006: Parameter 'sum' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(312,74): error TS7006: Parameter 'it' implicitly has an 'any' type.
+src/screens/ClientAllProductsScreen.tsx(266,79): error TS2339: Property 'background' does not exist on type '{ bg: string; bgGradient: string; accent: string; accent2: string; accentDark: string; accentGlow: string; success: string; warning: string; danger: string; info: string; text: string; textSoft: string; ... 30 more ...; categoryColors: string[]; }'.
+src/screens/ClientAllProductsScreen.tsx(267,84): error TS2339: Property 'background' does not exist on type '{ bg: string; bgGradient: string; accent: string; accent2: string; accentDark: string; accentGlow: string; success: string; warning: string; danger: string; info: string; text: string; textSoft: string; ... 30 more ...; categoryColors: string[]; }'.
+src/screens/ClientAllProductsScreen.tsx(290,73): error TS2339: Property 'background' does not exist on type '{ bg: string; bgGradient: string; accent: string; accent2: string; accentDark: string; accentGlow: string; success: string; warning: string; danger: string; info: string; text: string; textSoft: string; ... 30 more ...; categoryColors: string[]; }'.
+src/screens/ClientDetailScreen.tsx(84,13): error TS2740: Type '{ orders: any[]; hasMore: boolean; nextCursor: any; count: number; }' is missing the following properties from type 'any[]': length, pop, push, concat, and 35 more.
+src/screens/ClientHomeScreen.tsx(103,94): error TS2339: Property 'category' does not exist on type 'Collection'.
+src/screens/ClientHomeScreen.tsx(116,23): error TS2571: Object is of type 'unknown'.
+src/screens/ClientHomeScreen.tsx(116,30): error TS2571: Object is of type 'unknown'.
+src/screens/ClientOrderDetailScreen.tsx(58,9): error TS2698: Spread types may only be created from object types.
+src/screens/ClientOrderDetailScreen.tsx(59,34): error TS2339: Property 'order_items' does not exist on type 'GenericStringError'.
+src/screens/ClientOrdersScreen.tsx(399,53): error TS18048: 's' is possibly 'undefined'.
+src/screens/ClientOrdersScreen.tsx(497,28): error TS18048: 'store' is possibly 'undefined'.
+src/screens/ClientOrdersScreen.tsx(500,45): error TS18048: 'store' is possibly 'undefined'.
+src/screens/ClientOrdersScreen.tsx(502,78): error TS18048: 'store' is possibly 'undefined'.
+src/screens/ClientOrdersScreen.tsx(506,45): error TS18048: 'store' is possibly 'undefined'.
+src/screens/ClientOrdersScreen.tsx(508,26): error TS18048: 'store' is possibly 'undefined'.
+src/screens/ClientOrdersScreen.tsx(597,69): error TS2339: Property 'delivery_fee' does not exist on type 'OrderWithDetails'.
+src/screens/ClientOrdersScreen.tsx(600,34): error TS2339: Property 'delivery_fee' does not exist on type 'OrderWithDetails'.
+src/screens/ClientOrdersScreen.tsx(604,40): error TS2339: Property 'delivery_fee' does not exist on type 'OrderWithDetails'.
+src/screens/ClientSearchScreen.tsx(130,28): error TS2554: Expected 1 arguments, but got 0.
+src/screens/ClientSearchScreen.tsx(422,17): error TS2339: Property 'stores' does not exist on type 'Product'.
+src/screens/ClientSearchScreen.tsx(441,28): error TS2551: Property 'product_count' does not exist on type 'Store'. Did you mean 'products_count'?
+src/screens/ClientSearchScreen.tsx(562,13): error TS2322: Type '{ value: string; onChangeText: (text: string) => void; onSubmitEditing: () => void; onFocus: () => void; onBlur: () => void; onClear: () => void; placeholder: string; style: any; autoFocus: false; showCancelButton: boolean; onCancel: () => void; }' is not assignable to type 'IntrinsicAttributes & SearchBarProps'.
+  Property 'onSubmitEditing' does not exist on type 'IntrinsicAttributes & SearchBarProps'.
+src/screens/ClientSearchScreen.tsx(583,29): error TS2339: Property 'loadingContainer' does not exist on type '{ flexContainer: { flex: number; backgroundColor: string; }; maxWidthContainer: { maxWidth: number; width: "100%"; alignSelf: "center"; flex: number; }; container: { flex: number; }; headerContainer: any; ... 44 more ...; suggestionsList: { ...; }; }'.
+src/screens/ClientSearchScreen.tsx(598,11): error TS2322: Type '{ title: string; description: string; icon: string; actionLabel: string; onAction: () => void; imageStyle: { width: number; height: number; }; }' is not assignable to type 'IntrinsicAttributes & EmptyStateProps'.
+  Property 'imageStyle' does not exist on type 'IntrinsicAttributes & EmptyStateProps'.
+src/screens/ClientSearchScreen.tsx(609,11): error TS2322: Type '{ title: string; description: string; icon: string; secondaryActionLabel: string; onSecondaryAction: () => void; imageStyle: { width: number; height: number; }; }' is not assignable to type 'IntrinsicAttributes & EmptyStateProps'.
+  Property 'secondaryActionLabel' does not exist on type 'IntrinsicAttributes & EmptyStateProps'.
+src/screens/PricingScreen.tsx(163,34): error TS2339: Property 'expiredBanner' does not exist on type '{ container: { flex: number; backgroundColor: string; }; header: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "center"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 34 more ...; ctaDescription: { ...; }; }'.
+src/screens/PricingScreen.tsx(189,34): error TS2339: Property 'expiredBanner' does not exist on type '{ container: { flex: number; backgroundColor: string; }; header: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "center"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 34 more ...; ctaDescription: { ...; }; }'.
+src/screens/PricingScreen.tsx(220,33): error TS2339: Property 'emptyState' does not exist on type '{ container: { flex: number; backgroundColor: string; }; header: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "center"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 34 more ...; ctaDescription: { ...; }; }'.
+src/screens/PricingScreen.tsx(221,35): error TS2339: Property 'emptyStateText' does not exist on type '{ container: { flex: number; backgroundColor: string; }; header: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "center"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 34 more ...; ctaDescription: { ...; }; }'.
+src/screens/PricingScreen.tsx(262,38): error TS2339: Property 'disabledBanner' does not exist on type '{ container: { flex: number; backgroundColor: string; }; header: { flexDirection: "row"; justifyContent: "space-between"; alignItems: "center"; paddingHorizontal: number; paddingTop: number; paddingBottom: number; }; ... 34 more ...; ctaDescription: { ...; }; }'.
+src/screens/ProductDetailScreen.tsx(399,57): error TS18047: 'productData.store' is possibly 'null'.
+src/screens/ProductDetailScreen.tsx(465,31): error TS2339: Property 'headerLikeContainer' does not exist on type '{ container: { flex: number; backgroundColor: string; }; scrollContent: { flexGrow: number; }; centerState: { flex: number; alignItems: "center"; justifyContent: "center"; }; notFoundTitle: { color: string; fontSize: number; fontWeight: "800"; textAlign: "center"; }; ... 106 more ...; paginationDotActive: { ...; }; }'.
+src/screens/ProductDetailScreen.tsx(484,27): error TS2339: Property 'isDark' does not exist on type 'Theme'.
+src/screens/ProductDetailScreen.tsx(545,27): error TS2339: Property 'isDark' does not exist on type 'Theme'.
+src/screens/ProductDetailScreen.tsx(571,25): error TS2339: Property 'isDark' does not exist on type 'Theme'.
+src/screens/ProductDetailScreen.tsx(618,39): error TS2339: Property 'star' does not exist on type '{ background: string; bg: string; card: string; surface: string; text: string; textSecondary: string; textSoft: string; textTertiary: string; textMuted: string; textInverse: string; textDisabled: string; ... 17 more ...; primaryDark: string; }'.
+src/screens/ProductDetailScreen.tsx(748,39): error TS2339: Property 'star' does not exist on type '{ background: string; bg: string; card: string; surface: string; text: string; textSecondary: string; textSoft: string; textTertiary: string; textMuted: string; textInverse: string; textDisabled: string; ... 17 more ...; primaryDark: string; }'.
+src/screens/SellerAddProductScreen.tsx(391,24): error TS2304: Cannot find name 'Platform'.
+src/screens/SellerAddStoreScreen.tsx(260,28): error TS2345: Argument of type '[never]' is not assignable to parameter of type 'never'.
+src/screens/SellerAddStoreScreen.tsx(265,87): error TS2345: Argument of type '[never]' is not assignable to parameter of type 'never'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(199,29): error TS2345: Argument of type 'string' is not assignable to parameter of type '{ name: "Features"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | { name: "Pricing"; params: undefined; path?: string | undefined; merge?: boolean | undefined; pop?: boolean | undefined; } | ... 59 more ... | { ...; }'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(253,17): error TS2322: Type '{ placeholder: string; value: any; onChangeText: (value: string) => void; onBlur: () => void; error: string | undefined; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'onBlur' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(269,17): error TS2322: Type '{ placeholder: string; value: any; onChangeText: (value: string) => void; onBlur: () => void; error: string | undefined; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'onBlur' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(298,17): error TS2322: Type '{ placeholder: string; value: any; onChangeText: (value: string) => void; onBlur: () => void; keyboardType: "email-address"; autoCapitalize: "none"; error: string | undefined; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'onBlur' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(316,17): error TS2322: Type '{ placeholder: string; value: any; onChangeText: (value: string) => void; onBlur: () => void; keyboardType: "phone-pad"; error: string | undefined; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'onBlur' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(333,17): error TS2322: Type '{ placeholder: string; value: any; onChangeText: (value: string) => void; onBlur: () => void; multiline: true; numberOfLines: number; error: string | undefined; }' is not assignable to type 'IntrinsicAttributes & InputProps'.
+  Property 'onBlur' does not exist on type 'IntrinsicAttributes & InputProps'.
+src/screens/SellerAddStoreScreen_VALIDATED.tsx(352,17): error TS2322: Type '"url"' is not assignable to type '"default" | "email-address" | "numeric" | "phone-pad" | undefined'.
+src/screens/SellerAnalyticsScreen.tsx(465,31): error TS2304: Cannot find name 'useChartPressState'.
+src/screens/SellerAnalyticsScreen.tsx(468,3): error TS2304: Cannot find name 'useDerivedValue'.
+src/screens/SellerAnalyticsScreen.tsx(470,7): error TS2304: Cannot find name 'runOnJS'.
+src/screens/SellerAnalyticsScreen.tsx(470,15): error TS2304: Cannot find name 'setTooltipData'.
+src/screens/SellerAnalyticsScreen.tsx(475,7): error TS2304: Cannot find name 'runOnJS'.
+src/screens/SellerAnalyticsScreen.tsx(475,15): error TS2304: Cannot find name 'setTooltipData'.
+src/screens/SellerAnalyticsScreen.tsx(480,24): error TS2304: Cannot find name 'useAnimatedStyle'.
+src/screens/SellerAnalyticsScreen.tsx(490,27): error TS2304: Cannot find name 'withTiming'.
+src/screens/SellerAnalyticsScreen.tsx(490,43): error TS2304: Cannot find name 'withTiming'.
+src/screens/SellerAnalyticsScreen.tsx(933,18): error TS2304: Cannot find name 'LinearGradient'.
+src/screens/SellerAnalyticsScreen.tsx(941,19): error TS2304: Cannot find name 'LinearGradient'.
+src/screens/SellerCollectionScreen.tsx(106,13): error TS2322: Type '{ id: string; name: string; description: string; productCount: number; isActive: boolean; icon: string; createdAt: string; updatedAt: string; parentCategoryId: string | undefined; coverColor: string | undefined; }[]' is not assignable to type 'UiCollection[]'.
+  Type '{ id: string; name: string; description: string; productCount: number; isActive: boolean; icon: string; createdAt: string; updatedAt: string; parentCategoryId: string | undefined; coverColor: string | undefined; }' is not assignable to type 'UiCollection'.
+    Types of property 'icon' are incompatible.
+      Type 'string' is not assignable to type '"push" | "map" | "filter" | "at" | "key" | "scale" | "search" | "repeat" | "link" | "card" | "desktop" | "accessibility" | "warning" | "text" | "body" | "code" | "menu" | "time" | ... 1338 more ... | "woman-sharp"'.
+src/screens/SellerCollectionScreen.tsx(114,22): error TS2339: Property 'updated_at' does not exist on type 'Collection'.
+src/screens/SellerCollectionScreen.tsx(114,44): error TS2339: Property 'updated_at' does not exist on type 'Collection'.
+src/screens/SellerCollectionScreen.tsx(1167,8): error TS2741: Property 'onEdit' is missing in type '{ visible: boolean; onClose: () => void; onAdd: (data: NewCollectionData) => Promise<void>; categories: { id: string; name: string; icon: any; }[]; }' but required in type 'AddCollectionModalProps'.
+src/screens/SellerSaleScreen.tsx(82,33): error TS2345: Argument of type 'number | "0"' is not assignable to parameter of type 'string'.
+  Type 'number' is not assignable to type 'string'.
+src/utils/aiTheme.ts(262,18): error TS2345: Argument of type '"light" | "dark" | "amoled"' is not assignable to parameter of type 'ThemeMode'.
+  Type '"amoled"' is not assignable to type 'ThemeMode'.
+src/utils/aiTheme.ts(348,25): error TS18048: 'suggestion.confidence' is possibly 'undefined'.

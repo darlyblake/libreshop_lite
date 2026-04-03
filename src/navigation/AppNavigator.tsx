@@ -592,6 +592,8 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Features" component={Screens.FeaturesScreen} />
         <Stack.Screen name="Pricing" component={Screens.PricingScreen} />
         <Stack.Screen name="SellerChangePlan" component={Screens.SellerChangePlanScreen} />
+        <Stack.Screen name="AgentChat" component={Screens.SellerAgentChatScreen} />
+        <Stack.Screen name="AdminAgentChat" component={Screens.AdminAgentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

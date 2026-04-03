@@ -68,7 +68,7 @@
 | expo-av | Audio/Vidéo |
 | expo-haptics | Retours haptiques |
 | expo-print | Impression PDF |
-| react-native-chart-kit | Graphiques |
+| victory-native | Graphiques |
 
 ---
 

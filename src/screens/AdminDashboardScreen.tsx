@@ -8,17 +8,24 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
+  Dimensions as RN_Dimensions,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
-import { LineChart } from 'react-native-chart-kit';
-import Animated, {
+import Animated, { 
+  useAnimatedStyle, 
+  useDerivedValue, 
+  withTiming, 
+  runOnJS,
+  useAnimatedReaction,
   FadeInDown,
   FadeInUp,
   Layout,
-  SlideInRight,
+  SlideInRight
 } from 'react-native-reanimated';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { RevenueChart } from '../components/RevenueChart';
 import { COLORS, SPACING, FONT_SIZE, RADIUS, SHADOWS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
@@ -128,25 +135,17 @@ export const AdminDashboardScreen: React.FC = () => {
     }
   }, []);
 
-  // Chart data processed for react-native-chart-kit
   const chartData = useMemo(() => {
-    if (revenueTimeline.length === 0) {
-      return {
-        labels: ['-'],
-        datasets: [{ data: [0] }]
-      };
+    if (!revenueTimeline || revenueTimeline.length === 0) {
+      return [];
     }
     
-    return {
-      labels: revenueTimeline.map(d => {
-        const date = new Date(d.date);
-        const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-        return days[date.getDay()];
-      }),
-      datasets: [{
-        data: revenueTimeline.map(d => d.revenue / 1000) // in k FCFA
-      }]
-    };
+    return revenueTimeline
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(d => ({
+        date: new Date(d.date).getTime(),
+        revenue: d.revenue
+      }));
   }, [revenueTimeline]);
 
   const distributionData = [
@@ -225,6 +224,14 @@ export const AdminDashboardScreen: React.FC = () => {
   ], [stats]);
 
   const menuItems = [
+    { 
+      id: 'agent',
+      title: 'Assistant IA', 
+      icon: 'sparkles-outline' as const, 
+      screen: 'AdminAgentChat' as const,
+      color: COLORS.primary,
+      description: 'Analyser les requêtes et conseiller',
+    },
     { 
       id: 'users',
       title: 'Gestion des utilisateurs', 
@@ -516,38 +523,24 @@ export const AdminDashboardScreen: React.FC = () => {
       <Animated.View entering={SlideInRight.delay(400)}>
         <Card style={styles.chartCard}>
           <View style={styles.chartHeader}>
-            <Text style={styles.chartTitle}>Revenus hebdomadaires (k FCFA)</Text>
+            <Text style={styles.chartTitle}>Évolution des revenus</Text>
             <TouchableOpacity onPress={goToRevenueDetails}>
               <Text style={styles.chartLink}>Voir détails</Text>
             </TouchableOpacity>
           </View>
           {revenueTimeline.length > 0 ? (
-            <LineChart
-              data={chartData}
-              width={CHART_WIDTH}
-              height={220}
-              chartConfig={{
-                backgroundColor: COLORS.card,
-                backgroundGradientFrom: COLORS.card,
-                backgroundGradientTo: COLORS.card,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(138, 43, 226, ${opacity})`, // COLORS.accent
-                labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity * 0.6})`,
-                style: {
-                  borderRadius: 16,
-                },
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: COLORS.accent,
-                },
-              }}
-              bezier
-              style={{
-                marginVertical: 8,
-                borderRadius: RADIUS.md,
-              }}
-            />
+            <View style={{ height: 240, paddingRight: SPACING.md }}>
+              <RevenueChart 
+                data={chartData} 
+                loading={loading} 
+                timeRange="30d" 
+                color={COLORS.accent} 
+                textColor={COLORS.textMuted} 
+                borderColor={COLORS.border} 
+                cardColor={COLORS.card} 
+                useGradient={true}
+              />
+            </View>
           ) : (
             <View style={[styles.simpleChart, { height: 220, justifyContent: 'center' }]}>
               <Text style={styles.chartLabel}>Aucune donnée disponible</Text>

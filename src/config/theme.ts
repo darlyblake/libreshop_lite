@@ -35,14 +35,25 @@ function validateSupabaseConfig(url: string, key: string) {
 
 // Récupération sécurisée des variables d'environnement
 const getEnvVar = (key: string, fallback?: string) => {
+  // Static access is required for bundlers to replace the strings
+  if (key === 'EXPO_PUBLIC_SUPABASE_URL') return process.env.EXPO_PUBLIC_SUPABASE_URL || Constants?.expoConfig?.extra?.[key] || fallback;
+  if (key === 'EXPO_PUBLIC_SUPABASE_ANON_KEY') return process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
+  if (key === 'EXPO_PUBLIC_GEMINI_API_KEY') return process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
+  if (key === 'EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME') return process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || Constants?.expoConfig?.extra?.[key] || fallback;
+  if (key === 'EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET') return process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || Constants?.expoConfig?.extra?.[key] || fallback;
+  
   return Constants?.expoConfig?.extra?.[key] || 
-         process.env[key] || 
+         (process.env as any)[key] || 
          fallback;
 };
 
 export const supabaseConfig = {
   supabaseUrl: getEnvVar('EXPO_PUBLIC_SUPABASE_URL'),
   supabaseAnonKey: getEnvVar('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
+};
+
+export const agentConfig = {
+  geminiApiKey: getEnvVar('EXPO_PUBLIC_GEMINI_API_KEY'),
 };
 
 // Validation au démarrage
@@ -73,14 +84,8 @@ export const isSupabaseConfigured = checkSupabaseConfig();
 
 // Configuration Cloudinary
 export const cloudinaryConfig = {
-  cloudName:
-    (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME ||
-    process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME ||
-    'YOUR_CLOUD_NAME',
-  uploadPreset:
-    (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET ||
-    process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET ||
-    'libreshop',
+  cloudName: getEnvVar('EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME', 'YOUR_CLOUD_NAME'),
+  uploadPreset: getEnvVar('EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET', 'libreshop'),
 };
 
 export const COLORS = {

@@ -1,4 +1,6 @@
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const path = require('path');
 
 module.exports = async function (env, argv) {
   const config = await createExpoWebpackConfigAsync(env, argv);
@@ -31,6 +33,44 @@ module.exports = async function (env, argv) {
     /react-native-worklets[\s\S]*require\.getModules\(\)/,
     /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
   ];
+
+  // Fix: Victory Native and Skia for web
+  // Force transpilation of these modules as they contain JSX/modern JS
+  config.module.rules.unshift({
+    test: /\.(js|jsx|ts|tsx)$/,
+    include: /[\\/]node_modules[\\/](victory-native|@shopify[\\/]react-native-skia)[\\/]/,
+    use: {
+      loader: 'babel-loader',
+      options: {
+        presets: ['babel-preset-expo'],
+      },
+    },
+  });
+
+  // Support for Skia Web (.wasm)
+  if (!config.plugins) {
+    config.plugins = [];
+  }
+  config.plugins.push(
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: 'node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+          to: 'canvaskit.wasm',
+        },
+      ],
+    })
+  );
+
+  // Fix for canvaskit-wasm trying to require Node.js modules on web
+  if (!config.resolve) {
+    config.resolve = {};
+  }
+  config.resolve.fallback = {
+    ...config.resolve.fallback,
+    fs: false,
+    path: false,
+  };
 
   return config;
 };

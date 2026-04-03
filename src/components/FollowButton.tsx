@@ -109,6 +109,8 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isProcessingRef = React.useRef(false);
+
   // Valeurs partagées pour les animations
   const scale = useSharedValue(1);
   const rotate = useSharedValue(0);
@@ -220,8 +222,9 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
       return;
     }
 
-    if (loading || disabled) return;
+    if (isProcessingRef.current || disabled) return;
 
+    isProcessingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -247,7 +250,6 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
         // Recharger les données en cas d'incohérence
         await loadFollowData();
       } else {
-        // Mettre à jour le compteur
         const count = await storeService.getFollowersCount(storeId);
         setFollowerCount(count);
       }
@@ -265,9 +267,10 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
       
       Alert.alert(
         'Erreur',
-        `Impossible de ${newFollowing ? 'suivre' : 'ne plus suivre'} ${storeName}. Veuillez réessayer.`
+        `Impossible d'effectuer cette action.`
       );
     } finally {
+      isProcessingRef.current = false;
       setLoading(false);
     }
   }, [effectiveUserId, storeId, following, followerCount, loading, disabled, storeName]);

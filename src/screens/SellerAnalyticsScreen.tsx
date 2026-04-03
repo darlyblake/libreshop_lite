@@ -8,27 +8,28 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LineChart } from 'react-native-chart-kit';
 import { useAuthStore } from '../store';
+import { RevenueChart } from '../components/RevenueChart';
 import { useTheme } from '../hooks/useTheme';
 import { useResponsive } from '../utils/useResponsive';
 import { storeService } from '../services/storeService';
 import { orderService } from '../services/orderService';
 import { productService } from '../services/productService';
-import { LinearGradient } from 'expo-linear-gradient';
 import { analyticsService, TimelineDataPoint } from '../services/analyticsService';
 import { COLORS as THEME_COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { generateAICoachAdvice, answerSellerQuestion, SellerStats, CoachAdvice } from '../services/analyticsCoach';
+import { getGeminiStrategicAdvice, answerSellerQuestion, SellerStats, CoachAdvice } from '../services/analyticsCoach';
+import { LinearGradient } from 'expo-linear-gradient';
 import { errorHandler } from '../utils/errorHandler';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 
-type TimeRange = 'today' | '7d' | '30d' | 'month';
+type TimeRange = 'today' | 'yesterday' | '7d' | '30d' | 'thisMonth' | 'lastMonth' | '3m' | 'thisYear' | 'all';
 
 interface Kpi {
   title: string;
@@ -56,7 +57,6 @@ interface DeadStockItem {
 }
 
 const formatAmount = (amount: number) => amount.toLocaleString() + ' FCFA';
-
 export const SellerAnalyticsScreen = () => {
   const [coachAdvice, setCoachAdvice] = useState<CoachAdvice[]>([]);
   const [coachStats, setCoachStats] = useState<SellerStats | null>(null);
@@ -73,6 +73,7 @@ export const SellerAnalyticsScreen = () => {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [store, setStore] = useState<any>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('7d');
+  const [loadingAdvice, setLoadingAdvice] = useState(false);
   
   const [revenueTimeline, setRevenueTimeline] = useState<TimelineDataPoint[]>([]);
   const [kpis, setKpis] = useState<Kpi[]>([]);
@@ -84,18 +85,37 @@ export const SellerAnalyticsScreen = () => {
 
   const getRangeBounds = useCallback((range: TimeRange) => {
     const now = new Date();
-    if (range === 'today') {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      return { start, end: now, days: 1 };
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (range) {
+      case 'today':
+        return { start: startOfToday, end: now, days: 1 };
+      case 'yesterday':
+        const yesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+        const endOfYesterday = new Date(startOfToday.getTime() - 1);
+        return { start: yesterday, end: endOfYesterday, days: 1 };
+      case '7d':
+        return { start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), end: now, days: 7 };
+      case '30d':
+        return { start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), end: now, days: 30 };
+      case 'thisMonth':
+        return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now, days: now.getDate() };
+      case 'lastMonth':
+        const firstOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        return { start: firstOfLastMonth, end: lastOfLastMonth, days: 30 };
+      case '3m':
+        return { start: new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()), end: now, days: 90 };
+      case 'thisYear':
+        return { start: new Date(now.getFullYear(), 0, 1), end: now, days: 365 };
+      case 'all':
+        const startOfHistory = store?.created_at ? new Date(store.created_at) : new Date(2025, 0, 1);
+        const daysSinceStart = Math.max(1, Math.ceil((now.getTime() - startOfHistory.getTime()) / (24 * 60 * 60 * 1000)));
+        return { start: startOfHistory, end: now, days: daysSinceStart };
+      default:
+        return { start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), end: now, days: 7 };
     }
-    if (range === 'month') {
-      const start = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { start, end: now, days: 30 };
-    }
-    const days = range === '7d' ? 7 : 30;
-    const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    return { start, end: now, days };
-  }, []);
+  }, [store]);
 
   const fetchStore = useCallback(async () => {
     if (!user) return;
@@ -183,7 +203,13 @@ export const SellerAnalyticsScreen = () => {
       };
 
       setCoachStats(statsForCoach);
-      setCoachAdvice(generateAICoachAdvice(statsForCoach));
+      
+      // Chargement asynchrone des conseils Gemini
+      setLoadingAdvice(true);
+      getGeminiStrategicAdvice(statsForCoach)
+        .then(advice => setCoachAdvice(advice))
+        .catch(err => console.error("Coach Advice Error:", err))
+        .finally(() => setLoadingAdvice(false));
 
       const averageOrderValue = confirmedOrdersInRange.length > 0 ? totalRevenue / confirmedOrdersInRange.length : 0;
       const cancelRate = ordersCount > 0 ? (cancelledOrders / ordersCount) * 100 : 0;
@@ -232,15 +258,18 @@ export const SellerAnalyticsScreen = () => {
     loadAnalyticsData();
   }, [loadAnalyticsData]);
 
-  const handleAskCoach = (question: string) => {
+  const handleAskCoach = async (question: string) => {
     if (!coachStats) return;
     setIsAnswering(true);
     setCoachResponse(null);
-    setTimeout(() => {
-      const response = answerSellerQuestion(question, coachStats);
+    try {
+      const response = await answerSellerQuestion(question, coachStats);
       setCoachResponse(response);
+    } catch (e) {
+      setCoachResponse("Désolé, je rencontre une petite difficulté technique. Peux-tu reformuler ?");
+    } finally {
       setIsAnswering(false);
-    }, 800);
+    }
   };
 
   const handleExportCSV = async () => {
@@ -276,31 +305,57 @@ export const SellerAnalyticsScreen = () => {
 
   const handleExportPDF = async () => {
     try {
+      setLoading(true);
       const { start, end } = getRangeBounds(timeRange);
       const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
       
       const html = `
+        <!DOCTYPE html>
         <html>
           <head>
+            <meta charset="utf-8">
             <style>
-              body { font-family: sans-serif; padding: 40px; color: #333; }
-              h1 { color: #007AFF; margin-bottom: 5px; }
-              .date { color: #666; margin-bottom: 30px; font-size: 14px; }
-              .kpi-grid { display: flex; gap: 20px; margin-bottom: 40px; }
-              .kpi-card { flex: 1; border: 1px solid #EEE; padding: 15px; border-radius: 8px; }
-              .kpi-label { font-size: 12px; color: #888; text-transform: uppercase; }
-              .kpi-value { font-size: 20px; font-weight: bold; margin-top: 5px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th { background: #F8F9FA; text-align: left; padding: 12px; border-bottom: 2px solid #EEE; }
-              td { padding: 12px; border-bottom: 1px solid #EEE; }
-              .footer { margin-top: 50px; font-size: 10px; color: #AAA; text-align: center; }
+              @page { margin: 20mm; }
+              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1F2937; line-height: 1.5; padding: 0; margin: 0; }
+              .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #6366F1; padding-bottom: 20px; margin-bottom: 30px; }
+              .logo { font-size: 24px; font-weight: 800; color: #6366F1; }
+              .report-title { font-size: 18px; color: #4B5563; font-weight: 600; }
+              .date-range { font-size: 14px; color: #9CA3AF; margin-top: 5px; }
+              
+              .kpi-container { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
+              .kpi-card { background: #F9FAFB; padding: 15px; border-radius: 10px; border: 1px solid #E5E7EB; }
+              .kpi-label { font-size: 11px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+              .kpi-value { font-size: 18px; font-weight: 700; color: #111827; }
+              
+              .section { margin-bottom: 35px; }
+              .section-title { font-size: 16px; font-weight: 700; color: #374151; margin-bottom: 15px; border-left: 4px solid #6366F1; padding-left: 10px; }
+              
+              .advice-box { background: #EEF2FF; border-radius: 12px; padding: 20px; margin-bottom: 30px; }
+              .advice-item { display: flex; gap: 12px; margin-bottom: 12px; font-size: 13px; color: #4338CA; }
+              
+              table { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; }
+              th { background: #F3F4F6; text-align: left; padding: 12px; font-size: 12px; font-weight: 600; color: #4B5563; }
+              td { padding: 12px; border-bottom: 1px solid #F3F4F6; font-size: 13px; }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+              
+              .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #E5E7EB; text-align: center; font-size: 10px; color: #9CA3AF; }
+              .highlight { color: #6366F1; font-weight: 600; }
             </style>
           </head>
           <body>
-            <h1>Rapport de Performance LibreShop</h1>
-            <div class="date">Période : ${fmt.format(start)} - ${fmt.format(end)}</div>
-            
-            <div class="kpi-grid">
+            <div class="header">
+              <div>
+                <div class="logo">LIBRESHOP <span style="font-weight: 300;">ANALYTICS</span></div>
+                <div class="date-range">Période : ${fmt.format(start)} — ${fmt.format(end)}</div>
+              </div>
+              <div style="text-align: right">
+                <div class="report-title">Rapport de Performance</div>
+                <div style="font-size: 12px; color: #6B7280;">Boutique : ${store?.name || 'Ma Boutique'}</div>
+              </div>
+            </div>
+
+            <div class="kpi-container">
               ${kpis.map(k => `
                 <div class="kpi-card">
                   <div class="kpi-label">${k.title}</div>
@@ -309,33 +364,62 @@ export const SellerAnalyticsScreen = () => {
               `).join('')}
             </div>
 
-            <h2>Performance des Produits</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Produit</th>
-                  <th style="text-align: center;">Ventes</th>
-                  <th style="text-align: right;">Chiffre d'Affaires</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${productPerformance.map(p => `
-                  <tr>
-                    <td>${p.name}</td>
-                    <td style="text-align: center;">${p.qty}</td>
-                    <td style="text-align: right;">${formatAmount(p.revenue)}</td>
-                  </tr>
+            <div class="section">
+              <div class="section-title">Analyse Stratégique (IA Coach)</div>
+              <div class="advice-box">
+                ${coachAdvice.map(a => `
+                  <div class="advice-item">
+                    <span>◈</span>
+                    <span>${a.text}</span>
+                  </div>
                 `).join('')}
-              </tbody>
-            </table>
+              </div>
+            </div>
 
-            <div class="footer">Généré automatiquement par LibreShop AI Coach - ${new Date().toLocaleString()}</div>
+            <div class="section">
+              <div class="section-title">Performance des Produits</div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th class="text-center">Quantité Vendue</th>
+                    <th class="text-right">Chiffre d'Affaires</th>
+                    <th class="text-right">Tendance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${productPerformance.map(p => `
+                    <tr>
+                      <td style="font-weight: 500;">${p.name}</td>
+                      <td class="text-center">${p.qty}</td>
+                      <td class="text-right highlight">${formatAmount(p.revenue)}</td>
+                      <td class="text-right" style="color: ${p.growth >= 0 ? '#10B981' : '#EF4444'}">
+                        ${p.growth >= 0 ? '↑' : '↓'} ${Math.abs(Math.round(p.growth))}%
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="footer">
+              Ce document a été généré par l'IA LibreShop pour aider au pilotage de votre activité commerciale.<br/>
+              © ${new Date().getFullYear()} LibreShop Global - Analyse réalisée le ${new Date().toLocaleString('fr-FR')}
+            </div>
           </body>
         </html>
       `;
 
       if (Platform.OS === 'web') {
-        await Print.printAsync({ html });
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+          }, 500);
+        }
       } else {
         const { uri } = await Print.printToFileAsync({ html });
         await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
@@ -343,60 +427,44 @@ export const SellerAnalyticsScreen = () => {
     } catch (e) {
       console.error('Export PDF error:', e);
       Alert.alert('Erreur', 'Impossible de générer le rapport PDF');
+    } finally {
+      setLoading(false);
     }
   };
 
   const timeRanges: { key: TimeRange; label: string }[] = [
     { key: 'today', label: "Aujourd'hui" },
+    { key: 'yesterday', label: 'Hier' },
     { key: '7d', label: '7 jours' },
     { key: '30d', label: '30 jours' },
-    { key: 'month', label: 'Mois' },
+    { key: 'thisMonth', label: 'Ce mois' },
+    { key: 'lastMonth', label: 'Mois dernier' },
+    { key: '3m', label: '3 mois' },
+    { key: 'thisYear', label: 'Cette année' },
+    { key: 'all', label: 'Tout' },
   ];
 
   const getDateRangeForFilter = (key: TimeRange) => {
-    const now = new Date();
+    const { start, end } = getRangeBounds(key);
     const fmt = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
-    if (key === 'today') return fmt.format(now);
-    const past = new Date();
-    if (key === '7d') past.setDate(now.getDate() - 7);
-    if (key === '30d') past.setDate(now.getDate() - 30);
-    if (key === 'month') past.setDate(1);
-    return `${fmt.format(past)} - ${fmt.format(now)}`;
-  };
-
-  const chartConfig = {
-    backgroundGradientFrom: COLORS.card,
-    backgroundGradientTo: COLORS.card,
-    color: (opacity = 1) => `rgba(${parseInt(COLORS.accent.slice(1, 3), 16)}, ${parseInt(COLORS.accent.slice(3, 5), 16)}, ${parseInt(COLORS.accent.slice(5, 7), 16)}, ${opacity})`,
-    labelColor: (opacity = 1) => COLORS.textSoft,
-    strokeWidth: 3,
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false,
-    propsForDots: {
-      r: '4',
-      strokeWidth: '2',
-      stroke: COLORS.card,
-    },
-    decimalPlaces: 0,
+    if (key === 'today' || key === 'yesterday') return fmt.format(start);
+    return `${fmt.format(start)} - ${fmt.format(end)}`;
   };
 
   const chartData = useMemo(() => {
-    if (revenueTimeline && revenueTimeline.length > 0) {
-      return {
-        labels: revenueTimeline.map(d => {
-          const dt = new Date(d.date);
-          return `${dt.getDate()}/${dt.getMonth() + 1}`;
-        }),
-        datasets: [{ data: revenueTimeline.map(d => d.revenue) }]
-      };
+    if (!revenueTimeline || revenueTimeline.length === 0) {
+      return [];
     }
-    return {
-      labels: ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'],
-      datasets: [{ data: [0, 0, 0, 0, 0, 0, 0] }]
-    };
+    return revenueTimeline
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map((d) => ({
+        date: new Date(d.date).getTime(),
+        revenue: Number(d.revenue) || 0,
+      }));
   }, [revenueTimeline]);
 
-  const styles = StyleSheet.create({
+
+const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.bg },
     header: {
       flexDirection: 'row',
@@ -417,12 +485,14 @@ export const SellerAnalyticsScreen = () => {
     content: { padding: spacing.xl },
     filtersContainer: { marginBottom: spacing.xl },
     timeChip: {
-      borderRadius: 100,
+      borderRadius: RADIUS.lg,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       alignItems: 'center',
+      justifyContent: 'center',
       marginRight: spacing.sm,
       borderWidth: 1,
+      minWidth: 90,
     },
     section: { marginBottom: spacing.xxl },
     sectionTitle: { fontSize: fontSize.lg, fontWeight: '700', color: COLORS.text, marginBottom: spacing.md, marginLeft: 4 },
@@ -430,8 +500,11 @@ export const SellerAnalyticsScreen = () => {
       backgroundColor: COLORS.card,
       borderRadius: component.cardBorderRadius,
       padding: spacing.lg,
-      paddingRight: 0,
+      paddingRight: spacing.md,
       overflow: 'hidden',
+      minHeight: 260,
+      borderWidth: 1,
+      borderColor: COLORS.border,
     },
     kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
     kpiCard: {
@@ -789,27 +862,18 @@ export const SellerAnalyticsScreen = () => {
             <View style={styles.section}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
                 <Ionicons name="trending-up" size={20} color={COLORS.success} />
-                <Text style={styles.sectionTitle}>Revenus attendus</Text>
+                <Text style={styles.sectionTitle}>Revenus réalisés</Text>
               </View>
+
               <View style={styles.chartCard}>
-                <LineChart
-                  data={chartData}
-                  width={isDesktop ? 1000 : width - spacing.xl * 2 - spacing.lg * 2 + 10}
-                  height={220}
-                  chartConfig={chartConfig}
-                  bezier
-                  style={{ borderRadius: component.cardBorderRadius }}
-                  withInnerLines={false}
-                  withOuterLines={false}
-                  withVerticalLines={false}
-                  yAxisLabel=""
-                  yAxisSuffix=""
-                  formatYLabel={(v) => {
-                    const num = Number(v);
-                    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-                    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
-                    return v;
-                  }}
+                <RevenueChart 
+                  data={chartData} 
+                  loading={loading} 
+                  timeRange={timeRange} 
+                  color={COLORS.primary} 
+                  textColor={COLORS.textMuted} 
+                  borderColor={COLORS.border} 
+                  cardColor={COLORS.card} 
                 />
               </View>
             </View>
@@ -859,8 +923,13 @@ export const SellerAnalyticsScreen = () => {
                         <Text style={styles.adviceText}>{advice.text}</Text>
                       </View>
                     ))
+                  ) : loadingAdvice ? (
+                    <View style={{ paddingVertical: spacing.md, alignItems: 'center' }}>
+                      <ActivityIndicator size="small" color={COLORS.accent} />
+                      <Text style={[styles.adviceText, { marginTop: 8, color: COLORS.textMuted }]}>Gemini analyse tes données...</Text>
+                    </View>
                   ) : (
-                    <Text style={styles.adviceText}>Analyse de tes données en cours pour générer des conseils personnalisés...</Text>
+                    <Text style={styles.adviceText}>Aucun conseil disponible pour le moment.</Text>
                   )}
 
                   {coachResponse && (

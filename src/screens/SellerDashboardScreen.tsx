@@ -17,7 +17,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { LineChart } from 'react-native-chart-kit';
 import { useAuthStore } from '../store';
 import { useNotificationStore } from '../store/notificationStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -933,6 +932,12 @@ export const SellerDashboardScreen: React.FC = () => {
 
     const actions = [
       { 
+        label: 'Assistant IA', 
+        icon: 'sparkles', 
+        color: COLORS.info, // distinctive color
+        screen: 'AgentChat' 
+      },
+      { 
         label: 'Ajouter produit', 
         icon: 'add-circle', 
         color: COLORS.accent,
@@ -961,7 +966,7 @@ export const SellerDashboardScreen: React.FC = () => {
       },
     ];
 
-    const visibleActions = isMobile && !isLandscape ? actions.slice(0, 3) : actions;
+    const visibleActions = isMobile && !isLandscape ? actions.slice(0, 4) : actions;
 
     return (
       <View style={styles.section}>
@@ -1305,46 +1310,74 @@ export const SellerDashboardScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* FAB pour mobile uniquement */}
+      {/* FABs pour mobile uniquement */}
       {isMobile && !isExpired && (
-        <TouchableOpacity 
-          style={[
-            styles.fab,
-            {
-              bottom: spacing.xxl + (insets.bottom || 0),
-              right: spacing.lg,
-              width: component.fabSize,
-              height: component.fabSize,
-              borderRadius: component.fabBorderRadius,
-              backgroundColor: COLORS.accent,
-              ...(Platform.OS === 'web'
-                ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
-                : {
-                    shadowColor: COLORS.accent,
-                    shadowOpacity: 0.3,
-                    shadowRadius: 8,
-                    shadowOffset: { width: 0, height: 4 },
-                    elevation: 8,
-                  }),
-            }
-          ]}
-          onPress={() => {
-            if (store?.cashier_active === false) {
-              Alert.alert(
-                'Caisse non incluse',
-                `La caisse physique n'est pas incluse dans votre plan ${store?.subscription_plan || 'actuel'}.`,
-                [
-                  { text: 'Plus tard', style: 'cancel' },
-                  { text: 'Changer de plan', onPress: () => navigation.navigate('SellerChangePlan' as never) }
-                ]
-              );
-              return;
-            }
-            navigation.navigate('SellerCaisse');
-          }}
-        >
-          <Ionicons name={store?.cashier_active === false ? "lock-closed" : "calculator"} size={fontSize.xxl} color={COLORS.text} />
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity 
+            style={[
+              styles.fab,
+              {
+                bottom: spacing.xxl + (insets.bottom || 0),
+                right: spacing.lg,
+                width: component.fabSize,
+                height: component.fabSize,
+                borderRadius: component.fabBorderRadius,
+                backgroundColor: COLORS.accent,
+                ...(Platform.OS === 'web'
+                  ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
+                  : {
+                      shadowColor: COLORS.accent,
+                      shadowOpacity: 0.3,
+                      shadowRadius: 8,
+                      shadowOffset: { width: 0, height: 4 },
+                      elevation: 8,
+                    }),
+              }
+            ]}
+            onPress={() => {
+              if (store?.cashier_active === false) {
+                Alert.alert(
+                  'Caisse non incluse',
+                  `La caisse physique n'est pas incluse dans votre plan ${store?.subscription_plan || 'actuel'}.`,
+                  [
+                    { text: 'Plus tard', style: 'cancel' },
+                    { text: 'Changer de plan', onPress: () => navigation.navigate('SellerChangePlan' as never) }
+                  ]
+                );
+                return;
+              }
+              navigation.navigate('SellerCaisse');
+            }}
+          >
+            <Ionicons name={store?.cashier_active === false ? "lock-closed" : "calculator"} size={fontSize.xxl} color={COLORS.text} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.fab,
+              {
+                bottom: spacing.xxl + (insets.bottom || 0) + component.fabSize + 16,
+                right: spacing.lg,
+                width: component.fabSize,
+                height: component.fabSize,
+                borderRadius: component.fabBorderRadius,
+                backgroundColor: COLORS.info, // Distinct color for AI
+                ...(Platform.OS === 'web'
+                  ? { boxShadow: `0px 4px 8px ${COLORS.info}4D` }
+                  : {
+                      shadowColor: COLORS.info,
+                      shadowOpacity: 0.3,
+                      shadowRadius: 8,
+                      shadowOffset: { width: 0, height: 4 },
+                      elevation: 8,
+                    }),
+              }
+            ]}
+            onPress={() => navigation.navigate('AgentChat' as never)}
+          >
+            <Ionicons name="sparkles" size={fontSize.xxl} color={COLORS.bg} />
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );
