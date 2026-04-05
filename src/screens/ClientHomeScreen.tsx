@@ -1,5 +1,5 @@
 // Clean sync comment to force IDE refresh
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,17 @@ import { collectionService } from '../services/collectionService';
 import { useCartStore } from '../store';
 import { categoryService } from '../services/categoryService';
 import { cloudinaryService } from '../services/cloudinaryService';
+import { cacheService } from '../services/cacheService';
+
+// Cache Keys
+const CACHE_KEYS = {
+  CAROUSEL: 'HOME_CAROUSEL_BANNERS',
+  PROMO: 'HOME_PROMO_BANNERS',
+  STORES: 'HOME_FEATURED_STORES',
+  PRODUCTS: 'HOME_FEATURED_PRODUCTS',
+  CATEGORIES: 'HOME_POPULAR_CATEGORIES',
+  COLLECTIONS: 'HOME_COLLECTIONS',
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -138,7 +149,39 @@ export const ClientHomeScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentBannerIndex, carouselBanners.length, isPaused]);
 
-  // Filter stores logic - No longer needed here as handleCategoryPress handles it  // Load data from Supabase with high resilience
+  // Cache loading logic
+  const loadCachedData = useCallback(async () => {
+    try {
+      const [cachedCarousel, cachedPromo, cachedStores, cachedProducts, cachedCats, cachedColls] = await Promise.all([
+        cacheService.get<HomeBanner[]>(CACHE_KEYS.CAROUSEL),
+        cacheService.get<HomeBanner[]>(CACHE_KEYS.PROMO),
+        cacheService.get<Store[]>(CACHE_KEYS.STORES),
+        cacheService.get<Product[]>(CACHE_KEYS.PRODUCTS),
+        cacheService.get<string[]>(CACHE_KEYS.CATEGORIES),
+        cacheService.get<Collection[]>(CACHE_KEYS.COLLECTIONS),
+      ]);
+
+      if (cachedCarousel) setCarouselBanners(cachedCarousel);
+      if (cachedPromo) setPromoBanners(cachedPromo);
+      if (cachedStores) setStores(cachedStores);
+      if (cachedProducts) setProducts(cachedProducts);
+      if (cachedCats) setCategoriesList(cachedCats);
+      if (cachedColls) setCollections(cachedColls);
+      
+      // If we have some cached data, we can already stop the initial full-screen loading
+      if (cachedProducts || cachedStores) {
+        setLoading(false);
+      }
+    } catch (e) {
+      console.warn('[ClientHome] Failed to load cached data:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCachedData();
+  }, [loadCachedData]);
+
+  // Load data from Supabase with high resilience
   const loadData = async (refresh = false) => {
     try {
       if (!refresh) setLoading(true);
@@ -147,7 +190,10 @@ export const ClientHomeScreen: React.FC = () => {
       // 1. Featured Stores (Wrapped for resilience)
       try {
         const storesData = await storeService.getFeatured();
-        setStores(storesData || []);
+        if (storesData) {
+          setStores(storesData);
+          cacheService.set(CACHE_KEYS.STORES, storesData, 30);
+        }
       } catch (err) {
         // Non-critical failure
       }
@@ -161,6 +207,9 @@ export const ClientHomeScreen: React.FC = () => {
           const collectionsResults = await Promise.all(collectionPromises);
           collectionsResults.forEach(res => allCollections.push(...res));
           setCollections(allCollections);
+          if (allCollections.length > 0) {
+            cacheService.set(CACHE_KEYS.COLLECTIONS, allCollections, 60);
+          }
         }
       } catch (err) {
         // Non-critical failure
@@ -169,12 +218,15 @@ export const ClientHomeScreen: React.FC = () => {
       // 3. Products (CRITICAL - setting global error if this fails and nothing else loaded)
       try {
         const productsData = await productService.getAll(0, 8, productSort as any);
-        setProducts(productsData || []);
-        setHasMoreProducts((productsData?.length || 0) >= 8);
-        setProductPage(0);
+        if (productsData) {
+          setProducts(productsData);
+          setHasMoreProducts(productsData.length >= 8);
+          setProductPage(0);
+          cacheService.set(CACHE_KEYS.PRODUCTS, productsData, 15);
+        }
       } catch (err) {
         console.error('Critical failure in productService.getAll:', err);
-        // Only set global error if products fail AND we have no fallback content
+        // Only set global error if products fail AND we have no fallback content (checked via local state)
         if (products.length === 0) {
            setError('Impossible de charger les produits principaux');
         }
@@ -189,10 +241,18 @@ export const ClientHomeScreen: React.FC = () => {
           categoryService.getPopularCategories(6).catch(() => []),
         ]);
         
-        setCarouselBanners(carousel || []);
-        setPromoBanners(promo || []);
+        if (carousel && carousel.length > 0) {
+          setCarouselBanners(carousel);
+          cacheService.set(CACHE_KEYS.CAROUSEL, carousel, 60);
+        }
+        if (promo && promo.length > 0) {
+          setPromoBanners(promo);
+          cacheService.set(CACHE_KEYS.PROMO, promo, 60);
+        }
         if (cats && cats.length > 0) {
-          setCategoriesList(['Toutes', ...cats.map(c => c.name)]);
+          const catNames = ['Toutes', ...cats.map(c => c.name)];
+          setCategoriesList(catNames);
+          cacheService.set(CACHE_KEYS.CATEGORIES, catNames, 60 * 24); // 24h for categories
         }
       } catch (err) {
         console.warn('DEBUG: Non-critical failure in banners/categories:', err);
@@ -284,7 +344,7 @@ export const ClientHomeScreen: React.FC = () => {
     navigation.navigate(screen, banner.link_params || undefined);
   };
 
-  const renderBannerItem = ({ item, index }: { item: HomeBanner; index: number }) => {
+  const renderBannerItem = useCallback(({ item, index }: { item: HomeBanner; index: number }) => {
     const bannerWidth = SCREEN_WIDTH - SPACING.xl * 2;
     const inputRange = [
       (index - 1) * bannerWidth,
@@ -308,11 +368,15 @@ export const ClientHomeScreen: React.FC = () => {
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => handleBannerPress(item)}
-        style={{ width: SCREEN_WIDTH - SPACING.xl * 2 }}
+        style={{ width: bannerWidth }}
       >
         <Animated.View style={[styles.bannerCard, { transform: [{ scale }], opacity }]}>
           {item.image_url ? (
-            <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.image_url, 800) }} style={styles.bannerImage} />
+            <Image 
+              source={{ uri: cloudinaryService.getOptimizedUrl(item.image_url, 800) }} 
+              style={styles.bannerImage}
+              resizeMode="cover"
+            />
           ) : null}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
@@ -329,7 +393,7 @@ export const ClientHomeScreen: React.FC = () => {
         </Animated.View>
       </TouchableOpacity>
     );
-  };
+  }, [SCREEN_WIDTH, SPACING.xl, scrollX, styles.bannerCard, styles.bannerImage, styles.bannerGradient, styles.bannerContent, styles.bannerTitle, styles.bannerSubtitle, styles.bannerButton, styles.bannerButtonText]);
 
   const renderCategoryChip = (category: string) => {
     const isActive = selectedCollection === category;
@@ -346,7 +410,7 @@ export const ClientHomeScreen: React.FC = () => {
     );
   };
 
-  const renderStoreCard = ({ item }: { item: Store }) => (
+  const renderStoreCard = useCallback(({ item }: { item: Store }) => (
     <StoreCard
       name={item.name}
       category={item.category}
@@ -354,9 +418,9 @@ export const ClientHomeScreen: React.FC = () => {
       logoUrl={item.logo_url}
       onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
     />
-  );
+  ), [navigation]);
 
-  const renderProductCard = ({ item }: { item: any }) => (
+  const renderProductCard = useCallback(({ item }: { item: any }) => (
     <View style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
       <ProductCard
         name={item.name}
@@ -369,7 +433,7 @@ export const ClientHomeScreen: React.FC = () => {
         {item.stores?.name || 'Boutique'}
       </Text>
     </View>
-  );
+  ), [responsiveProductCardWidth, styles.productCardWrapper, styles.storeNameLabel, navigation]);
 
   // Calcul des dimensions responsive
   const storeCardWidth = isDesktop ? 220 : isTablet ? 200 : 180;
@@ -504,6 +568,10 @@ export const ClientHomeScreen: React.FC = () => {
                         flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
                       });
                     }}
+                    windowSize={3}
+                    initialNumToRender={2}
+                    maxToRenderPerBatch={2}
+                    removeClippedSubviews={Platform.OS !== 'web'}
                   />
 
                   {/* Pagination Dots */}
