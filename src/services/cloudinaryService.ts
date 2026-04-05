@@ -27,7 +27,7 @@ export const cloudinaryService = {
     return url.replace('/upload/', `/upload/${transforms.join(',')}/`);
   },
 
-  async uploadImage(uri: string, opts?: { folder?: string }): Promise<string> {
+  async uploadImage(uri: string, opts?: { folder?: string; enhance?: boolean }): Promise<string> {
     const cloudName = cloudinaryConfig?.cloudName;
     const uploadPreset = cloudinaryConfig?.uploadPreset;
 
@@ -44,6 +44,11 @@ export const cloudinaryService = {
     formData.append('upload_preset', uploadPreset);
     if (opts?.folder) {
       formData.append('folder', opts.folder);
+    }
+    
+    // Add auto-improvement if requested
+    if (opts?.enhance) {
+      formData.append('transformation', 'e_improve,e_sharpen,q_auto,f_auto');
     }
 
     if (Platform.OS === 'web') {

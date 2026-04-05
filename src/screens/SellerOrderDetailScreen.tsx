@@ -132,7 +132,20 @@ export const SellerOrderDetailScreen: React.FC = () => {
     
     // Format phone number for WhatsApp (remove spaces, special chars, and +)
     const cleanPhone = phone.replace(/[\s\-\(\)\+]/g, '');
-    const message = `Bonjour! Je suis votre vendeur LibreShop. Je vous contacte concernant votre commande #${order.id.slice(0, 8)}`;
+    
+    const storeName = (order as any).stores?.name || (order as any).store?.name;
+    const storeText = storeName ? `la boutique ${storeName} sur Libreshop` : `Libreshop`;
+    const itemsList = order.order_items.map(item => `- ${item.product?.name || 'Produit'} (x${item.quantity || 1})`).join('\n');
+    
+    const message = `Bonjour, je suis le vendeur de ${storeText}.
+Je vous contacte concernant votre commande #${order.id.slice(0, 8).toUpperCase()}.
+
+Produits :
+${itemsList}
+
+Pouvez-vous me confirmer votre disponibilité pour la livraison ?
+Merci.`;
+
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     
     Linking.openURL(whatsappUrl).catch(() => {

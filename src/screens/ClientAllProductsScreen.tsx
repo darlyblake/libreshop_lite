@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler } from '../utils/errorHandler';
 import { ProductCard } from '../components';
@@ -27,6 +27,7 @@ const MAX_CONTENT_WIDTH = 1200;
 const CATEGORIES = ['Toutes', 'Électronique', 'Mode', 'Beauté', 'Maison', 'Alimentation', 'Audio', 'Sports'];
 
 export const ClientAllProductsScreen: React.FC = () => {
+  const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width: windowWidth, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
@@ -38,7 +39,8 @@ export const ClientAllProductsScreen: React.FC = () => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sort, setSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('newest');
+  const initialSort = route.params?.sort || 'newest';
+  const [sort, setSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>(initialSort);
 
   const numColumns = isLargeDesktop ? 6 : isDesktop ? 4 : isTablet ? 3 : 2;
   const contentWidth = Math.min(windowWidth, MAX_CONTENT_WIDTH);
@@ -263,8 +265,8 @@ export const ClientAllProductsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  maxWidthContainer: { flex: 1, alignItems: 'center', backgroundColor: COLORS.background },
-  container: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, backgroundColor: COLORS.background, flex: 1 },
+  maxWidthContainer: { flex: 1, alignItems: 'center', backgroundColor: COLORS.bg },
+  container: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, backgroundColor: COLORS.bg, flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: FONT_SIZE.xl, fontWeight: '700', color: COLORS.text },
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
   resultsHeader: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
   resultsCount: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
   listContent: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xxl },
-  sortContainer: { paddingVertical: SPACING.sm, backgroundColor: COLORS.background },
+  sortContainer: { paddingVertical: SPACING.sm, backgroundColor: COLORS.bg },
   row: { justifyContent: 'flex-start', gap: SPACING.md },
   productCardWrapper: { marginBottom: SPACING.lg },
   storeName: { marginTop: 6, fontSize: FONT_SIZE.xs, color: COLORS.textMuted },

@@ -139,6 +139,25 @@ export const ClientCardSkeleton: React.FC = () => {
   );
 };
 
+// Skeleton pour carte boutique
+export const StoreCardSkeleton: React.FC = () => {
+  const themeContext = useTheme();
+  const { spacing: SPACING, radius: RADIUS } = themeContext;
+  const styles = React.useMemo(() => getStoreCardStyles(themeContext), [themeContext]);
+  
+  return (
+    <View style={styles.container}>
+      <SkeletonLoader width={60} height={60} borderRadius={30} />
+      <SkeletonLoader width="80%" height={16} style={{ marginTop: SPACING.md }} />
+      <SkeletonLoader width="50%" height={12} style={{ marginTop: SPACING.xs }} />
+      <View style={{ flexDirection: 'row', gap: SPACING.xs, marginTop: SPACING.md }}>
+        <SkeletonLoader width={40} height={18} borderRadius={RADIUS.sm} />
+        <SkeletonLoader width={40} height={18} borderRadius={RADIUS.sm} />
+      </View>
+    </View>
+  );
+};
+
 // Skeleton pour statistics
 export const StatCardSkeleton: React.FC = () => {
   const themeContext = useTheme();
@@ -250,6 +269,23 @@ const getClientCardStyles = (theme: any) => {
       paddingTop: SPACING.md,
       borderTopWidth: 1,
       borderTopColor: COLORS.border,
+    },
+  });
+};
+
+const getStoreCardStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  return StyleSheet.create({
+    container: {
+      backgroundColor: COLORS.card,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.lg,
+      width: 160,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: COLORS.border,
     },
   });
 };

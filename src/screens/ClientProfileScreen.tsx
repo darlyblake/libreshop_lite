@@ -40,6 +40,7 @@ const MENU_ITEMS: Array<{
   soon?: boolean;
   action?: string;
 }> = [
+  { icon: 'storefront-outline', label: 'Ouvrir ma boutique', screen: 'SellerAuth' as any },
   { icon: 'person-outline', label: 'Informations personnelles', soon: true },
   { icon: 'location-outline', label: 'Adresses enregistrées', soon: true },
   { icon: 'heart-outline', label: 'Mes favoris', screen: 'Wishlist' },
@@ -187,6 +188,8 @@ export const ClientProfileScreen: React.FC = () => {
     }
     if (item.screen && CLIENT_TAB_NAMES.includes(item.screen as keyof ClientTabParamList)) {
       navigateToClientTab(navigation, item.screen as keyof ClientTabParamList);
+    } else if (item.screen) {
+      navigation.navigate(item.screen);
     }
   };
 

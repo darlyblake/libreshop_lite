@@ -1,3 +1,4 @@
+// Clean sync comment to force IDE refresh
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
@@ -25,7 +26,7 @@ import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette'
 import { useTheme } from '../hooks/useTheme';
 import { navigateToClientTab } from '../navigation/clientNavigation';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { StoreCard, ProductCard } from '../components';
+import { StoreCard, ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase } from '../components';
 import { PWAInstallButton } from '../components/PWAInstallButton';
 import { SortTabs } from '../components/SortTabs';
 import { useResponsive } from '../utils/responsive';
@@ -35,6 +36,7 @@ import { productService } from '../services/productService';
 import { homeBannerService } from '../services/homeBannerService';
 import { collectionService } from '../services/collectionService';
 import { useCartStore } from '../store';
+import { categoryService } from '../services/categoryService';
 import { cloudinaryService } from '../services/cloudinaryService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -63,7 +65,29 @@ export const ClientHomeScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [selectedCollection, setSelectedCollection] = useState<string>('Toutes');
-  
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Animation pulse pour le bouton "Ouvrir ma boutique"
+  useEffect(() => {
+    const startPulse = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 1000,
+            useNativeDriver: Platform.OS !== 'web',
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: Platform.OS !== 'web',
+          }),
+        ])
+      ).start();
+    };
+    startPulse();
+  }, []);
+
   // Calculer le nombre de colonnes et la largeur des cartes dynamiquement
   const numProductColumns = isLargeDesktop ? 6 : isDesktop ? 4 : isTablet ? 3 : 2;
   const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
@@ -73,99 +97,113 @@ export const ClientHomeScreen: React.FC = () => {
     const totalGap = SPACING.md * (numProductColumns - 1); // gap entre colonnes
     return (contentWidth - totalHorizontalPadding - totalGap) / numProductColumns;
   }, [contentWidth, numProductColumns, SPACING]);
-  
+
   // Real data states
   const [stores, setStores] = useState<Store[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingStores, setLoadingStores] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [carouselBanners, setCarouselBanners] = useState<HomeBanner[]>([]);
   const [promoBanners, setPromoBanners] = useState<HomeBanner[]>([]);
+  const [categoriesList, setCategoriesList] = useState<string[]>(['Toutes']);
   const [productPage, setProductPage] = useState(0);
   const [hasMoreProducts, setHasMoreProducts] = useState(true);
   const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
-  const [productSort, setProductSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('popular');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [productSort, setProductSort] = useState<string>('newest');
+  const [isPaused, setIsPaused] = useState(false);
 
-  // Auto-play carousel
+  // Auto-play carousel logic
   useEffect(() => {
+    if (carouselBanners.length <= 1 || isPaused) return;
+
     const interval = setInterval(() => {
-      if (carouselBanners.length > 0) {
-        setCurrentBannerIndex((prev) => (prev + 1) % carouselBanners.length);
+      const nextIndex = (currentBannerIndex + 1) % carouselBanners.length;
+      try {
+        flatListRef.current?.scrollToIndex({
+          index: nextIndex,
+          animated: true,
+        });
+        setCurrentBannerIndex(nextIndex);
+      } catch (err) {
+        // Fallback for initial render or index issues
+        setCurrentBannerIndex(nextIndex);
       }
-    }, 4000);
+    }, 5000);
+
     return () => clearInterval(interval);
-  }, [currentBannerIndex, carouselBanners.length]);
+  }, [currentBannerIndex, carouselBanners.length, isPaused]);
 
-  // Extract unique categories from collections
-  const extractCategoriesFromCollections = (collectionsList: Collection[]) => {
-    const uniqueCategories = Array.from(new Set(collectionsList.map(collection => collection.category).filter(Boolean)));
-    if (uniqueCategories.length > 0) return ['Toutes', ...uniqueCategories];
-
-    // Fallback: derive categories from loaded products and sort by popularity (count)
-    const prodCats = products
-      .map(p => (p as any)?.category)
-      .filter(Boolean)
-      .reduce((acc: Record<string, number>, c: string) => {
-        acc[c] = (acc[c] || 0) + 1;
-        return acc;
-      }, {});
-
-    const sorted = Object.entries(prodCats)
-      .sort((a, b) => b[1] - a[1])
-      .map(([cat]) => cat);
-
-    return ['Toutes', ...sorted];
-  };
-
-  // Filter stores by selected category
-  const filteredStores = selectedCollection === 'Toutes' 
-    ? stores 
-    : stores.filter(store => store.category === selectedCollection);
-
-  // Load data from Supabase
+  // Filter stores logic - No longer needed here as handleCategoryPress handles it  // Load data from Supabase with high resilience
   const loadData = async (refresh = false) => {
     try {
       if (!refresh) setLoading(true);
       setError(null);
-      
-      // Load featured stores (verified, active)
-      const storesData = await storeService.getFeatured();
-      setStores(storesData || []);
-      
-      // Load collections from all stores
-      const allCollections: Collection[] = [];
-      if (storesData && storesData.length > 0) {
-        for (const store of storesData) {
-          const storeCollections = await collectionService.getByStore(store.id);
-          allCollections.push(...storeCollections);
-        }
-        setCollections(allCollections);
-      }
-      
-      // Load featured products (Initial page) using selected sort
-      const productsData = await productService.getAll(0, 8, productSort as any);
-      setProducts(productsData || []);
-      setHasMoreProducts((productsData?.length || 0) >= 8);
-      setProductPage(0);
 
+      // 1. Featured Stores (Wrapped for resilience)
       try {
-        const [carousel, promo] = await Promise.all([
-          homeBannerService.getActiveByPlacement('carousel'),
-          homeBannerService.getActiveByPlacement('promo'),
+        const storesData = await storeService.getFeatured();
+        setStores(storesData || []);
+      } catch (err) {
+        // Non-critical failure
+      }
+
+      // 2. Collections (Wrapped for resilience)
+      try {
+        const allCollections: Collection[] = [];
+        const storesForCollections = stores || []; // Use current stores if already fetched
+        if (storesForCollections.length > 0) {
+          const collectionPromises = storesForCollections.map(s => collectionService.getByStore(s.id).catch(() => []));
+          const collectionsResults = await Promise.all(collectionPromises);
+          collectionsResults.forEach(res => allCollections.push(...res));
+          setCollections(allCollections);
+        }
+      } catch (err) {
+        // Non-critical failure
+      }
+
+      // 3. Products (CRITICAL - setting global error if this fails and nothing else loaded)
+      try {
+        const productsData = await productService.getAll(0, 8, productSort as any);
+        setProducts(productsData || []);
+        setHasMoreProducts((productsData?.length || 0) >= 8);
+        setProductPage(0);
+      } catch (err) {
+        console.error('Critical failure in productService.getAll:', err);
+        // Only set global error if products fail AND we have no fallback content
+        if (products.length === 0) {
+           setError('Impossible de charger les produits principaux');
+        }
+      }
+
+      // 4. Banners & Metadata (Wrapped for resilience)
+      try {
+        console.log('DEBUG: Fetching banners and categories...');
+        const [carousel, promo, cats] = await Promise.all([
+          homeBannerService.getActiveByPlacement('carousel').catch(() => []),
+          homeBannerService.getActiveByPlacement('promo').catch(() => []),
+          categoryService.getPopularCategories(6).catch(() => []),
         ]);
+        
         setCarouselBanners(carousel || []);
         setPromoBanners(promo || []);
-      } catch (bannerErr) {
-        errorHandler.handle(bannerErr, 'ClientHomeScreen banners unavailable', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-        setCarouselBanners([]);
-        setPromoBanners([]);
+        if (cats && cats.length > 0) {
+          setCategoriesList(['Toutes', ...cats.map(c => c.name)]);
+        }
+      } catch (err) {
+        console.warn('DEBUG: Non-critical failure in banners/categories:', err);
       }
+
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'ClientHomeScreen loadData error');
-      setError('Impossible de charger les données');
-      Alert.alert('Erreur', 'Impossible de charger les données. Veuillez réessayer.');
+      errorHandler.handleDatabaseError(e, 'ClientHomeScreen global loadData error');
+      // If we reach here, something really bad happened
+      if (products.length === 0 && stores.length === 0) {
+        setError('Une erreur est survenue lors du chargement');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -178,12 +216,12 @@ export const ClientHomeScreen: React.FC = () => {
 
   const handleLoadMoreProducts = async () => {
     if (loadingMoreProducts || !hasMoreProducts) return;
-    
+
     try {
       setLoadingMoreProducts(true);
       const nextPage = productPage + 1;
       const newProducts = await productService.getAll(nextPage, 8, productSort as any);
-      
+
       if (newProducts && newProducts.length > 0) {
         setProducts(prev => [...prev, ...newProducts]);
         setProductPage(nextPage);
@@ -198,9 +236,46 @@ export const ClientHomeScreen: React.FC = () => {
     }
   };
 
+  const handleProductSortChange = async (sort: any) => {
+    setProductSort(sort);
+    setLoadingProducts(true);
+    try {
+      const data = await productService.getAll(0, 8, sort);
+      setProducts(data || []);
+      setProductPage(0);
+      setHasMoreProducts((data?.length || 0) >= 8);
+    } catch (e) {
+      console.error('Error sorting products:', e);
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
+    setSelectedCategory(null);
+    setSelectedCollection('Toutes');
     loadData(true);
+  };
+
+  const handleCategoryPress = async (category: string) => {
+    setSelectedCollection(category);
+    setSelectedCategory(category === 'Toutes' ? null : category);
+
+    setLoadingStores(true);
+    try {
+      let data;
+      if (category === 'Toutes') {
+        data = await categoryService.getFeaturedStores(5);
+      } else {
+        data = await categoryService.getStoresByCategory(category, 5);
+      }
+      setStores(data);
+    } catch (e) {
+      console.error('Error filtering stores:', e);
+    } finally {
+      setLoadingStores(false);
+    }
   };
 
   const handleBannerPress = (banner: HomeBanner) => {
@@ -210,10 +285,11 @@ export const ClientHomeScreen: React.FC = () => {
   };
 
   const renderBannerItem = ({ item, index }: { item: HomeBanner; index: number }) => {
+    const bannerWidth = SCREEN_WIDTH - SPACING.xl * 2;
     const inputRange = [
-      (index - 1) * SCREEN_WIDTH,
-      index * SCREEN_WIDTH,
-      (index + 1) * SCREEN_WIDTH,
+      (index - 1) * bannerWidth,
+      index * bannerWidth,
+      (index + 1) * bannerWidth,
     ];
 
     const scale = scrollX.interpolate({
@@ -261,7 +337,7 @@ export const ClientHomeScreen: React.FC = () => {
       <TouchableOpacity
         key={category}
         style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-        onPress={() => setSelectedCollection(category)}
+        onPress={() => handleCategoryPress(category)}
       >
         <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
           {category}
@@ -301,8 +377,8 @@ export const ClientHomeScreen: React.FC = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={palette.bg} />
-       <ScrollView 
-        style={styles.container} 
+      <ScrollView
+        style={styles.container}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -323,9 +399,20 @@ export const ClientHomeScreen: React.FC = () => {
           >
             <View style={styles.headerContent}>
               <View style={styles.logoContainer}>
-                <Text style={styles.logoText}>libreshop</Text>
-                <Text style={styles.logoSlogan}>Achetez local, vivez mieux</Text>
+                <Text style={styles.logoText} numberOfLines={1} adjustsFontSizeToFit>libreshop</Text>
+                <Text style={styles.logoSlogan} numberOfLines={1}>Achetez local, vivez mieux</Text>
               </View>
+              <TouchableOpacity
+                style={styles.openShopButton}
+                onPress={() => navigation.navigate('SellerAuth')}
+              >
+                <Animated.View style={{ transform: [{ scale: pulseAnim }], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Ionicons name="storefront" size={16} color="white" />
+                  {!isMobile && (
+                    <Text style={styles.openShopButtonText}>Ouvrir ma boutique</Text>
+                  )}
+                </Animated.View>
+              </TouchableOpacity>
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -333,7 +420,7 @@ export const ClientHomeScreen: React.FC = () => {
                 >
                   <Ionicons name="heart-outline" size={22} color="white" />
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.iconButton}
                   onPress={() => navigation.navigate('Cart')}
                 >
@@ -348,7 +435,7 @@ export const ClientHomeScreen: React.FC = () => {
             </View>
 
             {/* Search Bar */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.searchBar}
               onPress={() => navigation.navigate('ClientSearch')}
               activeOpacity={0.7}
@@ -401,6 +488,22 @@ export const ClientHomeScreen: React.FC = () => {
                     contentContainerStyle={styles.bannerList}
                     snapToInterval={SCREEN_WIDTH - SPACING.xl * 2}
                     decelerationRate="fast"
+                    getItemLayout={(_, index) => ({
+                      length: SCREEN_WIDTH - SPACING.xl * 2,
+                      offset: (SCREEN_WIDTH - SPACING.xl * 2) * index,
+                      index,
+                    })}
+                    snapToAlignment="center"
+                    onScrollBeginDrag={() => setIsPaused(true)}
+                    onScrollEndDrag={() => {
+                      setTimeout(() => setIsPaused(false), 2000);
+                    }}
+                    onScrollToIndexFailed={(info) => {
+                      const wait = new Promise(resolve => setTimeout(resolve, 500));
+                      wait.then(() => {
+                        flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+                      });
+                    }}
                   />
 
                   {/* Pagination Dots */}
@@ -476,7 +579,7 @@ export const ClientHomeScreen: React.FC = () => {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.categoriesList}
                 >
-                  {extractCategoriesFromCollections(collections).map(renderCategoryChip)}
+                  {categoriesList.map(renderCategoryChip)}
                 </ScrollView>
               </View>
 
@@ -484,23 +587,39 @@ export const ClientHomeScreen: React.FC = () => {
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View>
-                    <Text style={styles.sectionTitle}>Boutiques vérifiées</Text>
+                    <Text style={styles.sectionTitle}>Boutiques populaires</Text>
                     <Text style={styles.sectionSubtitle}>Le meilleur du commerce local</Text>
                   </View>
                   <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
                     <Text style={styles.seeAll}>Tout voir</Text>
                   </TouchableOpacity>
                 </View>
-                <FlatList
-                  data={filteredStores}
-                  renderItem={renderStoreCard}
-                  keyExtractor={(item) => item.id}
+                <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.storesList}
                   snapToInterval={storeCardWidth + SPACING.md}
                   decelerationRate="fast"
-                />
+                >
+                  {loadingStores ? (
+                    [1, 2, 3].map((i) => (
+                      <StoreCardSkeleton key={i} />
+                    ))
+                  ) : (
+                    stores.slice(0, 5).map((item) => (
+                      <StoreCard
+                        key={item.id}
+                        name={item.name}
+                        category={item.category}
+                        description={item.description}
+                        logoUrl={item.logo_url}
+                        orderCount={item.total_orders || (Array.isArray(item.store_stats) ? item.store_stats[0]?.customers_count : item.store_stats?.customers_count) || 0}
+                        followersCount={(Array.isArray(item.store_stats) ? item.store_stats[0]?.followers_count : item.store_stats?.followers_count) || 0}
+                        onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
+                      />
+                    ))
+                  )}
+                </ScrollView>
               </View>
 
               {promoBanners.length > 0 ? (
@@ -535,40 +654,56 @@ export const ClientHomeScreen: React.FC = () => {
                 </TouchableOpacity>
               ) : null}
 
+              {/* Category Showcase - Amazon style */}
+              <CategoryShowcase
+                categories={categoriesList}
+                onNavigate={(cat) => handleCategoryPress(cat)}
+              />
+
               {/* Featured Products */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <View>
-                      <Text style={styles.sectionTitle}>Produits</Text>
-                      <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
+                    <Text style={styles.sectionTitle}>Produits</Text>
+                    <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
                   </View>
                   <TouchableOpacity onPress={() => navigation.navigate('ClientAllProducts')}>
                     <Text style={styles.seeAll}>Voir tout</Text>
                   </TouchableOpacity>
                 </View>
-                  {/* Sort tabs */}
-                  <SortTabs
-                    options={[
-                      { id: 'popular', label: 'Populaires' },
-                      { id: 'ranked', label: 'Tendance' },
-                      { id: 'newest', label: 'Nouveaux' },
-                      { id: 'sales', label: 'Top ventes' },
-                    ]}
-                    selected={productSort}
-                    onSelect={(id) => { setProductSort(id as any); loadData(); }}
-                  />
-
-                <FlatList
-                  data={products}
-                  renderItem={renderProductCard}
-                  keyExtractor={(item) => item.id}
-                  numColumns={numProductColumns}
-                  key={numProductColumns}
-                  scrollEnabled={true}
-                  nestedScrollEnabled={true}
-                  columnWrapperStyle={styles.productsGrid}
-                  contentContainerStyle={styles.productsList}
+                {/* Sort tabs */}
+                <SortTabs
+                  options={[
+                    { id: 'popular', label: 'Populaires' },
+                    { id: 'ranked', label: 'Tendance' },
+                    { id: 'newest', label: 'Nouveaux' },
+                    { id: 'sales', label: 'Top ventes' },
+                  ]}
+                  selected={productSort}
+                  onSelect={(id) => handleProductSortChange(id as any)}
                 />
+
+                {loadingProducts ? (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
+                    {[1, 2, 3, 4].map((i) => (
+                      <View key={i} style={{ width: responsiveProductCardWidth }}>
+                        <ProductCardSkeleton />
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <FlatList
+                    data={products}
+                    renderItem={renderProductCard}
+                    keyExtractor={(item) => item.id}
+                    numColumns={numProductColumns}
+                    key={numProductColumns}
+                    scrollEnabled={true}
+                    nestedScrollEnabled={true}
+                    columnWrapperStyle={styles.productsGrid}
+                    contentContainerStyle={styles.productsList}
+                  />
+                )}
               </View>
 
               {/* Newsletter */}
@@ -586,7 +721,7 @@ export const ClientHomeScreen: React.FC = () => {
               {/* Load More */}
               {hasMoreProducts && (
                 <View style={styles.loadMoreContainer}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.loadMoreButton}
                     onPress={handleLoadMoreProducts}
                     disabled={loadingMoreProducts}
@@ -606,7 +741,7 @@ export const ClientHomeScreen: React.FC = () => {
           )}
         </View>
       </ScrollView>
-      
+
       {/* PWA Install Button - Only on Web */}
       {Platform.OS === 'web' && <PWAInstallButton />}
     </View>
@@ -615,437 +750,456 @@ export const ClientHomeScreen: React.FC = () => {
 
 function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any) {
   return StyleSheet.create({
-  promoSection: {
-    marginBottom: SPACING.xl,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: palette.bg,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    backgroundColor: palette.bg,
-  },
-  maxWidthContainer: {
-    maxWidth: MAX_CONTENT_WIDTH,
-    width: '100%',
-    alignSelf: 'center',
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.xl,
-    borderBottomLeftRadius: RADIUS.xl,
-    borderBottomRightRadius: RADIUS.xl,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  logoContainer: {
-    flex: 1,
-  },
-  logoText: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '800',
-    color: palette.text,
-    letterSpacing: 0.5,
-  },
-  logoSlogan: {
-    fontSize: FONT_SIZE.xs,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: palette.danger,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: palette.border,
-  },
-  cartBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: palette.text,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: palette.card,
-    borderRadius: RADIUS.full,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    fontSize: FONT_SIZE.sm,
-    color: palette.textMuted,
-  },
-  
-  // Banner Carousel
-  bannerSection: {
-    marginTop: -SPACING.lg,
-    marginBottom: SPACING.md,
-  },
-  bannerList: {
-    paddingHorizontal: SPACING.xl,
-  },
-  bannerCard: {
-    width: '100%',
-    height: 180,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    backgroundColor: palette.card,
-    ...(Platform.OS === 'web'
-      ? { boxShadow: '0px 4px 8px rgba(0,0,0,0.2)' }
-      : {
+    promoSection: {
+      marginBottom: SPACING.xl,
+    },
+    container: {
+      flex: 1,
+      backgroundColor: palette.bg,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      backgroundColor: palette.bg,
+    },
+    maxWidthContainer: {
+      maxWidth: Platform.OS === 'web' ? '100%' : MAX_CONTENT_WIDTH,
+      width: '100%',
+      alignSelf: 'center',
+      flex: 1,
+    },
+    header: {
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING.xl,
+      paddingBottom: SPACING.xl,
+      borderBottomLeftRadius: RADIUS.xl,
+      borderBottomRightRadius: RADIUS.xl,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: SPACING.lg,
+    },
+    logoContainer: {
+      flex: 1,
+    },
+    logoText: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '800',
+      color: palette.text,
+      letterSpacing: 0.5,
+    },
+    logoSlogan: {
+      fontSize: FONT_SIZE.xs,
+      color: 'rgba(255,255,255,0.8)',
+      marginTop: 2,
+    },
+    openShopButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.3)',
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADIUS.full,
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.5)',
+      marginRight: SPACING.sm,
+      ...(Platform.OS === 'web' ? { boxShadow: '0 0 15px rgba(255,255,255,0.4)' } : { elevation: 5 }),
+    },
+    openShopButtonText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: 'white',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    iconButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cartBadge: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      backgroundColor: palette.danger,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: palette.border,
+    },
+    cartBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.card,
+      borderRadius: RADIUS.full,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      gap: SPACING.sm,
+    },
+    searchPlaceholder: {
+      flex: 1,
+      fontSize: FONT_SIZE.sm,
+      color: palette.textMuted,
+    },
+
+    // Banner Carousel
+    bannerSection: {
+      marginTop: -SPACING.lg,
+      marginBottom: SPACING.md,
+    },
+    bannerList: {
+      paddingHorizontal: SPACING.xl,
+    },
+    bannerCard: {
+      width: '100%',
+      height: 180,
+      borderRadius: RADIUS.lg,
+      overflow: 'hidden',
+      backgroundColor: palette.card,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0px 4px 8px rgba(0,0,0,0.2)' }
+        : {
           boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.2)',
           elevation: 5,
         }),
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-  },
-  bannerGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '70%',
-  },
-  bannerContent: {
-    position: 'absolute',
-    bottom: SPACING.lg,
-    left: SPACING.lg,
-    right: SPACING.lg,
-  },
-  bannerTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
-    color: palette.text,
-    marginBottom: 4,
-    ...(Platform.OS === 'web'
-      ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
-      : {
+    },
+    bannerImage: {
+      width: '100%',
+      height: '100%',
+      position: 'absolute',
+    },
+    bannerGradient: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: '70%',
+    },
+    bannerContent: {
+      position: 'absolute',
+      bottom: SPACING.lg,
+      left: SPACING.lg,
+      right: SPACING.lg,
+    },
+    bannerTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '800',
+      color: palette.text,
+      marginBottom: 4,
+      ...(Platform.OS === 'web'
+        ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
+        : {
           textShadow: '0px 1px 2px rgba(0,0,0,0.3)',
         }),
-  },
-  bannerSubtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: SPACING.sm,
-    ...(Platform.OS === 'web'
-      ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
-      : {
+    },
+    bannerSubtitle: {
+      fontSize: FONT_SIZE.sm,
+      color: 'rgba(255,255,255,0.9)',
+      marginBottom: SPACING.sm,
+      ...(Platform.OS === 'web'
+        ? { textShadow: '0px 1px 2px rgba(0,0,0,0.3)' }
+        : {
           textShadow: '0px 1px 2px rgba(0,0,0,0.3)',
         }),
-  },
-  bannerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
-    gap: SPACING.xs,
-  },
-  bannerButtonText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: palette.text,
-  },
-  paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: SPACING.md,
-    gap: SPACING.xs,
-  },
-  paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: palette.border,
-  },
-  paginationDotActive: {
-    width: 24,
-    backgroundColor: palette.accent,
-  },
-  
-  // Quick Actions
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-  },
-  quickAction: {
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickActionText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '500',
-    color: palette.text,
-  },
-  
-  // Categories
-  categoriesSection: {
-    marginBottom: SPACING.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    marginBottom: SPACING.md,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: palette.text,
-  },
-  sectionSubtitle: {
-    fontSize: FONT_SIZE.xs,
-    color: palette.textMuted,
-    marginTop: 2,
-  },
-  seeAll: {
-    fontSize: FONT_SIZE.sm,
-    color: palette.accent,
-    fontWeight: '600',
-  },
-  categoriesList: {
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.sm,
-  },
-  categoryChip: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    backgroundColor: palette.card,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  categoryChipActive: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
-  },
-  categoryChipText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
-    color: palette.textSoft,
-  },
-  categoryChipTextActive: {
-    color: palette.text,
-  },
-  
-  // Sections
-  section: {
-    marginBottom: SPACING.xl,
-  },
-  storesList: {
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.md,
-  },
-  productsList: {
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.md,
-  },
-  productsGrid: {
-    justifyContent: 'flex-start',
-    gap: SPACING.md,
-  },
-  productCardWrapper: {
-    marginBottom: SPACING.lg,
-  },
-  storeNameLabel: {
-    fontSize: FONT_SIZE.xs,
-    color: palette.textMuted,
-    marginTop: 4,
-    paddingHorizontal: 2,
-  },
-  
-  // Promo Banner
-  promoBanner: {
-    flexDirection: 'row',
-    marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    height: 140,
-  },
-  promoContent: {
-    flex: 1,
-    padding: SPACING.lg,
-    justifyContent: 'center',
-  },
-  promoTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '800',
-    color: palette.text,
-    marginBottom: 4,
-  },
-  promoSubtitle: {
-    fontSize: FONT_SIZE.sm,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: SPACING.md,
-  },
-  promoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    gap: SPACING.xs,
-  },
-  promoButtonText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: palette.text,
-  },
-  promoImage: {
-    width: 120,
-    height: '100%',
-  },
-  
-  // Newsletter
-  newsletterSection: {
-    marginHorizontal: SPACING.xl,
-    marginBottom: SPACING.xl,
-    padding: SPACING.xl,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  newsletterTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: palette.text,
-    marginBottom: SPACING.sm,
-    textAlign: 'center',
-  },
-  newsletterText: {
-    fontSize: FONT_SIZE.sm,
-    color: palette.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-  },
-  newsletterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: palette.accent,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.full,
-    gap: SPACING.sm,
-  },
-  newsletterButtonText: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-    color: palette.text,
-  },
-  
-  // Load More
-  loadMoreContainer: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  loadMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: palette.card,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  loadMoreText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: palette.accent,
-  },
-  
-  // Loading & Error States
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: SPACING.xxxl,
-    gap: SPACING.md,
-  },
-  loadingText: {
-    fontSize: FONT_SIZE.md,
-    color: palette.textMuted,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: SPACING.xxxl,
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.md,
-  },
-  errorTitle: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: palette.text,
-  },
-  errorText: {
-    fontSize: FONT_SIZE.md,
-    color: palette.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-  },
-  retryButton: {
-    backgroundColor: palette.accent,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.full,
-  },
-  retryButtonText: {
-    color: palette.text,
-    fontWeight: '600',
-    fontSize: FONT_SIZE.md,
-  },
-});
+    },
+    bannerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: RADIUS.full,
+      gap: SPACING.xs,
+    },
+    bannerButtonText: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '600',
+      color: palette.text,
+    },
+    paginationContainer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: SPACING.md,
+      gap: SPACING.xs,
+    },
+    paginationDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: palette.border,
+    },
+    paginationDotActive: {
+      width: 24,
+      backgroundColor: palette.accent,
+    },
+
+    // Quick Actions
+    quickActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingHorizontal: SPACING.xl,
+      marginBottom: SPACING.xl,
+    },
+    quickAction: {
+      alignItems: 'center',
+      gap: SPACING.xs,
+    },
+    quickActionIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickActionText: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '500',
+      color: palette.text,
+    },
+
+    // Categories
+    categoriesSection: {
+      marginBottom: SPACING.xl,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.xl,
+      marginBottom: SPACING.md,
+    },
+    sectionTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    sectionSubtitle: {
+      fontSize: FONT_SIZE.xs,
+      color: palette.textMuted,
+      marginTop: 2,
+    },
+    seeAll: {
+      fontSize: FONT_SIZE.sm,
+      color: palette.accent,
+      fontWeight: '600',
+    },
+    categoriesList: {
+      paddingHorizontal: SPACING.xl,
+      gap: SPACING.sm,
+    },
+    categoryChip: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADIUS.full,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    categoryChipActive: {
+      backgroundColor: palette.accent,
+      borderColor: palette.accent,
+    },
+    categoryChipText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '500',
+      color: palette.textSoft,
+    },
+    categoryChipTextActive: {
+      color: palette.text,
+    },
+
+    // Sections
+    section: {
+      marginBottom: SPACING.xl,
+    },
+    storesList: {
+      paddingHorizontal: SPACING.xl,
+      gap: SPACING.md,
+    },
+    productsList: {
+      paddingHorizontal: SPACING.xl,
+      gap: SPACING.md,
+    },
+    productsGrid: {
+      justifyContent: 'flex-start',
+      gap: SPACING.md,
+    },
+    productCardWrapper: {
+      marginBottom: SPACING.lg,
+    },
+    storeNameLabel: {
+      fontSize: FONT_SIZE.xs,
+      color: palette.textMuted,
+      marginTop: 4,
+      paddingHorizontal: 2,
+    },
+
+    // Promo Banner
+    promoBanner: {
+      flexDirection: 'row',
+      marginHorizontal: SPACING.xl,
+      marginBottom: SPACING.xl,
+      borderRadius: RADIUS.lg,
+      overflow: 'hidden',
+      height: 140,
+    },
+    promoContent: {
+      flex: 1,
+      padding: SPACING.lg,
+      justifyContent: 'center',
+    },
+    promoTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '800',
+      color: palette.text,
+      marginBottom: 4,
+    },
+    promoSubtitle: {
+      fontSize: FONT_SIZE.sm,
+      color: 'rgba(255,255,255,0.9)',
+      marginBottom: SPACING.md,
+    },
+    promoButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADIUS.full,
+      gap: SPACING.xs,
+    },
+    promoButtonText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '600',
+      color: palette.text,
+    },
+    promoImage: {
+      width: 120,
+      height: '100%',
+    },
+
+    // Newsletter
+    newsletterSection: {
+      marginHorizontal: SPACING.xl,
+      marginBottom: SPACING.xl,
+      padding: SPACING.xl,
+      borderRadius: RADIUS.lg,
+      overflow: 'hidden',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255,255,255,0.9)',
+    },
+    newsletterTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: palette.text,
+      marginBottom: SPACING.sm,
+      textAlign: 'center',
+    },
+    newsletterText: {
+      fontSize: FONT_SIZE.sm,
+      color: palette.textMuted,
+      textAlign: 'center',
+      marginBottom: SPACING.lg,
+    },
+    newsletterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.accent,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.full,
+      gap: SPACING.sm,
+    },
+    newsletterButtonText: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '600',
+      color: palette.text,
+    },
+
+    // Load More
+    loadMoreContainer: {
+      alignItems: 'center',
+      marginBottom: SPACING.xl,
+    },
+    loadMoreButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      backgroundColor: palette.card,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.full,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    loadMoreText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '600',
+      color: palette.accent,
+    },
+
+    // Loading & Error States
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: SPACING.xxxl,
+      gap: SPACING.md,
+    },
+    loadingText: {
+      fontSize: FONT_SIZE.md,
+      color: palette.textMuted,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: SPACING.xxxl,
+      paddingHorizontal: SPACING.xl,
+      gap: SPACING.md,
+    },
+    errorTitle: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    errorText: {
+      fontSize: FONT_SIZE.md,
+      color: palette.textMuted,
+      textAlign: 'center',
+      marginBottom: SPACING.lg,
+    },
+    retryButton: {
+      backgroundColor: palette.accent,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.full,
+    },
+    retryButtonText: {
+      color: palette.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
+    },
+  });
 }
 
 export default ClientHomeScreen;

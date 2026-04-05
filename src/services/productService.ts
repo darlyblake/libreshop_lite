@@ -168,10 +168,9 @@ export const productService = {
       .eq('is_active', true)
       .gt('stock', 0);
 
-    if (sort === 'popular' || sort === 'trending') {
-      query = query.order('created_at', { ascending: false });
-    } else if (sort === 'sales' || sort === 'top') {
-      query = query.order('created_at', { ascending: false });
+    if (sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top') {
+      // Fallback to view_count because total_sales doesn't exist on the table
+      query = query.order('view_count', { ascending: false, nullsFirst: false });
     } else {
       query = query.order('created_at', { ascending: false });
     }
@@ -190,6 +189,20 @@ export const productService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async getPopularByCategory(category: string, limit: number = 4) {
+    const client = useSupabase();
+    const { data, error } = await client
+      .from('products')
+      .select('id, name, price, images, view_count, stores!inner(category)')
+      .eq('stores.category', category)
+      .eq('is_active', true)
+      .order('view_count', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
   },
 
   async update(id: string, product: Partial<Product>) {

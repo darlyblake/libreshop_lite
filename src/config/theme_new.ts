@@ -5,7 +5,7 @@
 
 import { Platform } from 'react-native';
 import { lightColors, darkColors, amoledTheme, ColorPalette } from './colors';
-import { getResponsiveSpacing } from './breakpoints';
+import { getResponsiveSpacing, getResponsiveFontSize } from './breakpoints';
 
 // Espacements responsives
 export const SPACING = {
@@ -83,7 +83,7 @@ export const themes: Record<'light' | 'dark' | 'amoled', Theme> = {
     platform: Platform.OS as 'ios' | 'android' | 'web',
     responsive: {
       spacing: getResponsiveSpacing,
-      fontSize: (width: number) => getResponsiveSpacing(width), // Sera remplacé par la vraie fonction
+      fontSize: getResponsiveFontSize,
     },
     accessibility: {
       highContrast: false,
@@ -101,7 +101,7 @@ export const themes: Record<'light' | 'dark' | 'amoled', Theme> = {
     platform: Platform.OS as 'ios' | 'android' | 'web',
     responsive: {
       spacing: getResponsiveSpacing,
-      fontSize: (width: number) => getResponsiveSpacing(width), // Sera remplacé par la vraie fonction
+      fontSize: getResponsiveFontSize,
     },
     accessibility: {
       highContrast: false,
@@ -119,7 +119,7 @@ export const themes: Record<'light' | 'dark' | 'amoled', Theme> = {
     platform: Platform.OS as 'ios' | 'android' | 'web',
     responsive: {
       spacing: getResponsiveSpacing,
-      fontSize: (width: number) => getResponsiveSpacing(width), // Sera remplacé par la vraie fonction
+      fontSize: getResponsiveFontSize,
     },
     accessibility: {
       highContrast: true,

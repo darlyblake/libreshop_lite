@@ -163,6 +163,13 @@ export const adminService = {
     if (diffMinutes < 60) return `Il y a ${diffMinutes} min`;
     if (diffHours < 24) return `Il y a ${diffHours} h`;
     if (diffDays === 1) return 'Hier';
+    if (diffDays >= 5) {
+      return date.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit'
+      });
+    }
     return `Il y a ${diffDays} j`;
   },
   

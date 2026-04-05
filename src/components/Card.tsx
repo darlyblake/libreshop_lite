@@ -11,6 +11,161 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { cloudinaryService } from '../services/cloudinaryService';
 
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
+    card: {
+      backgroundColor: COLORS.card,
+      borderRadius: RADIUS.xl,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      padding: SPACING.xl,
+    },
+    // Store Card Styles
+    storeCard: {
+      backgroundColor: COLORS.card,
+      borderRadius: RADIUS.xl,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      padding: SPACING.xl,
+      alignItems: 'center',
+      minHeight: 200,
+      justifyContent: 'space-between',
+    },
+    storeImageContainer: {
+      marginBottom: SPACING.md,
+    },
+    storeImage: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderWidth: 2,
+      borderColor: COLORS.accent,
+    },
+    storeImagePlaceholder: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: COLORS.accent + '20',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    storeImagePlaceholderText: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '700',
+      color: COLORS.accent,
+    },
+    storeName: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '700',
+      color: COLORS.text,
+      textAlign: 'center',
+      marginBottom: 2,
+    },
+    storeCategory: {
+      fontSize: 10,
+      color: COLORS.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      textAlign: 'center',
+      marginBottom: SPACING.sm,
+    },
+    storeDescription: {
+      fontSize: FONT_SIZE.xs,
+      color: COLORS.textSoft,
+      textAlign: 'center',
+      marginBottom: SPACING.md,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      marginTop: 'auto',
+    },
+    statBadge: {
+      backgroundColor: COLORS.borderLight,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 2,
+      borderRadius: RADIUS.sm,
+      borderWidth: 1,
+      borderColor: 'rgba(0,0,0,0.05)',
+    },
+    statBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: COLORS.textSoft,
+    },
+    // Product Card Styles
+    productCard: {
+      backgroundColor: COLORS.card,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      overflow: 'hidden',
+    },
+    productImageContainer: {
+      aspectRatio: 0.5,
+      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    },
+    productImage: {
+      width: '100%',
+      height: '100%',
+    },
+    productImagePlaceholder: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    productImagePlaceholderText: {
+      fontSize: 40,
+    },
+    productName: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '600',
+      color: COLORS.text,
+      padding: SPACING.sm,
+      paddingBottom: SPACING.xs,
+    },
+    priceContainer: {
+      paddingHorizontal: SPACING.sm,
+      paddingBottom: SPACING.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+    },
+    productPrice: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '700',
+      color: COLORS.accent,
+    },
+    productComparePrice: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.textMuted,
+      textDecorationLine: 'line-through',
+    },
+    promoBadge: {
+      position: 'absolute',
+      top: SPACING.sm,
+      left: SPACING.sm,
+      backgroundColor: '#FF3B30',
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: 2,
+      borderRadius: RADIUS.sm,
+      elevation: 4,
+    },
+    promoBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+  });
+};
+
 interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -19,12 +174,7 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, style, onPress }) => {
   const themeContext = useTheme();
-  const theme = themeContext.theme;
-  const COLORS = themeContext.getColor;
-  const SPACING = themeContext.spacing;
-  const RADIUS = themeContext.radius;
-  const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const Wrapper = onPress ? TouchableOpacity : View;
   return (
@@ -45,6 +195,8 @@ interface StoreCardProps {
   description?: string;
   logoUrl?: string;
   productCount?: number;
+  followersCount?: number;
+  orderCount?: number;
   onPress: () => void;
 }
 
@@ -54,15 +206,13 @@ export const StoreCard: React.FC<StoreCardProps> = ({
   description,
   logoUrl,
   productCount,
+  followersCount,
+  orderCount,
   onPress,
 }) => {
   const themeContext = useTheme();
-  const theme = themeContext.theme;
   const COLORS = themeContext.getColor;
-  const SPACING = themeContext.spacing;
-  const RADIUS = themeContext.radius;
-  const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   return (
     <TouchableOpacity style={styles.storeCard} onPress={onPress} activeOpacity={0.8}>
@@ -80,11 +230,23 @@ export const StoreCard: React.FC<StoreCardProps> = ({
       <Text style={styles.storeName}>{name}</Text>
       <Text style={styles.storeCategory}>{category}</Text>
       {description && <Text style={styles.storeDescription}>{description}</Text>}
-      {productCount !== undefined && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{productCount} produits</Text>
-        </View>
-      )}
+      <View style={styles.statsContainer}>
+        {orderCount !== undefined && orderCount > 0 && (
+          <View style={[styles.statBadge, { backgroundColor: COLORS.success + '20' }]}>
+            <Text style={[styles.statBadgeText, { color: COLORS.success }]}>📦 {orderCount}</Text>
+          </View>
+        )}
+        {followersCount !== undefined && followersCount > 0 && (
+          <View style={[styles.statBadge, { backgroundColor: COLORS.accent + '20' }]}>
+            <Text style={[styles.statBadgeText, { color: COLORS.accent }]}>👤 {followersCount}</Text>
+          </View>
+        )}
+        {productCount !== undefined && (
+          <View style={styles.statBadge}>
+            <Text style={styles.statBadgeText}>{productCount} prod.</Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -106,12 +268,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onPress,
 }) => {
   const themeContext = useTheme();
-  const theme = themeContext.theme;
   const COLORS = themeContext.getColor;
-  const SPACING = themeContext.spacing;
-  const RADIUS = themeContext.radius;
-  const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   return (
     <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.8}>
@@ -140,148 +298,5 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
-
-const getStyles = (theme: any) => {
-  const COLORS = theme.getColor;
-  const SPACING = theme.spacing;
-  const RADIUS = theme.radius;
-  const FONT_SIZE = theme.fontSize;
-  return StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: SPACING.xl,
-  },
-  // Store Card Styles
-  storeCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: SPACING.xl,
-    alignItems: 'center',
-  },
-  storeImageContainer: {
-    marginBottom: SPACING.md,
-  },
-  storeImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: COLORS.accent,
-  },
-  storeImagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storeImagePlaceholderText: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  storeName: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.xs,
-  },
-  storeCategory: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: SPACING.sm,
-  },
-  storeDescription: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
-    textAlign: 'center',
-    marginBottom: SPACING.sm,
-  },
-  badge: {
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
-  },
-  badgeText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  // Product Card Styles
-  productCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    overflow: 'hidden',
-  },
-  productImageContainer: {
-    aspectRatio: 0.5,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-  },
-  productImagePlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  productImagePlaceholderText: {
-    fontSize: 40,
-  },
-  productName: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.text,
-    padding: SPACING.sm,
-    paddingBottom: SPACING.xs,
-  },
-  priceContainer: {
-    paddingHorizontal: SPACING.sm,
-    paddingBottom: SPACING.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  productPrice: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '700',
-    color: COLORS.accent,
-  },
-  productComparePrice: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
-    textDecorationLine: 'line-through',
-  },
-  promoBadge: {
-    position: 'absolute',
-    top: SPACING.sm,
-    left: SPACING.sm,
-    backgroundColor: '#FF3B30', // A vibrant red for promo
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-    elevation: 4,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.25)',
-  },
-  promoBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-});
 };
 

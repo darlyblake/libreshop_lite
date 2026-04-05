@@ -126,8 +126,8 @@ export const PWAInstallButton: React.FC = () => {
       }
       
       setDeferredPrompt(null);
-    } catch (error) {
-      errorHandler.handle('Erreur lors de l\'installation:', error, 'UnknownContext');
+    } catch (error: any) {
+      errorHandler.handle(error, 'PWA installation error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       showIOSInstallInstructions();
     }
   };
@@ -167,15 +167,17 @@ export const PWAInstallButton: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="download-outline" size={24} color={COLORS.accent} />
-        </View>
-        
-        <View style={styles.textContainer}>
-          <Text style={styles.title}>Installer LibreShop</Text>
-          <Text style={styles.subtitle}>
-            Installez l\'application pour un accès rapide et une expérience optimale
-          </Text>
+        <View style={styles.topRow}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="download-outline" size={24} color={COLORS.accent} />
+          </View>
+          
+          <View style={styles.textContainer}>
+            <Text style={styles.title}>Installer LibreShop</Text>
+            <Text style={styles.subtitle}>
+              Installez l'application pour un accès rapide et une expérience optimale
+            </Text>
+          </View>
         </View>
         
         <View style={styles.buttonContainer}>
@@ -211,23 +213,48 @@ const getStyles = (theme: any) => {
     container: {
       position: 'absolute',
       bottom: SPACING.lg,
-      left: SPACING.lg,
-      right: SPACING.lg,
-      backgroundColor: COLORS.card,
-      borderRadius: RADIUS.lg,
-      padding: SPACING.md,
       ...Platform.select({
         web: {
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.15)',
+          right: SPACING.lg,
+          width: 350,
+          backgroundColor: COLORS.card,
+          borderRadius: RADIUS.lg,
+          borderWidth: 1,
+          borderColor: COLORS.border,
         },
         default: {
-          boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.15)',
+          left: SPACING.lg,
+          right: SPACING.lg,
+          backgroundColor: COLORS.card,
+          borderRadius: RADIUS.lg,
           elevation: 8,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
         },
       }),
+      padding: SPACING.md,
       zIndex: 1000,
+      // Fallback for web boxShadow if needed
+      ...(Platform.OS === 'web' && {
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      } as any),
     },
     content: {
+      ...Platform.select({
+        web: {
+          flexDirection: 'column',
+          alignItems: 'stretch',
+        },
+        default: {
+          flexDirection: 'row',
+          alignItems: 'center',
+        }
+      }),
+      gap: SPACING.md,
+    },
+    topRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.md,
@@ -257,7 +284,9 @@ const getStyles = (theme: any) => {
     buttonContainer: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: Platform.OS === 'web' ? 'flex-end' : 'flex-start',
       gap: SPACING.sm,
+      marginTop: Platform.OS === 'web' ? SPACING.sm : 0,
     },
     button: {
       flexDirection: 'row',

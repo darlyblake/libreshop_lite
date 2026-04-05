@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import Animated, {
@@ -38,6 +38,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
 
 export const ClientAllStoresScreen: React.FC = () => {
+  const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
@@ -95,8 +96,9 @@ export const ClientAllStoresScreen: React.FC = () => {
       const currentPage = reset ? 0 : page;
       const pageSize = 20;
 
-      // Récupérer les boutiques triées par 'score' (store_score calculé en base)
-      const data = await storeService.getAll(currentPage, pageSize, 'score');
+      // Récupérer les boutiques avec le tri passé en paramètre ou par défaut
+      const sortParam = route.params?.sort || 'score';
+      const data = await storeService.getAll(currentPage, pageSize, sortParam);
       const list = (data || []) as Store[];
       
       if (reset) {

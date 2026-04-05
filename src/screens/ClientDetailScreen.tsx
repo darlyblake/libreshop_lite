@@ -74,44 +74,91 @@ export const ClientDetailScreen: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    if (!user?.id) return;
+  const loadData = useCallback(async (isReset = true) => {
+    if (!user?.id || !clientId) return;
     try {
+      if (isReset) {
+        setLoading(true);
+        setNextCursor(null);
+      } else {
+        setLoadingMore(true);
+      }
+
       const store = await storeService.getByUser(user.id);
       if (!store?.id) return;
 
-      const allOrders: any[] = await orderService.getByStore(store.id);
+      const limit = 20;
 
-      // Filter by clientId (phone or name-based id used in SellerClientsScreen)
-      const clientOrders = allOrders.filter((o: any) => {
+      // Use search feature with a higher limit to find more client orders
+      const response: any = await orderService.getByStore(store.id, { 
+        limit, 
+        search: clientId.replace(/[^\d+]/g, ''), // Clean the phone for searching
+        includeUser: true,
+        cursor: isReset ? undefined : (nextCursor || undefined)
+      });
+      
+      const ordersData = Array.isArray(response?.orders) ? response.orders : (Array.isArray(response) ? response : []);
+      const more = response?.hasMore || false;
+      const cursor = response?.nextCursor || null;
+
+      // Normalize phone for comparison (remove +, spaces)
+      const targetPhone = clientId.replace(/[^\d]/g, '');
+
+      const clientOrdersData = ordersData.filter((o: any) => {
         const phone = String(o?.customer_phone || '').trim();
+        const cleanOPhone = phone.replace(/[^\d]/g, '');
         const name  = String(o?.customer_name || '').trim();
         const uid   = String(o?.user_id || '').trim();
-        const id    = phone || name || uid || o?.id || '';
-        return id === clientId || phone === clientId;
+        
+        // Match by normalized phone, name, or user_id
+        return (cleanOPhone && targetPhone && cleanOPhone.includes(targetPhone)) || 
+               (targetPhone && cleanOPhone.includes(targetPhone)) ||
+               name === clientId || 
+               uid === clientId || 
+               phone === clientId ||
+               o?.id === clientId;
       });
 
-      setOrders(
-        clientOrders.map((o: any) => ({
-          id: String(o.id),
-          customer_phone: String(o.customer_phone || ''),
-          customer_name:  String(o.customer_name || o?.users?.full_name || ''),
-          total_amount:   Number(o.total_amount || 0),
-          status:         (o.status as Order['status']) || 'pending',
-          created_at:     String(o.created_at || ''),
-          order_items:    Array.isArray(o.order_items) ? o.order_items : [],
-        }))
-      );
+      const mappedOrders = clientOrdersData.map((o: any) => ({
+        id: String(o.id),
+        customer_phone: String(o.customer_phone || ''),
+        customer_name:  String(o.customer_name || o?.users?.full_name || ''),
+        total_amount:   Number(o.total_amount || 0),
+        status:         (o.status as Order['status']) || 'pending',
+        created_at:     String(o.created_at || ''),
+        order_items:    Array.isArray(o.order_items) ? o.order_items : [],
+      }));
+
+      if (isReset) {
+        setOrders(mappedOrders);
+      } else {
+        setOrders(prev => [...prev, ...mappedOrders]);
+      }
+
+      setHasMore(more);
+      setNextCursor(cursor);
+
     } catch (e: any) {
+      console.error('ClientDetail Error:', e);
       Alert.alert('Erreur', e?.message || 'Impossible de charger les données client');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
-  }, [user?.id, clientId]);
+  }, [user?.id, clientId, nextCursor]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadData(true); }, []); // Initial load only once
+
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+      loadData(false);
+    }
+  };
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -319,6 +366,23 @@ export const ClientDetailScreen: React.FC = () => {
               );
             })
           )}
+          
+          {hasMore && (
+            <TouchableOpacity 
+              style={styles.loadMoreBtn} 
+              onPress={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? (
+                <ActivityIndicator size="small" color={COLORS.accent} />
+              ) : (
+                <>
+                  <Text style={styles.loadMoreText}>Charger plus de commandes</Text>
+                  <Ionicons name="chevron-down" size={16} color={COLORS.accent} />
+                </>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -452,6 +516,24 @@ const styles = StyleSheet.create({
   // Empty
   emptyState: { alignItems: 'center', paddingVertical: SPACING.xxl * 2, gap: 8 },
   emptyText: { fontSize: FONT_SIZE.md, color: COLORS.textMuted },
+
+  loadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: SPACING.md,
+    marginTop: SPACING.md,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  loadMoreText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
 });
 
 export default ClientDetailScreen;

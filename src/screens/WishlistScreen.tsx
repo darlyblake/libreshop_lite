@@ -266,12 +266,7 @@ export const WishlistScreen: React.FC = () => {
           </Text>
         </View>
         
-        {/* products_count est calculé ou ignoré si la colonne est absente */}
-        {follow.store?.total_orders !== undefined && (
-          <Text style={styles.productCount}>
-            {follow.store.total_orders} commande(s) réalisée(s)
-          </Text>
-        )}
+        {/* products_count et total_orders sont absents ou gérés via store_stats */}
       </View>
       
       <TouchableOpacity

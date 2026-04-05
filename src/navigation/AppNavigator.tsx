@@ -38,7 +38,8 @@ const linking = {
     : [Linking.createURL('/')],
   config: {
     screens: {
-      Landing: '',
+      ClientTabs: '',
+      Landing: 'welcome',
       SellerEmailConfirm: 'auth/confirm',
       StoreDetail: 'store/:slug?',
       ProductDetail: 'product/:productId',
@@ -291,7 +292,7 @@ const SellerTabs: React.FC = React.memo(() => {
 // Navigateur principal
 export const AppNavigator: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
-  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Landing');
+  const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('ClientTabs');
   const appState = useRef(AppState.currentState);
 
   // Auth store avec fallback sécurisé
@@ -406,7 +407,7 @@ export const AppNavigator: React.FC = () => {
       setLoading(true);
       try {
         if (!supabase?.auth) {
-          setInitialRoute('Landing');
+          setInitialRoute('ClientTabs');
           return;
         }
 
@@ -445,7 +446,7 @@ export const AppNavigator: React.FC = () => {
         }
       } catch (error) {
         errorHandler.handleAuthError(error as Error, 'SessionRestoration');
-        setInitialRoute('Landing');
+        setInitialRoute('ClientTabs');
       } finally {
         setLoading(false);
         setIsReady(true);
@@ -465,7 +466,7 @@ export const AppNavigator: React.FC = () => {
           if (!session?.user) {
             setUser(null);
             setSession(null);
-            setInitialRoute('Landing');
+            setInitialRoute('ClientTabs');
             return;
           }
 
@@ -489,17 +490,8 @@ export const AppNavigator: React.FC = () => {
   // Helper pour déterminer la route initiale
   const getInitialRouteForRole = async (role: UserRole, userId: string): Promise<keyof RootStackParamList> => {
     switch (role) {
-      case 'seller': {
-        try {
-          const isExpired = await checkSubscription(userId);
-          if (isExpired) return 'SubscriptionExpired';
-          
-          const hasStore = await storeService.getByUser(userId).catch(() => null);
-          return hasStore ? 'SellerTabs' : 'SellerAddStore';
-        } catch {
-          return 'SubscriptionExpired';
-        }
-      }
+      case 'seller':
+        return 'ClientTabs';
       case 'admin':
         return 'AdminDashboard';
       case 'client':

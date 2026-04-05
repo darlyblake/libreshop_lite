@@ -130,6 +130,7 @@ export interface Store {
   rating_count?: number;
   products_count?: number; // Calculé ou via trigger
   created_at: string;
+  store_stats?: any;
 }
 
 // Types pour les produits
@@ -156,6 +157,10 @@ export interface Product {
   view_count?: number;
   total_sales?: number;
   created_at: string;
+  stores?: {
+    name: string;
+    logo_url?: string;
+  };
 }
 
 export interface ProductReview {

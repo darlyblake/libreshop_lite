@@ -44,11 +44,13 @@ interface Order {
   paymentMethod: string;
   paymentStatus?: 'pending' | 'paid' | 'failed';
   deliveryAddress?: string;
+  isoDate?: string;
 }
 
 const formatTimeAgo = (isoDate?: string) => {
   if (!isoDate) return '';
-  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const dateObj = new Date(isoDate);
+  const diffMs = Date.now() - dateObj.getTime();
   if (!Number.isFinite(diffMs) || diffMs < 0) return '';
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 60) return `Il y a ${diffMin} min`;
@@ -56,6 +58,13 @@ const formatTimeAgo = (isoDate?: string) => {
   if (diffHours < 24) return `Il y a ${diffHours}h`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays === 1) return 'Hier';
+  if (diffDays >= 5) {
+    return dateObj.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit'
+    });
+  }
   return `Il y a ${diffDays}j`;
 };
 
@@ -135,6 +144,7 @@ export const SellerOrdersScreen: React.FC = () => {
   const [sortBy, setSortBy] = React.useState<'date' | 'total'>('date');
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc');
   const [storeId, setStoreId] = React.useState<string | null>(null);
+  const [storeName, setStoreName] = React.useState<string | null>(null);
   const [updatingOrderId, setUpdatingOrderId] = React.useState<string | null>(null);
   
   // 🚀 États pour la pagination optimisée
@@ -184,6 +194,7 @@ export const SellerOrdersScreen: React.FC = () => {
       
 
       setStoreId(store.id);
+      setStoreName(store.name || null);
 
       // 🎯 Requête optimisée avec cursor et filtres
       const result = await orderService.getByStore(store.id, {
@@ -225,6 +236,7 @@ export const SellerOrdersScreen: React.FC = () => {
           paymentMethod: String(o.payment_method || ''),
           paymentStatus: o.payment_status,
           deliveryAddress: o.shipping_address,
+          isoDate: o.created_at,
         };
       });
 
@@ -304,6 +316,15 @@ export const SellerOrdersScreen: React.FC = () => {
     delivered: orders.filter((o) => o.status === 'delivered').length,
   }), [orders]);
 
+  const delayedOrdersCount = useMemo(() => {
+    return orders.filter(o => {
+      if (!o.isoDate) return false;
+      if (['delivered', 'cancelled', 'refunded', 'pending'].includes(o.status)) return false;
+      const daysOld = (Date.now() - new Date(o.isoDate).getTime()) / (1000 * 60 * 60 * 24);
+      return daysOld >= 2;
+    }).length;
+  }, [orders]);
+
   const handleStatusChange = async (orderId: string, newStatus: Order['status']) => {
     
     const actionText = newStatus === 'cancelled' ? 'annuler' : 
@@ -341,9 +362,20 @@ export const SellerOrdersScreen: React.FC = () => {
     }
   };
 
-  const handleContactCustomer = (phone: string, customer: string, total: number) => {
-    const formattedPhone = phone.replace(/[^0-9+]/g, '');
-    const message = `Bonjour ${customer}, concernant votre commande de ${total.toLocaleString()} FCFA sur LibreShop.`;
+  const handleContactCustomer = (order: Order) => {
+    const formattedPhone = order.phone.replace(/[^0-9+]/g, '');
+    const itemsList = order.items.map(item => `- ${item.name} (x${item.quantity || 1})`).join('\n');
+    const storeText = storeName ? `la boutique ${storeName} sur Libreshop` : `Libreshop`;
+    
+    const message = `Bonjour, je suis le vendeur de ${storeText}.
+Je vous contacte concernant votre commande #${order.id.slice(0, 8).toUpperCase()}.
+
+Produits :
+${itemsList}
+
+Pouvez-vous me confirmer votre disponibilité pour la livraison ?
+Merci.`;
+    
     const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
     
     Linking.canOpenURL(url).then((supported: boolean) => {
@@ -477,7 +509,7 @@ export const SellerOrdersScreen: React.FC = () => {
                 </Text>
                 <TouchableOpacity 
                   style={styles.phoneRow}
-                  onPress={() => handleContactCustomer(order.phone, order.customer, order.total)}
+                  onPress={() => handleContactCustomer(order)}
                 >
                   <Ionicons name="logo-whatsapp" size={fontSize.sm} color={COLORS.success} />
                   <Text style={[styles.phoneText, { fontSize: fontSize.sm }]}>
@@ -529,6 +561,53 @@ export const SellerOrdersScreen: React.FC = () => {
               )}
             </View>
           </View>
+
+          {/* === PROGRESS BAR (ZEIGARNIK EFFECT) === */}
+          {!['cancelled', 'refunded'].includes(order.status) && (
+            <View style={{ marginTop: 16, paddingHorizontal: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                {['pending', 'accepted', 'shipped', 'delivered'].map((step, idx, arr) => {
+                  let currentIndex = ['pending', 'accepted', 'shipped', 'delivered'].indexOf(
+                    order.status === 'paid' ? 'accepted' : order.status
+                  );
+                  if (currentIndex < 0) currentIndex = 0;
+                  const isCompleted = idx <= currentIndex;
+                  const isLast = idx === arr.length - 1;
+                  const stepColor = isCompleted ? COLORS.accent : COLORS.border;
+                  
+                  return (
+                    <React.Fragment key={step}>
+                      {/* Cercle étape */}
+                      <View style={{ alignItems: 'center', zIndex: 2 }}>
+                        <View style={{ 
+                          width: 20, height: 20, borderRadius: 10, 
+                          backgroundColor: isCompleted ? stepColor : COLORS.card,
+                          borderWidth: isCompleted ? 0 : 2,
+                          borderColor: stepColor,
+                          justifyContent: 'center', alignItems: 'center'
+                        }}>
+                          {isCompleted && <Ionicons name="checkmark" size={12} color="#fff" />}
+                        </View>
+                        <Text style={{ fontSize: fontSize.xs - 2, color: isCompleted ? COLORS.text : COLORS.textMuted, marginTop: 4, position: 'absolute', top: 22, width: 60, textAlign: 'center', left: -20 }}>
+                          {step === 'pending' ? 'Attente' : step === 'accepted' ? 'Acceptée' : step === 'shipped' ? 'Expédiée' : 'Livrée'}
+                        </Text>
+                      </View>
+                      
+                      {/* Ligne connectrice */}
+                      {!isLast && (
+                        <View style={{ 
+                          flex: 1, height: 3, 
+                          backgroundColor: idx < currentIndex ? COLORS.accent : COLORS.border,
+                          marginHorizontal: -4, zIndex: 1
+                        }} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </View>
+              <View style={{ height: 24 }} />
+            </View>
+          )}
 
           <View style={styles.orderFooter}>
             <View style={styles.paymentMethod}>
@@ -1107,33 +1186,53 @@ export const SellerOrdersScreen: React.FC = () => {
               key={filter.id}
               style={[
                 styles.filterChip,
-                selectedFilter === filter.id && styles.filterChipActive,
+                selectedFilter === filter.id && styles.filterChipActive
               ]}
               onPress={() => setSelectedFilter(filter.id)}
             >
               <Ionicons 
                 name={filter.icon as any} 
                 size={fontSize.sm} 
-                color={selectedFilter === filter.id ? COLORS.text : COLORS.textMuted} 
+                color={selectedFilter === filter.id ? COLORS.card : COLORS.text} 
               />
               <Text style={[
                 styles.filterText,
                 selectedFilter === filter.id && styles.filterTextActive,
+                { color: selectedFilter === filter.id ? COLORS.card : COLORS.text }
               ]}>
                 {filter.label}
               </Text>
-              {filter.count > 0 && (
-                <Text style={[
-                  styles.filterCount,
-                  selectedFilter === filter.id && styles.filterCountActive,
-                ]}>
-                  ({filter.count})
-                </Text>
-              )}
+              <Text style={[
+                styles.filterCount,
+                selectedFilter === filter.id && styles.filterCountActive,
+                { color: selectedFilter === filter.id ? COLORS.card + 'CC' : COLORS.textMuted }
+              ]}>
+                ({filter.count})
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
+
+      {/* BANNIÈRE DE RAPPEL DYNAMIQUES */}
+      {delayedOrdersCount > 0 && selectedFilter === 'all' && (
+        <View style={{
+          backgroundColor: '#eff6ff',
+          marginHorizontal: spacing.lg,
+          marginBottom: spacing.md,
+          padding: spacing.md,
+          borderRadius: RADIUS.md,
+          borderWidth: 1,
+          borderColor: '#bfdbfe',
+          flexDirection: 'row',
+          alignItems: 'center'
+        }}>
+          <Ionicons name="alert-circle" size={24} color="#3b82f6" style={{ marginRight: spacing.sm }} />
+          <Text style={{ flex: 1, fontSize: fontSize.sm, color: '#1e3a8a', fontWeight: '500' }}>
+            ⚠️ Vous avez <Text style={{fontWeight: '800'}}>{delayedOrdersCount}</Text> commande{delayedOrdersCount > 1 ? 's' : ''} en attente depuis plusieurs jours. N'oubliez pas d'actualiser leurs statuts (Expédiée ou Livrée) pour de meilleures statistiques.
+          </Text>
+        </View>
+      )}
 
       {/* Barre de tri */}
       <View style={styles.sortBar}>

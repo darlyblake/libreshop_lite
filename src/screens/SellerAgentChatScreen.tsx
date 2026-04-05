@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { agentService } from '../services/agentService';
+import { cacheService } from '../services/cacheService';
 import { useOrdersStore, useStoreStore } from '../store';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 
@@ -61,8 +62,21 @@ export const SellerAgentChatScreen: React.FC = () => {
         .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
 
       const context = `CA actuel: ${totalRevenue} FCFA | Commandes en attente: ${pendingCount} | Boutique ID: ${store?.id || 'Inconnue'}`;
+      const cacheKey = `agent_chat_response_${text.trim()}`;
+
+      // Check cache for this exact question (15 min)
+      const cachedResponse = await cacheService.get<string>(cacheKey);
+      if (cachedResponse) {
+        const agentMsg: Message = { id: (Date.now() + 1).toString(), role: 'agent', text: cachedResponse };
+        setMessages((prev) => [agentMsg, ...prev]);
+        setLoading(false);
+        return;
+      }
 
       const answer = await agentService.askAgent(text.trim(), context, store?.id);
+
+      // Save to cache (15 minutes)
+      cacheService.set(cacheKey, answer, 15);
 
       const agentMsg: Message = { id: (Date.now() + 1).toString(), role: 'agent', text: answer };
       setMessages((prev) => [agentMsg, ...prev]);

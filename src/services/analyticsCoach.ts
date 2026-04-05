@@ -1,5 +1,6 @@
 // src/services/analyticsCoach.ts
 import { agentService } from './agentService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface SellerStats {
   totalRevenue: number;           // CA total
@@ -34,10 +35,28 @@ const getGrowth = (current: number, previous: number): number =>
   previous === 0 ? 0 : ((current - previous) / previous) * 100;
 
 /**
- * 🤖 Génère des conseils stratégiques via Gemini
+ * 🤖 Génère des conseils stratégiques via Gemini avec Cache
  */
-export const getGeminiStrategicAdvice = async (stats: SellerStats): Promise<CoachAdvice[]> => {
+export const getGeminiStrategicAdvice = async (stats: SellerStats, storeId?: string, periodDays: number = 30): Promise<CoachAdvice[]> => {
   const growth = getGrowth(stats.revenueLast30Days, stats.revenuePrevious30Days);
+  
+  // --- GESTION DU CACHE ---
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const CACHE_KEY = `libreshop_coach_advice_${storeId || 'anon'}_${periodDays}_${today}`;
+  
+  if (storeId) {
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        console.log(`[analyticsCoach] 🧠 Utilisation du cache pour la période ${periodDays}j :`, CACHE_KEY);
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      console.warn("[analyticsCoach] Erreur lecture cache:", e);
+    }
+  }
+  
+  console.log(`[analyticsCoach] 🌐 Appel Gemini API pour le vendeur ${storeId || 'inconnu'}...`);
   
   const statsPrompt = `
 Voici les statistiques de performance d'un vendeur LibreShop :
@@ -65,7 +84,14 @@ Garde les icônes simples issues de Ionicons (rocket, cart, alert-circle, trendi
     const jsonMatch = response.match(/\[.*\]/s);
     if (jsonMatch) {
       const advices = JSON.parse(jsonMatch[0]);
-      return advices.map((a: any, i: number) => ({ ...a, priority: i + 1 }));
+      const finalAdvices = advices.map((a: any, i: number) => ({ ...a, priority: i + 1 }));
+      
+      // Stockage en cache
+      if (storeId) {
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(finalAdvices)).catch(e => console.warn("Erreur écriture cache:", e));
+      }
+      
+      return finalAdvices;
     }
     throw new Error("Format JSON non détecté");
   } catch (error) {

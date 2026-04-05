@@ -161,6 +161,63 @@ export const storeService = {
     return data;
   },
 
+  async getPopularStores(limit: number = 4) {
+    const client = useSupabase();
+    try {
+      // Pour éviter une erreur 400 sur la colonne 'total_orders' manquante,
+      // on récupère les boutiques avec leurs followers, puis on trie en mémoire
+      const { data: stores, error } = await client
+        .from('stores')
+        .select('*')
+        .eq('status', 'active')
+        .eq('visible', true)
+        .order('verified', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      if (!stores || stores.length === 0) return [];
+
+      const storeIds = stores.map((s: any) => s.id);
+      const { data: stats } = await client
+        .from('store_stats')
+        .select('store_id, followers_count, customers_count')
+        .in('store_id', storeIds);
+
+      const statsMap: Record<string, any> = {};
+      (stats || []).forEach((st: any) => {
+        statsMap[st.store_id] = st;
+      });
+
+      const scoredStores = stores.map((s: any) => {
+        const foll = Number(statsMap[s.id]?.followers_count || 0);
+        const cust = Number(statsMap[s.id]?.customers_count || 0);
+        return { ...s, _score: foll * 2 + cust };
+      });
+
+      scoredStores.sort((a: any, b: any) => b._score - a._score);
+      return scoredStores.slice(0, limit).map((s: any) => {
+        delete s._score;
+        return s;
+      });
+    } catch (e) {
+      console.error('getPopularStores error:', e);
+      return [];
+    }
+  },
+
+  async getNewStores(limit: number = 4) {
+    const client = useSupabase();
+    const { data, error } = await client
+      .from('stores')
+      .select('*')
+      .eq('status', 'active')
+      .eq('visible', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  },
+
   async getBySlug(slug: string) {
     const client = useSupabase();
     const { data, error } = await client

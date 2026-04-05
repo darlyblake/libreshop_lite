@@ -55,7 +55,10 @@ if (Platform.OS === 'web') {
       msg.includes('onResponder') ||
       msg.includes('onStartShouldSetResponder') ||
       msg.includes('aria-hidden') ||
-      msg.includes('react-devtools')
+      msg.includes('react-devtools') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('ERR_NAME_NOT_RESOLVED') ||
+      msg.includes('WebSocket connection')
     ) {
       return;
     }

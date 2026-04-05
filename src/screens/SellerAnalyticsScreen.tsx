@@ -204,9 +204,9 @@ export const SellerAnalyticsScreen = () => {
 
       setCoachStats(statsForCoach);
       
-      // Chargement asynchrone des conseils Gemini
+      // Chargement asynchrone des conseils Gemini avec CACHE
       setLoadingAdvice(true);
-      getGeminiStrategicAdvice(statsForCoach)
+      getGeminiStrategicAdvice(statsForCoach, storeId, days)
         .then(advice => setCoachAdvice(advice))
         .catch(err => console.error("Coach Advice Error:", err))
         .finally(() => setLoadingAdvice(false));

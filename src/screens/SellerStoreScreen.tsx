@@ -97,7 +97,6 @@ export const SellerStoreScreen: React.FC = () => {
     () => [
       { id: 'info', label: 'Informations' },
       { id: 'settings', label: 'Paramètres' },
-      { id: 'analytics', label: 'Statistiques' },
     ],
     []
   );
@@ -539,9 +538,14 @@ export const SellerStoreScreen: React.FC = () => {
           <Text style={{ textAlign: 'center', marginTop: 40, color: getColor.textSoft }}>Boutique non trouvée.</Text>
         ) : (
           <>
-            <View style={styles.bannerContainer}>
-              <TouchableOpacity onPress={() => handleQuickImageUpdate('bannerUrl')} activeOpacity={0.8}>
-                <Image source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl || 'https://picsum.photos/800', 800) }} style={styles.banner} />
+            <View style={[styles.bannerContainer, { backgroundColor: getColor.card, overflow: 'hidden' }]}>
+              <TouchableOpacity onPress={() => handleQuickImageUpdate('bannerUrl')} activeOpacity={0.8} style={{ width: '100%', height: '100%' }}>
+                <Image 
+                  key={storeData.bannerUrl || 'default'} 
+                  source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl || 'https://images.unsplash.com/photo-1557683316-973673baf926', 800) }} 
+                  style={styles.banner} 
+                  resizeMode="cover" 
+                />
                 <View style={styles.bannerOverlay} />
                 <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 15, padding: 6 }}>
                   <Ionicons name="camera" size={16} color="white" />
@@ -604,28 +608,6 @@ export const SellerStoreScreen: React.FC = () => {
 
                   {renderSettingItem('key-outline', 'Changer le mot de passe', false, () => setShowPasswordModal(true))}
                   {renderSettingItem('log-out-outline', 'Se déconnecter', true, () => setShowSignOutModal(true))}
-                </View>
-              )}
-
-              {activeTab === 'analytics' && (
-                <View>
-                  <Text style={[styles.analyticsTitle, { marginBottom: 16 }]}>Aperçu des performances</Text>
-                  <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
-                    <View style={[styles.card, { flex: 1, alignItems: 'center', paddingVertical: 24 }]}>
-                      <Ionicons name="cube" size={32} color={getColor.accent} style={{ marginBottom: 8 }} />
-                      <Text style={{ fontSize: 24, fontWeight: '700', color: getColor.text }}>{storeData.products || 0}</Text>
-                      <Text style={{ fontSize: 13, color: getColor.textMuted }}>Produits Actifs</Text>
-                    </View>
-                    <View style={[styles.card, { flex: 1, alignItems: 'center', paddingVertical: 24 }]}>
-                      <Ionicons name="cart" size={32} color="#10b981" style={{ marginBottom: 8 }} />
-                      <Text style={{ fontSize: 24, fontWeight: '700', color: getColor.text }}>{storeData.orders || 0}</Text>
-                      <Text style={{ fontSize: 13, color: getColor.textMuted }}>Commandes Totales</Text>
-                    </View>
-                  </View>
-                  <View style={styles.card}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: getColor.text, marginBottom: 16 }}>Détails livraison</Text>
-                    {renderAnalyticsRow('Frais de livraison', storeData.shippingPrice ? `${storeData.shippingPrice} FCFA` : 'Livraison Gratuite')}
-                  </View>
                 </View>
               )}
             </View>

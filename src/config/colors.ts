@@ -172,6 +172,7 @@ export const amoledTheme = {
     tertiary: '#121212',
   },
   text: {
+    ...darkColors.text,
     primary: '#ffffff',      // Blanc pur
     secondary: '#e5e5e5',
     tertiary: '#b3b3b3',

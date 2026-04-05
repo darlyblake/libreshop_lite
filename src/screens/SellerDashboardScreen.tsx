@@ -26,12 +26,13 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { orderService } from '../services/orderService';
 import { productService } from '../services/productService';
-import { storeService } from '../services/storeService';
+import { storeService, storeStatsService } from '../services/storeService';
 import { authService } from '../services/authService';
 import { productLikesService } from '../services/productLikesService';
 import { notificationService } from '../services/notificationService';
 import { analyticsService, TimelineDataPoint, TopProductData } from '../services/analyticsService';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { cacheService } from '../services/cacheService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card, LoadingSpinner } from '../components';
 import { useResponsive } from '../utils/useResponsive';
@@ -96,7 +97,8 @@ const formatAmount = (amount: number) => {
 
 const formatTimeAgo = (isoDate?: string) => {
   if (!isoDate) return '';
-  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const dateObj = new Date(isoDate);
+  const diffMs = Date.now() - dateObj.getTime();
   if (!Number.isFinite(diffMs) || diffMs < 0) return '';
   const diffMin = Math.floor(diffMs / 60000);
   if (diffMin < 60) return `Il y a ${diffMin} min`;
@@ -104,6 +106,13 @@ const formatTimeAgo = (isoDate?: string) => {
   if (diffHours < 24) return `Il y a ${diffHours}h`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays === 1) return 'Hier';
+  if (diffDays >= 5) {
+    return dateObj.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit'
+    });
+  }
   return `Il y a ${diffDays}j`;
 };
 
@@ -295,17 +304,33 @@ export const SellerDashboardScreen: React.FC = () => {
     }
   }, [isExpired, store?.id, navigation]);
 
-  const loadDashboardData = React.useCallback(async () => {
+  const loadDashboardData = React.useCallback(async (isRefreshing = false) => {
     if (!store?.id) return;
     try {
+      const cacheKey = `seller_dashboard_${store.id}_${timeRange}`;
+      
+      // Try to load from cache if not refreshing
+      if (!isRefreshing) {
+        const cached = await cacheService.get<any>(cacheKey);
+        if (cached) {
+          if (cached.stats) setStats(cached.stats);
+          if (cached.recentOrders) setRecentOrders(cached.recentOrders);
+          if (cached.activities) setActivities(cached.activities);
+          if (cached.summary) setSummary(cached.summary);
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
 
       const { start, prevStart, prevEnd } = getRangeBounds(timeRange);
 
-      const [ordersResponse, products, totalLikes] = await Promise.all([
+      const [ordersResponse, products, totalLikes, storeStats] = await Promise.all([
         orderService.getByStore(store.id),
         productService.getByStoreAll(store.id),
         productLikesService.getStoreLikesCount(store.id).catch(() => 0),
+        storeStatsService.getByStore(store.id).catch(() => null),
       ]);
       
       const orders = ordersResponse.orders || [];
@@ -341,60 +366,10 @@ export const SellerDashboardScreen: React.FC = () => {
 
       const totalViews = (products as any[]).reduce((sum, p) => sum + (Number(p?.view_count) || 0), 0);
 
-      setStats([
-        {
-          title: 'Total commandes',
-          value: String(ordersCount),
-          trend: formatTrend(totalOrders, totalOrdersPrev),
-          icon: 'cart',
-          positive: totalOrdersPrev <= 0 ? totalOrders > 0 : totalOrders >= totalOrdersPrev,
-          color: COLORS.accent,
-        },
-        {
-          title: 'Revenus',
-          value: revenueLabel,
-          trend: formatTrend(totalRevenue, totalRevenuePrev),
-          icon: 'wallet',
-          positive: totalRevenuePrev <= 0 ? totalRevenue > 0 : totalRevenue >= totalRevenuePrev,
-          color: COLORS.success,
-        },
-        {
-          title: 'Produits actifs',
-          value: String(products.length),
-          trend: '',
-          icon: 'cube',
-          positive: true,
-          color: COLORS.warning,
-        },
-        {
-          title: 'En attente',
-          value: String(pendingOrders),
-          trend: '',
-          icon: 'time',
-          positive: pendingOrders === 0,
-          color: COLORS.info,
-        },
-        {
-          title: 'Total Vues',
-          value: totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}K` : String(totalViews),
-          trend: '',
-          icon: 'eye',
-          positive: true,
-          color: COLORS.accent,
-        },
-        {
-          title: 'Favoris',
-          value: String(totalLikes),
-          trend: '',
-          icon: 'heart',
-          positive: true,
-          color: COLORS.danger,
-        },
-      ]);
-
       const lowStock = (products as any[]).filter((p: any) => Number(p?.stock || 0) > 0 && Number(p?.stock || 0) <= 3);
       const outOfStock = (products as any[]).filter((p: any) => Number(p?.stock || 0) <= 0);
       const noImage = (products as any[]).filter((p: any) => !Array.isArray(p?.images) || p.images.length === 0);
+      
       const maxOrders = 4;
       const mappedOrders: DashboardOrder[] = orders.slice(0, maxOrders).map((o: any) => {
         const itemsCount = Array.isArray(o.order_items)
@@ -406,13 +381,12 @@ export const SellerDashboardScreen: React.FC = () => {
           id: o.id,
           customer: String(customerName),
           amount: Number(o.total_amount || 0),
-          status: o.status,
+          status: o.status as any,
           time: formatTimeAgo(o.created_at),
           items: itemsCount,
         };
       });
 
-      // Activités récentes basées sur les données réelles
       const orderActivities: Activity[] = orders.slice(0, 4).map((o: any) => ({
         id: `order-${o.id}`,
         text: `Nouvelle commande de ${o.customer_phone || 'client'} (${formatAmount(Number(o.total_amount))})`,
@@ -435,9 +409,94 @@ export const SellerDashboardScreen: React.FC = () => {
         .sort((a, b) => (Number.isFinite(b.ts) ? b.ts : 0) - (Number.isFinite(a.ts) ? a.ts : 0))
         .slice(0, 4);
 
+      const finalActivities = recentActivities.length > 0 ? recentActivities : [];
+      
+      const dashboardStats = [
+        {
+          title: 'Total commandes',
+          value: String(ordersCount),
+          trend: formatTrend(totalOrders, totalOrdersPrev),
+          icon: 'cart' as const,
+          positive: totalOrdersPrev <= 0 ? totalOrders > 0 : totalOrders >= totalOrdersPrev,
+          color: COLORS.accent,
+        },
+        {
+          title: 'Revenus',
+          value: revenueLabel,
+          trend: formatTrend(totalRevenue, totalRevenuePrev),
+          icon: 'wallet' as const,
+          positive: totalRevenuePrev <= 0 ? totalRevenue > 0 : totalRevenue >= totalRevenuePrev,
+          color: COLORS.success,
+        },
+        {
+          title: 'Produits actifs',
+          value: String(products.length),
+          trend: '',
+          icon: 'cube' as const,
+          positive: true,
+          color: COLORS.warning,
+        },
+        {
+          title: 'En attente',
+          value: String(pendingOrders),
+          trend: '',
+          icon: 'time' as const,
+          positive: pendingOrders === 0,
+          color: COLORS.info,
+        },
+        {
+          title: 'Total Vues',
+          value: totalViews >= 1000 ? `${(totalViews / 1000).toFixed(1)}K` : String(totalViews),
+          trend: '',
+          icon: 'eye' as const,
+          positive: true,
+          color: COLORS.accent,
+        },
+        {
+          title: 'Favoris',
+          value: String(totalLikes),
+          trend: '',
+          icon: 'heart' as const,
+          positive: true,
+          color: COLORS.danger,
+        },
+        {
+          title: 'Abonnés',
+          value: String(storeStats?.followers_count || 0),
+          trend: '',
+          icon: 'people' as const,
+          positive: true,
+          color: COLORS.accent,
+        },
+        {
+          title: 'Note',
+          value: (storeStats?.rating_avg !== undefined && storeStats?.rating_avg !== null) 
+            ? `${Number(storeStats.rating_avg).toFixed(1)}/5` 
+            : (store?.rating_avg !== undefined && store?.rating_avg !== null)
+              ? `${Number(store.rating_avg).toFixed(1)}/5` 
+              : 'N/A',
+          trend: storeStats?.rating_count ? `(${storeStats.rating_count})` : store?.rating_count ? `(${store.rating_count})` : '',
+          icon: 'star' as const,
+          positive: true,
+          color: '#F59E0B',
+        },
+      ];
+
+      setStats(dashboardStats);
       setRecentOrders(mappedOrders);
-      setActivities(recentActivities.length > 0 ? recentActivities : []);
-      setSummary({ totalRevenue, pendingOrders, deliveredOrders });
+      setActivities(finalActivities);
+      
+      const dashboardSummary = { totalRevenue, pendingOrders, deliveredOrders };
+      setSummary(dashboardSummary);
+
+      // Save to cache (10 minutes)
+      const dashboardData = {
+        stats: dashboardStats,
+        recentOrders: mappedOrders,
+        activities: finalActivities,
+        summary: dashboardSummary
+      };
+      cacheService.set(cacheKey, dashboardData, 10);
     } catch (e) {
       errorHandler.handleDatabaseError(e as any, 'load dashboard data');
       const rawMsg = String((e as any)?.message || '');
@@ -549,7 +608,7 @@ export const SellerDashboardScreen: React.FC = () => {
   const onRefresh = React.useCallback(() => {
     const run = async () => {
       setRefreshing(true);
-      await loadDashboardData();
+      await loadDashboardData(true);
       setRefreshing(false);
     };
     run();

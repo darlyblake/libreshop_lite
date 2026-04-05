@@ -5,18 +5,21 @@ import {
   Modal,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Image,
-  StyleSheet,
+  FlatList,
+  ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
   Alert,
+  TextInput,
+  Image,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { cloudinaryService } from '../services/cloudinaryService';
+import { imageProcessorService } from '../services/imageProcessorService';
 
 interface CollectionOption {
   id: string;
@@ -43,6 +46,340 @@ interface AddProductModalProps {
   title?: string;
 }
 
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: COLORS.bg + 'E6',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: COLORS.card,
+      borderTopLeftRadius: RADIUS.xl,
+      borderTopRightRadius: RADIUS.xl,
+      height: '90%',
+      paddingBottom: SPACING.lg,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.lg,
+      paddingBottom: SPACING.md,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
+    modalTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: COLORS.text,
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: COLORS.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    modalBody: {
+      flex: 1,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+    },
+    modalInput: {
+      marginBottom: SPACING.lg,
+    },
+    inputLabel: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '600',
+      color: COLORS.text,
+      marginBottom: SPACING.sm,
+    },
+    required: {
+      color: COLORS.danger,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      fontSize: FONT_SIZE.md,
+      color: COLORS.text,
+      backgroundColor: COLORS.bg,
+    },
+    selectInput: {
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.md,
+      backgroundColor: COLORS.bg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.sm,
+    },
+    textArea: {
+      height: 100,
+      textAlignVertical: 'top',
+    },
+    pickerOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+      justifyContent: 'flex-end',
+    },
+    pickerContent: {
+      backgroundColor: COLORS.card,
+      borderTopLeftRadius: RADIUS.xl,
+      borderTopRightRadius: RADIUS.xl,
+      maxHeight: '75%',
+      paddingBottom: SPACING.lg,
+    },
+    pickerHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.lg,
+      paddingBottom: SPACING.md,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
+    pickerTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: COLORS.text,
+    },
+    pickerSearchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      marginHorizontal: SPACING.lg,
+      marginTop: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      borderRadius: RADIUS.md,
+      backgroundColor: COLORS.bg,
+    },
+    pickerSearchInput: {
+      flex: 1,
+      fontSize: FONT_SIZE.md,
+      color: COLORS.text,
+      paddingVertical: 0,
+    },
+    pickerList: {
+      marginTop: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+    },
+    pickerEmpty: {
+      paddingVertical: SPACING.xl,
+      alignItems: 'center',
+    },
+    pickerEmptyText: {
+      color: COLORS.textMuted,
+      fontSize: FONT_SIZE.md,
+      fontWeight: '500',
+    },
+    pickerItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.bg,
+      marginBottom: SPACING.sm,
+    },
+    pickerItemSelected: {
+      borderColor: COLORS.accent,
+      backgroundColor: COLORS.accent + '10',
+    },
+    pickerItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      flex: 1,
+      marginRight: SPACING.md,
+    },
+    pickerItemText: {
+      color: COLORS.text,
+      fontSize: FONT_SIZE.md,
+      fontWeight: '600',
+      flex: 1,
+    },
+    radioOuter: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 2,
+      borderColor: COLORS.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: COLORS.card,
+    },
+    radioOuterSelected: {
+      borderColor: COLORS.accent,
+    },
+    radioInner: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: COLORS.accent,
+    },
+    pickerActions: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    pickerButton: {
+      flex: 1,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pickerCancelButton: {
+      backgroundColor: COLORS.bg,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    pickerConfirmButton: {
+      backgroundColor: COLORS.accent,
+    },
+    pickerCancelText: {
+      color: COLORS.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
+    },
+    pickerConfirmText: {
+      color: COLORS.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
+    },
+    imagesContainer: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.lg, // Added vertical padding
+      gap: SPACING.md,
+    },
+    imageItem: {
+      position: 'relative',
+      marginRight: SPACING.md,
+    },
+    imagePreview: {
+      width: 100,
+      height: 100,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    imageLoadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 100,
+      height: 100,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    removeImageButton: {
+      position: 'absolute',
+      top: -8,
+      right: -8,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: COLORS.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 30,
+      elevation: 5,
+    },
+    addImageButton: {
+      width: 100,
+      height: 100,
+      borderRadius: RADIUS.md,
+      borderWidth: 2,
+      borderStyle: 'dashed',
+      borderColor: COLORS.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: COLORS.bg,
+    },
+    addImageText: {
+      fontSize: FONT_SIZE.xs,
+      color: COLORS.textMuted,
+      marginTop: SPACING.xs,
+    },
+    stockRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.md,
+    },
+    stockButton: {
+      padding: SPACING.xs,
+    },
+    stockValue: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: COLORS.text,
+      minWidth: 40,
+      textAlign: 'center',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelButton: {
+      backgroundColor: COLORS.bg,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    confirmButton: {
+      backgroundColor: COLORS.accent,
+    },
+    cancelButtonText: {
+      color: COLORS.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
+    },
+    confirmButtonText: {
+      color: COLORS.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
+    },
+  });
+};
+
 export const AddProductModal: React.FC<AddProductModalProps> = ({
   visible,
   onClose,
@@ -53,10 +390,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const themeContext = useTheme();
   const theme = themeContext.theme;
   const COLORS = themeContext.getColor;
-  const SPACING = themeContext.spacing;
-  const RADIUS = themeContext.radius;
-  const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const initialCollectionId = collections && collections.length > 0 ? collections[0]!.id : '';
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
@@ -72,6 +406,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     images: [],
     collectionId: initialCollectionId,
   });
+  const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
 
   React.useEffect(() => {
     if (!visible) return;
@@ -164,6 +499,40 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       ...newProduct,
       images: newProduct.images.filter((_, i) => i !== index),
     });
+    // Remove from enhancing state if present
+    const nextEnhancing = { ...enhancingImages };
+    delete nextEnhancing[index];
+    setEnhancingImages(nextEnhancing);
+  };
+
+  const handleEnhanceImage = async (index: number) => {
+    const uri = newProduct.images[index];
+    if (!uri || enhancingImages[index]) return;
+
+    try {
+      console.log('[AddProductModal] Enhancing image at index:', index);
+      setEnhancingImages(prev => ({ ...prev, [index]: true }));
+      
+      // 1. Remove background locally (100% Free)
+      console.log('[AddProductModal] Calling imageProcessorService.removeBackground...');
+      const processedUri = await imageProcessorService.removeBackground(uri);
+      console.log('[AddProductModal] Enhancement complete. New URI length:', processedUri.length);
+      
+      // 2. Update state
+      const nextImages = [...newProduct.images];
+      nextImages[index] = processedUri;
+      
+      setNewProduct(prev => ({
+        ...prev,
+        images: nextImages
+      }));
+
+    } catch (e) {
+      console.error('[AddProductModal] Enhancement failed:', e);
+      Alert.alert('Erreur', "L'amélioration automatique a échoué. Vérifiez votre connexion ou réessayez.");
+    } finally {
+      setEnhancingImages(prev => ({ ...prev, [index]: false }));
+    }
   };
 
   const incrementStock = () => {
@@ -318,14 +687,21 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   <View key={index} style={styles.imageItem}>
                     <Image
                       source={{ uri: cloudinaryService.getOptimizedUrl(image, 800) }}
-                      style={styles.imagePreview}
+                      style={[styles.imagePreview, enhancingImages[index] && { opacity: 0.5 }]}
                     />
                     <TouchableOpacity
                       style={styles.removeImageButton}
                       onPress={() => handleRemoveImage(index)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="close" size={16} color={COLORS.text} />
+                      <Ionicons name="close" size={14} color="#fff" />
                     </TouchableOpacity>
+                    
+                    {enhancingImages[index] ? (
+                      <View style={styles.imageLoadingOverlay}>
+                        <ActivityIndicator color="#fff" size="small" />
+                      </View>
+                    ) : null}
                   </View>
                 ))}
 
@@ -446,321 +822,4 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       </Modal>
     </Modal>
   );
-};
-
-const getStyles = (theme: any) => {
-  const COLORS = theme.getColor;
-  const SPACING = theme.spacing;
-  const RADIUS = theme.radius;
-  const FONT_SIZE = theme.fontSize;
-  return StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: COLORS.bg + 'E6',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    height: '90%',
-    paddingBottom: SPACING.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  modalBody: {
-    flex: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  modalInput: {
-    marginBottom: SPACING.lg,
-  },
-  inputLabel: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-  },
-  required: {
-    color: COLORS.danger,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-    backgroundColor: COLORS.bg,
-  },
-  selectInput: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.bg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SPACING.sm,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  pickerContent: {
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    maxHeight: '75%',
-    paddingBottom: SPACING.lg,
-  },
-  pickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  pickerTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  pickerSearchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.bg,
-  },
-  pickerSearchInput: {
-    flex: 1,
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-    paddingVertical: 0,
-  },
-  pickerList: {
-    marginTop: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-  },
-  pickerEmpty: {
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
-  },
-  pickerEmptyText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '500',
-  },
-  pickerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    marginBottom: SPACING.sm,
-  },
-  pickerItemSelected: {
-    borderColor: COLORS.accent,
-    backgroundColor: COLORS.accent + '10',
-  },
-  pickerItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  pickerItemText: {
-    color: COLORS.text,
-    fontSize: FONT_SIZE.md,
-    fontWeight: '600',
-    flex: 1,
-  },
-  radioOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.card,
-  },
-  radioOuterSelected: {
-    borderColor: COLORS.accent,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.accent,
-  },
-  pickerActions: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  pickerButton: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerCancelButton: {
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  pickerConfirmButton: {
-    backgroundColor: COLORS.accent,
-  },
-  pickerCancelText: {
-    color: COLORS.text,
-    fontWeight: '600',
-    fontSize: FONT_SIZE.md,
-  },
-  pickerConfirmText: {
-    color: COLORS.text,
-    fontWeight: '600',
-    fontSize: FONT_SIZE.md,
-  },
-  imagesContainer: {
-    paddingRight: SPACING.lg,
-    gap: SPACING.md,
-  },
-  imageItem: {
-    position: 'relative',
-  },
-  imagePreview: {
-    width: 80,
-    height: 80,
-    borderRadius: RADIUS.md,
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addImageButton: {
-    width: 80,
-    height: 80,
-    borderRadius: RADIUS.md,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.bg,
-  },
-  addImageText: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
-    marginTop: SPACING.xs,
-  },
-  stockRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.md,
-  },
-  stockButton: {
-    padding: SPACING.xs,
-  },
-  stockValue: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-    minWidth: 40,
-    textAlign: 'center',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  confirmButton: {
-    backgroundColor: COLORS.accent,
-  },
-  cancelButtonText: {
-    color: COLORS.text,
-    fontWeight: '600',
-    fontSize: FONT_SIZE.md,
-  },
-  confirmButtonText: {
-    color: COLORS.text,
-    fontWeight: '600',
-    fontSize: FONT_SIZE.md,
-  },
-});
 };

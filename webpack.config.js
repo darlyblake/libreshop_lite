@@ -72,5 +72,18 @@ module.exports = async function (env, argv) {
     path: false,
   };
 
+  // Force WebSocket HMR configuration to avoid "WebSocket connection failed"
+  if (config.devServer) {
+    config.devServer.allowedHosts = 'all';
+    config.devServer.client = {
+      ...config.devServer.client,
+      webSocketURL: {
+        hostname: 'localhost',
+        pathname: '/hot', // Expo Web specific
+        port: 19006,
+      },
+    };
+  }
+
   return config;
 };

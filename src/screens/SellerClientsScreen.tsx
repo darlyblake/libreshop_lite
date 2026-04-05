@@ -20,6 +20,7 @@ import { useResponsive } from '../utils/responsive';
 import AddUserModal, { UserData } from '../components/AddUserModal';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
+import { cacheService } from '../services/cacheService';
 import { useAuthStore } from '../store';
 
 /* =========================
@@ -69,9 +70,19 @@ export const SellerClientsScreen: React.FC = () => {
   const loadClients = useCallback(async (reset = true, cursor?: string) => {
     if (!user?.id) return;
     try {
+      const cacheKey = `seller_clients_${user.id}`;
+      
+      if (reset && !cursor) {
+        const cached = await cacheService.get<Client[]>(cacheKey);
+        if (cached) {
+          setClients(cached);
+          setLoading(false);
+          // Background fetch still happens for fresh data
+        }
+      }
+
       if (reset) {
         setLoading(true);
-        setClients([]);
         setHasMore(true);
         setLastCursor(null);
       } else {
@@ -143,6 +154,8 @@ export const SellerClientsScreen: React.FC = () => {
         setClients(prev => [...prev, ...newClients]);
       } else {
         setClients(newClients);
+        // Cache first page / initial list (30 minutes)
+        cacheService.set(cacheKey, newClients, 30);
       }
       setHasMore(hasMoreData);
       setLastCursor(nextCursor);
@@ -331,22 +344,6 @@ export const SellerClientsScreen: React.FC = () => {
             >
               <Ionicons name="eye-outline" size={20} color={COLORS.accent} />
               <Text style={styles.actionText}>Voir</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() =>
-                navigation.navigate('SellerTabs', {
-                  screen: 'SellerOrders',
-                })
-              }
-            >
-              <Ionicons
-                name="receipt-outline"
-                size={20}
-                color={COLORS.accent}
-              />
-              <Text style={styles.actionText}>Commandes</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

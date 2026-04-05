@@ -29,6 +29,7 @@ import { type Collection, type Product as SupabaseProduct, type Store } from '..
 import { collectionService } from '../services/collectionService';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
+import { cacheService } from '../services/cacheService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useAuthStore } from '../store';
 
@@ -104,10 +105,23 @@ export const SellerProductsScreen: React.FC = () => {
     if (!user?.id) return;
     
     try {
+      const cacheKey = `seller_products_${user.id}_${selectedCollection}_${stockFilter}_${sortBy}_${searchQuery || ''}`;
+      
+      if (reset) {
+        const cached = await cacheService.get<any>(cacheKey);
+        if (cached) {
+          setProducts(cached.products || []);
+          setTotalCount(cached.totalCount || 0);
+          setTotalPages(cached.totalPages || 0);
+          setCollections(cached.collections || []);
+          setLoading(false);
+          // Still fetch in background for accuracy on open, but avoid flash
+        }
+      }
+
       if (reset) {
         setLoading(true);
         setCurrentPage(0);
-        setProducts([]);
         setHasMore(true);
       } else {
         setLoadingMore(true);
@@ -153,6 +167,14 @@ export const SellerProductsScreen: React.FC = () => {
       
       if (!reset) {
         setCurrentPage(page + 1);
+      } else {
+        // Save first page to cache (5 minutes)
+        cacheService.set(cacheKey, { 
+          products: result.products, 
+          totalCount: result.totalCount, 
+          totalPages: result.totalPages, 
+          collections: cols 
+        }, 5);
       }
 
     } catch (e) {
@@ -903,7 +925,10 @@ export const SellerProductsScreen: React.FC = () => {
             const uploadedUrls: string[] = [];
             if (Array.isArray(product.images) && product.images.length > 0) {
               for (const uri of product.images.slice(0, 5)) {
-                const url = await cloudinaryService.uploadImage(uri, { folder: 'libreshop/products' });
+                const url = await cloudinaryService.uploadImage(uri, { 
+                  folder: 'libreshop/products',
+                  enhance: true 
+                });
                 uploadedUrls.push(url);
               }
             }
