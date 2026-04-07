@@ -46,14 +46,50 @@ export const cloudinaryService = {
       formData.append('folder', opts.folder);
     }
     
-    // Add auto-improvement if requested
+    // Add tags for auto-improvement (applied after upload)
     if (opts?.enhance) {
-      formData.append('transformation', 'e_improve,e_sharpen,q_auto,f_auto');
+      formData.append('tags', 'auto_enhance');
+      // Add eager transformations for optimization
+      formData.append('eager', 'e_improve,e_sharpen,q_auto,f_auto');
+      formData.append('eager_async', 'true');
     }
 
     if (Platform.OS === 'web') {
-      const blob = await fetch(uri).then((r) => r.blob());
-      formData.append('file', blob);
+      try {
+        // Handle both blob URLs and regular URLs
+        let blob: Blob;
+        
+        if (uri.startsWith('blob:')) {
+          // For blob URLs, we need to fetch them differently
+          const response = await fetch(uri);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch blob: ${response.statusText}`);
+          }
+          blob = await response.blob();
+        } else if (uri.startsWith('data:')) {
+          // Handle data URLs
+          const arr = uri.split(',');
+          const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+          const bstr = atob(arr[1]);
+          const n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          for (let i = 0; i < n; i++) {
+            u8arr[i] = bstr.charCodeAt(i);
+          }
+          blob = new Blob([u8arr], { type: mime });
+        } else {
+          // Regular URLs
+          const response = await fetch(uri);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+          }
+          blob = await response.blob();
+        }
+
+        formData.append('file', blob, `image_${Date.now()}.jpg`);
+      } catch (error) {
+        throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
+      }
     } else {
       const name = uri.split('/').pop() || `image_${Date.now()}.jpg`;
       formData.append('file', {
@@ -70,6 +106,7 @@ export const cloudinaryService = {
 
     if (!res.ok) {
       const text = await res.text();
+      console.error('[Cloudinary] Error response:', text);
       throw new Error(`Cloudinary upload failed (${res.status}): ${text}`);
     }
 

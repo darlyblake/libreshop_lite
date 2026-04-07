@@ -9,6 +9,41 @@ const globalForSupabase = globalThis as unknown as {
   supabaseClient: SupabaseClient | null;
 };
 
+/**
+ * Storage adapter for web to use localStorage instead of AsyncStorage
+ * AsyncStorage doesn't persist reliably on web between page reloads
+ */
+const getStorageAdapter = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    return {
+      getItem: (key: string) => {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (error) {
+          console.error(`[StorageAdapter] Error getting ${key}:`, error);
+          return null;
+        }
+      },
+      setItem: (key: string, value: string) => {
+        try {
+          window.localStorage.setItem(key, value);
+        } catch (error) {
+          console.error(`[StorageAdapter] Error setting ${key}:`, error);
+        }
+      },
+      removeItem: (key: string) => {
+        try {
+          window.localStorage.removeItem(key);
+        } catch (error) {
+          console.error(`[StorageAdapter] Error removing ${key}:`, error);
+        }
+      },
+    };
+  }
+  // Fallback to AsyncStorage for native platforms
+  return AsyncStorage;
+};
+
 const getSupabaseClient = (): SupabaseClient | null => {
   if (globalForSupabase.supabaseClient) {
     return globalForSupabase.supabaseClient;
@@ -45,7 +80,7 @@ const getSupabaseClient = (): SupabaseClient | null => {
   
   const client = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-      storage: AsyncStorage,
+      storage: getStorageAdapter(),
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: typeof window !== 'undefined',

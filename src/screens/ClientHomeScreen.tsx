@@ -21,15 +21,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
 import { navigateToClientTab } from '../navigation/clientNavigation';
-import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
-import { StoreCard, ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase } from '../components';
+import { errorHandler } from '../utils/errorHandler';
+import { StoreCard, ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase, SearchBar } from '../components';
 import { PWAInstallButton } from '../components/PWAInstallButton';
 import { SortTabs } from '../components/SortTabs';
 import { useResponsive } from '../utils/responsive';
+import { useClientHomeState } from '../hooks/useClientHomeState';
 import { Store, Product, HomeBanner, Collection } from '../lib/supabase';
 import { storeService } from '../services/storeService';
 import { productService } from '../services/productService';
@@ -39,6 +39,8 @@ import { useCartStore } from '../store';
 import { categoryService } from '../services/categoryService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { cacheService } from '../services/cacheService';
+import { CACHE_TTL } from '../config/cacheConfig';
+import { cacheMonitor } from '../utils/cacheMonitor';
 
 // Cache Keys
 const CACHE_KEYS = {
@@ -52,6 +54,14 @@ const CACHE_KEYS = {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
+
+// Sort options configuration
+const SORT_OPTIONS = [
+  { id: 'popular', label: 'Populaires' },
+  { id: 'ranked', label: 'Tendance' },
+  { id: 'newest', label: 'Nouveaux' },
+  { id: 'sales', label: 'Top ventes' },
+];
 
 const normalizeHexColor = (value?: string | null) => {
   if (!value) return undefined;
@@ -74,9 +84,36 @@ export const ClientHomeScreen: React.FC = () => {
   );
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const [selectedCollection, setSelectedCollection] = useState<string>('Toutes');
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Initialize state with reducer
+  const { state, dispatch } = useClientHomeState();
+
+  // Destructure state for easier reading
+  const {
+    stores,
+    products,
+    collections,
+    loading,
+    loadingStores,
+    loadingProducts,
+    error,
+    refreshing,
+    carouselBanners,
+    promoBanners,
+    categoriesList,
+    productCursor,
+    hasMoreProducts,
+    loadingMoreProducts,
+    selectedCategory,
+    productSort,
+    isPaused,
+    newsletterEmail,
+    newsletterLoading,
+    newsletterSuccess,
+    currentBannerIndex,
+    selectedCollection,
+  } = state;
 
   // Animation pulse pour le bouton "Ouvrir ma boutique"
   useEffect(() => {
@@ -99,6 +136,16 @@ export const ClientHomeScreen: React.FC = () => {
     startPulse();
   }, []);
 
+  // Start cache monitoring for performance metrics
+  useEffect(() => {
+    console.log('[ClientHome] 🚀 Starting cache optimization monitoring...');
+    const stopMonitoring = cacheMonitor.start(60000); // Log every 60 seconds
+    return () => {
+      stopMonitoring();
+      console.log('[ClientHome] ⏹️ Cache monitoring stopped');
+    };
+  }, []);
+
   // Calculer le nombre de colonnes et la largeur des cartes dynamiquement
   const numProductColumns = isLargeDesktop ? 6 : isDesktop ? 4 : isTablet ? 3 : 2;
   const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
@@ -109,45 +156,30 @@ export const ClientHomeScreen: React.FC = () => {
     return (contentWidth - totalHorizontalPadding - totalGap) / numProductColumns;
   }, [contentWidth, numProductColumns, SPACING]);
 
-  // Real data states
-  const [stores, setStores] = useState<Store[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingStores, setLoadingStores] = useState(false);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [carouselBanners, setCarouselBanners] = useState<HomeBanner[]>([]);
-  const [promoBanners, setPromoBanners] = useState<HomeBanner[]>([]);
-  const [categoriesList, setCategoriesList] = useState<string[]>(['Toutes']);
-  const [productPage, setProductPage] = useState(0);
-  const [hasMoreProducts, setHasMoreProducts] = useState(true);
-  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [productSort, setProductSort] = useState<string>('newest');
-  const [isPaused, setIsPaused] = useState(false);
+  // Auto-play carousel logic - using ref to avoid dependency on currentBannerIndex
+  const currentBannerIndexRef = useRef(currentBannerIndex);
+  
+  useEffect(() => {
+    currentBannerIndexRef.current = currentBannerIndex;
+  }, [currentBannerIndex]);
 
-  // Auto-play carousel logic
   useEffect(() => {
     if (carouselBanners.length <= 1 || isPaused) return;
 
     const interval = setInterval(() => {
-      const nextIndex = (currentBannerIndex + 1) % carouselBanners.length;
+      const nextIndex = (currentBannerIndexRef.current + 1) % carouselBanners.length;
       try {
         flatListRef.current?.scrollToIndex({
           index: nextIndex,
           animated: true,
         });
-        setCurrentBannerIndex(nextIndex);
       } catch (err) {
-        // Fallback for initial render or index issues
-        setCurrentBannerIndex(nextIndex);
+        // Silent fail - index out of bounds on initial render
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [currentBannerIndex, carouselBanners.length, isPaused]);
+  }, [carouselBanners.length, isPaused]);
 
   // Cache loading logic
   const loadCachedData = useCallback(async () => {
@@ -161,188 +193,223 @@ export const ClientHomeScreen: React.FC = () => {
         cacheService.get<Collection[]>(CACHE_KEYS.COLLECTIONS),
       ]);
 
-      if (cachedCarousel) setCarouselBanners(cachedCarousel);
-      if (cachedPromo) setPromoBanners(cachedPromo);
-      if (cachedStores) setStores(cachedStores);
-      if (cachedProducts) setProducts(cachedProducts);
-      if (cachedCats) setCategoriesList(cachedCats);
-      if (cachedColls) setCollections(cachedColls);
-      
-      // If we have some cached data, we can already stop the initial full-screen loading
+      if (cachedCarousel || cachedPromo) {
+        dispatch({
+          type: 'SET_BANNERS',
+          payload: {
+            carousel: cachedCarousel || [],
+            promo: cachedPromo || [],
+          },
+        });
+      }
+      if (cachedStores) dispatch({ type: 'SET_STORES', payload: cachedStores });
+      if (cachedProducts) dispatch({ type: 'SET_PRODUCTS', payload: cachedProducts });
+      if (cachedCats) dispatch({ type: 'SET_CATEGORIES', payload: cachedCats });
+      if (cachedColls) dispatch({ type: 'SET_COLLECTIONS', payload: cachedColls });
+
       if (cachedProducts || cachedStores) {
-        setLoading(false);
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     } catch (e) {
       console.warn('[ClientHome] Failed to load cached data:', e);
     }
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     loadCachedData();
   }, [loadCachedData]);
 
   // Load data from Supabase with high resilience
-  const loadData = async (refresh = false) => {
-    try {
-      if (!refresh) setLoading(true);
-      setError(null);
-
-      // 1. Featured Stores (Wrapped for resilience)
+  const loadData = useCallback(
+    async (refresh = false) => {
       try {
-        const storesData = await storeService.getFeatured();
-        if (storesData) {
-          setStores(storesData);
-          cacheService.set(CACHE_KEYS.STORES, storesData, 30);
-        }
-      } catch (err) {
-        // Non-critical failure
-      }
+        if (!refresh) dispatch({ type: 'SET_LOADING', payload: true });
+        dispatch({ type: 'SET_ERROR', payload: null });
 
-      // 2. Collections (Wrapped for resilience)
-      try {
-        const allCollections: Collection[] = [];
-        const storesForCollections = stores || []; // Use current stores if already fetched
-        if (storesForCollections.length > 0) {
-          const collectionPromises = storesForCollections.map(s => collectionService.getByStore(s.id).catch(() => []));
-          const collectionsResults = await Promise.all(collectionPromises);
-          collectionsResults.forEach(res => allCollections.push(...res));
-          setCollections(allCollections);
-          if (allCollections.length > 0) {
-            cacheService.set(CACHE_KEYS.COLLECTIONS, allCollections, 60);
-          }
-        }
-      } catch (err) {
-        // Non-critical failure
-      }
-
-      // 3. Products (CRITICAL - setting global error if this fails and nothing else loaded)
-      try {
-        const productsData = await productService.getAll(0, 8, productSort as any);
-        if (productsData) {
-          setProducts(productsData);
-          setHasMoreProducts(productsData.length >= 8);
-          setProductPage(0);
-          cacheService.set(CACHE_KEYS.PRODUCTS, productsData, 15);
-        }
-      } catch (err) {
-        console.error('Critical failure in productService.getAll:', err);
-        // Only set global error if products fail AND we have no fallback content (checked via local state)
-        if (products.length === 0) {
-           setError('Impossible de charger les produits principaux');
-        }
-      }
-
-      // 4. Banners & Metadata (Wrapped for resilience)
-      try {
-        console.log('DEBUG: Fetching banners and categories...');
-        const [carousel, promo, cats] = await Promise.all([
-          homeBannerService.getActiveByPlacement('carousel').catch(() => []),
-          homeBannerService.getActiveByPlacement('promo').catch(() => []),
-          categoryService.getPopularCategories(6).catch(() => []),
+        // Parallel data loading with individual error handling
+        const [storesResult, productsResult, bannersResult] = await Promise.allSettled([
+          storeService.getFeatured().then(data => {
+            if (data) {
+              dispatch({ type: 'SET_STORES', payload: data });
+              cacheService.set(CACHE_KEYS.STORES, data, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+            }
+            return data;
+          }),
+          productService.getAllWithCursor(null, 8, productSort as any).then(result => {
+            if (result.data && result.data.length > 0) {
+              dispatch({
+                type: 'SET_PRODUCTS_WITH_CURSOR',
+                payload: {
+                  data: result.data,
+                  cursor: result.nextCursor,
+                  hasMore: result.hasMore,
+                },
+              });
+              cacheService.set(CACHE_KEYS.PRODUCTS, result.data, CACHE_TTL.PRODUCTS.duration, CACHE_TTL.PRODUCTS.stale);
+            }
+            return result;
+          }),
+          Promise.all([
+            homeBannerService.getActiveByPlacement('carousel').catch(() => []),
+            homeBannerService.getActiveByPlacement('promo').catch(() => []),
+            categoryService.getPopularCategories(6).catch(() => []),
+          ]).then(([carousel, promo, cats]) => {
+            if (carousel?.length) {
+              dispatch({
+                type: 'SET_BANNERS',
+                payload: {
+                  carousel,
+                  promo: promo || [],
+                },
+              });
+              cacheService.set(CACHE_KEYS.CAROUSEL, carousel, CACHE_TTL.CAROUSEL.duration, CACHE_TTL.CAROUSEL.stale);
+            }
+            if (promo?.length) {
+              cacheService.set(CACHE_KEYS.PROMO, promo, CACHE_TTL.PROMO.duration, CACHE_TTL.PROMO.stale);
+            }
+            if (cats?.length) {
+              const catNames = ['Toutes', ...cats.map(c => c.name)];
+              dispatch({ type: 'SET_CATEGORIES', payload: catNames });
+              cacheService.set(CACHE_KEYS.CATEGORIES, catNames, CACHE_TTL.CATEGORIES.duration, CACHE_TTL.CATEGORIES.stale);
+            }
+          }),
         ]);
-        
-        if (carousel && carousel.length > 0) {
-          setCarouselBanners(carousel);
-          cacheService.set(CACHE_KEYS.CAROUSEL, carousel, 60);
-        }
-        if (promo && promo.length > 0) {
-          setPromoBanners(promo);
-          cacheService.set(CACHE_KEYS.PROMO, promo, 60);
-        }
-        if (cats && cats.length > 0) {
-          const catNames = ['Toutes', ...cats.map(c => c.name)];
-          setCategoriesList(catNames);
-          cacheService.set(CACHE_KEYS.CATEGORIES, catNames, 60 * 24); // 24h for categories
-        }
-      } catch (err) {
-        console.warn('DEBUG: Non-critical failure in banners/categories:', err);
-      }
 
-    } catch (e) {
-      errorHandler.handleDatabaseError(e, 'ClientHomeScreen global loadData error');
-      // If we reach here, something really bad happened
-      if (products.length === 0 && stores.length === 0) {
-        setError('Une erreur est survenue lors du chargement');
+        // Check for critical failures
+        if (productsResult.status === 'rejected' && products.length === 0) {
+          dispatch({ type: 'SET_ERROR', payload: 'Impossible de charger les produits' });
+        }
+      } catch (e) {
+        errorHandler.handleDatabaseError(e, 'ClientHomeScreen loadData error');
+        if (products.length === 0 && stores.length === 0) {
+          dispatch({ type: 'SET_ERROR', payload: 'Une erreur est survenue lors du chargement' });
+        }
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+        dispatch({ type: 'SET_REFRESHING', payload: false });
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    },
+    [dispatch, productSort, products.length, stores.length]
+  );
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
-  const handleLoadMoreProducts = async () => {
+  const handleLoadMoreProducts = useCallback(async () => {
     if (loadingMoreProducts || !hasMoreProducts) return;
 
     try {
-      setLoadingMoreProducts(true);
-      const nextPage = productPage + 1;
-      const newProducts = await productService.getAll(nextPage, 8, productSort as any);
+      dispatch({ type: 'SET_LOADING_PRODUCTS', payload: true });
+      const result = await productService.getAllWithCursor(
+        productCursor,
+        8,
+        productSort as any
+      );
 
-      if (newProducts && newProducts.length > 0) {
-        setProducts(prev => [...prev, ...newProducts]);
-        setProductPage(nextPage);
-        setHasMoreProducts(newProducts.length === 8);
+      if (result.data && result.data.length > 0) {
+        dispatch({
+          type: 'ADD_MORE_PRODUCTS',
+          payload: {
+            data: result.data,
+            hasMore: result.hasMore,
+            cursor: result.nextCursor,
+          },
+        });
       } else {
-        setHasMoreProducts(false);
+        dispatch({
+          type: 'ADD_MORE_PRODUCTS',
+          payload: { data: [], hasMore: false, cursor: null },
+        });
       }
     } catch (e) {
       console.error('Error loading more products:', e);
-    } finally {
-      setLoadingMoreProducts(false);
+      dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
     }
-  };
+  }, [loadingMoreProducts, hasMoreProducts, productCursor, productSort, dispatch]);
 
-  const handleProductSortChange = async (sort: any) => {
-    setProductSort(sort);
-    setLoadingProducts(true);
-    try {
-      const data = await productService.getAll(0, 8, sort);
-      setProducts(data || []);
-      setProductPage(0);
-      setHasMoreProducts((data?.length || 0) >= 8);
-    } catch (e) {
-      console.error('Error sorting products:', e);
-    } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setSelectedCategory(null);
-    setSelectedCollection('Toutes');
-    loadData(true);
-  };
-
-  const handleCategoryPress = async (category: string) => {
-    setSelectedCollection(category);
-    setSelectedCategory(category === 'Toutes' ? null : category);
-
-    setLoadingStores(true);
-    try {
-      let data;
-      if (category === 'Toutes') {
-        data = await categoryService.getFeaturedStores(5);
-      } else {
-        data = await categoryService.getStoresByCategory(category, 5);
+  const handleProductSortChange = useCallback(
+    async (sort: any) => {
+      dispatch({ type: 'UPDATE_SORT', payload: sort });
+      try {
+        const data = await productService.getAll(0, 8, sort);
+        dispatch({ type: 'SET_PRODUCTS', payload: data || [] });
+      } catch (e) {
+        console.error('Error sorting products:', e);
+        dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
       }
-      setStores(data);
-    } catch (e) {
-      console.error('Error filtering stores:', e);
-    } finally {
-      setLoadingStores(false);
-    }
-  };
+    },
+    [dispatch]
+  );
 
-  const handleBannerPress = (banner: HomeBanner) => {
+  // Quick Actions Handlers
+  const handleFlashDeals = useCallback(() => {
+    handleProductSortChange('sales');
+  }, [handleProductSortChange]);
+
+  const handleBonPlans = useCallback(() => {
+    dispatch({ type: 'UPDATE_CATEGORY', payload: null });
+  }, [dispatch]);
+
+  const handleNouveautes = useCallback(() => {
+    handleProductSortChange('newest');
+  }, [handleProductSortChange]);
+
+  const handleFavorites = useCallback(() => {
+    navigateToClientTab(navigation, 'Wishlist');
+  }, [navigation]);
+
+  const handleNewsletterSubscribe = useCallback(async () => {
+    if (!newsletterEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newsletterEmail)) {
+      Alert.alert('Email invalide', 'Veuillez entrer une adresse email valide');
+      return;
+    }
+
+    dispatch({ type: 'SET_NEWSLETTER_LOADING', payload: true });
+    try {
+      dispatch({ type: 'SET_NEWSLETTER_SUCCESS', payload: true });
+      dispatch({ type: 'SET_NEWSLETTER_EMAIL', payload: '' });
+      setTimeout(() => dispatch({ type: 'SET_NEWSLETTER_SUCCESS', payload: false }), 3000);
+    } catch (e) {
+      console.error('Error subscribing to newsletter:', e);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de l\'inscription');
+    } finally {
+      dispatch({ type: 'SET_NEWSLETTER_LOADING', payload: false });
+    }
+  }, [newsletterEmail, dispatch]);
+
+  const handleRefresh = useCallback(() => {
+    dispatch({ type: 'SET_REFRESHING', payload: true });
+    dispatch({ type: 'UPDATE_CATEGORY', payload: null });
+    loadData(true);
+  }, [loadData, dispatch]);
+
+  const handleCategoryPress = useCallback(
+    async (category: string) => {
+      dispatch({ type: 'UPDATE_CATEGORY', payload: category === 'Toutes' ? null : category });
+
+      try {
+        let data;
+        if (category === 'Toutes') {
+          data = await categoryService.getFeaturedStores(5);
+        } else {
+          data = await categoryService.getStoresByCategory(category, 5);
+        }
+        dispatch({ type: 'SET_STORES', payload: data });
+      } catch (e) {
+        console.error('Error filtering stores:', e);
+      } finally {
+        dispatch({ type: 'SET_LOADING_STORES', payload: false });
+      }
+    },
+    [dispatch]
+  );
+
+  const handleBannerPress = useCallback((banner: HomeBanner) => {
     const screen = banner.link_screen;
     if (!screen) return;
     navigation.navigate(screen, banner.link_params || undefined);
-  };
+  }, [navigation]);
 
   const renderBannerItem = useCallback(({ item, index }: { item: HomeBanner; index: number }) => {
     const bannerWidth = SCREEN_WIDTH - SPACING.xl * 2;
@@ -393,7 +460,7 @@ export const ClientHomeScreen: React.FC = () => {
         </Animated.View>
       </TouchableOpacity>
     );
-  }, [SCREEN_WIDTH, SPACING.xl, scrollX, styles.bannerCard, styles.bannerImage, styles.bannerGradient, styles.bannerContent, styles.bannerTitle, styles.bannerSubtitle, styles.bannerButton, styles.bannerButtonText]);
+  }, [SPACING.xl, scrollX, styles, handleBannerPress]);
 
   const renderCategoryChip = (category: string) => {
     const isActive = selectedCollection === category;
@@ -499,14 +566,18 @@ export const ClientHomeScreen: React.FC = () => {
             </View>
 
             {/* Search Bar */}
-            <TouchableOpacity
+            <SearchBar
+              value={state.searchQuery}
+              onChangeText={(text) => dispatch({ type: 'SET_SEARCH_QUERY', payload: text })}
+              onSubmitEditing={() => {
+                if (state.searchQuery.trim()) {
+                  navigation.navigate('ClientSearch', { query: state.searchQuery });
+                }
+              }}
+              onClear={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
+              placeholder="Rechercher un produit, une boutique..."
               style={styles.searchBar}
-              onPress={() => navigation.navigate('ClientSearch')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="search-outline" size={20} color={palette.textMuted} />
-              <Text style={styles.searchPlaceholder}>Rechercher un produit, une boutique...</Text>
-            </TouchableOpacity>
+            />
           </LinearGradient>
 
           {/* Loading/Error State */}
@@ -545,7 +616,7 @@ export const ClientHomeScreen: React.FC = () => {
                     )}
                     onMomentumScrollEnd={(event) => {
                       const index = Math.round(event.nativeEvent.contentOffset.x / (SCREEN_WIDTH - SPACING.xl * 2));
-                      setCurrentBannerIndex(index);
+                      dispatch({ type: 'SET_CURRENT_BANNER_INDEX', payload: index });
                     }}
                     renderItem={renderBannerItem}
                     keyExtractor={(item) => item.id}
@@ -558,9 +629,9 @@ export const ClientHomeScreen: React.FC = () => {
                       index,
                     })}
                     snapToAlignment="center"
-                    onScrollBeginDrag={() => setIsPaused(true)}
+                    onScrollBeginDrag={() => dispatch({ type: 'SET_IS_PAUSED', payload: true })}
                     onScrollEndDrag={() => {
-                      setTimeout(() => setIsPaused(false), 2000);
+                      setTimeout(() => dispatch({ type: 'SET_IS_PAUSED', payload: false }), 2000);
                     }}
                     onScrollToIndexFailed={(info) => {
                       const wait = new Promise(resolve => setTimeout(resolve, 500));
@@ -581,7 +652,7 @@ export const ClientHomeScreen: React.FC = () => {
                         key={index}
                         onPress={() => {
                           flatListRef.current?.scrollToIndex({ index, animated: true });
-                          setCurrentBannerIndex(index);
+                          dispatch({ type: 'SET_CURRENT_BANNER_INDEX', payload: index });
                         }}
                       >
                         <View style={[
@@ -596,7 +667,7 @@ export const ClientHomeScreen: React.FC = () => {
 
               {/* Quick Actions */}
               <View style={styles.quickActions}>
-                <TouchableOpacity style={styles.quickAction}>
+                <TouchableOpacity style={styles.quickAction} onPress={handleFlashDeals}>
                   <LinearGradient
                     colors={[palette.accent + '20', palette.accent + '05']}
                     style={styles.quickActionIcon}
@@ -605,7 +676,7 @@ export const ClientHomeScreen: React.FC = () => {
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Flash deals</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction}>
+                <TouchableOpacity style={styles.quickAction} onPress={handleBonPlans}>
                   <LinearGradient
                     colors={[palette.success + '20', palette.success + '05']}
                     style={styles.quickActionIcon}
@@ -614,7 +685,7 @@ export const ClientHomeScreen: React.FC = () => {
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Bons plans</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction}>
+                <TouchableOpacity style={styles.quickAction} onPress={handleNouveautes}>
                   <LinearGradient
                     colors={[palette.warning + '20', palette.warning + '05']}
                     style={styles.quickActionIcon}
@@ -623,7 +694,7 @@ export const ClientHomeScreen: React.FC = () => {
                   </LinearGradient>
                   <Text style={styles.quickActionText}>Nouveautés</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction}>
+                <TouchableOpacity style={styles.quickAction} onPress={handleFavorites}>
                   <LinearGradient
                     colors={[palette.info + '20', palette.info + '05']}
                     style={styles.quickActionIcon}
@@ -741,12 +812,7 @@ export const ClientHomeScreen: React.FC = () => {
                 </View>
                 {/* Sort tabs */}
                 <SortTabs
-                  options={[
-                    { id: 'popular', label: 'Populaires' },
-                    { id: 'ranked', label: 'Tendance' },
-                    { id: 'newest', label: 'Nouveaux' },
-                    { id: 'sales', label: 'Top ventes' },
-                  ]}
+                  options={SORT_OPTIONS}
                   selected={productSort}
                   onSelect={(id) => handleProductSortChange(id as any)}
                 />
@@ -766,25 +832,58 @@ export const ClientHomeScreen: React.FC = () => {
                     keyExtractor={(item) => item.id}
                     numColumns={numProductColumns}
                     key={numProductColumns}
-                    scrollEnabled={true}
-                    nestedScrollEnabled={true}
+                    scrollEnabled={false}
+                    nestedScrollEnabled={false}
                     columnWrapperStyle={styles.productsGrid}
                     contentContainerStyle={styles.productsList}
+                    initialNumToRender={numProductColumns * 2}
+                    maxToRenderPerBatch={numProductColumns}
+                    updateCellsBatchingPeriod={50}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                    windowSize={3}
                   />
                 )}
               </View>
 
               {/* Newsletter */}
-              <BlurView intensity={80} tint="light" style={styles.newsletterSection}>
+              <View style={styles.newsletterSection}>
                 <Text style={styles.newsletterTitle}>Ne manquez aucune offre</Text>
                 <Text style={styles.newsletterText}>
                   Inscrivez-vous à notre newsletter et recevez -10% sur votre première commande
                 </Text>
-                <TouchableOpacity style={styles.newsletterButton}>
-                  <Text style={styles.newsletterButtonText}>S'inscrire</Text>
-                  <Ionicons name="mail-outline" size={18} color="white" />
-                </TouchableOpacity>
-              </BlurView>
+                {newsletterSuccess ? (
+                  <View style={styles.newsletterSuccess}>
+                    <Ionicons name="checkmark-circle" size={24} color={palette.success} />
+                    <Text style={styles.newsletterSuccessText}>Merci de votre inscription !</Text>
+                  </View>
+                ) : (
+                  <View style={styles.newsletterForm}>
+                    <TextInput
+                      style={styles.newsletterInput}
+                      placeholder="Votre adresse email"
+                      placeholderTextColor={palette.textMuted}
+                      value={newsletterEmail}
+                      onChangeText={(email) => dispatch({ type: 'SET_NEWSLETTER_EMAIL', payload: email })}
+                      keyboardType="email-address"
+                      editable={!newsletterLoading}
+                    />
+                    <TouchableOpacity
+                      style={[styles.newsletterButton, newsletterLoading && styles.newsletterButtonDisabled]}
+                      onPress={handleNewsletterSubscribe}
+                      disabled={newsletterLoading}
+                    >
+                      {newsletterLoading ? (
+                        <ActivityIndicator size="small" color={palette.text} />
+                      ) : (
+                        <>
+                          <Text style={styles.newsletterButtonText}>S'inscrire</Text>
+                          <Ionicons name="mail-outline" size={18} color="white" />
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
 
               {/* Load More */}
               {hasMoreProducts && (
@@ -1173,7 +1272,9 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       borderRadius: RADIUS.lg,
       overflow: 'hidden',
       alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.9)',
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
     },
     newsletterTitle: {
       fontSize: FONT_SIZE.lg,
@@ -1188,19 +1289,51 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       textAlign: 'center',
       marginBottom: SPACING.lg,
     },
+    newsletterForm: {
+      width: '100%',
+      gap: SPACING.sm,
+    },
+    newsletterInput: {
+      backgroundColor: palette.bg,
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: RADIUS.md,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      fontSize: FONT_SIZE.sm,
+      color: palette.text,
+    },
     newsletterButton: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: palette.accent,
       paddingHorizontal: SPACING.xl,
       paddingVertical: SPACING.md,
       borderRadius: RADIUS.full,
       gap: SPACING.sm,
     },
+    newsletterButtonDisabled: {
+      opacity: 0.6,
+    },
     newsletterButtonText: {
       fontSize: FONT_SIZE.md,
       fontWeight: '600',
       color: palette.text,
+    },
+    newsletterSuccess: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      backgroundColor: palette.bg,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.md,
+    },
+    newsletterSuccessText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '600',
+      color: palette.success,
     },
 
     // Load More

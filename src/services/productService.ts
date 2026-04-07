@@ -180,6 +180,77 @@ export const productService = {
     return data;
   },
 
+  /**
+   * Cursor-based pagination for infinite scroll
+   * Returns next cursor along with data for stable pagination
+   */
+  async getAllWithCursor(
+    cursor: string | null,
+    pageSize = 8,
+    sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'newest'
+  ) {
+    const client = useSupabase();
+    
+    let query = client
+      .from('products')
+      .select('id, name, price, compare_price, images, view_count, is_active, stock, stores(name, logo_url)')
+      .eq('is_active', true)
+      .gt('stock', 0);
+
+    if (sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top') {
+      query = query.order('view_count', { ascending: false, nullsFirst: false });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    // If cursor exists, parse it and fetch next batch
+    if (cursor) {
+      try {
+        const decodedCursor = JSON.parse(Buffer.from(cursor, 'base64').toString());
+        const lastId = decodedCursor.id;
+        const lastValue = decodedCursor.value;
+
+        // Get items after cursor
+        if (sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top') {
+          query = query.lt('view_count', lastValue).or(`view_count.eq.${lastValue},id.lt.${lastId}`);
+        } else {
+          query = query.lt('created_at', lastValue).or(`created_at.eq.${lastValue},id.lt.${lastId}`);
+        }
+      } catch (e) {
+        console.warn('[ProductService] Invalid cursor, fetching from start:', e);
+      }
+    }
+
+    const { data, error } = await query.limit(pageSize + 1);
+    if (error) throw error;
+
+    const items = data || [];
+    const hasMore = items.length > pageSize;
+    const products = items.slice(0, pageSize);
+
+    let nextCursor = null;
+    if (hasMore && products.length > 0) {
+      const lastProduct = products[products.length - 1] as any;
+      const sortValue = sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top'
+        ? lastProduct.view_count
+        : lastProduct.created_at;
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          id: lastProduct.id,
+          value: sortValue,
+          sort
+        })
+      ).toString('base64');
+    }
+
+    return {
+      data: products,
+      nextCursor,
+      hasMore
+    };
+  },
+
   async getById(id: string) {
     const client = useSupabase();
     const { data, error } = await client

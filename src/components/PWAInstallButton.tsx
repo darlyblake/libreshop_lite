@@ -35,134 +35,104 @@ export const PWAInstallButton: React.FC = () => {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
   useEffect(() => {
-    // Vérifier si l'app est déjà installée
-    const checkIfInstalled = () => {
-      // Pour iOS Safari
-      if ('standalone' in window.navigator && (window.navigator as any).standalone) {
-        setIsInstalled(true);
-        return;
-      }
-      
-      // Pour Chrome/Android
-      if (window.matchMedia('(display-mode: standalone)').matches) {
-        setIsInstalled(true);
-        return;
-      }
-      
-      // Vérifier si l'app est lancée depuis PWA
-      if (window.location.search.includes('utm_source=pwa')) {
-        setIsInstalled(true);
-        return;
-      }
-    };
+    if (Platform.OS !== 'web') return;
 
-    // Écouter l'événement beforeinstallprompt
+    // Reset dismissed state after 3 days
+    const dismissedAt = localStorage.getItem('pwa-install-dismissed-at');
+    if (dismissedAt) {
+      const threeDays = 3 * 24 * 60 * 60 * 1000;
+      if (Date.now() - parseInt(dismissedAt, 10) > threeDays) {
+        localStorage.removeItem('pwa-install-dismissed');
+        localStorage.removeItem('pwa-install-dismissed-at');
+      }
+    }
+
+    // Don't show if user dismissed recently
+    if (localStorage.getItem('pwa-install-dismissed') === 'true') return;
+
+    // Check if already installed as standalone PWA
+    const isStandalone =
+      ('standalone' in window.navigator && (window.navigator as any).standalone) ||
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.location.search.includes('utm_source=pwa');
+
+    if (isStandalone) {
+      setIsInstalled(true);
+      return;
+    }
+
+    // Listen for Chrome/Android native install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowInstallPrompt(true);
     };
 
-    // Écouter l'événement appinstalled
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
-      
-      // Montrer une confirmation
-      if (Platform.OS === 'web') {
-        Alert.alert(
-          'Installation réussie !',
-          'LibreShop est maintenant installée sur votre appareil.',
-          [{ text: 'OK' }]
-        );
-      }
     };
 
-    // Initialiser les écouteurs d'événements
-    if (Platform.OS === 'web') {
-      checkIfInstalled();
-      
-      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.addEventListener('appinstalled', handleAppInstalled);
-      
-      // Vérifier si on doit montrer le prompt après un certain temps
-      const timer = setTimeout(() => {
-        if (!isInstalled && !deferredPrompt) {
-          // Pour iOS, on montre toujours le guide d'installation
-          if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-            setShowInstallPrompt(true);
-          }
-        }
-      }, 5000); // 5 secondes après le chargement
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
-      return () => {
-        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-        window.removeEventListener('appinstalled', handleAppInstalled);
-        clearTimeout(timer);
-      };
-    }
-  }, [isInstalled, deferredPrompt]);
+    // For iOS Safari: show manual instructions after 3 seconds
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const iOSTimer = setTimeout(() => {
+      if (isIOS) setShowInstallPrompt(true);
+    }, 3000);
+
+    // For desktop/Android Chrome: show fallback banner after 5s
+    // if beforeinstallprompt hasn't fired yet (e.g. already visited)
+    const fallbackTimer = setTimeout(() => {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+      if (isHTTPS && !isIOS) {
+        setShowInstallPrompt(prev => prev ? prev : isMobile ? true : true);
+      }
+    }, 5000);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+      clearTimeout(iOSTimer);
+      clearTimeout(fallbackTimer);
+    };
+  }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      // Pour iOS Safari, montrer les instructions
-      showIOSInstallInstructions();
-      return;
-    }
-
-    try {
-      // Montrer le prompt d'installation natif
-      await deferredPrompt.prompt();
-      
-      // Attendre la réponse de l'utilisateur
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      if (outcome === 'accepted') {
-        // Log: 'L\'utilisateur a accepté l\'installation';
-      } else {
-        // Log: 'L\'utilisateur a refusé l\'installation';
-        setShowInstallPrompt(false);
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome !== 'accepted') setShowInstallPrompt(false);
+        setDeferredPrompt(null);
+      } catch (error: any) {
+        errorHandler.handle(error, 'PWA installation error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       }
-      
-      setDeferredPrompt(null);
-    } catch (error: any) {
-      errorHandler.handle(error, 'PWA installation error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-      showIOSInstallInstructions();
+    } else {
+      // iOS or browsers without native prompt — show manual instructions
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      Alert.alert(
+        'Installer LibreShop',
+        isIOS
+          ? 'Sur Safari :\n\n1. Appuyez sur l\'icône "Partager" (⬆) en bas\n2. Sélectionnez "Sur l\'écran d\'accueil"\n3. Appuyez sur "Ajouter"'
+          : 'Sur Chrome :\n\n1. Appuyez sur le menu ⋮ en haut à droite\n2. Sélectionnez "Ajouter à l\'écran d\'accueil"\n3. Confirmez l\'installation',
+        [{ text: 'Compris', style: 'default' }]
+      );
     }
-  };
-
-  const showIOSInstallInstructions = () => {
-    Alert.alert(
-      'Installer LibreShop',
-      'Pour installer LibreShop sur votre appareil :\n\n' +
-      '1. Appuyez sur l\'icône "Partager" en bas de l\'écran\n' +
-      '2. Faites défiler vers le bas et appuyez sur "Sur l\'écran d\'accueil"\n' +
-      '3. Appuyez sur "Ajouter" pour installer l\'application',
-      [
-        { text: 'Compris', style: 'default' },
-        { text: 'Ne plus afficher', onPress: () => setShowInstallPrompt(false) }
-      ]
-    );
   };
 
   const handleDismiss = () => {
     setShowInstallPrompt(false);
-    // Sauvegarder la préférence de l'utilisateur
     if (Platform.OS === 'web') {
       localStorage.setItem('pwa-install-dismissed', 'true');
+      localStorage.setItem('pwa-install-dismissed-at', Date.now().toString());
     }
   };
 
-  // Ne pas afficher le bouton si l'app est déjà installée ou si le prompt est masqué
-  if (isInstalled || !showInstallPrompt) {
-    return null;
-  }
-
-  // Vérifier si l'utilisateur a déjà masqué le prompt
-  if (Platform.OS === 'web' && localStorage.getItem('pwa-install-dismissed') === 'true') {
-    return null;
-  }
+  if (isInstalled || !showInstallPrompt) return null;
 
   return (
     <View style={styles.container}>

@@ -5,7 +5,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  TextInput,
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -33,6 +32,8 @@ import { storeService } from '../services/storeService';
 import { storeStatsService } from '../services/storeStatsService';
 import { useResponsive } from '../utils/responsive';
 import { cloudinaryService } from '../services/cloudinaryService';
+import { SearchBar } from '../components/SearchBar';
+import { useSearch } from '../hooks/useSearch';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -64,7 +65,7 @@ export const ClientAllStoresScreen: React.FC = () => {
     return () => subscription?.remove();
   }, []);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
   const [selectedCategory, setSelectedCategory] = useState('Toutes');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,18 +189,18 @@ export const ClientAllStoresScreen: React.FC = () => {
       storesList = storesList.filter((s) => s.city_id === filters.cityId);
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
+    if (query.trim()) {
+      const searchTerm = query.toLowerCase().trim();
       storesList = storesList.filter(
         (store) =>
-          store.name?.toLowerCase().includes(query) ||
-          store.description?.toLowerCase().includes(query) ||
-          store.category?.toLowerCase().includes(query)
+          store.name?.toLowerCase().includes(searchTerm) ||
+          store.description?.toLowerCase().includes(searchTerm) ||
+          store.category?.toLowerCase().includes(searchTerm)
       );
     }
 
     return storesList;
-  }, [searchQuery, selectedCategory, stores]);
+  }, [query, selectedCategory, stores, filters, statsByStoreId]);
 
   const renderStars = useCallback((avg: number) => {
     const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
@@ -316,10 +317,6 @@ export const ClientAllStoresScreen: React.FC = () => {
     [navigation, renderStars, statsByStoreId, dynamicStyles.cardWidth]
   );
 
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-  }, []);
-
   const handleSelectCategory = useCallback((cat: string) => {
     setSelectedCategory(cat);
   }, []);
@@ -379,23 +376,13 @@ export const ClientAllStoresScreen: React.FC = () => {
 
           {/* Barre de recherche flottante */}
           <BlurView intensity={80} tint="light" style={styles.searchContainer}>
-            <View style={styles.searchBar}>
-              <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Rechercher une boutique..."
-                placeholderTextColor={COLORS.textMuted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoCapitalize="none"
-                returnKeyType="search"
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={handleClearSearch}>
-                  <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
+            <SearchBar
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Rechercher une boutique..."
+              isLoading={searchLoading}
+              onClear={() => setQuery('')}
+            />
           </BlurView>
 
           {/* Catégories scrollables */}

@@ -32,6 +32,8 @@ import { orderService } from '../services/orderService';
 import { qrCodeService } from '../services/qrCodeService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
+import { SearchBar } from '../components/SearchBar';
+import { useSearch } from '../hooks/useSearch';
 
 type Product = {
   id: string;
@@ -71,7 +73,7 @@ export const SellerCaisseScreen = () => {
   const [clients, setClients] = useState<{id: string, name: string, phone: string}[]>([]);
 
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [search, setSearch] = useState('');
+  const { query: productSearch, setQuery: setProductSearch, isLoading: productSearchLoading } = useSearch({ debounceDelay: 300 });
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
@@ -267,7 +269,7 @@ export const SellerCaisseScreen = () => {
     let filtered = products;
     
     // Filtre recherche
-    const q = search.toLowerCase().trim();
+    const q = productSearch.toLowerCase().trim();
     if (q) {
       filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(q) ||
@@ -282,7 +284,7 @@ export const SellerCaisseScreen = () => {
     }
     
     return filtered;
-  }, [search, products, selectedCategory]);
+  }, [productSearch, products, selectedCategory]);
 
   /* ======================
      RENDER PRODUCT CARD
@@ -742,49 +744,38 @@ export const SellerCaisseScreen = () => {
 
           {/* Barre de recherche */}
           <View style={styles.searchContainer}>
-            <View style={styles.searchWrapper}>
-              <Ionicons name="search" size={20} color={COLORS.textMuted} />
-              <TextInput
-                placeholder="Scanner ou rechercher..."
-                placeholderTextColor={COLORS.textMuted}
-                value={search}
-                onChangeText={setSearch}
-                style={styles.searchInput}
-                onSubmitEditing={() => {
-                  const q = search.trim().toLowerCase();
-                  if (q) {
-                    const match = products.find(p => p.reference?.toLowerCase() === q);
-                    if (match) {
-                      addToCart(match);
-                      setSearch('');
-                    } else if (filtered.length === 1) {
-                      addToCart(filtered[0]);
-                      setSearch('');
-                    }
+            <SearchBar
+              value={productSearch}
+              onChangeText={setProductSearch}
+              placeholder="Scanner ou rechercher..."
+              isLoading={productSearchLoading}
+              onClear={() => setProductSearch('')}
+              onSubmitEditing={() => {
+                const q = productSearch.trim().toLowerCase();
+                if (q) {
+                  const match = products.find(p => p.reference?.toLowerCase() === q);
+                  if (match) {
+                    addToCart(match);
+                    setProductSearch('');
                   }
-                }}
-              />
-              <TouchableOpacity 
-                style={{ marginLeft: 12, padding: 4 }}
-                onPress={async () => {
-                  if (!permission?.granted) {
-                    const status = await requestPermission();
-                    if (!status.granted) {
-                      Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
-                      return;
-                    }
+                }
+              }}
+            />
+            <TouchableOpacity 
+              style={{ marginLeft: 12, padding: 4 }}
+              onPress={async () => {
+                if (!permission?.granted) {
+                  const status = await requestPermission();
+                  if (!status.granted) {
+                    Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
+                    return;
                   }
-                  setShowCameraScanner(true);
-                }}
-              >
-                <Ionicons name="barcode-outline" size={24} color={COLORS.info} />
-              </TouchableOpacity>
-              {search !== '' ? (
-                <TouchableOpacity onPress={() => setSearch('')}>
-                  <Ionicons name="close-circle" size={20} color={COLORS.textMuted} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
+                }
+                setShowCameraScanner(true);
+              }}
+            >
+              <Ionicons name="barcode-outline" size={24} color={COLORS.info} />
+            </TouchableOpacity>
           </View>
 
           {/* Client sélectionné */}

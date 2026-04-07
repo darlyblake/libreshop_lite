@@ -434,14 +434,62 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   );
 
   const handleAddProduct = () => {
-    if (!newProduct.name.trim() || !newProduct.price.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir au moins le nom et le prix');
-      return;
+    const errors: string[] = [];
+
+    // Validation champs obligatoires
+    if (!newProduct.name || !newProduct.name.trim()) {
+      errors.push('❌ Nom du produit');
+    } else if (newProduct.name.trim().length < 3) {
+      errors.push('❌ Nom du produit (minimum 3 caractères)');
+    }
+
+    if (!newProduct.price || !newProduct.price.trim()) {
+      errors.push('❌ Prix');
+    } else if (isNaN(Number(newProduct.price)) || Number(newProduct.price) <= 0) {
+      errors.push('❌ Prix (doit être un nombre > 0)');
+    }
+
+    if (!newProduct.stock || !newProduct.stock.trim()) {
+      errors.push('❌ Stock');
+    } else if (isNaN(Number(newProduct.stock)) || Number(newProduct.stock) < 0) {
+      errors.push('❌ Stock (doit être un nombre ≥ 0)');
     }
 
     if (!newProduct.collectionId) {
-      Alert.alert('Erreur', 'Veuillez sélectionner une collection');
+      errors.push('❌ Collection');
+    }
+
+    if (!newProduct.description || !newProduct.description.trim()) {
+      errors.push('❌ Description');
+    } else if (newProduct.description.trim().length < 10) {
+      errors.push('❌ Description (minimum 10 caractères)');
+    }
+
+    if (!newProduct.images || newProduct.images.length === 0) {
+      errors.push('❌ Au moins une image');
+    }
+
+    // Afficher les erreurs
+    if (errors.length > 0) {
+      const missingFields = errors.join('\n');
+      Alert.alert(
+        'Champs manquants ou invalides',
+        `Veuillez remplir les champs suivants:\n\n${missingFields}`,
+        [{ text: 'D\'accord', onPress: () => {} }]
+      );
       return;
+    }
+
+    // Validation prix comparé (optionnel mais si rempli, doit être valide)
+    if (newProduct.comparePrice && newProduct.comparePrice.trim()) {
+      if (isNaN(Number(newProduct.comparePrice)) || Number(newProduct.comparePrice) <= 0) {
+        Alert.alert('Erreur', 'Le prix comparé doit être un nombre valide > 0');
+        return;
+      }
+      if (Number(newProduct.comparePrice) <= Number(newProduct.price)) {
+        Alert.alert('Erreur', 'Le prix comparé doit être supérieur au prix de vente');
+        return;
+      }
     }
 
     onAdd(newProduct);

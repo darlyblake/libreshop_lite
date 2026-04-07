@@ -5,7 +5,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
+
   Alert,
   FlatList,
   ListRenderItem,
@@ -18,6 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/responsive';
 import AddUserModal, { UserData } from '../components/AddUserModal';
+import { SearchBar } from '../components/SearchBar';
+import { useSearch } from '../hooks/useSearch';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
 import { cacheService } from '../services/cacheService';
@@ -48,8 +50,8 @@ export const SellerClientsScreen: React.FC = () => {
   const { isDesktop } = useResponsive();
   const { user } = useAuthStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
   // (optional) keep reference for initial values if needed later
   const [newClient, setNewClient] = useState<UserData>({
     name: '',
@@ -234,15 +236,15 @@ export const SellerClientsScreen: React.FC = () => {
   ========================= */
 
   const filteredClients = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
+    const searchTerm = query.toLowerCase().trim();
 
     return clients.filter((client) => {
       return (
-        client.name?.toLowerCase().includes(query) ||
-        client.phone?.includes(query)
+        client.name?.toLowerCase().includes(searchTerm) ||
+        client.phone?.includes(searchTerm)
       );
     });
-  }, [clients, searchQuery]);
+  }, [clients, query]);
 
   /* =========================
      RENDER ITEM
@@ -397,21 +399,13 @@ export const SellerClientsScreen: React.FC = () => {
 
       {/* SEARCH */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color={COLORS.textMuted}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Rechercher un client..."
-            placeholderTextColor={COLORS.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-          />
-        </View>
+        <SearchBar
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Rechercher un client..."
+          isLoading={searchLoading}
+          onClear={() => setQuery('')}
+        />
       </View>
 
       {/* CONTENT */}

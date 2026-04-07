@@ -491,7 +491,7 @@ export const AppNavigator: React.FC = () => {
   const getInitialRouteForRole = async (role: UserRole, userId: string): Promise<keyof RootStackParamList> => {
     switch (role) {
       case 'seller':
-        return 'ClientTabs';
+        return 'SellerTabs';
       case 'admin':
         return 'AdminDashboard';
       case 'client':
