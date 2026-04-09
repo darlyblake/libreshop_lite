@@ -18,13 +18,12 @@ import { errorHandler } from '../utils/errorHandler';
 import { ProductCard } from '../components';
 import { SortTabs } from '../components/SortTabs';
 import { productService } from '../services/productService';
+import { categoryService } from '../services/categoryService';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useResponsive } from '../utils/responsive';
 
 const { width } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
-
-const CATEGORIES = ['Toutes', 'Électronique', 'Mode', 'Beauté', 'Maison', 'Alimentation', 'Audio', 'Sports'];
 
 export const ClientAllProductsScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -32,6 +31,7 @@ export const ClientAllProductsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
   const [searchQuery, setSearchQuery] = useState('');
+  const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('Toutes');
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +50,21 @@ export const ClientAllProductsScreen: React.FC = () => {
     const gap = SPACING.md * (numColumns - 1);
     return (contentWidth - totalPadding - gap) / numColumns;
   }, [contentWidth, numColumns]);
+
+  // Load categories from database
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categoryData = await categoryService.getAll();
+        const categoryNames = categoryData.map((cat: any) => cat.name);
+        setCategories(['Toutes', ...categoryNames]);
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+        setCategories(['Toutes']);
+      }
+    };
+    loadCategories();
+  }, []);
 
   useEffect(() => {
     loadData(true);
@@ -70,7 +85,13 @@ export const ClientAllProductsScreen: React.FC = () => {
       const currentPage = reset ? 0 : page;
       const pageSize = 20;
 
-      const productsData = await productService.getAll(currentPage, pageSize, sort);
+      // Fetch products based on selected category
+      let productsData;
+      if (selectedCategory === 'Toutes') {
+        productsData = await productService.getAll(currentPage, pageSize, sort);
+      } else {
+        productsData = await productService.getAllByCategory(selectedCategory, currentPage, pageSize, sort);
+      }
 
       if (productsData) {
         if (reset) {
@@ -81,6 +102,7 @@ export const ClientAllProductsScreen: React.FC = () => {
         setHasMore(productsData.length === pageSize);
       }
     } catch (e: any) {
+      console.error('[ClientAllProducts] Error loading products:', e);
       errorHandler.handleDatabaseError?.(e, 'Failed to load products');
       setError(e.message || 'Impossible de charger les produits');
     } finally {
@@ -101,6 +123,11 @@ export const ClientAllProductsScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort]);
 
+  useEffect(() => {
+    loadData(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory]);
+
   const handleLoadMore = () => {
     if (!loading && !loadingMore && hasMore) {
       setPage(prev => prev + 1);
@@ -118,21 +145,17 @@ export const ClientAllProductsScreen: React.FC = () => {
   const filteredProducts = useMemo(() => {
     let filtered = products;
 
-    if (selectedCategory !== 'Toutes') {
-      filtered = filtered.filter(product => product.category === selectedCategory);
-    }
-
+    // Category filtering is done server-side, so we only do text search here
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(product =>
         product.name?.toLowerCase().includes(query) ||
-        product.description?.toLowerCase().includes(query) ||
-        product.category?.toLowerCase().includes(query)
+        product.description?.toLowerCase().includes(query)
       );
     }
 
     return filtered;
-  }, [products, searchQuery, selectedCategory]);
+  }, [products, searchQuery]);
 
   if (loading) {
     return (
@@ -208,7 +231,7 @@ export const ClientAllProductsScreen: React.FC = () => {
 
         <View style={styles.categoriesContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-            {CATEGORIES.map((category) => (
+            {categories.map((category) => (
               <TouchableOpacity
                 key={category}
                 style={[styles.categoryChip, selectedCategory === category && styles.categoryChipActive]}

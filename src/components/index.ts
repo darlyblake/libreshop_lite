@@ -22,4 +22,7 @@ export { CategoryShowcase } from './CategoryShowcase';
 export { LikeButton } from './LikeButton';
 export { FollowButton } from './FollowButton';
 export { PWAInstallButton } from './PWAInstallButton';
+export { StoreHeader } from './StoreHeader';
+export { StoreTabs } from './StoreTabs';
+export { StoreInfoCard } from './StoreInfoCard';
 

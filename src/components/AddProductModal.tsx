@@ -115,6 +115,18 @@ const getStyles = (theme: any) => {
       fontSize: FONT_SIZE.md,
       color: COLORS.text,
       backgroundColor: COLORS.bg,
+      pointerEvents: 'auto' as const,
+    },
+    inputError: {
+      borderColor: COLORS.danger,
+      backgroundColor: COLORS.danger + '08',
+    },
+    errorText: {
+      color: COLORS.danger,
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '600',
+      marginTop: SPACING.xs,
+      marginLeft: SPACING.xs,
     },
     selectInput: {
       borderWidth: 1,
@@ -127,6 +139,7 @@ const getStyles = (theme: any) => {
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: SPACING.sm,
+      pointerEvents: 'auto' as const,
     },
     textArea: {
       height: 100,
@@ -358,6 +371,7 @@ const getStyles = (theme: any) => {
       borderRadius: RADIUS.md,
       alignItems: 'center',
       justifyContent: 'center',
+      pointerEvents: 'auto' as const,
     },
     cancelButton: {
       backgroundColor: COLORS.bg,
@@ -376,6 +390,16 @@ const getStyles = (theme: any) => {
       color: COLORS.text,
       fontWeight: '600',
       fontSize: FONT_SIZE.md,
+    },
+    // Web-specific fixes for modal interaction
+    webInteractiveElement: Platform.OS === 'web' ? {
+      pointerEvents: 'auto' as const,
+    } : {},
+    imagesErrorContainer: {
+      borderWidth: 2,
+      borderColor: COLORS.danger,
+      borderRadius: RADIUS.md,
+      padding: SPACING.md,
     },
   });
 };
@@ -407,6 +431,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     collectionId: initialCollectionId,
   });
   const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   React.useEffect(() => {
     if (!visible) return;
@@ -434,64 +459,64 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   );
 
   const handleAddProduct = () => {
-    const errors: string[] = [];
+    const errors: Record<string, string> = {};
 
     // Validation champs obligatoires
     if (!newProduct.name || !newProduct.name.trim()) {
-      errors.push('❌ Nom du produit');
+      errors.name = 'Nom requis';
     } else if (newProduct.name.trim().length < 3) {
-      errors.push('❌ Nom du produit (minimum 3 caractères)');
+      errors.name = 'Min 3 caractères';
     }
 
     if (!newProduct.price || !newProduct.price.trim()) {
-      errors.push('❌ Prix');
+      errors.price = 'Prix requis';
     } else if (isNaN(Number(newProduct.price)) || Number(newProduct.price) <= 0) {
-      errors.push('❌ Prix (doit être un nombre > 0)');
+      errors.price = 'Prix invalide (> 0)';
     }
 
     if (!newProduct.stock || !newProduct.stock.trim()) {
-      errors.push('❌ Stock');
+      errors.stock = 'Stock requis';
     } else if (isNaN(Number(newProduct.stock)) || Number(newProduct.stock) < 0) {
-      errors.push('❌ Stock (doit être un nombre ≥ 0)');
+      errors.stock = 'Stock invalide (≥ 0)';
     }
 
     if (!newProduct.collectionId) {
-      errors.push('❌ Collection');
+      errors.collection = 'Collection requise';
     }
 
     if (!newProduct.description || !newProduct.description.trim()) {
-      errors.push('❌ Description');
-    } else if (newProduct.description.trim().length < 10) {
-      errors.push('❌ Description (minimum 10 caractères)');
+      errors.description = 'Description requise';
+    } else if (newProduct.description.trim().length < 3) {
+      errors.description = 'Min 3 caractères';
     }
 
     if (!newProduct.images || newProduct.images.length === 0) {
-      errors.push('❌ Au moins une image');
+      errors.images = 'Au moins 1 image requise';
     }
 
-    // Afficher les erreurs
-    if (errors.length > 0) {
-      const missingFields = errors.join('\n');
-      Alert.alert(
-        'Champs manquants ou invalides',
-        `Veuillez remplir les champs suivants:\n\n${missingFields}`,
-        [{ text: 'D\'accord', onPress: () => {} }]
-      );
+    // S'il y a des erreurs, les afficher et arrêter
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      console.warn('[AddProductModal] Validation errors:', errors);
       return;
     }
+
+    // Réinitialiser les erreurs si tout est valide
+    setFieldErrors({});
 
     // Validation prix comparé (optionnel mais si rempli, doit être valide)
     if (newProduct.comparePrice && newProduct.comparePrice.trim()) {
       if (isNaN(Number(newProduct.comparePrice)) || Number(newProduct.comparePrice) <= 0) {
-        Alert.alert('Erreur', 'Le prix comparé doit être un nombre valide > 0');
+        setFieldErrors({ comparePrice: 'Prix invalide (> 0)' });
         return;
       }
       if (Number(newProduct.comparePrice) <= Number(newProduct.price)) {
-        Alert.alert('Erreur', 'Le prix comparé doit être supérieur au prix de vente');
+        setFieldErrors({ comparePrice: 'Doit être > prix de vente' });
         return;
       }
     }
 
+    console.log('[AddProductModal] ✅ Validation passed, calling onAdd()', newProduct);
     onAdd(newProduct);
     
     // Reset form
@@ -600,6 +625,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
+      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : 'overFullScreen'}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -625,12 +651,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               <Text style={styles.inputLabel}>
                 Collection <Text style={styles.required}>*</Text>
               </Text>
-              <TouchableOpacity style={styles.selectInput} onPress={openCollectionPicker} activeOpacity={0.8}>
+              <TouchableOpacity style={[styles.selectInput, fieldErrors.collection && styles.inputError]} onPress={openCollectionPicker} activeOpacity={0.8}>
                 <Text style={{ color: newProduct.collectionId ? COLORS.text : COLORS.textMuted }} numberOfLines={1}>
                   {collections?.find((c) => c.id === newProduct.collectionId)?.name || 'Sélectionner une collection'}
                 </Text>
                 <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
               </TouchableOpacity>
+              {fieldErrors.collection && <Text style={styles.errorText}>{fieldErrors.collection}</Text>}
             </View>
 
             <View style={styles.modalInput}>
@@ -638,7 +665,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 Nom du produit <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors.name && styles.inputError]}
                 placeholder="Ex: iPhone 15 Pro"
                 placeholderTextColor={COLORS.textMuted}
                 value={newProduct.name}
@@ -646,6 +673,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   setNewProduct({ ...newProduct, name: text })
                 }
               />
+              {fieldErrors.name && <Text style={styles.errorText}>{fieldErrors.name}</Text>}
             </View>
 
             <View style={styles.modalInput}>
@@ -653,7 +681,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 Prix <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors.price && styles.inputError]}
                 placeholder="Ex: 850000"
                 placeholderTextColor={COLORS.textMuted}
                 value={newProduct.price}
@@ -662,12 +690,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 }
                 keyboardType="numeric"
               />
+              {fieldErrors.price && <Text style={styles.errorText}>{fieldErrors.price}</Text>}
             </View>
 
             <View style={styles.modalInput}>
               <Text style={styles.inputLabel}>Prix comparé</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, fieldErrors.comparePrice && styles.inputError]}
                 placeholder="Ex: 950000"
                 placeholderTextColor={COLORS.textMuted}
                 value={newProduct.comparePrice}
@@ -704,13 +733,16 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   <Ionicons name="add-circle-outline" size={24} color={COLORS.success} />
                 </TouchableOpacity>
               </View>
+              {fieldErrors.stock && <Text style={styles.errorText}>{fieldErrors.stock}</Text>}
             </View>
 
             <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>Description</Text>
+              <Text style={styles.inputLabel}>
+                Description <Text style={styles.required}>*</Text>
+              </Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Description du produit..."
+                style={[styles.input, styles.textArea, fieldErrors.description && styles.inputError]}
+                placeholder="Description du produit (minimum 3 caractères)..."
                 placeholderTextColor={COLORS.textMuted}
                 value={newProduct.description}
                 onChangeText={(text) =>
@@ -720,17 +752,19 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 numberOfLines={4}
                 textAlignVertical="top"
               />
+              {fieldErrors.description && <Text style={styles.errorText}>{fieldErrors.description}</Text>}
             </View>
 
             <View style={styles.modalInput}>
               <Text style={styles.inputLabel}>
-                Images ({newProduct.images.length}/5)
+                Images ({newProduct.images.length}/5) <Text style={styles.required}>*</Text>
               </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.imagesContainer}
-              >
+              <View style={fieldErrors.images ? styles.imagesErrorContainer : {}}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.imagesContainer}
+                >
                 {newProduct.images.map((image, index) => (
                   <View key={index} style={styles.imageItem}>
                     <Image
@@ -763,6 +797,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   </TouchableOpacity>
                 )}
               </ScrollView>
+              </View>
+              {fieldErrors.images && <Text style={styles.errorText}>{fieldErrors.images}</Text>}
             </View>
           </ScrollView>
 

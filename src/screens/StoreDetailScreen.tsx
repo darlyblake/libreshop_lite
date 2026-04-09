@@ -24,7 +24,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ExpoLinking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from "../config/theme";
-import { ProductCard, FollowButton } from "../components";
+import { ProductCard, FollowButton, StoreHeader, StoreTabs, StoreInfoCard } from "../components";
 import { collectionService } from '../services/collectionService';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
@@ -166,6 +166,7 @@ const starStyles = StyleSheet.create({
 export const StoreDetailScreen: React.FC = () => {
   const [selectedCollectionId, setSelectedCollectionId] =
     useState<string>("Tous");
+  const [activeTab, setActiveTab] = useState<string>("accueil");
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { storeId: storeIdParam, slug: slugParam } = route.params || {};
@@ -549,6 +550,26 @@ export const StoreDetailScreen: React.FC = () => {
     await Linking.openURL(url);
   };
 
+  const handleFollowStore = useCallback(async () => {
+    if (!store?.id || !user?.id) {
+      Alert.alert("Suivi", "Vous devez être connecté pour suivre une boutique.");
+      return;
+    }
+
+    try {
+      // TODO: Implement actual follow/unfollow logic with backend
+      // For now, show a success message
+      Alert.alert("Suivi", "Vous suivez maintenant cette boutique! ❤️");
+    } catch (e: any) {
+      errorHandler.handle(
+        e,
+        "follow failed",
+        ErrorCategory.SYSTEM,
+        ErrorSeverity.LOW,
+      );
+    }
+  }, [store?.id, user?.id]);
+
   const mapProductToCard = useCallback((p: any) => {
     const images = Array.isArray(p?.images) ? p.images : [];
     const imageUrl =
@@ -622,163 +643,145 @@ export const StoreDetailScreen: React.FC = () => {
 
         {!loading && !errorMsg && (
           <>
-            {/* Store Banner — 220px */}
-            <View style={styles.storeBanner}>
-              <Image
-                source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 800) }}
-                style={styles.bannerImage}
-                resizeMode="cover"
+            {/* NEW: Modern Store Header with StoreHeader component */}
+            <StoreHeader
+              store={{
+                id: store?.id || "",
+                name: store?.name || storeData?.name || "Boutique",
+                category: store?.category || storeData?.category || "",
+                logo_url: store?.logo_url || storeData?.logoUrl,
+                banner_url: store?.banner_url || storeData?.bannerUrl,
+                description: store?.description || storeData?.description,
+                verified: Boolean(store?.verified || storeData?.verified),
+                rating: ratingAvg,
+                rating_count: ratingCount,
+              }}
+              onShare={handleShareStore}
+              onContact={() => {
+                if (hasPhone) {
+                  handleWhatsAppContact();
+                }
+              }}
+              onFollow={() => {
+                // Follow is handled by the component if needed
+              }}
+            />
+
+            {/* NEW: Store Info Card */}
+            {store && (
+              <StoreInfoCard
+                store={{
+                  phone: store?.phone,
+                  address: store?.address,
+                  opening_hours: store?.opening_hours,
+                  delivery_time: store?.delivery_time,
+                  email: store?.email,
+                }}
               />
-              <View style={styles.bannerOverlay} />
-            </View>
-
-            {/* Store Info */}
-            <View style={styles.storeInfo}>
-              <View style={styles.logoContainer}>
-                <Image
-                  source={{ uri: cloudinaryService.getOptimizedUrl(storeData.logoUrl, 800) }}
-                  style={styles.storeLogo}
-                />
-              </View>
-
-              <View style={styles.storeDetails}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.storeName}>{storeData.name}</Text>
-                  {storeData.verified && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={22}
-                      color={COLORS.success}
-                    />
-                  )}
-                </View>
-                {!!storeData.category && (
-                  <Text style={styles.storeCategory}>{storeData.category}</Text>
-                )}
-                {!!storeData.description && (
-                  <Text style={styles.storeDescription}>
-                    {storeData.description}
-                  </Text>
-                )}
-
-                {/* Star Rating */}
-                {(ratingAvg > 0 || ratingCount > 0) && (
-                  <View style={styles.ratingWrapper}>
-                    <StarRating avg={ratingAvg} count={ratingCount} />
-                  </View>
-                )}
-
-                {/* Stats */}
-                <View style={styles.statsRow}>
-                  <View style={styles.stat}>
-                    <Text style={styles.statValue}>
-                      {(products?.length || 0).toLocaleString("fr-FR")}
-                    </Text>
-                    <Text style={styles.statLabel}>Produits</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.stat}>
-                    <Text style={styles.statValue}>
-                      {ratingAvg > 0 ? ratingAvg.toFixed(1) : "-"}
-                    </Text>
-                    <Text style={styles.statLabel}>Note</Text>
-                  </View>
-                  <View style={styles.statDivider} />
-                  <View style={styles.stat}>
-                    <Text style={styles.statValue}>
-                      {typeof storeStats?.followers_count === "number"
-                        ? Number(storeStats.followers_count).toLocaleString(
-                            "fr-FR",
-                          )
-                        : "-"}
-                    </Text>
-                    <Text style={styles.statLabel}>Abonnés</Text>
-                  </View>
-                </View>
-
-                {/* Actions */}
-                <View style={styles.actions}>
-                  {store?.id ? (
-                    <FollowButton
-                      userId={user?.id ? String(user.id) : undefined}
-                      storeId={String(store.id)}
-                      storeName={String(store?.name || "Boutique")}
-                      size="large"
-                      variant="primary"
-                      showCount={false}
-                      style={styles.followButtonWrapper}
-                    />
-                  ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.followButtonWrapper,
-                        styles.followButtonDisabled,
-                      ]}
-                      disabled
-                    >
-                      <Text style={styles.followButtonDisabledText}>
-                        Suivre
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  {hasPhone && (
-                    <TouchableOpacity
-                      style={styles.secondaryButton}
-                      onPress={handleWhatsAppContact}
-                      accessibilityLabel="Contacter via WhatsApp"
-                      accessibilityRole="button"
-                    >
-                      <Ionicons
-                        name="logo-whatsapp"
-                        size={20}
-                        color={COLORS.whatsapp}
-                      />
-                      <Text style={styles.secondaryButtonText}>Contacter</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* Promo Banner */}
-            {shouldShowPromo && (
-              <TouchableOpacity
-                style={styles.promoCard}
-                onPress={handlePromoPress}
-                activeOpacity={0.85}
-              >
-                {!!storeData.promoImageUrl && (
-                  <Image
-                    source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
-                    style={styles.promoImage}
-                    resizeMode="cover"
-                  />
-                )}
-                <View style={styles.promoContent}>
-                  {!!String(storeData.promoTitle || "").trim() && (
-                    <Text style={styles.promoTitle}>
-                      {String(storeData.promoTitle)}
-                    </Text>
-                  )}
-                  {!!String(storeData.promoSubtitle || "").trim() && (
-                    <Text style={styles.promoSubtitle}>
-                      {String(storeData.promoSubtitle)}
-                    </Text>
-                  )}
-                  <View style={styles.promoCtaRow}>
-                    <Text style={styles.promoCtaText}>Voir l'offre</Text>
-                    <Ionicons
-                      name="arrow-forward"
-                      size={16}
-                      color={COLORS.text}
-                    />
-                  </View>
-                </View>
-              </TouchableOpacity>
             )}
 
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
+            {/* Action Buttons: Contact & Follow */}
+            <View style={styles.actionButtonsSection}>
+              <TouchableOpacity 
+                style={styles.contactButton}
+                onPress={() => {
+                  if (hasPhone) {
+                    handleWhatsAppContact();
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name="call" 
+                  size={18} 
+                  color={COLORS.white}
+                />
+                <Text style={styles.contactButtonText}>Contacter</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.followButton}
+                onPress={handleFollowStore}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name="heart" 
+                  size={18} 
+                  color={COLORS.accent}
+                />
+                <Text style={styles.followButtonText}>Suivre</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* NEW: Store Tabs Navigation */}
+            <StoreTabs
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              tabs={[
+                { id: "accueil", label: "Accueil" },
+                { id: "produits", label: "Produits" },
+                { id: "apropos", label: "À propos" },
+                { id: "avis", label: "Avis" },
+              ]}
+            />
+
+            {/* Old Store Header (now replaced by StoreHeader component above) - Code hidden for cleanliness */}
+
+            {/* ─── TAB-BASED CONTENT ─── */}
+
+            {/* ACCUEIL TAB */}
+            {activeTab === "accueil" && (
+              <>
+                {/* Promo Banner */}
+                {shouldShowPromo && (
+                  <TouchableOpacity
+                    style={styles.promoCard}
+                    onPress={handlePromoPress}
+                    activeOpacity={0.85}
+                  >
+                    {!!storeData.promoImageUrl && (
+                      <Image
+                        source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
+                        style={styles.promoImage}
+                        resizeMode="cover"
+                      />
+                    )}
+                    <View style={styles.promoContent}>
+                      {!!String(storeData.promoTitle || "").trim() && (
+                        <Text style={styles.promoTitle}>
+                          {String(storeData.promoTitle)}
+                        </Text>
+                      )}
+                      {!!String(storeData.promoSubtitle || "").trim() && (
+                        <Text style={styles.promoSubtitle}>
+                          {String(storeData.promoSubtitle)}
+                        </Text>
+                      )}
+                      <View style={styles.promoCtaRow}>
+                        <Text style={styles.promoCtaText}>Voir l'offre</Text>
+                        <Ionicons
+                          name="arrow-forward"
+                          size={16}
+                          color={COLORS.text}
+                        />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                )}
+
+                {/* Welcome section */}
+                <View style={styles.welcomeSection}>
+                  <Text style={styles.sectionTitle}>Bienvenue</Text>
+                  <Text style={styles.descriptionText}>{storeData.description}</Text>
+                </View>
+              </>
+            )}
+
+            {/* PRODUITS TAB */}
+            {activeTab === "produits" && (
+              <>
+                {/* Search Bar */}
+                <View style={styles.searchContainer}>
               <Ionicons
                 name="search-outline"
                 size={18}
@@ -955,6 +958,161 @@ export const StoreDetailScreen: React.FC = () => {
                     );
                   })}
                 </ScrollView>
+              </View>
+            )}
+              </>
+            )}
+
+            {/* À PROPOS TAB */}
+            {activeTab === "apropos" && (
+              <View style={styles.aboutSection}>
+                {/* Description */}
+                <View style={styles.aboutCard}>
+                  <Text style={styles.aboutTitle}>À propos de {storeData.name}</Text>
+                  <Text style={styles.descriptionText}>{storeData.description}</Text>
+                </View>
+
+                {/* Contact & Hours */}
+                <View style={styles.aboutCard}>
+                  <Text style={styles.aboutTitle}>Informations de contact</Text>
+                  
+                  {store?.phone && (
+                    <TouchableOpacity
+                      style={styles.contactItem}
+                      onPress={() => Linking.openURL(`tel:${store.phone}`)}
+                    >
+                      <Ionicons
+                        name="call"
+                        size={20}
+                        color={COLORS.accent}
+                        style={styles.contactIcon}
+                      />
+                      <View>
+                        <Text style={styles.contactLabel}>Téléphone</Text>
+                        <Text style={styles.contactValue}>{store.phone}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {store?.email && (
+                    <TouchableOpacity
+                      style={styles.contactItem}
+                      onPress={() => Linking.openURL(`mailto:${store.email}`)}
+                    >
+                      <Ionicons
+                        name="mail"
+                        size={20}
+                        color={COLORS.accent}
+                        style={styles.contactIcon}
+                      />
+                      <View>
+                        <Text style={styles.contactLabel}>Email</Text>
+                        <Text style={styles.contactValue}>{store.email}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {store?.address && (
+                    <TouchableOpacity
+                      style={styles.contactItem}
+                      onPress={() =>
+                        Linking.openURL(
+                          `geo:0,0?q=${encodeURIComponent(store.address)}`
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name="location"
+                        size={20}
+                        color={COLORS.accent}
+                        style={styles.contactIcon}
+                      />
+                      <View>
+                        <Text style={styles.contactLabel}>Adresse</Text>
+                        <Text style={styles.contactValue}>{store.address}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {store?.opening_hours && (
+                    <View style={styles.contactItem}>
+                      <Ionicons
+                        name="time"
+                        size={20}
+                        color={COLORS.accent}
+                        style={styles.contactIcon}
+                      />
+                      <View>
+                        <Text style={styles.contactLabel}>Horaires</Text>
+                        <Text style={styles.contactValue}>{store.opening_hours}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Stats */}
+                {storeStats && (
+                  <View style={styles.statsGrid}>
+                    {storeStats.total_products !== undefined && (
+                      <View style={styles.statBox}>
+                        <Text style={styles.statNumber}>
+                          {storeStats.total_products}
+                        </Text>
+                        <Text style={styles.statLabel}>Produits</Text>
+                      </View>
+                    )}
+                    {storeStats.total_followers !== undefined && (
+                      <View style={styles.statBox}>
+                        <Text style={styles.statNumber}>
+                          {storeStats.total_followers}
+                        </Text>
+                        <Text style={styles.statLabel}>Abonnés</Text>
+                      </View>
+                    )}
+                    {storeStats.total_orders !== undefined && (
+                      <View style={styles.statBox}>
+                        <Text style={styles.statNumber}>
+                          {storeStats.total_orders}
+                        </Text>
+                        <Text style={styles.statLabel}>Commandes</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* AVIS TAB */}
+            {activeTab === "avis" && (
+              <View style={styles.reviewsSection}>
+                <View style={styles.reviewHeader}>
+                  <View>
+                    <Text style={styles.sectionTitle}>Avis clients</Text>
+                    {storeStats?.rating_avg !== undefined && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: SPACING.sm, marginTop: SPACING.xs }}>
+                        <StarRating
+                          avg={Number(storeStats.rating_avg) || 0}
+                          count={Number(storeStats.rating_count) || 0}
+                        />
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Placeholder for reviews */}
+                <View style={styles.emptyReviews}>
+                  <Ionicons
+                    name="star-outline"
+                    size={48}
+                    color={COLORS.textMuted}
+                  />
+                  <Text style={styles.emptyReviewsText}>
+                    Pas d'avis pour le moment
+                  </Text>
+                  <Text style={styles.emptyReviewsSubtext}>
+                    Soyez le premier à évaluer cette boutique
+                  </Text>
+                </View>
               </View>
             )}
 
@@ -1348,4 +1506,142 @@ const styles = StyleSheet.create({
   suggestedCard: {
     width: 160,
   },
+  // Action Buttons
+  actionButtonsSection: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  contactButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.accent,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+  },
+  contactButtonText: {
+    color: COLORS.white,
+    fontWeight: "700",
+    fontSize: FONT_SIZE.sm,
+  },
+  followButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.card,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 2,
+    borderColor: COLORS.accent,
+  },
+  followButtonText: {
+    color: COLORS.accent,
+    fontWeight: "700",
+    fontSize: FONT_SIZE.sm,
+  },
+  // Welcome section (Accueil tab)
+  welcomeSection: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
+  },
+  // About section (À propos tab)
+  aboutSection: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+  },
+  aboutCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+  },
+  aboutTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  descriptionText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSoft,
+    lineHeight: 22,
+  },
+  contactItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: SPACING.md,
+    gap: SPACING.md,
+  },
+  contactIcon: {
+    marginTop: 2,
+  },
+  contactLabel: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    textTransform: "uppercase",
+    fontWeight: "600",
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  contactValue: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    fontWeight: "500",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statNumber: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: "700",
+    color: COLORS.accent,
+    marginBottom: SPACING.xs,
+  },
+  // Reviews section (Avis tab)
+  reviewsSection: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
+  },
+  reviewHeader: {
+    marginBottom: SPACING.xl,
+  },
+  emptyReviews: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: SPACING.xxxl,
+    gap: SPACING.md,
+  },
+  emptyReviewsText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  emptyReviewsSubtext: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    textAlign: "center",
+  },
 });
+

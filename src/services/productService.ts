@@ -3,6 +3,66 @@ import { Product, ProductReview } from '../lib/supabase';
 
 export type SortOption = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc' | 'date_asc' | 'date_desc';
 
+/**
+ * Unified 6-tier product ranking system
+ * Ensures consistent product ordering across all display contexts
+ */
+function rankProducts(products: any[], sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'newest'): any[] {
+  const now = Date.now();
+  
+  return products.map((p: any) => {
+    const view_count = Number(p.view_count || 0);
+    const ageDays = Math.max(0, (now - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24));
+    const freshness = Math.max(0, (30 - ageDays) / 30);
+    
+    // Calculate different ranking scores based on sort type
+    let score = 0;
+    
+    switch (sort) {
+      case 'newest':
+        // 1. Newly launched: prioritize recent products
+        score = -new Date(p.created_at).getTime();
+        break;
+        
+      case 'popular':
+        // 2. Popular: total view count (lifetime popularity)
+        score = -view_count;
+        break;
+        
+      case 'trending':
+        // 3. Trending: recent view surge + freshness + view velocity
+        // Prioritize products with high views that are relatively new
+        score = -(view_count * 0.6 + freshness * 40);
+        break;
+        
+      case 'ranked':
+        // 4. Ranked: composite score (views + freshness weighted)
+        score = -(view_count * 0.3 + freshness * 100 * 0.2);
+        break;
+        
+      case 'sales':
+        // 5. Sales: proxy using view count with recent boost
+        // Products with high views + recently active get priority
+        score = -(view_count * 0.7 + freshness * 50);
+        break;
+        
+      case 'top':
+        // 6. Top: monthly winners (recent views + freshness)
+        // Products performing well in the last 30 days
+        const recentBoost = ageDays <= 30 ? (30 - ageDays) / 30 : 0;
+        score = -(view_count * (1 + recentBoost));
+        break;
+    }
+    
+    return { ...p, __score: score };
+  })
+  .sort((a: any, b: any) => a.__score - b.__score)
+  .map((p: any) => {
+    delete p.__score;
+    return p;
+  });
+}
+
 export const productService = {
   async create(product: Partial<Product>) {
     const client = useSupabase();
@@ -134,54 +194,96 @@ export const productService = {
     const client = useSupabase();
     const from = page * pageSize;
     const to = from + pageSize - 1;
-    if (sort === 'ranked') {
-      const maxFetch = Math.max(200, pageSize * 10);
-      const { data, error } = await client
-        .from('products')
-        .select('*, stores(name, logo_url)')
-        .eq('is_active', true)
-        .gt('stock', 0)
-        .order('created_at', { ascending: false })
-        .range(0, maxFetch - 1);
-      if (error) throw error;
-
-      const now = Date.now();
-      const scored = (data || []).map((p: any) => {
-        const total_sales = Number(p.total_sales || 0);
-        const view_count = Number(p.view_count || 0);
-        const ageDays = Math.max(0, (now - new Date(p.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        const freshness = Math.max(0, (30 - ageDays) / 30);
-        const score = total_sales * 0.5 + view_count * 0.3 + freshness * 100 * 0.2;
-        return { ...p, __score: score };
-      });
-
-      scored.sort((a: any, b: any) => b.__score - a.__score);
-      const paged = scored.slice(from, to + 1).map((s: any) => {
-        delete s.__score; return s;
-      });
-      return paged;
-    }
-
-    let query = client
+    
+    // Fetch more data for ranking to ensure quality results after sorting
+    const fetchSize = Math.max(200, pageSize * 10);
+    
+    const { data, error } = await client
       .from('products')
-      .select('*, stores(name, logo_url)')
+      .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
       .eq('is_active', true)
-      .gt('stock', 0);
-
-    if (sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top') {
-      // Fallback to view_count because total_sales doesn't exist on the table
-      query = query.order('view_count', { ascending: false, nullsFirst: false });
-    } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    const { data, error } = await query.range(from, to);
+      .gt('stock', 0)
+      .order('created_at', { ascending: false })
+      .range(0, fetchSize - 1);
+    
     if (error) throw error;
-    return data;
+
+    // Apply unified ranking system
+    const ranked = rankProducts(data || [], sort);
+    
+    // Return paginated results from ranked data
+    return ranked.slice(from, to + 1);
   },
 
   /**
-   * Cursor-based pagination for infinite scroll
+   * Get products by category (via collections)
+   * Category → Collection → Product relationship
+   */
+  async getAllByCategory(
+    categoryName: string,
+    page = 0,
+    pageSize = 20,
+    sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'newest'
+  ) {
+    const client = useSupabase();
+    
+    try {
+      // Step 1: Get category ID by name
+      const { data: categoryData, error: catError } = await client
+        .from('categories')
+        .select('id, name')
+        .ilike('name', categoryName)
+        .single();
+      
+      if (catError || !categoryData?.id) {
+        return [];
+      }
+
+      const categoryId = categoryData.id;
+
+      // Step 2: Get all collections for this category
+      const { data: collections, error: collError } = await client
+        .from('collections')
+        .select('id, name')
+        .eq('category_id', categoryId)
+        .eq('is_active', true);
+      
+      if (collError) throw collError;
+      
+      if (!collections || collections.length === 0) {
+        return [];
+      }
+
+      const collectionIds = collections.map((c: any) => c.id);
+      
+      // Step 3: Fetch products from these collections with ranking
+      const fetchSize = Math.max(200, pageSize * 10);
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data: products, error: prodError } = await client
+        .from('products')
+        .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
+        .in('collection_id', collectionIds)
+        .eq('is_active', true)
+        .gt('stock', 0)
+        .order('created_at', { ascending: false })
+        .range(0, fetchSize - 1);
+
+      if (prodError) throw prodError;
+
+      // Apply unified ranking system
+      const ranked = rankProducts(products || [], sort);
+      
+      // Return paginated results from ranked data
+      return ranked.slice(from, to + 1);
+    } catch (err) {
+      return [];
+    }
+  },
+
+  /**
+   * Cursor-based pagination for infinite scroll with unified ranking
    * Returns next cursor along with data for stable pagination
    */
   async getAllWithCursor(
@@ -191,61 +293,65 @@ export const productService = {
   ) {
     const client = useSupabase();
     
+    // For cursor-based ranking, we fetch a larger batch to ensure quality rankings
+    const batchSize = Math.max(pageSize * 15, 120);
+    
     let query = client
       .from('products')
-      .select('id, name, price, compare_price, images, view_count, is_active, stock, stores(name, logo_url)')
+      .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
       .eq('is_active', true)
-      .gt('stock', 0);
+      .gt('stock', 0)
+      .order('created_at', { ascending: false });
 
-    if (sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top') {
-      query = query.order('view_count', { ascending: false, nullsFirst: false });
+    let allData: any[] = [];
+    
+    // Fetch initial batch
+    if (!cursor) {
+      const { data, error } = await query.limit(batchSize);
+      if (error) throw error;
+      allData = data || [];
     } else {
-      query = query.order('created_at', { ascending: false });
-    }
-
-    // If cursor exists, parse it and fetch next batch
-    if (cursor) {
+      // With cursor, we still need to fetch fresh batch from start for proper ranking
+      // This ensures ranking consistency across page loads
       try {
         const decodedCursor = JSON.parse(Buffer.from(cursor, 'base64').toString());
-        const lastId = decodedCursor.id;
-        const lastValue = decodedCursor.value;
-
-        // Get items after cursor
-        if (sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top') {
-          query = query.lt('view_count', lastValue).or(`view_count.eq.${lastValue},id.lt.${lastId}`);
-        } else {
-          query = query.lt('created_at', lastValue).or(`created_at.eq.${lastValue},id.lt.${lastId}`);
-        }
+        const offset = decodedCursor.offset || 0;
+        
+        const { data, error } = await query.range(offset, offset + batchSize - 1);
+        if (error) throw error;
+        allData = data || [];
       } catch (e) {
         console.warn('[ProductService] Invalid cursor, fetching from start:', e);
+        const { data, error } = await query.limit(batchSize);
+        if (error) throw error;
+        allData = data || [];
       }
     }
 
-    const { data, error } = await query.limit(pageSize + 1);
-    if (error) throw error;
-
-    const items = data || [];
-    const hasMore = items.length > pageSize;
-    const products = items.slice(0, pageSize);
+    // Apply unified ranking to the batch
+    const rankedData = rankProducts(allData, sort);
+    
+    // Take pageSize items from ranked data
+    const items = rankedData.slice(0, pageSize);
+    const hasMore = rankedData.length > pageSize;
 
     let nextCursor = null;
-    if (hasMore && products.length > 0) {
-      const lastProduct = products[products.length - 1] as any;
-      const sortValue = sort === 'popular' || sort === 'trending' || sort === 'sales' || sort === 'top'
-        ? lastProduct.view_count
-        : lastProduct.created_at;
-
+    if (hasMore && items.length > 0) {
+      // Calculate next offset based on cursor position
+      const currentOffset = cursor ? 
+        JSON.parse(Buffer.from(cursor, 'base64').toString()).offset || 0 : 0;
+      const nextOffset = currentOffset + pageSize;
+      
       nextCursor = Buffer.from(
         JSON.stringify({
-          id: lastProduct.id,
-          value: sortValue,
+          offset: nextOffset,
           sort
         })
       ).toString('base64');
     }
 
     return {
-      data: products,
+      data: items,
       nextCursor,
       hasMore
     };
@@ -264,16 +370,33 @@ export const productService = {
 
   async getPopularByCategory(category: string, limit: number = 4) {
     const client = useSupabase();
+    // Fetch more products to rank and return top ones
+    const fetchLimit = Math.max(50, limit * 10);
+    
     const { data, error } = await client
       .from('products')
-      .select('id, name, price, images, view_count, stores!inner(category)')
-      .eq('stores.category', category)
+      .select('id, name, price, compare_price, images, view_count, created_at, is_active, stock, stores!inner(category)')
+      .eq('stores.is_active', true)
       .eq('is_active', true)
-      .order('view_count', { ascending: false })
-      .limit(limit);
+      .gt('stock', 0)
+      .order('created_at', { ascending: false })
+      .limit(fetchLimit);
 
     if (error) throw error;
-    return data || [];
+    
+    // Filter by category (case-insensitive, normalized)
+    const categoryNorm = category.toLowerCase().trim();
+    const filtered = (data || []).filter((p: any) => 
+      p.stores && 
+      (Array.isArray(p.stores) ? 
+        p.stores.some((s: any) => s.category?.toLowerCase().trim() === categoryNorm) : 
+        p.stores.category?.toLowerCase().trim() === categoryNorm)
+    );
+    
+    // Apply popular ranking (view-count based + quality metrics)
+    const ranked = rankProducts(filtered, 'popular');
+    
+    return ranked.slice(0, limit);
   },
 
   async update(id: string, product: Partial<Product>) {

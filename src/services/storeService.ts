@@ -151,14 +151,49 @@ export const storeService = {
     const client = useSupabase();
     const { data, error } = await client
       .from('stores')
-      .select('*')
+      .select('*, store_stats(followers_count, customers_count, rating_avg)')
       .eq('status', 'active')
       .eq('visible', true)
-      .order('verified', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(50); // Fetch mehr to sort client-side
     if (error) throw error;
-    return data;
+    
+    // Robust ranking: verified → sales → followers → rating → date
+    return (data || [])
+      .sort((a, b) => {
+        // 1️⃣ Verified first
+        if (a.verified !== b.verified) {
+          return a.verified ? -1 : 1;
+        }
+        
+        // Get stats (handle array or object format)
+        const statsA = Array.isArray(a.store_stats) ? a.store_stats[0] : a.store_stats;
+        const statsB = Array.isArray(b.store_stats) ? b.store_stats[0] : b.store_stats;
+        
+        // 2️⃣ By sales (customers_count) - higher = first
+        const customersA = Number(statsA?.customers_count || 0);
+        const customersB = Number(statsB?.customers_count || 0);
+        if (customersB !== customersA) {
+          return customersB - customersA;
+        }
+        
+        // 3️⃣ By followers (popularity) - higher = first
+        const followersA = Number(statsA?.followers_count || 0);
+        const followersB = Number(statsB?.followers_count || 0);
+        if (followersB !== followersA) {
+          return followersB - followersA;
+        }
+        
+        // 4️⃣ By rating - higher = first
+        const ratingA = Number(statsA?.rating_avg || 0);
+        const ratingB = Number(statsB?.rating_avg || 0);
+        if (ratingB !== ratingA) {
+          return ratingB - ratingA;
+        }
+        
+        // 5️⃣ By creation date - newer = first
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      })
+      .slice(0, 10);
   },
 
   async getPopularStores(limit: number = 4) {

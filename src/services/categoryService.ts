@@ -169,25 +169,56 @@ export const categoryService = {
     try {
       if (!supabase) return [];
 
+      // ⚠️ Fetch all stores and filter client-side to handle:
+      // - Case-insensitive matching
+      // - Accents/diacritics normalization
+      // - Whitespace trimming
       const { data, error } = await supabase
         .from('stores')
         .select('*, store_stats(followers_count, customers_count, rating_avg)')
-        .eq('category', category)
         .eq('status', 'active')
         .eq('visible', true)
         .order('created_at', { ascending: false })
-        .limit(limit * 2); // On prend un peu plus pour filtrer après
+        .limit(limit * 10); // Fetch more to account for filtering
 
       if (error) throw error;
 
+      // Robust ranking: verified → sales → followers → rating → date
       return (data || [])
         .filter(s => normalize(s.category) === normalize(category))
         .sort((a, b) => {
+          // 1️⃣ Verified first
+          if (a.verified !== b.verified) {
+            return a.verified ? -1 : 1;
+          }
+          
+          // Get stats (handle array or object format)
           const statsA = Array.isArray(a.store_stats) ? a.store_stats[0] : a.store_stats;
           const statsB = Array.isArray(b.store_stats) ? b.store_stats[0] : b.store_stats;
-          const salesA = Number(statsA?.customers_count || 0);
-          const salesB = Number(statsB?.customers_count || 0);
-          return salesB - salesA;
+          
+          // 2️⃣ By sales (customers_count) - higher = first
+          const customersA = Number(statsA?.customers_count || 0);
+          const customersB = Number(statsB?.customers_count || 0);
+          if (customersB !== customersA) {
+            return customersB - customersA;
+          }
+          
+          // 3️⃣ By followers (popularity) - higher = first
+          const followersA = Number(statsA?.followers_count || 0);
+          const followersB = Number(statsB?.followers_count || 0);
+          if (followersB !== followersA) {
+            return followersB - followersA;
+          }
+          
+          // 4️⃣ By rating - higher = first
+          const ratingA = Number(statsA?.rating_avg || 0);
+          const ratingB = Number(statsB?.rating_avg || 0);
+          if (ratingB !== ratingA) {
+            return ratingB - ratingA;
+          }
+          
+          // 5️⃣ By creation date - newer = first
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
         })
         .slice(0, limit);
 
@@ -207,20 +238,45 @@ export const categoryService = {
         .select('*, store_stats(followers_count, customers_count, rating_avg)')
         .eq('status', 'active')
         .eq('visible', true)
-        .order('created_at', { ascending: false })
-        .limit(limit * 2);
+        .limit(limit * 10); // Fetch more to sort client-side
 
       if (error) throw error;
 
+      // Robust ranking: verified → sales → followers → rating → date
       return (data || [])
         .sort((a, b) => {
+          // 1️⃣ Verified first
+          if (a.verified !== b.verified) {
+            return a.verified ? -1 : 1;
+          }
+          
+          // Get stats (handle array or object format)
           const statsA = Array.isArray(a.store_stats) ? a.store_stats[0] : a.store_stats;
           const statsB = Array.isArray(b.store_stats) ? b.store_stats[0] : b.store_stats;
-          const salesA = Number(statsA?.customers_count || 0);
-          const salesB = Number(statsB?.customers_count || 0);
-          if (salesB !== salesA) return salesB - salesA;
-          // verified as fallback
-          return (a.verified === b.verified) ? 0 : (a.verified ? -1 : 1);
+          
+          // 2️⃣ By sales (customers_count) - higher = first
+          const customersA = Number(statsA?.customers_count || 0);
+          const customersB = Number(statsB?.customers_count || 0);
+          if (customersB !== customersA) {
+            return customersB - customersA;
+          }
+          
+          // 3️⃣ By followers (popularity) - higher = first
+          const followersA = Number(statsA?.followers_count || 0);
+          const followersB = Number(statsB?.followers_count || 0);
+          if (followersB !== followersA) {
+            return followersB - followersA;
+          }
+          
+          // 4️⃣ By rating - higher = first
+          const ratingA = Number(statsA?.rating_avg || 0);
+          const ratingB = Number(statsB?.rating_avg || 0);
+          if (ratingB !== ratingA) {
+            return ratingB - ratingA;
+          }
+          
+          // 5️⃣ By creation date - newer = first
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
         })
         .slice(0, limit);
 

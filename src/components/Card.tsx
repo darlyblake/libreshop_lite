@@ -108,7 +108,7 @@ const getStyles = (theme: any) => {
       overflow: 'hidden',
     },
     productImageContainer: {
-      aspectRatio: 0.5,
+      aspectRatio: 1,
       backgroundColor: 'rgba(255, 255, 255, 0.03)',
     },
     productImage: {

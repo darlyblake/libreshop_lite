@@ -46,12 +46,10 @@ export const cloudinaryService = {
       formData.append('folder', opts.folder);
     }
     
-    // Add tags for auto-improvement (applied after upload)
+    // Note: eager transformations require signed uploads, not allowed with upload_preset
+    // Images are optimized on-the-fly using getOptimizedUrl() instead
     if (opts?.enhance) {
       formData.append('tags', 'auto_enhance');
-      // Add eager transformations for optimization
-      formData.append('eager', 'e_improve,e_sharpen,q_auto,f_auto');
-      formData.append('eager_async', 'true');
     }
 
     if (Platform.OS === 'web') {

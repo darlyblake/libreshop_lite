@@ -228,13 +228,20 @@ export const ClientHomeScreen: React.FC = () => {
 
         // Parallel data loading with individual error handling
         const [storesResult, productsResult, bannersResult] = await Promise.allSettled([
-          storeService.getFeatured().then(data => {
+          // Load stores based on selected category
+          (async () => {
+            let data;
+            if (selectedCategory) {
+              data = await categoryService.getStoresByCategory(selectedCategory, 5);
+            } else {
+              data = await storeService.getFeatured();
+            }
             if (data) {
               dispatch({ type: 'SET_STORES', payload: data });
               cacheService.set(CACHE_KEYS.STORES, data, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
             }
             return data;
-          }),
+          })(),
           productService.getAllWithCursor(null, 8, productSort as any).then(result => {
             if (result.data && result.data.length > 0) {
               dispatch({
@@ -289,7 +296,7 @@ export const ClientHomeScreen: React.FC = () => {
         dispatch({ type: 'SET_REFRESHING', payload: false });
       }
     },
-    [dispatch, productSort, products.length, stores.length]
+    [dispatch, productSort, selectedCategory, products.length, stores.length]
   );
 
   useEffect(() => {
@@ -386,6 +393,7 @@ export const ClientHomeScreen: React.FC = () => {
 
   const handleCategoryPress = useCallback(
     async (category: string) => {
+      dispatch({ type: 'SET_LOADING_STORES', payload: true });
       dispatch({ type: 'UPDATE_CATEGORY', payload: category === 'Toutes' ? null : category });
 
       try {
@@ -395,9 +403,13 @@ export const ClientHomeScreen: React.FC = () => {
         } else {
           data = await categoryService.getStoresByCategory(category, 5);
         }
-        dispatch({ type: 'SET_STORES', payload: data });
+        if (data && data.length > 0) {
+          dispatch({ type: 'SET_STORES', payload: data });
+          cacheService.set(CACHE_KEYS.STORES, data, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+        }
       } catch (e) {
-        console.error('Error filtering stores:', e);
+        console.error('Error filtering stores by category:', e);
+        dispatch({ type: 'SET_ERROR', payload: `Erreur: Impossible de charger les boutiques` });
       } finally {
         dispatch({ type: 'SET_LOADING_STORES', payload: false });
       }
@@ -727,7 +739,11 @@ export const ClientHomeScreen: React.FC = () => {
                 <View style={styles.sectionHeader}>
                   <View>
                     <Text style={styles.sectionTitle}>Boutiques populaires</Text>
-                    <Text style={styles.sectionSubtitle}>Le meilleur du commerce local</Text>
+                    <Text style={styles.sectionSubtitle}>
+                      {selectedCategory && selectedCategory !== 'Toutes' 
+                        ? `Dans ${selectedCategory}`
+                        : 'Le meilleur du commerce local'}
+                    </Text>
                   </View>
                   <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
                     <Text style={styles.seeAll}>Tout voir</Text>
@@ -744,6 +760,10 @@ export const ClientHomeScreen: React.FC = () => {
                     [1, 2, 3].map((i) => (
                       <StoreCardSkeleton key={i} />
                     ))
+                  ) : stores.length === 0 ? (
+                    <View style={styles.emptyContainer}>
+                      <Text style={styles.emptyText}>Aucune boutique pour cette catégorie</Text>
+                    </View>
                   ) : (
                     stores.slice(0, 5).map((item) => (
                       <StoreCard
