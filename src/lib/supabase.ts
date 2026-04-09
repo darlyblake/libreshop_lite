@@ -159,7 +159,7 @@ export interface Store {
   product_limit?: number;
   visible?: boolean;
   tax_rate?: number;
-  shipping_fee?: number;
+  shipping_price?: number;
   total_orders?: number;
   rating_avg?: number;
   rating_count?: number;
@@ -191,6 +191,7 @@ export interface Product {
   sale_end_date?: string;
   view_count?: number;
   total_sales?: number;
+  featured?: boolean;
   created_at: string;
   stores?: {
     name: string;
@@ -205,6 +206,25 @@ export interface ProductReview {
   rating: number;
   comment: string;
   created_at: string;
+}
+
+export interface ProductOption {
+  id: string;
+  product_id: string;
+  name: string; // e.g., "Couleur", "Taille"
+  values: string[]; // e.g., ["Rouge", "Bleu", "Vert"]
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface StoreReview {
+  id: string;
+  store_id: string;
+  user_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 // Types pour les commandes

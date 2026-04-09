@@ -199,22 +199,40 @@ export const SellerStoreScreen: React.FC = () => {
         promoImageUrl = await cloudinaryService.uploadImage(promoImageUrl, { folder: `stores/${store.id}/promos` });
       }
 
-      await storeService.update(store.id, {
-        name: next.name,
-        description: next.description,
-        category: next.category,
-        logo_url: logoUrl,
-        banner_url: bannerUrl,
+      const updatePayload: any = {
+        name: String(next.name || '').trim(),
+        description: next.description ? String(next.description).trim() : null,
+        category: next.category || null,
         promo_enabled: Boolean(next.promoEnabled),
-        promo_title: next.promoTitle || undefined,
-        promo_subtitle: next.promoSubtitle || undefined,
-        promo_image_url: promoImageUrl || undefined,
-        promo_target_type: next.promoTargetType || undefined,
-        promo_target_id: next.promoTargetId || undefined,
-        promo_target_url: next.promoTargetUrl || undefined,
-        tax_rate: next.taxRate || undefined,
-        shipping_fee: next.shippingPrice || undefined,
-      });
+        tax_rate: next.taxRate ? Number(next.taxRate) : 0,
+        shipping_price: next.shippingPrice ? Number(next.shippingPrice) : 0,
+      };
+
+      // Ajouter les champs image seulement s'ils ont changé
+      if (logoUrl !== store?.logo_url) updatePayload.logo_url = logoUrl || null;
+      if (bannerUrl !== store?.banner_url) updatePayload.banner_url = bannerUrl || null;
+
+      // Ajouter les champs promo seulement s'ils sont définis ET ont changé
+      if (next.promoTitle !== undefined && next.promoTitle !== store?.promo_title) {
+        updatePayload.promo_title = next.promoTitle ? String(next.promoTitle).trim() : null;
+      }
+      if (next.promoSubtitle !== undefined && next.promoSubtitle !== store?.promo_subtitle) {
+        updatePayload.promo_subtitle = next.promoSubtitle ? String(next.promoSubtitle).trim() : null;
+      }
+      if (promoImageUrl !== undefined && promoImageUrl !== store?.promo_image_url) {
+        updatePayload.promo_image_url = promoImageUrl || null;
+      }
+      if (next.promoTargetType !== undefined && next.promoTargetType !== store?.promo_target_type) {
+        updatePayload.promo_target_type = next.promoTargetType || null;
+      }
+      if (next.promoTargetId !== undefined && next.promoTargetId !== store?.promo_target_id) {
+        updatePayload.promo_target_id = next.promoTargetId ? String(next.promoTargetId).trim() : null;
+      }
+      if (next.promoTargetUrl !== undefined && next.promoTargetUrl !== store?.promo_target_url) {
+        updatePayload.promo_target_url = next.promoTargetUrl ? String(next.promoTargetUrl).trim() : null;
+      }
+
+      await storeService.update(store.id, updatePayload);
 
       setShowEditModal(false);
       await loadStore();

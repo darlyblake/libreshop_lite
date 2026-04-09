@@ -30,6 +30,7 @@ import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { storeStatsService } from '../services/storeStatsService';
+import { storeReviewService } from '../services/storeReviewService';
 import { useAuthStore } from "../store";
 import { useResponsive } from "../utils/responsive";
 import { useTheme } from "../hooks/useTheme";
@@ -176,13 +177,19 @@ export const StoreDetailScreen: React.FC = () => {
 
   const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [homepageProducts, setHomepageProducts] = useState<any[]>([]);
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [collections, setCollections] = useState<any[]>([]);
   const [storeStats, setStoreStats] = useState<any>(null);
+  const [storeReviews, setStoreReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [reviewName, setReviewName] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   const parsedStoreIdFromUrl = useMemo(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -239,22 +246,25 @@ export const StoreDetailScreen: React.FC = () => {
 
       const storeIdForProducts = s?.id || effectiveStoreId;
       if (storeIdForProducts) {
-        const [p, c, stats] = await Promise.all([
+        const [p, c, stats, reviews] = await Promise.all([
           productService.getByStoreAvailable(String(storeIdForProducts)),
           collectionService.getByStore(String(storeIdForProducts)),
           storeStatsService
             .getByStore(String(storeIdForProducts))
             .catch(() => null),
+          storeReviewService.getByStore(String(storeIdForProducts)).catch(() => []),
         ]);
         const nextProducts = Array.isArray(p) ? p : [];
         setProducts(nextProducts);
         setCollections(Array.isArray(c) ? c : []);
         setStoreStats(stats);
+        setStoreReviews(Array.isArray(reviews) ? reviews : []);
         setDisplayedCount(PAGE_SIZE);
       } else {
         setProducts([]);
         setCollections([]);
         setStoreStats(null);
+        setStoreReviews([]);
       }
     } catch (e: any) {
       errorHandler.handle(
@@ -272,6 +282,7 @@ export const StoreDetailScreen: React.FC = () => {
       setProducts([]);
       setCollections([]);
       setStoreStats(null);
+      setStoreReviews([]);
     } finally {
       setLoading(false);
     }
@@ -287,6 +298,28 @@ export const StoreDetailScreen: React.FC = () => {
       mounted = false;
     };
   }, [loadStore]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadHomepageProducts = async () => {
+      if (!mounted) return;
+      if (!effectiveStoreId) return;
+      
+      try {
+        const products = await productService.getStoreHomepageProducts(effectiveStoreId, 8);
+        if (mounted) {
+          setHomepageProducts(products);
+        }
+      } catch (error) {
+        console.error('[StoreDetail] Error loading homepage products:', error);
+      }
+    };
+    
+    loadHomepageProducts();
+    return () => {
+      mounted = false;
+    };
+  }, [effectiveStoreId]);
 
   const storeData = store
     ? {
@@ -774,6 +807,37 @@ export const StoreDetailScreen: React.FC = () => {
                   <Text style={styles.sectionTitle}>Bienvenue</Text>
                   <Text style={styles.descriptionText}>{storeData.description}</Text>
                 </View>
+
+                {/* Featured/Recent Products */}
+                {homepageProducts && homepageProducts.length > 0 && (
+                  <View style={styles.homepageProductsSection}>
+                    <Text style={styles.sectionTitle}>
+                      {homepageProducts.some(p => p.featured) ? 'Produits en vedette' : 'Produits récents'}
+                    </Text>
+                    <View style={styles.productsGrid}>
+                      {homepageProducts.map((product, idx) => (
+                        <TouchableOpacity
+                          key={product.id || idx}
+                          style={styles.productCard}
+                          onPress={() => navigation.push('ProductDetail', { productId: product.id, storeId: effectiveStoreId })}
+                          activeOpacity={0.7}
+                        >
+                          {product.images && product.images.length > 0 && (
+                            <Image
+                              source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 300) }}
+                              style={styles.productImage}
+                              resizeMode="cover"
+                            />
+                          )}
+                          <View style={styles.productInfo}>
+                            <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                            <Text style={styles.productPrice}>{Number(product.price).toLocaleString()} FCA</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
               </>
             )}
 
@@ -1099,20 +1163,139 @@ export const StoreDetailScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Placeholder for reviews */}
-                <View style={styles.emptyReviews}>
-                  <Ionicons
-                    name="star-outline"
-                    size={48}
-                    color={COLORS.textMuted}
+                {/* Add Review Form */}
+                <View style={styles.reviewFormContainer}>
+                  <Text style={styles.formTitle}>Laissez un avis</Text>
+                  
+                  <Text style={styles.formLabel}>Votre nom *</Text>
+                  <TextInput
+                    style={styles.reviewInput}
+                    placeholder="Entrez votre nom"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={reviewName}
+                    onChangeText={setReviewName}
+                    editable={!submittingReview}
                   />
-                  <Text style={styles.emptyReviewsText}>
-                    Pas d'avis pour le moment
-                  </Text>
-                  <Text style={styles.emptyReviewsSubtext}>
-                    Soyez le premier à évaluer cette boutique
-                  </Text>
+
+                  <Text style={styles.formLabel}>Note *</Text>
+                  <View style={styles.ratingSelector}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => setReviewRating(star)}
+                        disabled={submittingReview}
+                      >
+                        <Ionicons
+                          name={star <= reviewRating ? "star" : "star-outline"}
+                          size={32}
+                          color={star <= reviewRating ? COLORS.star : COLORS.textMuted}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.formLabel}>Commentaire *</Text>
+                  <TextInput
+                    style={[styles.reviewInput, styles.reviewTextarea]}
+                    placeholder="Partagez votre avis..."
+                    placeholderTextColor={COLORS.textMuted}
+                    value={reviewComment}
+                    onChangeText={setReviewComment}
+                    multiline
+                    numberOfLines={4}
+                    editable={!submittingReview}
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      submittingReview && styles.submitButtonDisabled,
+                      (!reviewName || !reviewComment) && styles.submitButtonDisabled,
+                    ]}
+                    onPress={async () => {
+                      if (!store?.id || !reviewName || !reviewComment) {
+                        Alert.alert("Erreur", "Veuillez remplir tous les champs");
+                        return;
+                      }
+                      
+                      setSubmittingReview(true);
+                      try {
+                        await storeReviewService.create({
+                          store_id: store.id,
+                          user_name: reviewName,
+                          rating: reviewRating,
+                          comment: reviewComment,
+                        });
+                        
+                        // Reload reviews
+                        const updated = await storeReviewService.getByStore(store.id);
+                        setStoreReviews(Array.isArray(updated) ? updated : []);
+                        
+                        // Reset form
+                        setReviewName("");
+                        setReviewRating(5);
+                        setReviewComment("");
+                        
+                        Alert.alert("Succès", "Votre avis a été ajouté");
+                      } catch (error) {
+                        console.error("Error submitting review:", error);
+                        Alert.alert("Erreur", "Impossible d'ajouter votre avis");
+                      } finally {
+                        setSubmittingReview(false);
+                      }
+                    }}
+                    disabled={submittingReview || !reviewName || !reviewComment}
+                  >
+                    {submittingReview ? (
+                      <ActivityIndicator color={COLORS.white} />
+                    ) : (
+                      <Text style={styles.submitButtonText}>Soumettre l'avis</Text>
+                    )}
+                  </TouchableOpacity>
                 </View>
+
+                {/* Reviews List */}
+                {storeReviews && storeReviews.length > 0 ? (
+                  <View style={styles.reviewsList}>
+                    {storeReviews.map((review, index) => (
+                      <View key={review.id || index} style={styles.reviewItem}>
+                        <View style={styles.reviewTop}>
+                          <View>
+                            <Text style={styles.reviewName}>{review.user_name}</Text>
+                            <View style={{ flexDirection: "row", gap: 2, marginTop: 4 }}>
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Ionicons
+                                  key={star}
+                                  name={star <= review.rating ? "star" : "star-outline"}
+                                  size={16}
+                                  color={star <= review.rating ? COLORS.star : COLORS.textMuted}
+                                />
+                              ))}
+                            </View>
+                          </View>
+                          <Text style={styles.reviewDate}>
+                            {review.created_at ? new Date(review.created_at).toLocaleDateString('fr-FR') : ""}
+                          </Text>
+                        </View>
+                        <Text style={styles.reviewComment}>{review.comment}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyReviews}>
+                    <Ionicons
+                      name="star-outline"
+                      size={48}
+                      color={COLORS.textMuted}
+                    />
+                    <Text style={styles.emptyReviewsText}>
+                      Pas d'avis pour le moment
+                    </Text>
+                    <Text style={styles.emptyReviewsSubtext}>
+                      Soyez le premier à évaluer cette boutique
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -1627,6 +1810,92 @@ const styles = StyleSheet.create({
   reviewHeader: {
     marginBottom: SPACING.xl,
   },
+  reviewFormContainer: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  formTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginBottom: SPACING.lg,
+  },
+  formLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    backgroundColor: COLORS.bg,
+  },
+  reviewTextarea: {
+    textAlignVertical: "top",
+    maxHeight: 120,
+  },
+  ratingSelector: {
+    flexDirection: "row",
+    gap: SPACING.md,
+    marginVertical: SPACING.md,
+  },
+  submitButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    marginTop: SPACING.lg,
+  },
+  submitButtonDisabled: {
+    backgroundColor: COLORS.textMuted,
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "600",
+  },
+  reviewsList: {
+    gap: SPACING.md,
+  },
+  reviewItem: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  reviewTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: SPACING.md,
+  },
+  reviewName: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  reviewDate: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  reviewComment: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    lineHeight: 20,
+  },
   emptyReviews: {
     alignItems: "center",
     justifyContent: "center",
@@ -1642,6 +1911,44 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
     textAlign: "center",
+  },
+  // Homepage products section
+  homepageProductsSection: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
+  },
+  productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.md,
+    justifyContent: 'space-between',
+  },
+  productCard: {
+    width: '48%',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  productImage: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: COLORS.bg,
+  },
+  productInfo: {
+    padding: SPACING.md,
+  },
+  productName: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  productPrice: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.accent,
   },
 });
 

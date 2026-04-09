@@ -35,6 +35,7 @@ interface Product {
   description: string;
   images: string[];
   collectionId: string;
+  featured?: boolean;
 }
 
 interface AddProductModalProps {
@@ -401,6 +402,28 @@ const getStyles = (theme: any) => {
       borderRadius: RADIUS.md,
       padding: SPACING.md,
     },
+    toggleButton: {
+      width: 50,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 2,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.bg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    toggleButtonActive: {
+      backgroundColor: COLORS.accent,
+      borderColor: COLORS.accent,
+    },
+    toggleText: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: COLORS.textMuted,
+    },
+    toggleTextActive: {
+      color: COLORS.card,
+    },
   });
 };
 
@@ -429,6 +452,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     description: '',
     images: [],
     collectionId: initialCollectionId,
+    featured: false,
   });
   const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -529,6 +553,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       description: '',
       images: [],
       collectionId: initialCollectionId,
+      featured: false,
     });
   };
 
@@ -720,6 +745,18 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 }
                 keyboardType="numeric"
               />
+            </View>
+
+            <View style={[styles.modalInput, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+              <Text style={styles.inputLabel}>Ajouter en vedette (Accueil)</Text>
+              <TouchableOpacity 
+                style={[styles.toggleButton, newProduct.featured && styles.toggleButtonActive]}
+                onPress={() => setNewProduct({ ...newProduct, featured: !newProduct.featured })}
+              >
+                <Text style={[styles.toggleText, newProduct.featured && styles.toggleTextActive]}>
+                  {newProduct.featured ? '✓' : '○'}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.modalInput}>

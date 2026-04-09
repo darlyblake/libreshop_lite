@@ -399,6 +399,41 @@ export const productService = {
     return ranked.slice(0, limit);
   },
 
+  async getStoreHomepageProducts(storeId: string, limit = 8) {
+    const client = useSupabase();
+    
+    // First try to get featured products
+    const { data: featured, error: featuredError } = await client
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .eq('featured', true)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (featuredError && featuredError.code !== 'PGRST116') {
+      throw featuredError;
+    }
+
+    // If we have featured products, return them
+    if (featured && featured.length > 0) {
+      return featured;
+    }
+
+    // Otherwise, fall back to recent products
+    const { data: recent, error: recentError } = await client
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (recentError) throw recentError;
+    return recent || [];
+  },
+
   async update(id: string, product: Partial<Product>) {
     const client = useSupabase();
     const { data, error } = await client
@@ -496,6 +531,65 @@ export const productService = {
         .eq('id', productId);
     } catch (e) {
       // Silently fail - product sales stats are now handled by RPC functions
+    }
+  },
+
+  async getProductOptions(productId: string) {
+    const client = useSupabase();
+    try {
+      const { data, error } = await client
+        .from('product_options')
+        .select('*')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('Error fetching product options:', e);
+      return [];
+    }
+  },
+
+  async getSimilarProducts(product: Product, limit = 6) {
+    const client = useSupabase();
+    try {
+      if (!product.category || !product.store_id) {
+        return [];
+      }
+
+      // Fetch products from the same category, excluding the current product
+      const { data, error } = await client
+        .from('products')
+        .select('*')
+        .eq('category', product.category)
+        .eq('is_active', true)
+        .neq('id', product.id)
+        .eq('store_id', product.store_id)
+        .limit(limit);
+
+      if (error) throw error;
+
+      // If we don't have enough products from the same store, fetch from other stores in the same category
+      if ((data?.length || 0) < limit) {
+        const remainingLimit = limit - (data?.length || 0);
+        const { data: otherData, error: otherError } = await client
+          .from('products')
+          .select('*')
+          .eq('category', product.category)
+          .eq('is_active', true)
+          .neq('id', product.id)
+          .neq('store_id', product.store_id)
+          .limit(remainingLimit);
+
+        if (otherError) throw otherError;
+        return [...(data || []), ...(otherData || [])];
+      }
+
+      return data || [];
+    } catch (e) {
+      console.error('Error fetching similar products:', e);
+      return [];
     }
   },
 };

@@ -173,7 +173,7 @@ export const ClientAllStoresScreen: React.FC = () => {
 
     // apply modal filters
     if (filters.deliveryOnly) {
-      storesList = storesList.filter((s) => (s.shipping_fee || 0) > 0);
+      storesList = storesList.filter((s) => (s.shipping_price || 0) > 0);
     }
     if (typeof filters.minRating === 'number' && filters.minRating > 0) {
       storesList = storesList.filter((s) => {
