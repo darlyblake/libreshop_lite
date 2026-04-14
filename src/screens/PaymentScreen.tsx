@@ -65,7 +65,8 @@ export const PaymentScreen: React.FC = () => {
     : parseJsonParam<Array<{ product: Product; quantity: number }>>(itemsJson, []);
   const customer = routeCustomer || parseJsonParam<any>(customerJson, undefined);
 
-  const [selectedMethod, setSelectedMethod] = useState<string>(paymentMethod || 'mobile_money');
+  // Force default payment method to cash and disable other options for now
+  const [selectedMethod, setSelectedMethod] = useState<string>(paymentMethod || 'cash');
   const [phoneNumber, setPhoneNumber] = useState(customer?.phone || '');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -73,14 +74,16 @@ export const PaymentScreen: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // completed: prevents the user from re-submitting after an order was created
+  const [completed, setCompleted] = useState(false);
 
   const paymentMethods: PaymentMethod[] = [
     {
       id: 'mobile_money',
       name: 'Mobile Money',
       icon: 'phone-portrait-outline',
-      description: 'Orange Money, Moov, MTN...',
-      providers: ['Orange Money', 'Moov Money', 'MTN Money', 'Glo Mobile'],
+      description: 'Paiement via Airtel Money et Moov',
+      providers: ['Airtel Money', 'Moov Money'],
     },
     {
       id: 'card',
@@ -107,11 +110,11 @@ export const PaymentScreen: React.FC = () => {
 
   const handlePayment = () => {
     if (selectedMethod === 'mobile_money' && !phoneNumber.trim()) {
-      Alert.alert('Erreur', 'Veuillez entrer votre numéro tél.')
+      Alert.alert('Erreur', 'Veuillez entrer votre numéro tél.');
       return;
     }
     if (selectedMethod === 'card' && (!cardNumber.trim() || !cardExpiry.trim() || !cardCVV.trim())) {
-      Alert.alert('Erreur', 'Veuillez compléter les données de la carte')
+      Alert.alert('Erreur', 'Veuillez compléter les données de la carte');
       return;
     }
     setShowConfirmModal(true);
@@ -182,7 +185,7 @@ export const PaymentScreen: React.FC = () => {
               ? 'card'
               : 'mobile_money';
 
-          const updatedOrder = await orderService.update(existingOrderId, { payment_status: 'paid', payment_method: paymentMethodDb, status: 'paid' });
+          await orderService.update(existingOrderId, { payment_status: 'paid', payment_method: paymentMethodDb, status: 'paid' });
 
           // insert order_items if provided (best-effort)
           try {
@@ -240,6 +243,10 @@ export const PaymentScreen: React.FC = () => {
 
           const successTitle = 'Paiement réussi';
           const successMessage = `Votre paiement de ${(amount / 1000).toFixed(0)} KCFA a été traité avec succès.`;
+
+          // mark completed to prevent further submissions and keep UI disabled
+          setCompleted(true);
+
           if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
             (window as any).alert(`${successTitle}\n\n${successMessage}`);
           }
@@ -356,11 +363,13 @@ export const PaymentScreen: React.FC = () => {
           errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'notification creation failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
         }
 
-
         clearCart();
 
-        const successTitle = 'Paiement réussi';
-        const successMessage = `Votre paiement de ${(amount / 1000).toFixed(0)} KCFA a été traité avec succès.`;
+        const successTitle = 'Commande créée';
+        const successMessage = `Votre commande de ${(amount / 1000).toFixed(0)} KCFA a été créée avec succès.`;
+        // block further submissions immediately
+        setCompleted(true);
+
         if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
           (window as any).alert(`${successTitle}\n\n${successMessage}`);
         }
@@ -401,7 +410,8 @@ export const PaymentScreen: React.FC = () => {
 
       Alert.alert('Erreur', msg);
     } finally {
-      setProcessing(false);
+      // keep button disabled if completed, otherwise reset processing
+      if (!completed) setProcessing(false);
     }
   };
 
@@ -457,14 +467,15 @@ export const PaymentScreen: React.FC = () => {
         {/* Payment Methods */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Méthode de paiement</Text>
-          {paymentMethods.map((method) => (
+          {paymentMethods.filter(m => m.id === 'cash').map((method) => (
             <TouchableOpacity
               key={method.id}
               style={[
                 styles.methodCard,
                 selectedMethod === method.id && styles.methodCardSelected,
               ]}
-              onPress={() => setSelectedMethod(method.id)}
+              // disabled: only cash is selectable
+              onPress={() => { if (method.id === 'cash') setSelectedMethod(method.id); }}
             >
               <View style={styles.methodIcon}>
                 <Ionicons
@@ -586,9 +597,9 @@ export const PaymentScreen: React.FC = () => {
           </Text>
         )}
         <Pressable
-          style={[styles.payButton, processing && styles.payButtonDisabled]}
+          style={[styles.payButton, (processing || completed) && styles.payButtonDisabled]}
           onPress={handlePayment}
-          disabled={processing}
+          disabled={processing || completed}
           hitSlop={10}
         >
           {processing ? (
@@ -597,7 +608,7 @@ export const PaymentScreen: React.FC = () => {
             <>
               <Ionicons name="lock-closed-outline" size={20} color={COLORS.text} />
               <Text style={styles.payButtonText}>
-                Payer {formatCurrency(amount)}
+                Commander {formatCurrency(amount)}
               </Text>
             </>
           )}
@@ -613,7 +624,7 @@ export const PaymentScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.confirmModal}>
-            <Text style={styles.confirmTitle}>Confirmer le paiement</Text>
+            <Text style={styles.confirmTitle}>Confirmer la commande</Text>
             <View style={styles.confirmInfo}>
               <Text style={styles.confirmLabel}>Méthode</Text>
               <Text style={styles.confirmValue}>

@@ -41,6 +41,27 @@ export const authService = {
     }
     const { data, error } = await fn.call(client.auth);
     if (error) throw error;
+
+    // Ensure a minimal row exists in the public `users` table to satisfy foreign keys
+    try {
+      const user = (data as any)?.session?.user || (data as any)?.user;
+      if (user && user.id) {
+        // Attempt an upsert; ignore any error since RLS or other constraints may block it
+        await client.from('users').upsert({
+          id: user.id,
+          email: user.email || null,
+          full_name: (user.user_metadata && user.user_metadata.full_name) || 'Anonyme',
+          role: 'client',
+        }, { onConflict: 'id' });
+      }
+    } catch (upsertErr) {
+      // Non-fatal: log silently via console to avoid breaking flows
+      // Some setups may prevent upsert due to RLS when no confirmed session is present
+      // but the auth session should usually allow inserting the matching id row.
+      // eslint-disable-next-line no-console
+      console.debug('authService.signInAnonymously: users upsert skipped or failed', upsertErr);
+    }
+
     return data;
   },
 

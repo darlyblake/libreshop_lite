@@ -15,13 +15,14 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Linking,
   Platform,
   Share,
   TextInput,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ExpoLinking from "expo-linking";
+import { contactStore } from '../services/contactService';
+import { openURL } from '../utils/platformUtils';
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from "../config/theme";
 import { ProductCard, FollowButton, StoreHeader, StoreTabs, StoreInfoCard } from "../components";
@@ -181,6 +182,7 @@ export const StoreDetailScreen: React.FC = () => {
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [collections, setCollections] = useState<any[]>([]);
   const [storeStats, setStoreStats] = useState<any>(null);
+  const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [storeReviews, setStoreReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -243,6 +245,18 @@ export const StoreDetailScreen: React.FC = () => {
       }
 
       setStore(s);
+
+      // Check following status for current user
+      if (user?.id && s?.id) {
+        try {
+          const following = await storeService.isFollowing(String(user.id), String(s.id));
+          setIsFollowing(Boolean(following));
+        } catch (e) {
+          console.warn('[StoreDetail] could not determine follow status', e);
+        }
+      } else {
+        setIsFollowing(false);
+      }
 
       const storeIdForProducts = s?.id || effectiveStoreId;
       if (storeIdForProducts) {
@@ -532,7 +546,7 @@ export const StoreDetailScreen: React.FC = () => {
     if (t === "url") {
       const url = storeData?.promoTargetUrl;
       if (url) {
-        await Linking.openURL(String(url));
+        openURL(String(url));
       }
     }
   }, [navigation, storeData]);
@@ -574,13 +588,7 @@ export const StoreDetailScreen: React.FC = () => {
       return;
     }
 
-    const url = `https://wa.me/${waNumber}`;
-    const supported = await Linking.canOpenURL(url);
-    if (!supported) {
-      Alert.alert("WhatsApp", "Impossible d'ouvrir WhatsApp sur cet appareil.");
-      return;
-    }
-    await Linking.openURL(url);
+    contactStore({ rawPhone: waNumber });
   };
 
   const handleFollowStore = useCallback(async () => {
@@ -588,11 +596,24 @@ export const StoreDetailScreen: React.FC = () => {
       Alert.alert("Suivi", "Vous devez être connecté pour suivre une boutique.");
       return;
     }
-
     try {
-      // TODO: Implement actual follow/unfollow logic with backend
-      // For now, show a success message
-      Alert.alert("Suivi", "Vous suivez maintenant cette boutique! ❤️");
+      const newState = await storeService.toggleFollow(String(user.id), String(store.id));
+      setIsFollowing(Boolean(newState));
+
+      // Update followers count locally if available
+      try {
+        setStoreStats((prev: any) => {
+          if (!prev) return prev;
+          const before = Number(prev.followers_count || prev.total_followers || 0);
+          const after = newState ? before + 1 : Math.max(0, before - 1);
+          return { ...prev, followers_count: after, total_followers: after };
+        });
+      } catch {}
+
+      Alert.alert(
+        "Suivi",
+        newState ? "Vous suivez maintenant cette boutique! ❤️" : "Abonnement annulé.",
+      );
     } catch (e: any) {
       errorHandler.handle(
         e,
@@ -600,6 +621,7 @@ export const StoreDetailScreen: React.FC = () => {
         ErrorCategory.SYSTEM,
         ErrorSeverity.LOW,
       );
+      Alert.alert("Suivi", "Impossible de modifier l'abonnement. Réessayez plus tard.");
     }
   }, [store?.id, user?.id]);
 
@@ -738,11 +760,11 @@ export const StoreDetailScreen: React.FC = () => {
                 activeOpacity={0.8}
               >
                 <Ionicons 
-                  name="heart" 
+                  name={isFollowing ? 'heart' : 'heart-outline'} 
                   size={18} 
-                  color={COLORS.accent}
+                  color={isFollowing ? COLORS.accent : COLORS.text}
                 />
-                <Text style={styles.followButtonText}>Suivre</Text>
+                <Text style={styles.followButtonText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
               </TouchableOpacity>
             </View>
 
@@ -815,26 +837,20 @@ export const StoreDetailScreen: React.FC = () => {
                       {homepageProducts.some(p => p.featured) ? 'Produits en vedette' : 'Produits récents'}
                     </Text>
                     <View style={styles.productsGrid}>
-                      {homepageProducts.map((product, idx) => (
-                        <TouchableOpacity
-                          key={product.id || idx}
-                          style={styles.productCard}
-                          onPress={() => navigation.push('ProductDetail', { productId: product.id, storeId: effectiveStoreId })}
-                          activeOpacity={0.7}
-                        >
-                          {product.images && product.images.length > 0 && (
-                            <Image
-                              source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 300) }}
-                              style={styles.productImage}
-                              resizeMode="cover"
-                            />
-                          )}
-                          <View style={styles.productInfo}>
-                            <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                            <Text style={styles.productPrice}>{Number(product.price).toLocaleString()} FCA</Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
+                            {homepageProducts.map((product, idx) => {
+                              const card = mapProductToCard(product);
+                              return (
+                                <View key={card.id || `hp-${idx}`} style={[styles.productCardWrapper, { width: cardWidth }]}> 
+                                  <ProductCard
+                                    name={card.name}
+                                    price={card.price}
+                                    comparePrice={card.comparePrice}
+                                    imageUrl={card.imageUrl}
+                                    onPress={() => navigation.push('ProductDetail', { productId: card.id, storeId: effectiveStoreId })}
+                                  />
+                                </View>
+                              );
+                            })}
                     </View>
                   </View>
                 )}
@@ -1043,7 +1059,7 @@ export const StoreDetailScreen: React.FC = () => {
                   {store?.phone && (
                     <TouchableOpacity
                       style={styles.contactItem}
-                      onPress={() => Linking.openURL(`tel:${store.phone}`)}
+                      onPress={() => contactStore({ rawPhone: store.phone, fallback: 'tel' })}
                     >
                       <Ionicons
                         name="call"
@@ -1061,7 +1077,7 @@ export const StoreDetailScreen: React.FC = () => {
                   {store?.email && (
                     <TouchableOpacity
                       style={styles.contactItem}
-                      onPress={() => Linking.openURL(`mailto:${store.email}`)}
+                      onPress={() => openURL(`mailto:${store.email}`)}
                     >
                       <Ionicons
                         name="mail"
@@ -1079,11 +1095,7 @@ export const StoreDetailScreen: React.FC = () => {
                   {store?.address && (
                     <TouchableOpacity
                       style={styles.contactItem}
-                      onPress={() =>
-                        Linking.openURL(
-                          `geo:0,0?q=${encodeURIComponent(store.address)}`
-                        )
-                      }
+                      onPress={() => openURL(`geo:0,0?q=${encodeURIComponent(store.address)}`)}
                     >
                       <Ionicons
                         name="location"

@@ -451,11 +451,11 @@ export const ClientAllStoresScreen: React.FC = () => {
                     <Text style={styles.emptyText}>
                       Essayez avec un autre mot-clé ou une autre catégorie
                     </Text>
-                    {(searchQuery || selectedCategory !== 'Toutes') && (
+                    {(query || selectedCategory !== 'Toutes') && (
                       <TouchableOpacity
                         style={styles.clearFiltersButton}
                         onPress={() => {
-                          setSearchQuery('');
+                          setQuery('');
                           setSelectedCategory('Toutes');
                         }}
                       >

@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator, Ionicons } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONT_SIZE, SPACING, RADIUS } from '../config/theme';
 import { ProductReview } from '../lib/supabase';
 import { cloudinaryService } from '../services/cloudinaryService';

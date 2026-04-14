@@ -28,6 +28,8 @@ interface SearchBarProps {
   isLoading?: boolean;
   editable?: boolean;
   testID?: string;
+  enableVoice?: boolean;
+  onVoiceStart?: () => void;
 }
 
 export const SearchBar: React.FC<SearchBarProps> = ({
@@ -45,10 +47,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   isLoading = false,
   editable = true,
   testID = 'searchBar',
+  enableVoice = true,
+  onVoiceStart,
 }) => {
   const palette = useLegacyPalette();
   const theme = useTheme();
   const [isFocused, setIsFocused] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = React.useRef<any>(null);
 
   const styles = useMemo(
     () => createSearchBarStyles(palette, theme.spacing, theme.radius, theme.fontSize),
@@ -71,6 +77,57 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   }, [onChangeText, onClear]);
 
   const hasValue = value.length > 0;
+
+  // Voice recognition (web only) using Web Speech API
+  const startListening = useCallback(() => {
+    if (onVoiceStart) return onVoiceStart();
+    if (Platform.OS !== 'web') return;
+    const w: any = window as any;
+    const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Rec) return;
+    try {
+      const r = new Rec();
+      recognitionRef.current = r;
+      r.interimResults = true;
+      r.lang = 'fr-FR';
+      r.onresult = (ev: any) => {
+        const transcript = Array.from(ev.results).map((res: any) => res[0].transcript).join('');
+        onChangeText(transcript);
+      };
+      r.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+      r.onerror = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
+      r.start();
+      setIsListening(true);
+    } catch (err) {
+      // ignore
+    }
+  }, [onChangeText, onVoiceStart]);
+
+  const stopListening = useCallback(() => {
+    const r = recognitionRef.current;
+    if (r && typeof r.stop === 'function') {
+      try { r.stop(); } catch (e) {}
+    }
+    setIsListening(false);
+    recognitionRef.current = null;
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      // cleanup recognition on unmount
+      const r = recognitionRef.current;
+      if (r && typeof r.stop === 'function') {
+        try { r.stop(); } catch (e) {}
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
 
   return (
     <View style={[styles.container, style]}>
@@ -129,6 +186,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
           testID="searchBarCancel"
         >
           <Ionicons name="close" size={24} color={palette.text} />
+        </TouchableOpacity>
+      )}
+      {/* Voice search button (web only) */}
+      {enableVoice && Platform.OS === 'web' && (
+        <TouchableOpacity
+          onPress={() => (isListening ? stopListening() : startListening())}
+          style={styles.cancelButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          testID="searchBarVoice"
+        >
+          <Ionicons name={isListening ? 'mic' : 'mic-outline'} size={22} color={isListening ? palette.accent : palette.textMuted} />
         </TouchableOpacity>
       )}
     </View>

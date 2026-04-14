@@ -195,17 +195,33 @@ export const orderService = {
 
     const client = useSupabase();
     console.log('❌ Cancelling order robustly...', orderId);
-    
-    const { data, error } = await client.rpc('cancel_order_robust', {
-      p_order_id: orderId
-    });
-    
-    if (error) throw error;
-    
-    // Notification
-    await this.sendCustomerNotification(order, 'cancelled');
+    try {
+      const { data, error } = await client.rpc('cancel_order_robust', {
+        p_order_id: orderId
+      });
+      if (error) throw error;
+      // Notification
+      await this.sendCustomerNotification(order, 'cancelled');
+      return data;
+    } catch (e: any) {
+      // If the RPC does not exist (404) or fails for other reasons, fall back to a direct update
+      console.warn('cancel_order_robust RPC failed, falling back to direct update', e?.message || e);
+      try {
+        // Perform minimal update (avoid select) then re-fetch to get consistent object
+        const { error: updErr } = await client
+          .from('orders')
+          .update({ status: 'cancelled' })
+          .eq('id', orderId);
+        if (updErr) throw updErr;
 
-    return data;
+        const updated = await this.getById(orderId);
+        try { await this.sendCustomerNotification(updated, 'cancelled'); } catch (nErr) { console.warn('sendCustomerNotification failed', nErr); }
+        return updated;
+      } catch (e2) {
+        // rethrow original or fallback error
+        throw e2 || e;
+      }
+    }
   },
 
   async sendCustomerNotification(order: any, status: OrderStatus) {

@@ -49,9 +49,68 @@ export const initializeDOMProtection = () => {
       }
     `;
     document.head.appendChild(style);
+    // Remove any existing Google Translate script tags
+    const removeTranslateScripts = () => {
+      try {
+        const scripts = Array.from(document.querySelectorAll('script')) as HTMLScriptElement[];
+        for (const s of scripts) {
+          const src = s.src || '';
+          if (/translate\.google|translate\.googleapis/.test(src)) {
+            try { s.remove(); } catch (err) {}
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+    removeTranslateScripts();
   } catch (e) {
     // Silently fail if DOM operations aren't available
     console.debug('DOM protection setup failed (expected in React Native):', e);
+  }
+  
+  // Observe additions/attribute changes to detect when libraries set aria-hidden
+  try {
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'attributes' && m.attributeName === 'aria-hidden') {
+          const target = m.target as HTMLElement;
+          try {
+            // If the element (or its ancestor) receives aria-hidden="true",
+            // ensure no descendant keeps focus — blur active element and set inert.
+            if (target && target.getAttribute && target.getAttribute('aria-hidden') === 'true') {
+              const active = document.activeElement as HTMLElement | null;
+              if (active && target.contains(active)) {
+                try { active.blur(); } catch (err) {}
+              }
+              try { (target as any).inert = true; } catch (err) {}
+            }
+          } catch (inner) {
+            // ignore
+          }
+        }
+        // If nodes are added dynamically, remove Google Translate scripts immediately
+        if (m.type === 'childList' && m.addedNodes && m.addedNodes.length > 0) {
+          for (const n of Array.from(m.addedNodes)) {
+            try {
+              const el = n as HTMLElement;
+              if (el && el.tagName === 'SCRIPT') {
+                const src = (el as HTMLScriptElement).src || '';
+                if (/translate\.google|translate\.googleapis/.test(src)) {
+                  try { el.remove(); } catch (err) {}
+                }
+              }
+            } catch (err) {
+              // ignore
+            }
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['aria-hidden'], childList: true });
+  } catch (e) {
+    // ignore observer failures
   }
 };
 

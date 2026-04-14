@@ -25,4 +25,5 @@ export { PWAInstallButton } from './PWAInstallButton';
 export { StoreHeader } from './StoreHeader';
 export { StoreTabs } from './StoreTabs';
 export { StoreInfoCard } from './StoreInfoCard';
+export { TabContent } from './TabContent';
 

@@ -7,7 +7,6 @@ import {
   Alert,
   ActivityIndicator,
   TouchableOpacity,
-  Linking,
   Platform,
   Animated,
 } from 'react-native';
@@ -24,6 +23,7 @@ import { authService } from '../services/authService';
 import { storeService } from '../services/storeService';
 import { Plan, planService } from '../services/planService';
 import { useSettingsStore } from '../store/settingsStore';
+import { contactStore } from '../services/contactService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionExpired'>;
 
@@ -157,22 +157,14 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
     const adminPhoneNumber = adminConfig.whatsappNumber;
     const message = `Bonjour 👋\n\nJe souhaite activer le plan "${plan.name}" pour ma boutique.\n\n📦 Infos:\n• Boutique: ${store.name}\n• Plan: ${plan.name}\n• Prix: ${plan.price} FCFA\n• Durée: ${plan.duration_days} jours\n\nMerci!`;
 
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = Platform.select({
-      ios: `whatsapp://send?phone=${adminPhoneNumber}&text=${encodedMessage}`,
-      android: `https://wa.me/${adminPhoneNumber}?text=${encodedMessage}`,
-      web: `https://wa.me/${adminPhoneNumber}?text=${encodedMessage}`,
-    });
-
-    if (whatsappUrl) {
-      Linking.openURL(whatsappUrl).catch(() => {
-        Alert.alert(
-          'WhatsApp non installé',
-          'Veuillez installer WhatsApp ou contacter notre support'
-        );
-      });
+    try {
+      await contactStore({ rawPhone: adminPhoneNumber, message });
+    } catch (e) {
+      // contactStore already handles alerts; log for debugging
+      console.error('Erreur lors de l ouverture de WhatsApp', e);
+      Alert.alert('Erreur', 'Impossible d ouvrir WhatsApp');
     }
-    
+
     setSelectedPlan(null);
   };
 
@@ -464,7 +456,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
             Besoin d'aide ?{' '}
             <Text 
               style={styles.supportLink}
-              onPress={() => Linking.openURL(`https://wa.me/${adminConfig.whatsappNumber}`)}
+              onPress={() => contactStore({ rawPhone: adminConfig.whatsappNumber })}
             >
               Contactez-nous
             </Text>

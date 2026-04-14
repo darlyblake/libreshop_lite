@@ -59,8 +59,10 @@ class CacheMonitor {
 
   /**
    * Log cache metrics to console in a readable format
+   * @param silent - when true, do not print anything
    */
-  logMetrics(): void {
+  logMetrics(silent: boolean = false): void {
+    if (silent) return;
     const report = this.getReport();
     console.group('📊 LibreShop Cache Performance');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -85,21 +87,21 @@ class CacheMonitor {
    * @param intervalMs - Monitoring interval in milliseconds (default: 60 seconds)
    * @returns Function to stop monitoring
    */
-  start(intervalMs: number = 60000): () => void {
+  start(intervalMs: number = 60000, silent: boolean = false): () => void {
     if (this.stopMonitoring) {
-      console.warn('[cacheMonitor] Already monitoring. Call stop() first.');
+      if (!silent) console.warn('[cacheMonitor] Already monitoring. Call stop() first.');
       return this.stopMonitoring;
     }
 
-    console.log(`[cacheMonitor] 🚀 Started with ${intervalMs}ms interval`);
+    if (!silent) console.log(`[cacheMonitor] 🚀 Started with ${intervalMs}ms interval`);
     
     const interval = setInterval(() => {
-      this.logMetrics();
+      this.logMetrics(silent);
     }, intervalMs);
 
     this.stopMonitoring = () => {
       clearInterval(interval);
-      console.log('[cacheMonitor] ⏹️ Stopped monitoring');
+      if (!silent) console.log('[cacheMonitor] ⏹️ Stopped monitoring');
       this.stopMonitoring = null;
     };
 
@@ -122,7 +124,7 @@ class CacheMonitor {
     cacheService.resetStats();
     this.baselineLoads = 0;
     this.optimizedLoads = 0;
-    console.log('[cacheMonitor] 📍 Baseline reset');
+    // baseline reset is informational - avoid noisy logs by default
   }
 
   /**

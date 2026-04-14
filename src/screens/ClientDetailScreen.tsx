@@ -8,7 +8,6 @@ import {
   StatusBar,
   ActivityIndicator,
   Alert,
-  Linking,
   Platform,
   RefreshControl,
 } from 'react-native';
@@ -20,6 +19,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
+import { contactStore } from '../services/contactService';
 
 interface RouteParams {
   clientId: string;
@@ -202,17 +202,13 @@ export const ClientDetailScreen: React.FC = () => {
       return;
     }
     const msg = `Bonjour ${clientName} 👋 Je vous contacte depuis LibreShop concernant vos commandes.`;
-    Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`).catch(() =>
-      Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp')
-    );
+    contactStore({ rawPhone: phone, message: msg });
   };
 
   const handleCall = () => {
     const phone = clientPhone.replace(/[^\d+]/g, '');
     if (!phone) { Alert.alert('Erreur', 'Numéro indisponible'); return; }
-    Linking.openURL(`tel:${phone}`).catch(() =>
-      Alert.alert('Erreur', 'Impossible de passer l\'appel')
-    );
+    contactStore({ rawPhone: phone, fallback: 'tel' });
   };
 
   // ── Render ────────────────────────────────────────────────────────────────

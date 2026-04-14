@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +20,8 @@ import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
 import { errorHandler } from '../utils/errorHandler';
 import { useSettingsStore } from '../store/settingsStore';
+import { contactStore } from '../services/contactService';
+import { openURL } from '../utils/platformUtils';
 
 export const SellerChangePlanScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -113,10 +114,11 @@ export const SellerChangePlanScreen: React.FC = () => {
       default: `https://wa.me/${adminPhoneNumber}?text=${encodedMessage}`,
     });
 
-    if (url) {
-      Linking.openURL(url).catch(() => {
-        Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp');
-      });
+    if (adminPhoneNumber) {
+      contactStore({ rawPhone: adminPhoneNumber, message });
+    } else if (url) {
+      // fallback: try to open the url directly
+      try { openURL(String(url)); } catch { /* ignore */ }
     }
   };
 

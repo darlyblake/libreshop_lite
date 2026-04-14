@@ -12,7 +12,7 @@
     <meta name="msapplication-config" content="/browserconfig.xml" />
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
+    <link rel="manifest" href="/manifest.json" />
     
     <!-- Icons -->
     <link rel="icon" href="/favicon.ico" type="image/x-icon" />
@@ -268,9 +268,10 @@
       const dismissBtn = document.getElementById('pwa-dismiss-btn');
       
       window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('beforeinstallprompt event fired', e);
         e.preventDefault();
         deferredPrompt = e;
-        
+
         // Don't show banner if React PWA component is available
         if (!window.ReactNativeWebView) {
           installBanner.style.display = 'block';
@@ -278,16 +279,23 @@
       });
       
       installBtn?.addEventListener('click', async () => {
+        console.log('PWA install button clicked, deferredPrompt=', deferredPrompt);
         if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          
-          if (outcome === 'accepted') {
-            console.log('PWA installation accepted');
+          try {
+            await deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+
+            if (outcome === 'accepted') {
+              console.log('PWA installation accepted');
+            }
+          } catch (err) {
+            console.error('PWA prompt error', err);
           }
-          
+
           deferredPrompt = null;
           installBanner.style.display = 'none';
+        } else {
+          console.log('No install prompt available on click');
         }
       });
       

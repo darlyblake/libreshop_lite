@@ -12,6 +12,7 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,8 +20,8 @@ import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette'
 import { useTheme } from '../hooks/useTheme';
 import { Order, OrderItem, Product, Store, User } from '../lib/supabase';
 import { orderService } from '../services/orderService';
+import { contactStore } from '../services/contactService';
 import { useAuthStore } from '../store';
-import * as Linking from 'expo-linking';
 
 // Types étendus
 interface OrderWithDetails extends Order {
@@ -71,24 +72,38 @@ const formatDate = (iso: string) => {
   }
 };
 
-const generateWhatsAppMessage = (order: OrderWithDetails): string => {
-  const products = order.order_items.map(item => 
-    `${item.quantity}x ${item.product?.name || 'Produit'} - ${item.price} FCA`
-  ).join('\n');
-  
-  return `Bonjour ! Je vous contacte concernant ma commande #${order.id} du ${formatDate(order.created_at)}:\n\n${products}\n\nTotal: ${order.total_amount} FCA\n\nStatut: ${getStatusLabel(order.status)}\n\nPourriez-vous me donner plus d'informations ?`;
+const formatAmount = (value: number | string | undefined) => {
+  try {
+    const n = Number(value || 0);
+    return n.toLocaleString('fr-FR');
+  } catch {
+    return String(value ?? '0');
+  }
 };
 
-const generateWhatsAppUrl = (order: OrderWithDetails): string | null => {
-  // Use the store's phone (already loaded via the order join)
-  const rawPhone = order.store?.phone || (order.store as any)?.whatsapp_number;
-  if (!rawPhone) return null;
-  // Normalise: keep only digits (wa.me expects international digits, no '+')
-  const digits = String(rawPhone).replace(/\D/g, '');
-  if (!digits) return null;
-  const message = generateWhatsAppMessage(order);
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+const generateWhatsAppMessage = (order: OrderWithDetails): string => {
+  const shortId = String(order.id).slice(0, 8).toUpperCase();
+  const products = order.order_items.map(item => {
+    const name = item.product?.name || 'Produit';
+    const qty = item.quantity ?? 1;
+    const price = formatAmount(item.price);
+    return `${qty}× ${name} — ${price} FCA`;
+  }).join('\n');
+
+  const total = formatAmount(order.total_amount as any);
+
+  return [
+    `Bonjour, je vous contacte au sujet de ma commande #${shortId} du ${formatDate(order.created_at)}.`,
+    '',
+    products,
+    '',
+    `Total : ${total} FCA`,
+    `Statut : ${getStatusLabel(order.status)}`,
+    '',
+    `Pouvez-vous me donner plus d'informations, s'il vous plaît ?`,
+  ].join('\n');
 };
+
 
 export const ClientOrdersScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -103,6 +118,7 @@ export const ClientOrdersScreen: React.FC = () => {
   const [filters, setFilters] = useState<OrderFilters>({});
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [markingAsReceived, setMarkingAsReceived] = useState<string | null>(null);
+  const [cancelingOrder, setCancelingOrder] = useState<string | null>(null);
 
   const palette = useLegacyPalette();
   const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
@@ -211,33 +227,104 @@ export const ClientOrdersScreen: React.FC = () => {
     }
   };
 
-  // Contacter le vendeur
-  const contactSeller = (order: OrderWithDetails) => {
-    const whatsappUrl = generateWhatsAppUrl(order);
-    if (!whatsappUrl) {
-      Alert.alert(
-        'Numéro introuvable',
-        'Cette boutique n\'a pas encore renseigné un numéro WhatsApp de contact.'
-      );
+  // Accepter / confirmer le paiement (action vendeur/admin)
+  const acceptPayment = async (orderId: string) => {
+    try {
+      // call RPC to confirm payment
+      await orderService.confirmOrderPayment(orderId);
+
+      // update local state optimistically
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'paid', paid_at: new Date().toISOString(), payment_status: 'paid' } : o));
+      setSelectedOrder(prev => prev && prev.id === orderId ? { ...prev, status: 'paid', paid_at: new Date().toISOString(), payment_status: 'paid' } : prev);
+
+      Alert.alert('Succès', 'Paiement accepté');
+    } catch (e: any) {
+      errorHandler.handleDatabaseError?.(e, 'accept payment failed');
+      Alert.alert('Erreur', 'Impossible d\'accepter le paiement pour le moment');
+    }
+  };
+
+  // Annuler une commande (client)
+  const cancelOrder = async (orderId: string) => {
+    // Optimistic UI: mark cancelled locally immediately, revert on failure
+    const prevOrders = [...orders];
+    const prevSelected = selectedOrder ? { ...selectedOrder } : null;
+    try {
+      setCancelingOrder(orderId);
+
+      setOrders(prev => prev.map(order =>
+        order.id === orderId
+          ? { ...order, status: 'cancelled', cancelled_at: new Date().toISOString() }
+          : order
+      ));
+      setSelectedOrder(prev => prev && prev.id === orderId ? { ...prev, status: 'cancelled', cancelled_at: new Date().toISOString() } : prev);
+
+      await orderService.cancelOrderRobust(orderId);
+
+      // success
+      if (typeof window !== 'undefined') {
+        try { window.alert('La commande a été annulée'); } catch {}
+      } else {
+        Alert.alert('Succès', 'La commande a été annulée');
+      }
+    } catch (e: any) {
+      // revert optimistic update
+      setOrders(prevOrders);
+      setSelectedOrder(prevSelected);
+      errorHandler.handleDatabaseError?.(e, 'cancel order failed');
+      if (typeof window !== 'undefined') {
+        try { window.alert('Erreur: Impossible d\'annuler la commande pour le moment'); } catch {};
+      } else {
+        Alert.alert('Erreur', 'Impossible d\'annuler la commande pour le moment');
+      }
+    } finally {
+      setCancelingOrder(null);
+    }
+  };
+
+  // Confirmer avant annulation
+  const confirmCancel = (order: OrderWithDetails) => {
+    if (!order) return;
+    if (!(order.status === 'pending' || order.status === 'paid')) {
+      Alert.alert('Annulation impossible', 'Cette commande ne peut pas être annulée.');
       return;
     }
 
-    // On web, prefer opening in a new tab to avoid app routing collisions
-    if (typeof window !== 'undefined' && window && window.location && window.open) {
+    // Web: use native window.confirm for reliable dialog
+    if (typeof window !== 'undefined' && Platform.OS === 'web') {
       try {
-        window.open(whatsappUrl, '_blank');
-        return;
+        const ok = window.confirm(`Souhaitez‑vous vraiment annuler la commande #${order.id} ?`);
+        if (ok) void cancelOrder(order.id);
       } catch (e) {
-        // fallthrough to Linking
+        // fallback to Alert
+        Alert.alert(
+          'Annuler la commande',
+          `Souhaitez‑vous vraiment annuler la commande #${order.id} ?`,
+          [
+            { text: 'Non', style: 'cancel' },
+            { text: 'Oui, annuler', style: 'destructive', onPress: () => void cancelOrder(order.id) },
+          ],
+        );
       }
+      return;
     }
 
-    Linking.openURL(whatsappUrl).catch(() => {
-      Alert.alert(
-        'Impossible d\'ouvrir WhatsApp',
-        'Vérifiez que WhatsApp est installé sur votre appareil, ou copiez le numéro manuellement.'
-      );
-    });
+    Alert.alert(
+      'Annuler la commande',
+      `Souhaitez‑vous vraiment annuler la commande #${order.id} ?`,
+      [
+        { text: 'Non', style: 'cancel' },
+        { text: 'Oui, annuler', style: 'destructive', onPress: () => void cancelOrder(order.id) },
+      ],
+    );
+  };
+
+  // Contacter le vendeur
+  const contactSeller = (order: OrderWithDetails) => {
+    const rawPhone = order.store?.phone || (order.store as any)?.whatsapp_number || (order as any).stores?.phone;
+    const message = generateWhatsAppMessage(order);
+    // Use central contact service with fallbacks
+    void contactStore({ rawPhone, message, fallback: 'tel-or-copy' });
   };
 
   // Voir les détails
@@ -267,13 +354,55 @@ export const ClientOrdersScreen: React.FC = () => {
   }, [orders]);
 
   // Rendu d’une commande
+  // Calculate amounts helper (subtotal, delivery, tax, total)
+  const computeAmounts = (order: OrderWithDetails | null) => {
+    if (!order) return { subtotal: 0, delivery: 0, tax: 0, total: 0 };
+    const subtotal = (order.order_items || []).reduce((s, it) => s + (Number(it.price || 0) * Number(it.quantity || 0)), 0);
+    const delivery = order.delivery_fee != null ? Number(order.delivery_fee) : Number((order.store as any)?.shipping_price || 0);
+    const tax = order.tax_amount != null ? Number(order.tax_amount) : Math.round(subtotal * (Number((order.store as any)?.tax_rate || 0) / 100));
+    const total = Number(order.total_amount != null ? order.total_amount : subtotal + delivery + tax);
+    return { subtotal, delivery, tax, total };
+  };
+
+  // Compute order steps/timeline from timestamps/status
+  const computeOrderSteps = (order: OrderWithDetails | null) => {
+    if (!order) return [] as { key: string; label: string; date?: string; done: boolean }[];
+    const steps: { key: string; label: string; date?: string; done: boolean }[] = [];
+
+    // Created
+    steps.push({ key: 'created', label: 'Commande créée', date: order.created_at, done: true });
+
+    // Paid
+    const paid = (order as any).paid_at || order.status === 'paid' || order.status === 'shipped' || order.status === 'delivered';
+    steps.push({ key: 'paid', label: 'Commande acceptée', date: (order as any).paid_at, done: !!paid });
+
+    // Shipped
+    const shipped = (order as any).shipped_at || order.status === 'shipped' || order.status === 'delivered';
+    steps.push({ key: 'shipped', label: 'Expédiée', date: (order as any).shipped_at, done: !!shipped });
+
+    // Delivered
+    const delivered = (order as any).delivered_at || order.status === 'delivered';
+    steps.push({ key: 'delivered', label: 'Livrée', date: (order as any).delivered_at, done: !!delivered });
+
+    // Cancelled (if cancelled show at end)
+    const cancelled = (order as any).cancelled_at || order.status === 'cancelled';
+    if (cancelled) {
+      steps.push({ key: 'cancelled', label: 'Annulée', date: (order as any).cancelled_at, done: true });
+    }
+
+    return steps;
+  };
+
   const renderOrder = (order: OrderWithDetails) => (
     <View key={order.id} style={styles.orderCard}>
       {/* Header avec statut */}
       <View style={styles.orderHeader}>
         <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>Commande #{order.id}</Text>
+          <Text style={styles.orderId}>Commande #{String(order.id).split('-')[0].toUpperCase()}</Text>
           <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
+          {order.store?.name ? (
+            <Text style={styles.storeInline} numberOfLines={1}>{order.store.name}</Text>
+          ) : null}
         </View>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status, palette) }]}>
           <Text style={styles.statusText}>{getStatusLabel(order.status)}</Text>
@@ -309,8 +438,23 @@ export const ClientOrdersScreen: React.FC = () => {
 
       {/* Total */}
       <View style={styles.orderTotal}>
-        <Text style={styles.totalLabel}>Total</Text>
-        <Text style={styles.totalAmount}>{order.total_amount} FCA</Text>
+        {(() => {
+          const amt = computeAmounts(order);
+          return (
+            <>
+              <View style={{flex: 1}}>
+                <Text style={styles.subtotalLabel}>Sous-total</Text>
+                <Text style={styles.subtotalValue}>{amt.subtotal.toLocaleString()} FCA</Text>
+                {amt.delivery ? <Text style={styles.detailSmall}>Livraison: {amt.delivery.toLocaleString()} FCA</Text> : null}
+                {amt.tax ? <Text style={styles.detailSmall}>TVA: {amt.tax.toLocaleString()} FCA</Text> : null}
+              </View>
+              <View style={{alignItems: 'flex-end'}}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalAmount}>{amt.total.toLocaleString()} FCA</Text>
+              </View>
+            </>
+          );
+        })()}
       </View>
 
       {/* Actions */}
@@ -339,6 +483,23 @@ export const ClientOrdersScreen: React.FC = () => {
           <Ionicons name="logo-whatsapp" size={18} color={palette.text} />
           <Text style={styles.actionButtonText}>Contacter</Text>
         </TouchableOpacity>
+
+        {(order.status === 'pending' || order.status === 'paid') && (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.cancelButton]}
+            onPress={() => confirmCancel(order)}
+            disabled={cancelingOrder === order.id}
+          >
+            {cancelingOrder === order.id ? (
+              <ActivityIndicator color={palette.text} size="small" />
+            ) : (
+              <>
+                <Ionicons name="close-circle" size={18} color={palette.text} />
+                <Text style={styles.actionButtonText}>Annuler</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
         
         <TouchableOpacity 
           style={[styles.actionButton, styles.detailsButton]}
@@ -556,23 +717,54 @@ export const ClientOrdersScreen: React.FC = () => {
           <View style={styles.modalOverlay}>
             <View style={styles.detailsModal}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Détails de la commande #{selectedOrder.id}</Text>
+                <Text style={styles.modalTitle}>Détails de la commande</Text>
                 <TouchableOpacity onPress={() => setSelectedOrder(null)}>
                   <Ionicons name="close" size={24} color={palette.text} />
                 </TouchableOpacity>
               </View>
-              
+
               <ScrollView style={styles.modalContent}>
-                {/* Infos boutique */}
-                {selectedOrder.store && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Boutique</Text>
-                    <Text style={styles.detailText}>{selectedOrder.store.name}</Text>
-                    {selectedOrder.store.phone && (
-                      <Text style={styles.detailText}>{selectedOrder.store.phone}</Text>
-                    )}
-                  </View>
-                )}
+                <View style={styles.detailTotals}>
+                  {(() => {
+                    const amt = computeAmounts(selectedOrder as OrderWithDetails | null);
+                    return (
+                      <>
+                        <View style={{flex: 1}}>
+                          <Text style={styles.subtotalLabel}>Sous-total</Text>
+                          <Text style={styles.subtotalValue}>{amt.subtotal.toLocaleString()} FCA</Text>
+                          {amt.delivery ? <Text style={styles.detailSmall}>Livraison: {amt.delivery.toLocaleString()} FCA</Text> : null}
+                          {amt.tax ? <Text style={styles.detailSmall}>TVA: {amt.tax.toLocaleString()} FCA</Text> : null}
+                        </View>
+                        <View style={{alignItems: 'flex-end'}}>
+                          <Text style={styles.totalLabel}>Total</Text>
+                          <Text style={styles.totalAmount}>{amt.total.toLocaleString()} FCA</Text>
+                        </View>
+                      </>
+                    );
+                  })()}
+                </View>
+
+                {/* Timeline / étapes */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Étapes de la commande</Text>
+                  {computeOrderSteps(selectedOrder).map(step => (
+                    <View key={step.key} style={styles.stepRow}>
+                      <View style={[styles.stepBullet, step.done && { backgroundColor: palette.accent }]} />
+                      <View style={styles.stepTextWrap}>
+                        <Text style={[styles.stepLabel, step.done ? { color: palette.text } : { color: palette.textMuted }]}>{step.label}</Text>
+                        {step.date ? <Text style={styles.stepDate}>{formatDate(step.date)}</Text> : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Boutique</Text>
+                  <Text style={styles.detailText}>{selectedOrder.store?.name}</Text>
+                  {selectedOrder.store?.phone && (
+                    <Text style={styles.detailText}>{selectedOrder.store.phone}</Text>
+                  )}
+                </View>
 
                 {/* Produits */}
                 <View style={styles.detailSection}>
@@ -589,30 +781,63 @@ export const ClientOrdersScreen: React.FC = () => {
                   ))}
                 </View>
 
-                {/* Total */}
+                {/* Total détail */}
                 <View style={styles.detailSection}>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Sous-total:</Text>
-                    <Text style={styles.detailValue}>
-                      {(selectedOrder.total_amount - (selectedOrder.delivery_fee || 0))} FCA
-                    </Text>
+                    <Text style={styles.detailValue}>{computeAmounts(selectedOrder).subtotal.toLocaleString()} FCA</Text>
                   </View>
-                  {selectedOrder.delivery_fee && (
+                  {computeAmounts(selectedOrder).delivery ? (
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Livraison:</Text>
-                      <Text style={styles.detailValue}>
-                        {selectedOrder.delivery_fee} FCA
-                      </Text>
+                      <Text style={styles.detailValue}>{computeAmounts(selectedOrder).delivery.toLocaleString()} FCA</Text>
                     </View>
-                  )}
+                  ) : null}
+                  {computeAmounts(selectedOrder).tax ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>TVA:</Text>
+                      <Text style={styles.detailValue}>{computeAmounts(selectedOrder).tax.toLocaleString()} FCA</Text>
+                    </View>
+                  ) : null}
                   <View style={[styles.detailRow, styles.totalRow]}>
                     <Text style={styles.detailTotalLabel}>Total:</Text>
-                    <Text style={styles.detailTotalValue}>
-                      {selectedOrder.total_amount} FCA
-                    </Text>
+                    <Text style={styles.detailTotalValue}>{computeAmounts(selectedOrder).total.toLocaleString()} FCA</Text>
                   </View>
                 </View>
               </ScrollView>
+
+              <View style={{padding: SPACING.lg, borderTopWidth: 1, borderTopColor: palette.border, flexDirection: 'row', gap: SPACING.sm}}>
+                {/* Seller/admin: accept payment button */}
+                {(user && (user.role === 'seller' || user.role === 'admin') && selectedOrder && selectedOrder.payment_status !== 'paid' && (user.role === 'admin' || selectedOrder.store?.user_id === user.id)) && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.receivedButton]}
+                    onPress={() => {
+                      setSelectedOrder(null);
+                      acceptPayment(selectedOrder.id);
+                    }}
+                  >
+                    <Ionicons name="checkmark-circle" size={18} color={palette.text} />
+                    <Text style={styles.actionButtonText}>Accepter la commande</Text>
+                  </TouchableOpacity>
+                )}
+
+                {selectedOrder && (selectedOrder.status === 'pending' || selectedOrder.status === 'paid') && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.cancelButton]}
+                    onPress={() => {
+                      setSelectedOrder(null);
+                      confirmCancel(selectedOrder);
+                    }}
+                  >
+                    <Ionicons name="close-circle" size={18} color={palette.text} />
+                    <Text style={styles.actionButtonText}>Annuler la commande</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[styles.actionButton, styles.detailsButton]} onPress={() => setSelectedOrder(null)}>
+                  <Ionicons name="arrow-back" size={18} color={palette.accent} />
+                  <Text style={[styles.actionButtonText, { color: palette.accent }]}>Fermer</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -816,6 +1041,48 @@ function createClientOrdersStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     fontWeight: '700',
     color: palette.accent,
   },
+  storeInline: {
+    fontSize: FONT_SIZE.sm,
+    color: palette.textMuted,
+    marginTop: SPACING.xs,
+    maxWidth: 220,
+  },
+  subtotalLabel: {
+    fontSize: FONT_SIZE.sm,
+    color: palette.textMuted,
+  },
+  subtotalValue: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: palette.text,
+  },
+  detailSmall: {
+    fontSize: FONT_SIZE.sm,
+    color: palette.textMuted,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  stepBullet: {
+    width: 10,
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: palette.border,
+    marginRight: SPACING.md,
+  },
+  stepTextWrap: {
+    flex: 1,
+  },
+  stepLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+  },
+  stepDate: {
+    fontSize: FONT_SIZE.xs,
+    color: palette.textMuted,
+  },
   orderActions: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -840,6 +1107,11 @@ function createClientOrdersStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     backgroundColor: palette.accent + '10',
     borderWidth: 1,
     borderColor: palette.accent,
+  },
+  cancelButton: {
+    backgroundColor: palette.danger,
+    borderWidth: 1,
+    borderColor: palette.danger,
   },
   actionButtonText: {
     fontSize: FONT_SIZE.sm,

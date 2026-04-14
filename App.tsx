@@ -29,7 +29,8 @@ LogBox.ignoreLogs([
 if (Platform.OS === 'web') {
   const originalWarn = console.warn;
   console.warn = (...args) => {
-    const msg = String(args[0]);
+    const msg = String(args[0] ?? '');
+    // Common dev/noisy messages we want to ignore on web
     if (
       msg.includes('pointerEvents is deprecated') || 
       msg.includes('PushTokenManager') ||
@@ -39,7 +40,13 @@ if (Platform.OS === 'web') {
       msg.includes('TouchableMixin') ||
       msg.includes('None of the callbacks in the gesture are worklets') ||
       msg.includes('SkPath.addRect() is deprecated') ||
-      msg.includes('SkPath.addPath() is deprecated')
+      msg.includes('SkPath.addPath() is deprecated') ||
+      msg.includes('Running application') ||
+      msg.includes('Development-level warnings') ||
+      msg.includes('Performance optimizations') ||
+      msg.includes('translate.google.com') ||
+      msg.includes('translate.googleapis.com') ||
+      msg.includes('ERR_BLOCKED_BY_CLIENT')
     ) {
       return;
     }
@@ -48,7 +55,8 @@ if (Platform.OS === 'web') {
 
   const originalError = console.error;
   console.error = (...args) => {
-    const msg = String(args[0]);
+    const msg = String(args[0] ?? '');
+    // Filter noisy runtime errors that are safe to ignore during local dev
     if (
       msg.includes('transform-origin') ||
       msg.includes('transformOrigin') ||
@@ -58,12 +66,57 @@ if (Platform.OS === 'web') {
       msg.includes('react-devtools') ||
       msg.includes('Failed to fetch') ||
       msg.includes('ERR_NAME_NOT_RESOLVED') ||
-      msg.includes('WebSocket connection')
+      msg.includes('WebSocket connection') ||
+      msg.includes('Unexpected text node') ||
+      msg.includes('translate.google.com') ||
+      msg.includes('translate.googleapis.com') ||
+      msg.includes('gen204') ||
+      msg.includes('ERR_BLOCKED_BY_CLIENT')
     ) {
       return;
     }
     originalError(...args);
   };
+
+  // Suppress noisy network/resource load errors originating from third-party
+  // translation scripts (adblockers block these and browsers emit noisy errors).
+  try {
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('error', (ev: any) => {
+        try {
+          const filename = ev?.filename || ev?.target?.src || '';
+          const msg = String(ev?.message || '');
+          if (
+            filename.includes('translate.google.com') ||
+            filename.includes('translate.googleapis.com') ||
+            msg.includes('ERR_BLOCKED_BY_CLIENT') ||
+            msg.includes('gen204')
+          ) {
+            ev.preventDefault?.();
+            ev.stopImmediatePropagation?.();
+            return false;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', (ev: any) => {
+        try {
+          const reason = String(ev?.reason || '');
+          if (reason.includes('translate.google.com') || reason.includes('translate.googleapis.com') || reason.includes('gen204') || reason.includes('ERR_BLOCKED_BY_CLIENT')) {
+            ev.preventDefault?.();
+            ev.stopImmediatePropagation?.();
+            return false;
+          }
+        } catch (e) {
+          // ignore
+        }
+      });
+    }
+  } catch (e) {
+    // no-op
+  }
 }
 
 const { width, height } = Dimensions.get('window');

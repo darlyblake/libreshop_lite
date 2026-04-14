@@ -13,7 +13,7 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
-  Linking,
+  
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -32,6 +32,7 @@ import { Badge } from '../components/Badge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { adminService } from '../services/adminService';
+import { contactStore } from '../services/contactService';
 
 const { width } = Dimensions.get('window');
 
@@ -214,14 +215,9 @@ export const AdminUsersScreen: React.FC = () => {
     }
 
     const text = `Bonjour ${user.full_name}`;
-    const url = `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
 
     try {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.open(url, '_blank');
-      } else {
-        await Linking.openURL(url);
-      }
+      contactStore({ rawPhone: normalized, message: text });
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'open whatsapp');
       const msg = 'Impossible d’ouvrir WhatsApp.';

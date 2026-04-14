@@ -32,20 +32,28 @@ interface NotificationSound {
 }
 
 // Configuration des liens profonds
-const linking = {
-  prefixes: Platform.OS === 'web' 
-    ? ['https://', 'http://'] 
-    : [Linking.createURL('/')],
-  config: {
-    screens: {
-      ClientTabs: '',
-      Landing: 'welcome',
-      SellerEmailConfirm: 'auth/confirm',
-      StoreDetail: 'store/:slug?',
-      ProductDetail: 'product/:productId',
+const linking = (() => {
+  const prefixes: string[] = [];
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    // Prefer explicit origin on web to avoid generic prefix parsing issues
+    prefixes.push(window.location.origin);
+  }
+  // Fallback / universal expo url
+  prefixes.push(Linking.createURL('/'));
+
+  return {
+    prefixes,
+    config: {
+      screens: {
+        ClientTabs: '',
+        Landing: 'welcome',
+        SellerEmailConfirm: 'auth/confirm',
+        StoreDetail: 'store/:slug?',
+        ProductDetail: 'product/:productId',
+      },
     },
-  },
-};
+  } as const;
+})();
 
 // Écran de chargement (thème dynamique)
 const LoadingScreen: React.FC = () => {
@@ -377,8 +385,14 @@ export const AppNavigator: React.FC = () => {
     if (!user?.id) return;
     
     // Polling every 15 seconds
+    let pollingInProgress = false;
     const interval = setInterval(async () => {
       try {
+        // Skip polling when offline
+        if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+        if (pollingInProgress) return; // avoid overlapping polls
+        pollingInProgress = true;
+
         // Check if there are new unread notifications
         const { notificationService } = await import('../services/notificationService');
         const count = await notificationService.getUnreadCount(user.id);
@@ -395,6 +409,8 @@ export const AppNavigator: React.FC = () => {
         }
       } catch (err) {
         // Ignore silent polling errors
+      } finally {
+        pollingInProgress = false;
       }
     }, 15000);
 

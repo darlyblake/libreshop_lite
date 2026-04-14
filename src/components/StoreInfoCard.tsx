@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Linking,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { contactStore } from '../services/contactService';
+import { openURL } from '../utils/platformUtils';
 
 interface InfoItem {
   label: string;
@@ -36,19 +37,17 @@ export const StoreInfoCard: React.FC<StoreInfoCardProps> = ({
 }) => {
   const handleCall = () => {
     if (!store.phone) return;
-    const phoneUrl = `tel:${store.phone}`;
-    Linking.openURL(phoneUrl).catch(() => {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir l\'application');
-    });
+    contactStore({ rawPhone: store.phone, fallback: 'tel' });
     onCallPress?.();
   };
 
   const handleEmail = () => {
     if (!store.email) return;
-    const emailUrl = `mailto:${store.email}`;
-    Linking.openURL(emailUrl).catch(() => {
+    try {
+      openURL(`mailto:${store.email}`);
+    } catch (e) {
       Alert.alert('Erreur', 'Impossible d\'envoyer un email');
-    });
+    }
   };
 
   const infoItems: InfoItem[] = [

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,10 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { type Product } from '../lib/supabase';
+import { orderService } from '../services/orderService';
+import { storeService } from '../services/storeService';
 
-// Mock order data
+// Fallback mock while loading
 const ORDER_DATA = {
   id: 'CMD-2026-001',
   date: '13 Février 2026',
@@ -54,24 +56,61 @@ export const ConfirmationScreen: React.FC = () => {
   const orderId = routeOrderId || ORDER_DATA.id;
   const total = typeof routeAmount === 'number' ? routeAmount : ORDER_DATA.total;
 
+  const fullOrderId = orderData?.id || orderId;
+  const displayOrderId = fullOrderId ? String(fullOrderId).split('-')[0] : ORDER_DATA.id;
+
+  const [loading, setLoading] = useState(false);
+  const [orderData, setOrderData] = useState<any | null>(null);
+  const [storeInfo, setStoreInfo] = useState<any | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!routeOrderId) return;
+      setLoading(true);
+      try {
+        const o: any = await orderService.getById(String(routeOrderId), { includeStore: true });
+        if (!mounted) return;
+        setOrderData(o || null);
+        // if store not included, try fetching store separately
+        const sid = o?.store_id || o?.stores?.id;
+        if (sid) {
+          try {
+            const s = await storeService.getById(sid);
+            if (mounted) setStoreInfo(s || null);
+          } catch (e) {
+            // ignore
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load order for confirmation', e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [routeOrderId]);
+
+  const pm = routePaymentMethod || orderData?.payment_method;
   const paymentMethodLabel =
-    routePaymentMethod === 'cash'
+    pm === 'cash' || pm === 'cash_on_delivery'
       ? 'Paiement à la livraison'
-      : routePaymentMethod === 'card'
+      : pm === 'card'
         ? 'Carte Bancaire'
-        : routePaymentMethod === 'mobile_money'
+        : pm === 'mobile_money'
           ? 'Mobile Money'
-          : ORDER_DATA.paymentMethod;
+          : (orderData?.payment_method || ORDER_DATA.paymentMethod);
 
-  const orderItems = items.length
-    ? items.map((it) => ({
-        name: it.product.name,
-        quantity: it.quantity,
-        price: it.product.price,
-      }))
-    : ORDER_DATA.items;
+  const orderItems = (
+    orderData?.order_items?.length ? orderData.order_items.map((oi: any) => ({
+      name: oi.products?.name || oi.product_name || 'Produit',
+      quantity: oi.quantity,
+      price: oi.price,
+    })) : (items.length ? items.map((it) => ({ name: it.product.name, quantity: it.quantity, price: it.product.price })) : ORDER_DATA.items)
+  );
 
-  const dateLabel = new Date().toLocaleDateString('fr-FR');
+  const dateLabel = orderData?.created_at ? new Date(orderData.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
 
   return (
     <View style={styles.container}>
@@ -97,7 +136,7 @@ export const ConfirmationScreen: React.FC = () => {
         {/* Order ID */}
         <View style={styles.orderIdContainer}>
           <Text style={styles.orderIdLabel}>Numéro de commande</Text>
-          <Text style={styles.orderId}>{orderId}</Text>
+          <Text style={styles.orderId}>{displayOrderId}</Text>
         </View>
 
         {/* Order Details Card */}
@@ -128,7 +167,7 @@ export const ConfirmationScreen: React.FC = () => {
           <View style={styles.infoRow}>
             <Ionicons name="storefront-outline" size={18} color={COLORS.accent} />
             <Text style={styles.infoLabel}>Boutique</Text>
-            <Text style={styles.infoValue}>{ORDER_DATA.store}</Text>
+            <Text style={styles.infoValue}>{storeInfo?.name || orderData?.stores?.name || ORDER_DATA.store}</Text>
           </View>
           <View style={styles.infoRow}>
             <Ionicons name="phone-portrait-outline" size={18} color={COLORS.accent} />

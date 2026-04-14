@@ -27,18 +27,28 @@ const API_ROUTES = [
 self.addEventListener('install', event => {
   console.log('Service Worker installing...');
   event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then(cache => {
-        console.log('Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => {
-        console.log('Static assets cached successfully');
-        return self.skipWaiting();
-      })
-      .catch(err => {
-        console.log('Cache installation failed:', err);
-      })
+    caches.open(STATIC_CACHE).then(async (cache) => {
+      console.log('Caching static assets (tolerant mode)');
+      // Attempt to fetch and cache each asset individually so a missing file
+      // doesn't fail the entire install step.
+      for (const asset of STATIC_ASSETS) {
+        try {
+          const response = await fetch(asset, { cache: 'no-store' });
+          if (response && response.ok) {
+            await cache.put(asset, response.clone());
+            console.log('Cached', asset);
+          } else {
+            console.warn('Asset not cached (not ok):', asset);
+          }
+        } catch (err) {
+          console.warn('Asset fetch failed, skipping:', asset, err);
+        }
+      }
+      console.log('Static assets caching step completed');
+      return self.skipWaiting();
+    }).catch(err => {
+      console.warn('Service Worker install encountered an error:', err);
+    })
   );
 });
 

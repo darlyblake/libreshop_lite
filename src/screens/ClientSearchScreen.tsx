@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import Animated, { 
   FadeInDown, 
@@ -321,6 +321,63 @@ export const ClientSearchScreen: React.FC = () => {
     debouncedSearch,
     loadMore 
   } = useSearch(sort);
+
+  const route = useRoute<any>();
+  const recognitionRef = useRef<any>(null);
+
+  const startVoiceInSearch = useCallback((lang = 'fr-FR') => {
+    if (Platform.OS !== 'web') return;
+    const w: any = window as any;
+    const Rec = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!Rec) return;
+    try {
+      const r = new Rec();
+      recognitionRef.current = r;
+      r.interimResults = true;
+      r.lang = lang;
+      r.onresult = (ev: any) => {
+        const transcript = Array.from(ev.results).map((res: any) => res[0].transcript).join('');
+        setSearchQuery(transcript);
+        debouncedSearch(transcript);
+      };
+      r.onend = () => {
+        recognitionRef.current = null;
+      };
+      r.onerror = () => {
+        recognitionRef.current = null;
+      };
+      r.start();
+    } catch (err) {
+      // ignore
+    }
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    // If navigated with startVoice param, begin voice recognition here
+    try {
+      if (route?.params?.startVoice) {
+        const initial = String(route.params.query || '') || '';
+        if (initial) {
+          setSearchQuery(initial);
+          debouncedSearch(initial);
+        }
+        startVoiceInSearch();
+      } else if (route?.params?.query) {
+        setSearchQuery(String(route.params.query || ''));
+        debouncedSearch(String(route.params.query || ''));
+      }
+    } catch (e) {}
+  }, [route?.params, debouncedSearch, startVoiceInSearch]);
+
+  useEffect(() => {
+    return () => {
+      const r = recognitionRef.current;
+      if (r && typeof r.stop === 'function') {
+        try { r.stop(); } catch (e) {}
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
 
   // Valeurs mémoïsées
   const productItemWidth = useMemo(() => {

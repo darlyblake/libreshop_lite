@@ -4,6 +4,8 @@ import { registerRootComponent } from 'expo';
 if (typeof document !== 'undefined' && typeof window !== 'undefined') {
   try {
     require('./src/config/domProtection');
+    // Install global log filter to reduce noisy console output in web
+    try { require('./src/config/logFilter'); } catch (e) { /* ignore */ }
   } catch (e) {
     // Silently fail if DOM protection can't be loaded
   }

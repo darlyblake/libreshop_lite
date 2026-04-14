@@ -8,6 +8,8 @@ import {
   TextInput,
   StatusBar,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,20 +18,41 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { useAuthStore, useCartStore } from '../store';
 import { genericStorage } from '../lib/storage';
 import { storeService } from '../services/storeService';
+import { orderService } from '../services/orderService';
+import { userService } from '../services/userService';
+import { authService } from '../services/authService';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
-  const { items: globalItems, getTotal, storeId: storeIdFromStore } = useCartStore();
+  const { items: globalItems, getTotal, storeId: storeIdFromStore, clearCart } = useCartStore();
   const route = useRoute<any>();
 
   // allow passing `itemsJson` or `items` in navigation to checkout a subset (per-store)
   const paramItems = (() => {
     const p = route.params || {};
     if (Array.isArray(p.items)) return p.items;
+    // If itemsJson passed explicitly, parse it
     if (typeof p.itemsJson === 'string') {
       try { return JSON.parse(p.itemsJson); } catch { return undefined; }
     }
+
+    // Handle malformed web query where items was serialized as "[object Object]"
+    if (typeof p.items === 'string') {
+      try {
+        // Try to recover from a JSON string in the URL query (itemsJson)
+        if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const itemsJsonFromQuery = params.get('itemsJson') || params.get('items');
+          if (itemsJsonFromQuery) {
+            try { return JSON.parse(decodeURIComponent(itemsJsonFromQuery)); } catch {}
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
     return undefined;
   })();
 
@@ -41,13 +64,16 @@ export const CheckoutScreen: React.FC = () => {
     const [aggregatedTaxAmount, setAggregatedTaxAmount] = useState(0);
     const [aggregatedShipping, setAggregatedShipping] = useState(0);
 
-  const [paymentMethod, setPaymentMethod] = useState('mobile_money');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [formData, setFormData] = useState({
     name: user?.full_name || '',
     phone: user?.whatsapp_number || user?.phone || '',
     address: '',
     notes: '',
   });
+  const [processing, setProcessing] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Load store data for tax and shipping. Supports single-store or mixed carts.
   useEffect(() => {
@@ -149,6 +175,14 @@ export const CheckoutScreen: React.FC = () => {
       genericStorage.setItem('@libreshop_client_profile', next);
       return next;
     });
+
+    // Clear error for this field when user edits it
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const copy = { ...prev };
+      delete copy[field];
+      return copy;
+    });
   };
 
   return (
@@ -175,30 +209,32 @@ export const CheckoutScreen: React.FC = () => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Nom complet</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.name ? { borderColor: COLORS.danger } : null]}
               placeholder="Votre nom"
               placeholderTextColor={COLORS.textMuted}
               value={formData.name}
               onChangeText={(v) => handleInputChange('name', v)}
             />
+            {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
           </View>
           
           <View style={styles.formGroup}>
             <Text style={styles.label}>Téléphone WhatsApp</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.phone ? { borderColor: COLORS.danger } : null]}
               placeholder="+229 XX XXX XXXX"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="phone-pad"
               value={formData.phone}
               onChangeText={(v) => handleInputChange('phone', v)}
             />
+            {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
           </View>
           
           <View style={styles.formGroup}>
             <Text style={styles.label}>Adresse de livraison</Text>
             <TextInput
-              style={[styles.input, styles.multilineInput]}
+              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null]}
               placeholder="Ville, quartier, rue..."
               placeholderTextColor={COLORS.textMuted}
               multiline
@@ -206,6 +242,7 @@ export const CheckoutScreen: React.FC = () => {
               value={formData.address}
               onChangeText={(v) => handleInputChange('address', v)}
             />
+            {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
           </View>
           
           <View style={styles.formGroup}>
@@ -232,22 +269,20 @@ export const CheckoutScreen: React.FC = () => {
           <TouchableOpacity 
             style={[
               styles.paymentOption,
-              paymentMethod === 'mobile_money' && styles.paymentOptionActive
+              { opacity: 0.6 },
             ]}
-            onPress={() => setPaymentMethod('mobile_money')}
+            disabled
+            accessibilityLabel="Mobile Money temporairement désactivé"
           >
             <Ionicons name="phone-portrait-outline" size={24} color={COLORS.accent2} />
             <View style={styles.paymentInfo}>
               <Text style={styles.paymentTitle}>Mobile Money</Text>
-              <Text style={styles.paymentDesc}>Paiement via MTN Momo ou Moov</Text>
+              <Text style={[styles.paymentDesc, { color: COLORS.textMuted }]}>Temporairement désactivé</Text>
             </View>
             <View style={[
               styles.radioButton,
-              paymentMethod === 'mobile_money' && styles.radioButtonActive
+              { borderColor: COLORS.border }
             ]}>
-              {paymentMethod === 'mobile_money' && (
-                <View style={styles.radioInner} />
-              )}
             </View>
           </TouchableOpacity>
           
@@ -360,24 +395,161 @@ export const CheckoutScreen: React.FC = () => {
           <Text style={styles.bottomTotalValue}>{total.toLocaleString()} FCA</Text>
         </View>
           <TouchableOpacity 
-          style={[styles.orderButton, cartEmpty && { opacity: 0.6 }]}
-          disabled={cartEmpty}
-          onPress={() =>
-            navigation.navigate('Payment', {
-              amount: total,
-              storeId: activeStoreId,
-              itemsJson: JSON.stringify(paramItems ?? items),
-              customerJson: JSON.stringify({
-                name: formData.name,
+          style={[styles.orderButton, (cartEmpty || processing || completed) && { opacity: 0.6 }]}
+          disabled={cartEmpty || processing || completed}
+          onPress={async () => {
+            // Validate items exist and are parseable
+            if (!Array.isArray(paramItems) && !Array.isArray(items)) {
+              // Attempt to recover from URL query if possible
+              if (typeof window !== 'undefined' && typeof URLSearchParams !== 'undefined') {
+                const params = new URLSearchParams(window.location.search);
+                const raw = params.get('itemsJson') || params.get('items');
+                if (!raw || raw === '[object Object]') {
+                  if (typeof window !== 'undefined' && Platform.OS === 'web') {
+                    window.alert('Erreur: Impossible de lire le panier depuis l’URL. Retournez au panier et recommencez.');
+                  } else {
+                    Alert.alert('Erreur', 'Impossible de lire le panier depuis l’URL. Retournez au panier et recommencez.');
+                  }
+                  return;
+                }
+                try {
+                  const recovered = JSON.parse(decodeURIComponent(raw));
+                  if (!Array.isArray(recovered) || recovered.length === 0) {
+                    if (typeof window !== 'undefined' && Platform.OS === 'web') {
+                      window.alert('Erreur: Le panier est vide ou mal formé.');
+                    } else {
+                      Alert.alert('Erreur', 'Le panier est vide ou mal formé.');
+                    }
+                    return;
+                  }
+                } catch (e) {
+                  if (typeof window !== 'undefined' && Platform.OS === 'web') {
+                    window.alert('Erreur: Impossible de décoder les articles de la commande.');
+                  } else {
+                    Alert.alert('Erreur', 'Impossible de décoder les articles de la commande.');
+                  }
+                  return;
+                }
+              } else {
+                Alert.alert('Erreur', 'Panier introuvable.');
+                return;
+              }
+            }
+
+            // Basic form validation — collect field errors and show them on the form
+            const newErrors: Record<string, string> = {};
+            if (!formData.name || formData.name.trim().length < 2) {
+              newErrors.name = 'Veuillez entrer votre nom complet.';
+            }
+            if (!formData.phone || formData.phone.trim().length < 6) {
+              newErrors.phone = 'Veuillez entrer un numéro de téléphone valide.';
+            }
+            if (!formData.address || formData.address.trim().length < 5) {
+              newErrors.address = 'Veuillez entrer votre adresse de livraison.';
+            }
+
+            if (Object.keys(newErrors).length > 0) {
+              setErrors(newErrors);
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.alert('Erreur: Veuillez corriger les champs marqués.');
+              } else {
+                Alert.alert('Erreur', 'Veuillez corriger les champs marqués.');
+              }
+              return;
+            }
+
+            // Create order directly (commande)
+            setProcessing(true);
+            try {
+              // ensure user exists
+              let userId = user?.id;
+              if (!userId) {
+                try {
+                  await authService.signInAnonymously();
+                  const u = await authService.getCurrentUser();
+                  userId = u?.id;
+                } catch (e) {
+                  // ignore - will require login
+                }
+              }
+
+              if (!userId) {
+                setProcessing(false);
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  const ok = window.confirm('Connexion requise: veuillez vous connecter pour passer commande. Voulez-vous vous connecter maintenant ?');
+                  if (ok) navigation.navigate('SellerAuth');
+                } else {
+                  Alert.alert('Connexion requise', 'Veuillez vous connecter pour passer commande', [
+                    { text: 'Se connecter', onPress: () => navigation.navigate('SellerAuth') },
+                    { text: 'Annuler', style: 'cancel' },
+                  ]);
+                }
+                return;
+              }
+
+              await userService.upsertProfile(userId, {
+                full_name: formData.name,
                 phone: formData.phone,
-                address: formData.address,
+                whatsapp_number: formData.phone,
+              });
+
+              const payload = {
+                user_id: userId,
+                store_id: String(activeStoreId),
+                total_amount: Number(total),
+                status: 'pending',
+                payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod,
+                payment_status: 'paid',
+                shipping_address: formData.address,
+                customer_phone: formData.phone,
                 notes: formData.notes,
-              }),
-              paymentMethod,
-            })
-          }
+                customer_name: formData.name,
+              } as any;
+
+              const created = await orderService.create(payload);
+
+              // insert items
+              try {
+                const rows = (paramItems ?? items).map((it: any) => ({
+                  order_id: created.id,
+                  product_id: it.product.id,
+                  quantity: it.quantity,
+                  price: it.product.price,
+                }));
+                await orderService.createItems(rows);
+              } catch (e: any) {
+                // best-effort
+                console.warn('order_items insert failed', e);
+              }
+
+              // process order (decrement stock, notify)
+              try { await orderService.processPayment(created.id); } catch (e) { /* ignore */ }
+
+              // clear cart when success
+              clearCart();
+              setCompleted(true);
+
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                try { window.alert('Votre commande a été créée avec succès.'); } catch { /* ignore */ }
+                navigation.navigate('Confirmation', { orderId: created.id, amount: total, storeId: activeStoreId });
+              } else {
+                Alert.alert('Commande créée', 'Votre commande a été créée avec succès.', [
+                  { text: 'Continuer', onPress: () => navigation.navigate('Confirmation', { orderId: created.id, amount: total, storeId: activeStoreId }) }
+                ]);
+              }
+            } catch (e: any) {
+              errorHandler.handle(e, 'place order failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.alert('Erreur: ' + (e?.message || 'Impossible de créer la commande'));
+              } else {
+                Alert.alert('Erreur', e?.message || 'Impossible de créer la commande');
+              }
+            } finally {
+              if (!completed) setProcessing(false);
+            }
+          }}
         >
-          <Text style={styles.orderButtonText}>Procéder au paiement</Text>
+          <Text style={styles.orderButtonText}>{processing || completed ? '...' : 'Commander'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -581,6 +753,11 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
+  },
+  errorText: {
+    color: COLORS.danger,
+    marginTop: SPACING.sm,
+    fontSize: FONT_SIZE.sm,
   },
 });
 

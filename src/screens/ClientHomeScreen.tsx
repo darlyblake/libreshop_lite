@@ -138,11 +138,11 @@ export const ClientHomeScreen: React.FC = () => {
 
   // Start cache monitoring for performance metrics
   useEffect(() => {
-    console.log('[ClientHome] 🚀 Starting cache optimization monitoring...');
-    const stopMonitoring = cacheMonitor.start(60000); // Log every 60 seconds
+    // Avoid running cache monitor on web to reduce background work in the browser
+    if (Platform.OS === 'web') return;
+    const stopMonitoring = cacheMonitor.start(60000, true); // start silently
     return () => {
       stopMonitoring();
-      console.log('[ClientHome] ⏹️ Cache monitoring stopped');
     };
   }, []);
 
@@ -581,6 +581,14 @@ export const ClientHomeScreen: React.FC = () => {
             <SearchBar
               value={state.searchQuery}
               onChangeText={(text) => dispatch({ type: 'SET_SEARCH_QUERY', payload: text })}
+              onFocus={() => {
+                // Navigate to full search page when user focuses/clicks the search bar
+                navigation.navigate('ClientSearch', { query: state.searchQuery });
+              }}
+              onVoiceStart={() => {
+                // Navigate to ClientSearch and start voice recognition there
+                navigation.navigate('ClientSearch', { query: state.searchQuery, startVoice: true });
+              }}
               onSubmitEditing={() => {
                 if (state.searchQuery.trim()) {
                   navigation.navigate('ClientSearch', { query: state.searchQuery });

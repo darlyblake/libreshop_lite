@@ -17,7 +17,6 @@ import {
   Alert,
   FlatList,
   Animated,
-  Linking,
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,12 +29,15 @@ import { useResponsive } from "../utils/responsive";
 import { useCartStore } from "../store";
 import { useAuthStore } from "../store";
 import { useTheme } from "../hooks/useTheme";
-import { LikeButton, SkeletonLoader } from "../components";
+import { LikeButton, SkeletonLoader, TabContent } from "../components";
 import { type Product, type ProductReview, type Store } from '../lib/supabase';
 import { productService } from '../services/productService';
 import { reviewService } from '../services/reviewService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { storeService } from '../services/storeService';
+import { productLikesService } from '../services/productLikesService';
+import { authService } from '../services/authService';
+import { contactStore } from '../services/contactService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -74,6 +76,8 @@ export const ProductDetailScreen: React.FC = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
 
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'description' | 'characteristics' | 'reviews' | 'similar'>('description');
 
   const isWideScreen = width >= 1024;
 
@@ -176,6 +180,572 @@ export const ProductDetailScreen: React.FC = () => {
     return Math.round(avg * 10) / 10;
   }, [reviews]);
 
+  // Générateur d'HTML pour la version web (affichage statique proche du mock fourni)
+  const buildWebHtml = (pd: any, qty: number) => {
+    if (!pd) return '<div>Produit introuvable</div>';
+    const title = pd.name || 'Produit';
+    const price = pd.price ? `${pd.price.toLocaleString()} FCFA` : '';
+    const oldPrice = pd.comparePrice ? `${pd.comparePrice.toLocaleString()} FCFA` : '';
+    const img = pd.images && pd.images.length ? pd.images[0] : 'https://images.pexels.com/photos/2529157/pexels-photo-2529157.jpeg?auto=compress&cs=tinysrgb&w=800';
+    const wa = (pd.store && (pd.store.whatsapp_number || pd.store.phone)) || '';
+    const waNumber = String(wa).replace(/[^0-9+]/g, '').replace(/^\+/, '');
+    const waMessage = `Bonjour, je suis intéressé(e) par ${title} (quantité: ${qty}).`;
+    const waText = encodeURIComponent(waMessage);
+
+    return `
+      <!doctype html>
+      <html lang="fr">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${title} | Boutique</title>
+        <style>
+          :root{--bg:#fcfcfc;--card:#fff;--accent:#6b21a8;--accent-dark:#4c1d95;--text:#1e1e1e}
+          html,body{height:100%;}
+          body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); padding:24px; margin:0; min-height:100vh; display:flex; align-items:flex-start; justify-content:center}
+          .web-container{width:100%;max-width:1200px;padding:12px}
+          .product-card{background:var(--card);border-radius:20px;padding:0;box-shadow:0 12px 30px rgba(0,0,0,0.06);overflow:hidden;width:100%;display:flex;flex-direction:column}
+          .product-image{position:relative;border-radius:0;overflow:hidden;width:100%}
+          .product-image img{width:100%;height:auto;display:block;object-fit:cover}
+          .badge-new{position:absolute;top:16px;left:16px;background:rgba(20,20,20,0.8);color:#fff;padding:6px 16px;border-radius:999px;font-size:13px}
+          .magnifier{position:absolute;right:16px;bottom:16px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer}
+          .content-inner{padding:18px}
+          .brand{font-size:13px;color:var(--accent);font-weight:700;margin-bottom:6px}
+          .title{font-size:26px;font-weight:800;margin-bottom:6px}
+          .subtitle{font-size:15px;color:#5e5e5e;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap}
+          .limited-tag{background:#f3e8ff;color:var(--accent-dark);padding:4px 10px;border-radius:20px;font-size:13px}
+          .rating{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+          .price{font-size:28px;font-weight:800;color:var(--accent-dark)}
+          .old-price{font-size:16px;color:#aaa;text-decoration:line-through}
+          .installment{font-size:13px;background:#f0e6ff;padding:2px 8px;border-radius:16px}
+          .color-option{display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#f8f8f8;padding:10px 12px;border-radius:18px}
+          .color-dot{width:26px;height:26px;border-radius:50%;background:#1a1a1a}
+          .description{font-size:15px;color:#333;margin-bottom:20px}
+          .actions{display:flex;gap:12px;margin-bottom:12px}
+          .quantity{min-width:64px;height:48px;background:#f4f4f4;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:18px;font-weight:700}
+          .btn{flex:1;height:48px;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer}
+          .btn-buy{background:var(--accent);color:#fff}
+          .btn-cart{background:#fff;color:var(--accent-dark);border:1px solid #e6d9ff}
+          .whatsapp-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:#25D366;color:#fff;height:48px;border-radius:12px;text-decoration:none;padding:0 14px}
+          .tabs{display:flex;border-bottom:1px solid #f0f0f0;margin:18px 0 16px}
+          .tab{flex:1;padding:10px 0;text-align:center;color:#7c7c7c}
+          .tab.active{color:#000;border-bottom:3px solid var(--accent)}
+          .similar{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
+          .similar-item{flex:0 0 110px;text-align:center}
+          .similar img{width:110px;height:110px;object-fit:cover;border-radius:12px}
+          .footer-note{margin-top:18px;font-size:13px;color:#888;text-align:center}
+
+          /* Desktop layout: image left, content right, full-width feel */
+          @media (min-width:900px){
+            body{align-items:center}
+            .product-card{flex-direction:row;border-radius:20px}
+            .product-image{flex:1;max-width:55%;height:calc(100vh - 120px);min-height:420px}
+            .product-image img{height:100%;width:100%;object-fit:cover}
+            .content-inner{flex:1;padding:32px 36px}
+            .title{font-size:34px}
+            .price{font-size:36px}
+            .similar-item{flex:0 0 140px}
+            .similar img{width:140px;height:140px}
+          }
+        </style>
+        <script>
+          function openContact(phone, message){
+            try{
+              var txt = message || '';
+              if (phone) {
+                var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(txt);
+                window.open(url, '_blank');
+                return;
+              }
+              var url = 'https://wa.me/?text=' + encodeURIComponent(txt);
+              window.open(url, '_blank');
+            }catch(e){
+              console.error(e);
+              try{ alert('Impossible d ouvrir WhatsApp'); }catch(_){}
+            }
+          }
+        </script>
+      </head>
+      <body>
+        <div class="product-card">
+            <div class="product-image">
+            <img src="${img}" alt="${title}" />
+            <div class="badge-new">✨ Nouveauté</div>
+            <a class="magnifier" href="${img}" target="_blank" rel="noreferrer">🔍</a>
+          </div>
+          <div class="content-inner">
+            <div class="brand">${(pd.store && pd.store.name) || 'Savelle • Paris'}</div>
+            <h1 class="title">${title}</h1>
+            <div class="subtitle"><span>Modèle Icone 2026</span><span class="limited-tag">Édition Limitée</span></div>
+            <div class="rating"><div class="stars">★★★★★</div><span class="rating-text">4.9 <span class="rating-count">(128 avis vérifiés)</span></span></div>
+            <div class="price-block"><span class="price">${price}</span>${oldPrice?`<span class="old-price">${oldPrice}</span>`:''}<span class="installment">${pd.comparePrice?`-${Math.round((1 - (pd.price||0)/(pd.comparePrice||1))*100)}%`:''}</span></div>
+            <div class="color-option"><div class="color-dot"></div><span class="color-label"><strong>Noir Intemporel</strong> • Cuir grainé</span></div>
+            <p class="description">${pd.description || "L'accessoire signature. Finitions soignées."}</p>
+            <div class="actions"><div class="quantity">−&nbsp;<span id="qty">${qty}</span>&nbsp;+</div><button class="btn btn-buy" onclick="alert('Simulation: achat ${qty} × ${title}')">⚡ Acheter maintenant</button></div>
+            <button class="btn btn-cart" onclick="alert('Ajouté au panier: ${qty} × ${title}')">🛒 Ajouter au panier</button>
+            <a class="whatsapp-btn" href="#" onclick="openContact(${waNumber ? `'${waNumber}'` : 'null'}, ${JSON.stringify(waMessage)}); return false;">💬 Discuter sur WhatsApp</a>
+            <div class="tabs"><div class="tab active">Description</div><div class="tab">Caractéristiques</div><div class="tab">Avis (128)</div></div>
+            <div class="reviews"><div><strong>Ce que disent nos clientes</strong><br/><span style="color:#666;font-size:14px;">⭐ 98% recommandent</span></div><div class="review-avatars"></div></div>
+            <div class="similar-title"><span>✨ Vous pourriez aimer</span></div>
+            <div class="similar">
+              <div class="similar-item"><img src="https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?auto=compress&cs=tinysrgb&w=400" alt="s"/><div class="similar-price">72 000 FCFA</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer-note">Livraison offerte • Paiement sécurisé</div>
+      </body>
+      </html>
+    `;
+  };
+
+  // Composant web réactif et connecté aux fonctions de l'app
+  const WebProductView: React.FC = () => {
+    if (!productData) return null;
+
+    const waNumberRaw = (productData.store && ((productData.store as any).whatsapp_number || (productData.store as any).phone)) || '';
+    const waNumber = String(waNumberRaw).replace(/[^0-9+]/g, '').replace(/^\+/, '');
+    const waMessage = `Bonjour, je suis intéressé(e) par ${productData.name} (quantité: ${quantity}).`;
+    const waText = encodeURIComponent(waMessage);
+
+    const [similarProducts, setSimilarProducts] = React.useState<any[]>([]);
+
+    React.useEffect(() => {
+      let mounted = true;
+      (async () => {
+        try {
+          if (!productData) return;
+          const sims = await productService.getSimilarProducts(productData, 6);
+          if (mounted && Array.isArray(sims)) setSimilarProducts(sims);
+        } catch (e) {
+          console.error('failed to load similar products', e);
+        }
+      })();
+      return () => {
+        mounted = false;
+      };
+    }, [productData]);
+
+    const [webLightboxVisible, setWebLightboxVisible] = React.useState(false);
+    const [webLikeAnim, setWebLikeAnim] = React.useState(false);
+
+    const handleBack = () => {
+      try {
+        if (navigation && (navigation as any).canGoBack && (navigation as any).canGoBack()) {
+          navigation.goBack();
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      if (typeof window !== 'undefined') window.history.back();
+    };
+
+    const goToCart = () => {
+      try {
+        navigation.navigate('Cart');
+        return;
+      } catch (e) {
+        if (typeof window !== 'undefined') window.location.href = '/cart';
+      }
+    };
+    const cartCount = useCartStore((s) => s.items.length);
+
+    // Web like button state & handlers (moved here to keep hooks order)
+    const [webLiked, setWebLiked] = React.useState<boolean>(false);
+    const [webLikeCount, setWebLikeCount] = React.useState<number>(0);
+
+    const loadWebLike = async () => {
+      try {
+        if (!productData?.id) return;
+        const count = await productLikesService.getLikesCount(String(productData.id));
+        let liked = false;
+        if (user?.id) liked = await productLikesService.hasLiked(String(user.id), String(productData.id));
+        setWebLikeCount(count || 0);
+        setWebLiked(Boolean(liked));
+      } catch (e) {
+        console.error('failed to load web like', e);
+      }
+    };
+
+    React.useEffect(() => {
+      void loadWebLike();
+    }, [productData, user?.id]);
+
+    const toggleWebLike = async () => {
+      try {
+        // trigger local animation immediately
+        setWebLikeAnim(true);
+        setTimeout(() => setWebLikeAnim(false), 380);
+        if (!productData?.id) return;
+        let effectiveUserId = user?.id;
+        if (!effectiveUserId) {
+          // create anonymous session if needed
+          const res: any = await authService.signInAnonymously();
+          effectiveUserId = res?.data?.session?.user?.id;
+        }
+        if (!effectiveUserId) {
+          Alert.alert('Erreur', 'Impossible d\'identifier l\'utilisateur pour le like');
+          return;
+        }
+        const newLiked = await productLikesService.toggleLike(effectiveUserId, String(productData.id));
+        const count = await productLikesService.getLikesCount(String(productData.id));
+        setWebLiked(Boolean(newLiked));
+        setWebLikeCount(count || 0);
+      } catch (e) {
+        console.error('toggle like failed', e);
+        // If the DB rejected due to missing users row (23503), fallback to localStorage for web
+        try {
+          const err: any = e as any;
+          if (err?.code === '23503' || (err?.message && String(err.message).includes('product_likes_user_id_fkey'))) {
+            // store a local like so the UI feels responsive; sync when user signs in
+            const key = 'libreshop_web_likes';
+            const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+            const likes = raw ? JSON.parse(raw) : {};
+            likes[String(productData.id)] = true;
+            if (typeof window !== 'undefined') window.localStorage.setItem(key, JSON.stringify(likes));
+            setWebLiked(true);
+            setWebLikeCount((c) => (Number(c || 0) + 1));
+            Alert.alert('Like local', 'Like enregistré localement. Connectez‑vous pour le synchroniser.');
+            return;
+          }
+        } catch (inner) {
+          // ignore
+        }
+
+        Alert.alert('Erreur', 'Impossible de mettre à jour le like');
+      }
+    };
+
+    const handleAddToCartWeb = () => {
+      if (!product) return;
+      try {
+        // DEBUG: log product shape to help debugging when button is clicked
+        // useCartStore expects a full Product object and optional quantity
+        // eslint-disable-next-line no-console
+
+        // Ensure product has a numeric stock field so store.addItem doesn't silently ignore it
+        const productToAdd = { ...product, stock: typeof (product as any)?.stock === 'number' ? (product as any).stock : 9999 } as any;
+
+        addItem(productToAdd, quantity);
+
+        // eslint-disable-next-line no-console
+
+        setCartButtonAnimation(true);
+        setTimeout(() => setCartButtonAnimation(false), 600);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    const handleBuyNowWeb = async () => {
+      try {
+        if (!product) return;
+
+        // Re-check latest product state (stock/price) before checkout
+        let latest = product;
+        try {
+          const p = await productService.getById(String(product.id));
+          if (p) latest = p as any;
+        } catch (e) {
+          // ignore fetch errors and proceed with local product info
+        }
+
+        const available = Number((latest as any)?.stock || 0);
+        if (available < quantity) {
+          Alert.alert('Rupture de stock', 'La quantité demandée dépasse le stock disponible.');
+          return;
+        }
+
+        // Build checkout items payload (single-item checkout)
+        const itemsForCheckout = [
+          {
+            product: {
+              id: String((latest as any).id),
+              name: String((latest as any).name || productData.name || ''),
+              price: Number((latest as any).price || productData.price || 0),
+              images: (latest as any).images || productData.images || [],
+              store_id: (latest as any).store_id || (product as any)?.store_id || (productData.store && (productData.store as any).id) || null,
+            },
+            quantity: Number(quantity || 1),
+          },
+        ];
+
+        try {
+          navigation.navigate('Checkout', { items: itemsForCheckout, storeId: itemsForCheckout[0].product.store_id });
+          return;
+        } catch (e) {
+          // Fallback for web if navigation fails
+          if (typeof window !== 'undefined') {
+            // encode items as JSON in query if small, else redirect to /checkout
+            try {
+              const itemsJson = encodeURIComponent(JSON.stringify(itemsForCheckout));
+              window.location.href = `/checkout?itemsJson=${itemsJson}`;
+              return;
+            } catch (err) {
+              window.location.href = '/checkout';
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('buy now failed', e);
+        Alert.alert('Erreur', "Impossible de lancer l'achat pour le moment.");
+      }
+    };
+
+    const handleOpenProduct = (id: string) => {
+      try {
+        navigation.navigate('ProductDetail', { productId: String(id) });
+      } catch (e) {
+        if (typeof window !== 'undefined') window.location.href = `/product/${id}`;
+      }
+    };
+
+    const webCss = `
+      .web-container{width:100%;max-width:1200px;margin:0 auto;padding:12px}
+      .web-card{display:flex;flex-direction:column;background:#fff;border-radius:20px;overflow:visible;box-shadow:0 12px 30px rgba(0,0,0,0.06);position:relative}
+      .web-image-wrapper{display:flex;flex-direction:column;align-items:stretch}
+      .web-image{width:100%;height:auto;object-fit:cover;display:block}
+      .web-content{padding:20px}
+      .web-title{font-size:26px;font-weight:800;margin:6px 0}
+      .web-price{font-size:28px;color:#4c1d95;font-weight:800}
+      .web-actions{display:flex;gap:12px;margin-top:12px}
+      .web-qty{display:inline-flex;align-items:center;gap:12px;border-radius:12px;background:#f4f4f4;padding:8px 12px;font-weight:700}
+      .web-btn{padding:12px 16px;border-radius:12px;border:none;cursor:pointer;font-weight:700}
+      .web-buy{background:#6b21a8;color:#fff}
+      .web-cart{background:#fff;border:1px solid #e6d9ff;color:#4c1d95}
+      .web-tabs{display:flex;gap:8px;margin-top:18px;border-bottom:1px solid #eee}
+      .web-tab{padding:10px 12px;cursor:pointer;color:#666}
+      .web-tab.active{color:#111;border-bottom:3px solid #6b21a8;font-weight:700}
+      .web-section{padding:14px 0}
+      .web-top-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
+      .web-top-actions .left{display:flex;align-items:center;gap:8px}
+      .btn-back,.btn-visit{padding:8px 10px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+      .btn-back{background:#f3f4f6;color:#111}
+      .btn-visit{background:#6b21a8;color:white}
+      .btn-cart{background:#fff;border:1px solid #eee;padding:8px 10px;border-radius:10px;cursor:pointer}
+      .cart-badge{position:absolute;top:-6px;right:-6px;background:#e11d48;color:white;border-radius:999px;padding:2px 6px;font-size:11px;font-weight:700;min-width:18px;display:inline-flex;align-items:center;justify-content:center}
+      .web-top-left{position:absolute;top:16px;left:16px;z-index:30;display:flex;gap:8px;align-items:center}
+      /* Add to cart animation */
+      .btn-pulse{animation:btnPulse 620ms cubic-bezier(.2,.9,.2,1)}
+      @keyframes btnPulse{0%{transform:scale(1)}50%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+      /* Like pop animation */
+      .like-anim{animation:likePop 380ms cubic-bezier(.2,.9,.2,1)}
+      @keyframes likePop{0%{transform:scale(1)}40%{transform:scale(1.4)}100%{transform:scale(1)}}
+
+      /* Discuss button styling */
+      .web-discuss{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;background:transparent;border:1px dashed #c7b3ff;color:#4c1d95;text-decoration:none;font-weight:700}
+      .web-discuss:hover{background:#f7f4ff;box-shadow:0 6px 18px rgba(76,29,149,0.06);transform:translateY(-1px)}
+      .like-web-btn{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #eee;cursor:pointer}
+      .web-thumbs{display:flex;gap:8px;margin-top:10px;overflow:auto}
+      /* On large screens place thumbnails as an overlay at bottom-left of image */
+      @media(min-width:900px){
+        .web-thumbs{position:absolute;left:12px;bottom:12px;gap:8px;margin-top:0;z-index:25;padding:8px;border-radius:10px;background:rgba(255,255,255,0.92)}
+        .web-thumb{width:56px;height:56px;flex:0 0 56px}
+      }
+      .web-thumb{width:64px;height:64px;border-radius:8px;overflow:hidden;flex:0 0 64px;cursor:pointer;border:2px solid transparent}
+      .web-thumb img{width:100%;height:100%;object-fit:cover}
+      .web-thumb.active{border-color:#6b21a8}
+      .web-lightbox{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);z-index:9999}
+      .web-lightbox img{max-width:90%;max-height:90%;object-fit:contain}
+      .web-lightbox .nav{position:absolute;top:50%;transform:translateY(-50%);font-size:28px;color:white;cursor:pointer;padding:12px}
+      .web-lightbox .nav.left{left:12px}
+      .web-lightbox .nav.right{right:12px}
+      .web-lightbox .close{position:absolute;top:18px;right:18px;font-size:20px;color:white;cursor:pointer}
+      .review{border-top:1px solid #f4f4f4;padding:12px 0;display:flex;gap:12px}
+      .review-avatar{width:46px;height:46px;border-radius:50%;object-fit:cover}
+      .review-body{flex:1}
+      .review-name{font-weight:700}
+      .review-rating{color:#f1c40f;margin-right:8px}
+      .similar-title{font-weight:800;margin:18px 0 12px}
+      .similar-grid{display:flex;gap:12px;flex-wrap:wrap}
+      .similar-card{width:140px;border-radius:12px;overflow:hidden;background:#fff;border:1px solid #f4f4f4;padding:8px;text-align:center}
+      .similar-img{width:100%;height:120px;object-fit:cover;border-radius:8px}
+      .similar-name{font-size:13px;margin-top:8px;color:#333;height:36px;overflow:hidden}
+      .similar-price{font-weight:800;color:#4c1d95;margin-top:6px}
+      .promo-badge{display:inline-block;background:#e11d48;color:#fff;padding:4px 8px;border-radius:12px;font-size:12px;font-weight:800;margin-left:8px}
+      @media(min-width:900px){
+        .similar-card{position:relative}
+        .similar-card .promo-badge{position:absolute;left:8px;top:8px;z-index:20}
+        .web-image-wrapper .promo-badge{position:absolute;left:12px;top:12px;z-index:30}
+      }
+      @media(min-width:900px){
+        .web-card{flex-direction:row}
+        .web-image-wrapper{width:55%;max-height:calc(100vh - 120px);overflow:visible;position:relative}
+        .web-image{width:100%;height:auto;max-height:100%;object-fit:cover}
+        .web-content{width:45%}
+      }
+    `;
+
+    return (
+      <div className="web-container">
+        <style>{webCss}</style>
+        <div className="web-card">
+          <div className="web-top-left" role="toolbar" aria-label="Actions">
+            <button className="btn-back" onClick={handleBack} aria-label="Retour" title="Retour">
+              <Ionicons name="arrow-back" size={18} color="#111" />
+            </button>
+            <button className="btn-cart" onClick={goToCart} aria-label="Panier" title="Panier" style={{position:'relative'}}>
+              <Ionicons name="cart-outline" size={18} color="#111" />
+              {cartCount > 0 && (
+                <span className="cart-badge" aria-hidden>{cartCount}</span>
+              )}
+            </button>
+          </div>
+          <div className="web-image-wrapper">
+            <img className="web-image" style={{cursor:'pointer'}} onClick={() => setWebLightboxVisible(true)} src={(productData.images && productData.images[selectedImageIndex]) || (productData.images && productData.images[0]) || 'https://images.pexels.com/photos/2529157/pexels-photo-2529157.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={productData.name} />
+            {productData.images && productData.images.length > 1 && (
+              <div className="web-thumbs">
+                {productData.images.map((src: string, idx: number) => (
+                  <div key={idx} className={`web-thumb ${selectedImageIndex === idx ? 'active' : ''}`} onClick={() => setSelectedImageIndex(idx)}>
+                    <img src={cloudinaryService.getOptimizedUrl(src, 200)} alt={`thumb-${idx}`} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="web-content">
+            <div style={{color:'#6b21a8',fontWeight:700}}>{(productData.store && (productData.store as any).name) || 'Savelle • Paris'}</div>
+
+            <div className="web-top-actions">
+              <div className="left">
+                <button className="btn-visit" onClick={() => { try { navigation.navigate('StoreDetail', { storeId: productData.store?.id }); } catch (e) { if (typeof window !== 'undefined') window.location.href = `/store/${productData.store?.id}`; } }}>Visiter la boutique</button>
+              </div>
+              <div>
+                <button className={`like-web-btn ${webLikeAnim ? 'like-anim' : ''}`} onClick={() => void toggleWebLike()}>
+                  <span style={{color: webLiked ? '#e11d48' : '#666', fontSize: 16}}>{webLiked ? '❤' : '♡'}</span>
+                  <span style={{fontWeight:700}}>{webLikeCount}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="web-title">{productData.name}</div>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <div className="web-price">{productData.price?.toLocaleString()} FCFA</div>
+              {productData.comparePrice && productData.comparePrice > productData.price ? (
+                <>
+                  <div style={{textDecoration:'line-through',color:'#aaa'}}>{productData.comparePrice.toLocaleString()} FCFA</div>
+                  <span className="promo-badge">Promo</span>
+                </>
+              ) : null}
+            </div>
+            <div className="description" style={{marginTop:12}}>{productData.description}</div>
+
+            <div className="web-actions">
+              <div className="web-qty">
+                <button onClick={() => setQuantity(Math.max(1, quantity - 1))}>−</button>
+                <div>{quantity}</div>
+                <button onClick={() => setQuantity((q) => Math.min(99, q + 1))}>+</button>
+              </div>
+              <button className="web-btn web-buy" onClick={handleBuyNowWeb}>⚡ Acheter maintenant</button>
+            </div>
+
+            <div style={{marginTop:12,display:'flex',gap:8,alignItems:'center'}}>
+              <button className={`web-btn web-cart ${cartButtonAnimation ? 'btn-pulse' : ''}`} onClick={handleAddToCartWeb}>🛒 Ajouter au panier</button>
+              <a className={`web-btn web-discuss`} href="#" target="_blank" rel="noreferrer" onClick={(e:any) => { e.preventDefault(); void contactStore({ rawPhone: waNumberRaw, message: waMessage, fallback: 'tel-or-copy' }); }}>💬 Discuter</a>
+            </div>
+            <div style={{marginTop:12}}>
+              <div className="web-tabs">
+                <div className={`web-tab ${activeTab === 'description' ? 'active' : ''}`} onClick={() => setActiveTab('description')}>Description</div>
+                <div className={`web-tab ${activeTab === 'characteristics' ? 'active' : ''}`} onClick={() => setActiveTab('characteristics')}>Caractéristiques</div>
+                <div className={`web-tab ${activeTab === 'reviews' ? 'active' : ''}`} onClick={() => setActiveTab('reviews')}>Avis ({reviews.length})</div>
+              </div>
+
+              <div className="web-section">
+                {activeTab === 'description' && (
+                  <div>{productData.description || 'Aucune description fournie.'}</div>
+                )}
+
+                {activeTab === 'characteristics' && (
+                  <div>
+                    <div><strong>Catégorie :</strong> {productData.category || '—'}</div>
+                    <div><strong>En stock :</strong> {productData.inStock ? 'Oui' : 'Non'}</div>
+                    <div><strong>Magasin :</strong> {(productData.store && (productData.store as any).name) || '—'}</div>
+                  </div>
+                )}
+
+                {activeTab === 'reviews' && (
+                  <div>
+                    <div style={{marginBottom:12}}>
+                      {reviews.length === 0 ? (
+                        <div>Aucun avis pour le moment.</div>
+                      ) : (
+                        reviews.map((r) => (
+                          <div key={r.id || Math.random()} className="review">
+                            <img className="review-avatar" src={(r.avatar_url) || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={r.user_name || 'client'} />
+                            <div className="review-body">
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <div className="review-name">{r.user_name || 'Anonyme'}</div>
+                                <div className="review-rating">{'★'.repeat(Math.round(Number(r.rating) || 0))}</div>
+                              </div>
+                              <div style={{color:'#444'}}>{r.comment}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div style={{borderTop:'1px solid #f4f4f4',paddingTop:12}}>
+                      <div style={{marginBottom:8,fontWeight:700}}>Laissez un avis</div>
+                      <input placeholder="Votre nom" value={reviewName} onChange={(e: any) => setReviewName(e.target.value)} style={{width:'100%',padding:8,marginBottom:8,borderRadius:8,border:'1px solid #eee'}} />
+                      <select value={String(reviewRating)} onChange={(e: any) => setReviewRating(Number(e.target.value))} style={{padding:8,marginBottom:8,borderRadius:8}}>
+                        {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} étoiles</option>)}
+                      </select>
+                      <textarea placeholder="Votre commentaire" value={reviewComment} onChange={(e: any) => setReviewComment(e.target.value)} style={{width:'100%',padding:8,marginBottom:8,borderRadius:8,border:'1px solid #eee'}} />
+                      <div style={{display:'flex',gap:8}}>
+                        <button className="web-btn web-buy" onClick={() => void submitReview()} disabled={submittingReview}>{submittingReview ? 'Envoi...' : 'Envoyer'}</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {similarProducts.length > 0 && (
+              <div style={{marginTop:18}}>
+                <div className="similar-title">Produits similaires</div>
+                    <div className="similar-grid">
+                  {similarProducts.map((sp) => (
+                    <div key={sp.id} className="similar-card" onClick={() => handleOpenProduct(sp.id)} style={{cursor:'pointer'}}>
+                      {(sp.comparePrice && sp.comparePrice > sp.price) && (
+                        <div className="promo-badge">Promo</div>
+                      )}
+                      <img className="similar-img" src={(sp.images && sp.images[0]) || 'https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?auto=compress&cs=tinysrgb&w=400'} alt={sp.name} />
+                      <div className="similar-name">{sp.name}</div>
+                      <div className="similar-price">
+                        {sp.price?.toLocaleString()} FCFA
+                        {sp.comparePrice && sp.comparePrice > sp.price ? <div style={{textDecoration:'line-through',color:'#aaa',fontSize:12}}>{sp.comparePrice.toLocaleString()} FCFA</div> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {webLightboxVisible && productData.images && productData.images.length > 0 && (
+          <div className="web-lightbox" onClick={() => setWebLightboxVisible(false)}>
+            <div className="web-lightbox-inner" onClick={(e) => e.stopPropagation()} style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',width:'100%',height:'100%'}}>
+              <div className="close" onClick={() => setWebLightboxVisible(false)}>✕</div>
+              <div className="nav left" onClick={(e) => { e.stopPropagation(); setSelectedImageIndex((i) => (i - 1 + productData.images.length) % productData.images.length); }} onTouchStart={(e) => e.stopPropagation()}>&larr;</div>
+              <img src={cloudinaryService.getOptimizedUrl(productData.images[selectedImageIndex], 1200)} alt="lightbox" onClick={(e) => e.stopPropagation()} />
+              <div className="nav right" onClick={(e) => { e.stopPropagation(); setSelectedImageIndex((i) => (i + 1) % productData.images.length); }} onTouchStart={(e) => e.stopPropagation()}>&rarr;</div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    );
+  };
+
+  // NOTE: web render handled later after hooks to avoid Hooks ordering issues
+
+
+
+
   const headerOpacity = scrollY.interpolate({
     inputRange: [0, 120],
     outputRange: [0, 1],
@@ -214,42 +784,9 @@ export const ProductDetailScreen: React.FC = () => {
         (store as any)?.phone_number ||
         "",
     ).trim();
-    const waNumber = normalizeWhatsappNumber(raw);
-    if (!waNumber) {
-      Alert.alert(
-        "Discuter",
-        "Le vendeur n'a pas de numéro WhatsApp renseigné.",
-      );
-      return;
-    }
-
     const text = `Bonjour, je suis intéressé par: ${productData?.name || "ce produit"}`;
-    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
-
-    try {
-      if (Platform.OS === "web" && typeof window !== "undefined") {
-        window.open(url, "_blank");
-        return;
-      }
-
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        Alert.alert(
-          "WhatsApp",
-          "Impossible d'ouvrir WhatsApp sur cet appareil.",
-        );
-        return;
-      }
-      await Linking.openURL(url);
-    } catch (e) {
-      errorHandler.handle(
-        e,
-        "open whatsapp failed",
-        ErrorCategory.SYSTEM,
-        ErrorSeverity.LOW,
-      );
-      Alert.alert("Erreur", "Impossible d'ouvrir WhatsApp.");
-    }
+    // Use central contact service with fallbacks
+    await contactStore({ rawPhone: raw, message: text, fallback: 'tel-or-copy' });
   };
 
   const submitReview = async () => {
@@ -565,6 +1102,14 @@ export const ProductDetailScreen: React.FC = () => {
     );
   }
 
+  if (Platform.OS === 'web' && !loading && productData) {
+    return (
+      <View style={[styles.container, { backgroundColor: (theme && theme.bg) || COLORS.bg }] as any}>
+        <WebProductView />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -634,14 +1179,26 @@ export const ProductDetailScreen: React.FC = () => {
               </TouchableOpacity>
               {/* LikeButton redundant in body removed here */}
               <View style={styles.descriptionSection}>
-                <Text style={styles.sectionLabel}>Description</Text>
-                <View style={styles.descriptionCard}>
-                  <Text style={styles.descriptionText}>
-                    {productData.description?.trim()
-                      ? productData.description
-                      : "Aucune description disponible."}
-                  </Text>
-                </View>
+                <TabContent
+                  activeTab={activeTab}
+                  productDescription={productData.description}
+                  productCategory={productData.category}
+                  optionsList={[]}
+                  reviewsList={reviews}
+                  reviewsLoading={reviewsLoading}
+                  reviewForm={{
+                    name: reviewName,
+                    comment: reviewComment,
+                    rating: reviewRating,
+                    onNameChange: setReviewName,
+                    onCommentChange: setReviewComment,
+                    onRatingChange: setReviewRating,
+                    onSubmit: submitReview,
+                    isSubmitting: submittingReview,
+                  }}
+                  similiarProducts={[]}
+                  onProductPress={(id) => navigation.navigate('ProductDetail', { productId: id })}
+                />
               </View>
               {!!productData.category && (
                 <View style={styles.categoryBadge}>
@@ -710,7 +1267,9 @@ export const ProductDetailScreen: React.FC = () => {
                   onChangeText={setReviewComment}
                   placeholder="Votre commentaire..."
                   placeholderTextColor={COLORS.textMuted}
-                  style={[styles.inputPill, styles.inputFlex]}
+                  multiline
+                  numberOfLines={4}
+                  style={[styles.inputPill, styles.inputFlex, styles.commentInput]}
                 />
                 <TouchableOpacity
                   style={[
@@ -1401,6 +1960,11 @@ const styles = StyleSheet.create({
   },
   inputFlex: {
     flex: 1,
+  },
+  commentInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+    borderRadius: RADIUS.md,
   },
   sendBtn: {
     width: 48,

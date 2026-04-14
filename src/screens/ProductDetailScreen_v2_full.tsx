@@ -12,7 +12,6 @@ import {
   Alert,
   FlatList,
   Animated,
-  Linking,
   Platform,
   ScrollView,
 } from "react-native";
@@ -32,6 +31,7 @@ import { reviewService } from '../services/reviewService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { storeService } from '../services/storeService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from "../utils/errorHandler";
+import { contactStore } from '../services/contactService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -250,20 +250,8 @@ export const ProductDetailScreen: React.FC = () => {
     }
 
     const text = `Bonjour, je suis intéressé par: ${productData?.name || "ce produit"}`;
-    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
-
     try {
-      if (Platform.OS === "web" && typeof window !== "undefined") {
-        window.open(url, "_blank");
-        return;
-      }
-
-      const supported = await Linking.canOpenURL(url);
-      if (!supported) {
-        Alert.alert("WhatsApp", "Impossible d'ouvrir WhatsApp sur cet appareil.");
-        return;
-      }
-      await Linking.openURL(url);
+      contactStore({ rawPhone: waNumber, message: text });
     } catch (e) {
       errorHandler.handle(e, "open whatsapp failed", ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       Alert.alert("Erreur", "Impossible d'ouvrir WhatsApp.");

@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { notificationService } from './notificationService';
+import { storeService } from './storeService';
 
 export interface ProductLike {
   id: string;
@@ -60,20 +61,56 @@ export const productLikesService = {
         .from('product_likes')
         .upsert({ user_id: userId, product_id: productId }, { onConflict: 'user_id,product_id', ignoreDuplicates: true })
         .select()
-        .single();
-      
+        .maybeSingle();
+
       if (error && error.code !== '23505' && (error as any)?.status !== 409) throw error;
-      
+
       const likeData = data || { user_id: userId, product_id: productId } as ProductLike;
 
       // Récupérer les infos du produit et du vendeur
-      const { data: product, error: productError } = await supabase!
-        .from('products')
-        .select('id, name, user_id, store_id')
-        .eq('id', productId)
-        .single();
+      let product: any = null;
+      try {
+        const { data: p, error: productError } = await supabase!
+          .from('products')
+          .select('id, name, user_id, store_id')
+          .eq('id', String(productId).trim())
+          .maybeSingle();
 
-      if (!productError && product) {
+        if (!productError) {
+          product = p;
+        } else {
+          // If column `user_id` doesn't exist (42703), try a safer select
+          if (String(productError?.code) === '42703' || String(productError?.message || '').includes('does not exist')) {
+            try {
+              const { data: p2, error: e2 } = await supabase!
+                .from('products')
+                .select('id, name, store_id')
+                .eq('id', String(productId).trim())
+                .maybeSingle();
+              if (!e2 && p2) {
+                product = p2;
+                // fetch store owner as fallback for user_id
+                if (product?.store_id) {
+                  try {
+                    const store = await storeService.getById(product.store_id);
+                    if (store && (store as any).user_id) product.user_id = (store as any).user_id;
+                  } catch (se) {
+                    console.warn('productLikesService: failed to fetch store for owner fallback', se);
+                  }
+                }
+              }
+            } catch (inner) {
+              console.warn('productLikesService: fallback product fetch failed', inner);
+            }
+          } else {
+            console.warn('productLikesService: product fetch error', productError);
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('productLikesService: product fetch thrown', fetchErr);
+      }
+
+      if (product) {
         // Notifier le vendeur
         await notificationService.create({
           user_id: product.user_id,

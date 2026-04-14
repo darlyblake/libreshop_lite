@@ -8,12 +8,12 @@ import {
   StyleSheet,
   Alert,
   Image,
-  Linking,
   Platform,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { contactStore } from '../services/contactService';
 import { Order, OrderItem, Product } from '../lib/supabase';
 import { orderService } from '../services/orderService';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
@@ -146,11 +146,7 @@ ${itemsList}
 Pouvez-vous me confirmer votre disponibilité pour la livraison ?
 Merci.`;
 
-    const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-    
-    Linking.openURL(whatsappUrl).catch(() => {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp');
-    });
+    contactStore({ rawPhone: cleanPhone, message });
   };
 
   if (loading) {

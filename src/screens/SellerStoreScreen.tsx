@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
+import { copyToClipboard } from '../services/contactService';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -268,8 +269,7 @@ export const SellerStoreScreen: React.FC = () => {
     try {
       if (Platform.OS === 'web' || !Share?.share) {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          await navigator.clipboard.writeText(storePublicUrl);
-          Alert.alert('Succès', `Lien copié:\n${storePublicUrl}`);
+          await copyToClipboard(storePublicUrl, `Lien copié:\n${storePublicUrl}`);
         } else {
           Alert.alert('Lien boutique', storePublicUrl);
         }

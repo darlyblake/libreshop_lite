@@ -11,7 +11,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import * as Linking from 'expo-linking';
+import { contactStore } from '../services/contactService';
 import { Order, OrderItem, Product, Store } from '../lib/supabase';
 import { orderService } from '../services/orderService';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
@@ -293,7 +293,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
       {/* Actions */}
       {order.users && (
         <View style={styles.actions}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.helpButton}
             onPress={() => {
               const phone = order.users?.phone || order.customer_phone;
@@ -301,15 +301,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
                 Alert.alert('Erreur', 'Numéro de téléphone non disponible');
                 return;
               }
-              // Essayer WhatsApp d'abord
-              const whatsappUrl = `https://wa.me/${phone.replace(/\D/g, '')}?text=Bonjour, je vous contacte concernant la commande #${orderId.slice(0, 8)}`;
-              Linking.openURL(whatsappUrl).catch(() => {
-                // Fallback: SMS
-                const smsUrl = `sms:${phone}?body=Bonjour, je vous contacte concernant la commande #${orderId.slice(0, 8)}`;
-                Linking.openURL(smsUrl).catch(() => {
-                  Alert.alert('Erreur', 'Impossible d\'ouvrir WhatsApp ou SMS');
-                });
-              });
+              contactStore({ rawPhone: phone, message: `Bonjour, je vous contacte concernant la commande #${orderId.slice(0, 8)}` });
             }}
           >
             <Ionicons name="chatbubble-outline" size={20} color={COLORS.accent} />

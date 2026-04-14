@@ -7084,6 +7084,11 @@ react-native-url-polyfill@^3.0.0:
   dependencies:
     whatwg-url-without-unicode "8.0.0-3"
 
+react-native-vosk@^0.1.0:
+  version "0.1.16"
+  resolved "https://registry.npmjs.org/react-native-vosk/-/react-native-vosk-0.1.16.tgz"
+  integrity sha512-nkn+psDYjv064yU0oS8KIfnPiexLTsDA7laJlu/9RNI2N5u3m0O0Q7T4QggJD2EPHRsTTSJnw2FCMWcB+hoV2Q==
+
 react-native-web@^0.21.2:
   version "0.21.2"
   resolved "https://registry.npmjs.org/react-native-web/-/react-native-web-0.21.2.tgz"

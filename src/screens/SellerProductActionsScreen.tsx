@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
+import { copyToClipboard } from '../services/contactService';
 import { useAuthStore } from '../store';
 import { Product } from '../lib/supabase';
 import { productService } from '../services/productService';
@@ -135,8 +136,7 @@ export const SellerProductActionsScreen: React.FC = () => {
 
     try {
       if (Platform.OS === 'web' && navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        Alert.alert('✅ Lien copié', 'Le lien du produit a été copié dans le presse-papier.');
+        await copyToClipboard(url, 'Le lien du produit a été copié dans le presse-papier.');
       } else {
         await Share.share({
           title: product.name,

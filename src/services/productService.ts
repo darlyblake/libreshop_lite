@@ -557,22 +557,41 @@ export const productService = {
       if (!product.category || !product.store_id) {
         return [];
       }
+      // First, prefer products from the same seller collection (if set)
+      const collected: any[] = [];
 
-      // Fetch products from the same category, excluding the current product
-      const { data, error } = await client
-        .from('products')
-        .select('*')
-        .eq('category', product.category)
-        .eq('is_active', true)
-        .neq('id', product.id)
-        .eq('store_id', product.store_id)
-        .limit(limit);
+      if ((product as any).collection_id) {
+        const { data: collData, error: collError } = await client
+          .from('products')
+          .select('*')
+          .eq('collection_id', (product as any).collection_id)
+          .eq('is_active', true)
+          .neq('id', product.id)
+          .limit(limit);
 
-      if (error) throw error;
+        if (collError) throw collError;
+        if (collData && collData.length) collected.push(...collData);
+      }
 
-      // If we don't have enough products from the same store, fetch from other stores in the same category
-      if ((data?.length || 0) < limit) {
-        const remainingLimit = limit - (data?.length || 0);
+      // If we still need more, fetch from same store & category
+      if (collected.length < limit) {
+        const remaining = limit - collected.length;
+        const { data: storeData, error: storeError } = await client
+          .from('products')
+          .select('*')
+          .eq('category', product.category)
+          .eq('is_active', true)
+          .neq('id', product.id)
+          .eq('store_id', product.store_id)
+          .limit(remaining);
+
+        if (storeError) throw storeError;
+        if (storeData && storeData.length) collected.push(...storeData);
+      }
+
+      // If still under limit, fill with other stores in same category
+      if (collected.length < limit) {
+        const remaining = limit - collected.length;
         const { data: otherData, error: otherError } = await client
           .from('products')
           .select('*')
@@ -580,13 +599,25 @@ export const productService = {
           .eq('is_active', true)
           .neq('id', product.id)
           .neq('store_id', product.store_id)
-          .limit(remainingLimit);
+          .limit(remaining);
 
         if (otherError) throw otherError;
-        return [...(data || []), ...(otherData || [])];
+        if (otherData && otherData.length) collected.push(...otherData);
       }
 
-      return data || [];
+      // Deduplicate and return up to limit
+      const unique: any[] = [];
+      const seen = new Set<string>();
+      for (const p of collected) {
+        if (!p || !p.id) continue;
+        if (p.id === product.id) continue;
+        if (seen.has(String(p.id))) continue;
+        seen.add(String(p.id));
+        unique.push(p);
+        if (unique.length >= limit) break;
+      }
+
+      return unique;
     } catch (e) {
       console.error('Error fetching similar products:', e);
       return [];

@@ -11,7 +11,6 @@ import {
   FlatList,
   StatusBar,
   TextInput,
-  Linking,
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +22,7 @@ import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
+import { contactStore } from '../services/contactService';
 import { exportOrdersToPDF, exportOrderToPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
 
@@ -376,12 +376,7 @@ ${itemsList}
 Pouvez-vous me confirmer votre disponibilité pour la livraison ?
 Merci.`;
     
-    const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-    
-    Linking.canOpenURL(url).then((supported: boolean) => {
-      if (supported) Linking.openURL(url);
-      else Alert.alert('Contacter', `Appeler le ${phone}`);
-    }).catch(() => {
+    contactStore({ rawPhone: formattedPhone, message }).catch(() => {
       Alert.alert('Contacter', `Appeler le ${phone}`);
     });
   };
