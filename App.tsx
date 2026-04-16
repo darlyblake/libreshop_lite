@@ -4,6 +4,7 @@ import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { Dimensions, View, LogBox, Platform } from 'react-native';
+import { initSkiaWeb } from './SkiaLoader';
 
 // Configuration des notifications (uniquement sur mobile)
 if (Platform.OS !== 'web') {
@@ -126,33 +127,12 @@ export default function App() {
 
   useEffect(() => {
     if (Platform.OS === 'web') {
-      try {
-        const { LoadSkiaWeb } = require("@shopify/react-native-skia/lib/module/web");
-        // Using a reliable CDN as primary/fallback to ensure it works on the web
-        LoadSkiaWeb({
-          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/canvaskit-wasm@0.41.0/bin/full/${file}`
-        })
-          .then(() => {
-            console.log("Skia Web initialized successfully via CDN");
-            setSkiaReady(true);
-          })
-          .catch((err: any) => {
-            console.warn("Failed to load Skia Web from CDN, trying local root...", err);
-            LoadSkiaWeb({
-              locateFile: (file: string) => `/${file}`
-            })
-              .then(() => {
-                console.log("Skia Web initialized successfully via local root");
-                setSkiaReady(true);
-              })
-              .catch((err2: any) => {
-                console.error("Failed to load Skia Web completely:", err2);
-                setSkiaReady(true);
-              });
-          });
-      } catch (e) {
-        setSkiaReady(true);
-      }
+      initSkiaWeb()
+        .then(() => setSkiaReady(true))
+        .catch((err) => {
+          console.error('Failed to initialize Skia Web:', err);
+          setSkiaReady(true);
+        });
     }
   }, []);
 

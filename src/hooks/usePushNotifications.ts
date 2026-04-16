@@ -98,21 +98,32 @@ async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-        console.log('Failed to get push token for push notification!');
+      console.log('Failed to get push token for push notification!');
+      return;
+    }
+
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId || Constants?.easConfig?.projectId;
+    const googleServicesFile = Constants?.expoConfig?.android?.googleServicesFile;
+
+    if (Platform.OS === 'android' && !googleServicesFile) {
+      console.warn(
+        'Expo notifications for Android require a Firebase configuration file. ' +
+        'Add android.googleServicesFile to app.json and place a valid google-services.json in your project root.'
+      );
+      return;
+    }
+
+    if (!projectId) {
+      console.warn('Project ID non trouvé dans app.json. Les notifications push ne fonctionneront pas sans liaison EAS.');
       return;
     }
 
     try {
-        const projectId = Constants?.expoConfig?.extra?.eas?.projectId || Constants?.easConfig?.projectId;
-        if (!projectId) {
-            console.warn('Project ID non trouvé dans app.json. Les notifications push ne fonctionneront pas sans liaison EAS.');
-            return;
-        }
-        token = (await NotificationsModule.getExpoPushTokenAsync({
-            projectId,
-        })).data;
+      token = (await NotificationsModule.getExpoPushTokenAsync({
+        projectId,
+      })).data;
     } catch (e) {
-        console.error('Error getting push token:', e);
+      console.error('Error getting push token:', e);
     }
   } else {
     console.log('Must use physical device for Push Notifications');

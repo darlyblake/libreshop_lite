@@ -41,6 +41,7 @@ import { RootStackParamList } from '../navigation/types';
 import { Store, Product } from '../lib/supabase';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
+import { grocService } from '../services/grocService';
 import { SortTabs } from '../components/SortTabs';
 import { categoryService } from '../services/categoryService';
 import { errorHandler } from '../utils/errorHandler';
@@ -124,6 +125,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [popularSuggestions, setPopularSuggestions] = useState<string[]>([]);
   const [popularCategories, setPopularCategories] = useState<Category[]>([]);
+  const [intentKeywords, setIntentKeywords] = useState<string[]>([]);
   const [currentQuery, setCurrentQuery] = useState('');
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -166,6 +168,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
       setHasSearched(false);
       setError(null);
       setSuggestions([]);
+      setIntentKeywords([]);
       return;
     }
 
@@ -196,14 +199,18 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
       });
 
       const searchPromise = Promise.all([
-        productService.search(q, currentPage, PAGE_SIZE),
-        reset ? storeService.search(q) : Promise.resolve([])
+        grocService.searchProducts(q, currentPage, PAGE_SIZE),
+        reset ? grocService.searchStores(q) : Promise.resolve([])
       ]);
 
-      const [productsData, storesData] = await Promise.race([
+      const [productsResult, storesData] = await Promise.race([
         searchPromise,
         timeoutPromise
-      ]) as [any[], Store[]];
+      ]) as [any, Store[]];
+
+      const productsData = productsResult?.products || [];
+      const intentTerms = productsResult?.keywords || [];
+      setIntentKeywords(intentTerms.filter((term: string) => term.toLowerCase() !== q.toLowerCase()));
 
       // If 'ranked' sort is requested, compute score and sort client-side
       const computeScored = (arr: any[]) => {
@@ -283,6 +290,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
     suggestions,
     popularSuggestions,
     popularCategories,
+    intentKeywords,
     debouncedSearch,
     loadMore
   };
@@ -318,6 +326,7 @@ export const ClientSearchScreen: React.FC = () => {
     suggestions, 
     popularSuggestions,
     popularCategories,
+    intentKeywords,
     debouncedSearch,
     loadMore 
   } = useSearch(sort);
@@ -455,7 +464,7 @@ export const ClientSearchScreen: React.FC = () => {
   }, []);
 
   // Renderers
-  const renderProductItem = useCallback(({ item, index }: { item: Product; index: number }) => (
+  const renderProductItem = useCallback(({ item, index }: { item: Product & { comparePrice?: number }; index: number }) => (
     <Animated.View
       entering={SlideInRight
         .delay(index * 30)
@@ -471,6 +480,7 @@ export const ClientSearchScreen: React.FC = () => {
       <ProductCard
         name={item.name}
         price={item.price}
+        comparePrice={item.comparePrice}
         imageUrl={item.images?.[0]}
         onPress={() => handleProductPress(item)}
       />
@@ -657,6 +667,32 @@ export const ClientSearchScreen: React.FC = () => {
       );
     }
 
+    const renderIntentSuggestions = () => {
+      if (intentKeywords.length === 0) return null;
+      return (
+        <View style={styles.intentSuggestionContainer}>
+          <Text style={styles.intentSuggestionTitle}>Suggestions basées sur votre recherche</Text>
+          <View style={styles.intentSuggestionChips}>
+            {intentKeywords.map((keyword) => (
+              <TouchableOpacity
+                key={`intent-${keyword}`}
+                style={styles.intentSuggestionChip}
+                onPress={() => {
+                  setSearchQuery(keyword);
+                  addRecentSearch(keyword);
+                  debouncedSearch(keyword);
+                  Keyboard.dismiss();
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.intentSuggestionText}>{keyword}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      );
+    };
+
     if (!hasResults && hasSearched) {
       return (
         <EmptyState
@@ -681,6 +717,7 @@ export const ClientSearchScreen: React.FC = () => {
         scrollEventThrottle={16}
         entering={FadeIn.duration(ANIMATION_DURATION)}
       >
+        {intentKeywords.length > 0 && renderIntentSuggestions()}
         {products.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -1113,6 +1150,37 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
   },
   suggestionsList: {
     paddingVertical: SPACING.sm,
+  },
+  intentSuggestionContainer: {
+    marginBottom: SPACING.lg,
+    padding: SPACING.lg,
+    borderRadius: RADIUS.xl,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border,
+    ...shadows.small,
+  },
+  intentSuggestionTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: palette.text,
+    marginBottom: SPACING.sm,
+  },
+  intentSuggestionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  intentSuggestionChip: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: palette.accent + '15',
+    borderRadius: RADIUS.round,
+  },
+  intentSuggestionText: {
+    color: palette.accent,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
   },
 });
 }

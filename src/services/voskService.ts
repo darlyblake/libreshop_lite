@@ -1,11 +1,14 @@
-import { NativeModules, Platform } from 'react-native';
+import { EmitterSubscription, NativeEventEmitter, NativeModules, Platform } from 'react-native';
 
 type ResultCallback = (text: string, isFinal?: boolean) => void;
 
-const VoskNative = (NativeModules && (NativeModules as any).VoskBridge) || null;
-
+const VoskNative =
+  (NativeModules && ((NativeModules as any).Vosk || (NativeModules as any).VoskBridge)) ||
+  null;
+const eventEmitter = VoskNative ? new NativeEventEmitter(VoskNative) : null;
 let recognition: any = null;
 let webCallback: ResultCallback | null = null;
+let eventSubscriptions: EmitterSubscription[] = [];
 
 export function isAvailable(): boolean {
   if (Platform.OS === 'web') {
@@ -26,7 +29,7 @@ export function startListening(cb: ResultCallback, options?: { partialResults?: 
     if (!SpeechRecognition) throw new Error('Web Speech API not available');
     webCallback = cb;
     recognition = new SpeechRecognition();
-    recognition.lang = (navigator.language || 'en-US');
+    recognition.lang = navigator.language || 'en-US';
     recognition.interimResults = !!options?.partialResults;
     recognition.continuous = false;
     recognition.onresult = (ev: any) => {
@@ -44,25 +47,52 @@ export function startListening(cb: ResultCallback, options?: { partialResults?: 
   }
 
   if (!VoskNative) throw new Error('Vosk native bridge not installed');
-  return VoskNative.start((err: any, text: string, isFinal: boolean) => {
-    if (err) {
-      console.warn('Vosk error', err);
-      return;
+
+  if (eventEmitter) {
+    eventSubscriptions = [
+      eventEmitter.addListener('onResult', (e: any) => cb(e.data, true)),
+      eventEmitter.addListener('onFinalResult', (e: any) => cb(e.data, true)),
+      eventEmitter.addListener('onError', (e: any) => console.warn('Vosk error', e.data)),
+      eventEmitter.addListener('onTimeout', () => console.warn('Vosk timeout')),
+    ];
+
+    if (typeof VoskNative.start === 'function') {
+      VoskNative.start(null);
     }
-    cb(text, !!isFinal);
-  });
+    return;
+  }
+
+  if (typeof VoskNative.start === 'function') {
+    return VoskNative.start((err: any, text: string, isFinal: boolean) => {
+      if (err) {
+        console.warn('Vosk error', err);
+        return;
+      }
+      cb(text, !!isFinal);
+    });
+  }
+
+  throw new Error('Vosk native start method not available');
 }
 
 export function stopListening() {
   if (Platform.OS === 'web') {
     if (recognition) {
-      try { recognition.stop(); } catch (e) {}
+      try {
+        recognition.stop();
+      } catch (e) {}
       recognition = null;
       webCallback = null;
     }
     return;
   }
-  if (VoskNative && VoskNative.stop) {
+
+  if (eventSubscriptions.length > 0) {
+    eventSubscriptions.forEach((sub) => sub.remove());
+    eventSubscriptions = [];
+  }
+
+  if (VoskNative && typeof VoskNative.stop === 'function') {
     VoskNative.stop();
   }
 }

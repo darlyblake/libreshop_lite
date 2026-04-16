@@ -20,7 +20,9 @@ export const initializeDOMProtection = () => {
     return false;
   };
 
-  window.addEventListener('beforetranslate', preventTranslate);
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('beforetranslate', preventTranslate);
+  }
 
   // Protect root element from mutations
   try {

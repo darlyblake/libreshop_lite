@@ -188,6 +188,7 @@ export const StoreDetailScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortOption, setSortOption] = useState<'recent' | 'price_desc' | 'price_asc' | 'stock_desc'>('recent');
   const [reviewName, setReviewName] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -368,6 +369,21 @@ export const StoreDetailScreen: React.FC = () => {
     return map;
   }, [products]);
 
+  type SortOption = {
+    id: 'recent' | 'price_desc' | 'price_asc' | 'stock_desc';
+    label: string;
+  };
+
+  const sortOptions = useMemo<SortOption[]>(
+    () => [
+      { id: 'recent', label: 'Nouveautés' },
+      { id: 'price_desc', label: 'Prix ↓' },
+      { id: 'price_asc', label: 'Prix ↑' },
+      { id: 'stock_desc', label: 'En stock' },
+    ],
+    [],
+  );
+
   const collectionFilters = useMemo(() => {
     return [
       { id: "Tous", name: "Tous", count: products.length },
@@ -440,9 +456,25 @@ export const StoreDetailScreen: React.FC = () => {
     selectedCollectionId,
   ]);
 
+  const sortedProducts = useMemo(() => {
+    const list = [...allDisplayedProducts];
+    switch (sortOption) {
+      case 'price_asc':
+        return list.sort((a, b) => Number(a?.price || 0) - Number(b?.price || 0));
+      case 'price_desc':
+        return list.sort((a, b) => Number(b?.price || 0) - Number(a?.price || 0));
+      case 'stock_desc':
+        return list.sort(
+          (a, b) => Number((b as any)?.stock || 0) - Number((a as any)?.stock || 0),
+        );
+      default:
+        return list;
+    }
+  }, [allDisplayedProducts, sortOption]);
+
   const paginatedProducts = useMemo(() => {
-    return allDisplayedProducts.slice(0, displayedCount);
-  }, [allDisplayedProducts, displayedCount]);
+    return sortedProducts.slice(0, displayedCount);
+  }, [sortedProducts, displayedCount]);
 
   const hasMore = displayedCount < allDisplayedProducts.length;
 
@@ -922,6 +954,30 @@ export const StoreDetailScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            <View style={styles.sortBar}>
+              {sortOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.sortOptionButton,
+                    sortOption === option.id && styles.sortOptionButtonActive,
+                  ]}
+                  onPress={() => setSortOption(option.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Trier par ${option.label}`}
+                >
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      sortOption === option.id && styles.sortOptionTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             {/* Products Section */}
             <View style={styles.productsSection}>
@@ -1637,6 +1693,34 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
     fontWeight: "500",
+  },
+  sortBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+  },
+  sortOptionButton: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+  },
+  sortOptionButtonActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  sortOptionText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    fontWeight: "500",
+  },
+  sortOptionTextActive: {
+    color: COLORS.textInverse,
+    fontWeight: "700",
   },
   productsGrid: {
     flexDirection: "row",

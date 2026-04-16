@@ -167,8 +167,8 @@ class CacheMonitor {
 
 export const cacheMonitor = new CacheMonitor();
 
-// Auto-stop monitoring on app background (for React Native)
-if (typeof window !== 'undefined') {
+// Auto-stop monitoring on app background (for React Native / web)
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('pagehide', () => {
     cacheMonitor.stop();
   });

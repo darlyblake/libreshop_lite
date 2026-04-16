@@ -47,13 +47,13 @@ export const useSmartTheme = (config: SmartThemeConfig) => {
     const handleActivity = () => setUserActivity(Date.now());
     
     // Écouter les événements d'activité (web)
-    if (typeof document !== 'undefined') {
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
       document.addEventListener('mousemove', handleActivity);
       document.addEventListener('touchstart', handleActivity);
     }
     
     return () => {
-      if (typeof document !== 'undefined') {
+      if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
         document.removeEventListener('mousemove', handleActivity);
         document.removeEventListener('touchstart', handleActivity);
       }

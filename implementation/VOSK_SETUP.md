@@ -19,7 +19,7 @@ Android (native) - summary
 -------------------------
 1. Add Vosk Android dependency in `android/app/build.gradle` (see Vosk docs):
 
-   implementation 'org.vosk:vosk-android:0.3.45'
+   implementation 'com.alphacephei:vosk-android:0.3.47@aar'
 
 2. Add the model files to `android/app/src/main/assets/models/your-model` and load from that path.
 3. Request `RECORD_AUDIO` permission at runtime.
