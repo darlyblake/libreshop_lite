@@ -56,12 +56,12 @@ export const ConfirmationScreen: React.FC = () => {
   const orderId = routeOrderId || ORDER_DATA.id;
   const total = typeof routeAmount === 'number' ? routeAmount : ORDER_DATA.total;
 
-  const fullOrderId = orderData?.id || orderId;
-  const displayOrderId = fullOrderId ? String(fullOrderId).split('-')[0] : ORDER_DATA.id;
-
   const [loading, setLoading] = useState(false);
   const [orderData, setOrderData] = useState<any | null>(null);
   const [storeInfo, setStoreInfo] = useState<any | null>(null);
+
+  const fullOrderId = orderData?.id || orderId;
+  const displayOrderId = fullOrderId ? String(fullOrderId).split('-')[0] : ORDER_DATA.id;
 
   useEffect(() => {
     let mounted = true;
