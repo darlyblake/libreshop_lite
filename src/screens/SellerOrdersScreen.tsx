@@ -146,6 +146,7 @@ export const SellerOrdersScreen: React.FC = () => {
   const [storeId, setStoreId] = React.useState<string | null>(null);
   const [storeName, setStoreName] = React.useState<string | null>(null);
   const [summaryCounts, setSummaryCounts] = React.useState<{ total: number; pending: number }>({ total: 0, pending: 0 });
+  const [deliveredRevenue, setDeliveredRevenue] = React.useState<number>(0);
   const [updatingOrderId, setUpdatingOrderId] = React.useState<string | null>(null);
   
   // 🚀 États pour la pagination optimisée
@@ -203,6 +204,11 @@ export const SellerOrdersScreen: React.FC = () => {
       }).catch(() => {
         setSummaryCounts({ total: 0, pending: 0 });
       });
+
+      // Charger le chiffre d'affaire des commandes livrées
+      orderService.getDeliveredTotalByStore(store.id).then(total => {
+        setDeliveredRevenue(Number(total || 0));
+      }).catch(() => setDeliveredRevenue(0));
 
       // 🎯 Requête optimisée avec cursor et filtres
       const result = await orderService.getByStore(store.id, {
@@ -1121,7 +1127,7 @@ Merci.`;
               <View style={styles.statBadge}>
                 <Ionicons name="cart" size={fontSize.xs} color={COLORS.accent} />
                 <Text style={[styles.statText, { fontSize: fontSize.xs }]}>
-                  Total: <Text style={styles.statValue}>{stats.total?.toLocaleString() || '0'} F</Text>
+                  Total livré: <Text style={styles.statValue}>{deliveredRevenue?.toLocaleString() || '0'} F</Text>
                 </Text>
               </View>
               {summaryCounts.pending > 0 && (
