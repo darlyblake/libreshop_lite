@@ -145,6 +145,7 @@ export const SellerOrdersScreen: React.FC = () => {
   const [sortOrder, setSortOrder] = React.useState<'asc' | 'desc'>('desc');
   const [storeId, setStoreId] = React.useState<string | null>(null);
   const [storeName, setStoreName] = React.useState<string | null>(null);
+  const [summaryCounts, setSummaryCounts] = React.useState<{ total: number; pending: number }>({ total: 0, pending: 0 });
   const [updatingOrderId, setUpdatingOrderId] = React.useState<string | null>(null);
   
   // 🚀 États pour la pagination optimisée
@@ -195,6 +196,13 @@ export const SellerOrdersScreen: React.FC = () => {
 
       setStoreId(store.id);
       setStoreName(store.name || null);
+
+      // Charger les comptes agrégés (total commandes, en attente)
+      orderService.getCountsByStore(store.id).then(cnt => {
+        if (cnt) setSummaryCounts({ total: cnt.total || 0, pending: cnt.pending || 0 });
+      }).catch(() => {
+        setSummaryCounts({ total: 0, pending: 0 });
+      });
 
       // 🎯 Requête optimisée avec cursor et filtres
       const result = await orderService.getByStore(store.id, {

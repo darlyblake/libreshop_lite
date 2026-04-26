@@ -132,6 +132,30 @@ export const orderService = {
     };
   },
 
+  async getCountsByStore(storeId: string) {
+    const client = useSupabase();
+    try {
+      const totalResp: any = await client
+        .from('orders')
+        .select('id', { head: true, count: 'exact' })
+        .eq('store_id', storeId);
+
+      const pendingResp: any = await client
+        .from('orders')
+        .select('id', { head: true, count: 'exact' })
+        .eq('store_id', storeId)
+        .eq('status', 'pending');
+
+      const total = Number(totalResp.count || 0);
+      const pending = Number(pendingResp.count || 0);
+
+      return { total, pending };
+    } catch (e) {
+      // En cas d'erreur, retourner des zéros sans casser l'UI
+      return { total: 0, pending: 0 };
+    }
+  },
+
   async updateStatus(id: string, status: OrderStatus) {
     const client = useSupabase();
     const { data: order, error } = await client
