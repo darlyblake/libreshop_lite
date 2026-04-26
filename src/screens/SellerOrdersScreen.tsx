@@ -1124,11 +1124,11 @@ Merci.`;
                   Total: <Text style={styles.statValue}>{stats.total?.toLocaleString() || '0'} F</Text>
                 </Text>
               </View>
-              {stats.pending > 0 && (
+              {summaryCounts.pending > 0 && (
                 <View style={[styles.statBadge, { backgroundColor: COLORS.warning + '10' }]}>
                   <Ionicons name="time" size={fontSize.xs} color={COLORS.warning} />
                   <Text style={[styles.statText, { fontSize: fontSize.xs }]}>
-                    <Text style={{ color: COLORS.warning }}>{stats.pending}</Text> en attente
+                    <Text style={{ color: COLORS.warning }}>{summaryCounts.pending}</Text> en attente
                   </Text>
                 </View>
               )}
