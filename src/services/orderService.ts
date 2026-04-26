@@ -156,6 +156,24 @@ export const orderService = {
     }
   },
 
+  async getDeliveredTotalByStore(storeId: string) {
+    const client = useSupabase();
+    try {
+      const { data, error } = await client
+        .from('orders')
+        .select('total_amount')
+        .eq('store_id', storeId)
+        .eq('status', 'delivered');
+      if (error) throw error;
+      const rows = data || [];
+      const total = rows.reduce((sum: number, r: any) => sum + Number(r?.total_amount || 0), 0);
+      return total;
+    } catch (e) {
+      console.error('Error fetching delivered total for store', e);
+      return 0;
+    }
+  },
+
   async updateStatus(id: string, status: OrderStatus) {
     const client = useSupabase();
     const { data: order, error } = await client
