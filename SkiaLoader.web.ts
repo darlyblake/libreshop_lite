@@ -15,21 +15,34 @@ async function localAvailable(localPath: string, timeout = 2000): Promise<boolea
 }
 
 export async function initSkiaWeb(): Promise<void> {
-  // Prefer local copy (webpack copies canvaskit.wasm -> /canvaskit.wasm), fall back to CDN.
-  const useLocal = await localAvailable('/canvaskit.wasm');
+  // Prefer local copy. Check common local paths then fall back to CDN.
+  const localRootA = '/canvaskit.wasm';
+  const localRootB = '/canvaskit/bin/full/canvaskit.wasm';
+  const hasA = await localAvailable(localRootA);
+  const hasB = await localAvailable(localRootB);
 
-  if (useLocal) {
+  if (hasB) {
+    try {
+      await LoadSkiaWeb({
+        locateFile: (file: string) => `/canvaskit/bin/full/${file}`,
+      });
+      console.log('Skia Web initialized successfully via local public/canvaskit/bin/full');
+      return;
+    } catch (err) {
+      console.warn('Failed to load Skia Web from local public/canvaskit/bin/full, falling back...', err);
+    }
+  }
+
+  if (hasA) {
     try {
       await LoadSkiaWeb({
         locateFile: (file: string) => `/${file}`,
       });
-      console.log('Skia Web initialized successfully via local root');
+      console.log('Skia Web initialized successfully via local root /canvaskit.wasm');
       return;
     } catch (err) {
-      console.warn('Failed to load Skia Web from local root, falling back to CDN...', err);
+      console.warn('Failed to load Skia Web from local root /canvaskit.wasm, falling back...', err);
     }
-  } else {
-    console.log('Local CanvasKit not available, using CDN fallback');
   }
 
   try {
