@@ -130,7 +130,8 @@ export default function App() {
       initSkiaWeb()
         .then(() => setSkiaReady(true))
         .catch((err) => {
-          console.error('Failed to initialize Skia Web:', err);
+          const msg = err && err instanceof Error ? err.message : String(err);
+          console.error('Failed to initialize Skia Web:', msg);
           setSkiaReady(true);
         });
     }
