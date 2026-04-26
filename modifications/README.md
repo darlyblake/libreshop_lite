@@ -1,4 +1,4 @@
-# Suivi des modifications
+t pou# Suivi des modifications
 
 Ce dossier contient un résumé des modifications effectuées dans le projet.
 
@@ -46,3 +46,11 @@ Le fichier doit lister :
 - Préférer des noms de fichiers explicites et structurés.
 - Si une modification touche plusieurs zones, lister chaque zone et son impact séparément.
 - Vérifier que le suivi reste cohérent avec la réalité du code avant de clôturer une session.
+
+## Entrées récentes
+
+- `modifications/SEO_audit_libreshop.shop.md` — Audit SEO de libreshop.shop (2026-04-26)
+
+## Entrées récentes
+
+- Audit SEO : `modifications/SEO_audit_libreshop.shop.md` (2026-04-26)
