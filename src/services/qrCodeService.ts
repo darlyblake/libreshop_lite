@@ -4,15 +4,19 @@
  * Utilisé par : SellerCaisseScreen (reçu) et SellerSettingsScreen (paramètres boutique).
  */
 
-const WEB_BASE_URL = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-
 export const qrCodeService = {
   /**
    * URL publique d'une commande (pour le client).
    * Ex: https://monsite.com/order/abc123
    */
   getOrderUrl(orderId: string): string {
-    if (WEB_BASE_URL) return `${WEB_BASE_URL}/order/${orderId}`;
+    // Prefer explicit environment variable, else try to use window origin on web,
+    // otherwise fallback to deep-link scheme.
+    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    if (envBase) return `${envBase}/order/${orderId}`;
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      return `${window.location.origin.replace(/\/+$/, '')}/order/${orderId}`;
+    }
     return `libreshop://order/${orderId}`;
   },
 
@@ -21,7 +25,11 @@ export const qrCodeService = {
    * Ex: https://monsite.com/store/fred-shop
    */
   getStoreUrl(storeSlug: string): string {
-    if (WEB_BASE_URL) return `${WEB_BASE_URL}/store/${storeSlug}`;
+    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    if (envBase) return `${envBase}/store/${storeSlug}`;
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      return `${window.location.origin.replace(/\/+$/, '')}/store/${storeSlug}`;
+    }
     return `libreshop://store/${storeSlug}`;
   },
 
