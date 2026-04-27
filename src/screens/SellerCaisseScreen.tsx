@@ -622,28 +622,74 @@ export const SellerCaisseScreen = () => {
 
       try {
         if (Platform.OS === 'web') {
-          // Sur le web, expo-print ignore "html" et lance l'impression de toute la page
-          // On injecte manuellement une iframe pour n'imprimer que le rendu HTML du ticket
-          const iframe = document.createElement('iframe');
-          iframe.style.position = 'absolute';
-          iframe.style.width = '0px';
-          iframe.style.height = '0px';
-          iframe.style.border = 'none';
-          document.body.appendChild(iframe);
-          
-          if (iframe.contentWindow) {
-            iframe.contentWindow.document.open();
-            iframe.contentWindow.document.write(html);
-            iframe.contentWindow.document.close();
-            
-            // Un court délai pour laisser charger les polices et images
-            setTimeout(() => {
-              iframe.contentWindow?.focus();
-              iframe.contentWindow?.print();
+          // Sur le web (mobile & desktop) : ouvrir une nouvelle fenêtre dédiée au ticket
+          // Beaucoup de navigateurs mobiles gèrent mieux window.print() depuis une popup.
+          try {
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+              printWindow.document.open();
+              printWindow.document.write(html);
+              printWindow.document.close();
+              // Laisser le navigateur charger les ressources puis lancer l'impression
               setTimeout(() => {
-                document.body.removeChild(iframe);
-              }, 1000);
-            }, 500);
+                try {
+                  printWindow.focus();
+                  printWindow.print();
+                  // Fermer la fenêtre après impression (certaines plateformes empêchent)
+                  setTimeout(() => { try { printWindow.close(); } catch {} }, 1000);
+                } catch (pwErr) {
+                  console.warn('printWindow.print failed', pwErr);
+                }
+              }, 600);
+            } else {
+              // Fallback visible iframe (utile si popup bloquée) — rendre visible pour éviter capture écran
+              const iframe = document.createElement('iframe');
+              iframe.style.position = 'fixed';
+              iframe.style.left = '50%';
+              iframe.style.top = '10%';
+              iframe.style.transform = 'translateX(-50%)';
+              iframe.style.width = '360px';
+              iframe.style.height = '640px';
+              iframe.style.zIndex = '99999';
+              iframe.style.border = '1px solid #ccc';
+              document.body.appendChild(iframe);
+              if (iframe.contentWindow) {
+                iframe.contentWindow.document.open();
+                iframe.contentWindow.document.write(html);
+                iframe.contentWindow.document.close();
+                setTimeout(() => {
+                  iframe.contentWindow?.focus();
+                  iframe.contentWindow?.print();
+                  setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 1000);
+                }, 700);
+              }
+            }
+          } catch (e) {
+            console.warn('Web print fallback failed, attempting iframe', e);
+            try {
+              const iframe = document.createElement('iframe');
+              iframe.style.position = 'fixed';
+              iframe.style.left = '50%';
+              iframe.style.top = '10%';
+              iframe.style.transform = 'translateX(-50%)';
+              iframe.style.width = '360px';
+              iframe.style.height = '640px';
+              iframe.style.zIndex = '99999';
+              iframe.style.border = '1px solid #ccc';
+              document.body.appendChild(iframe);
+              if (iframe.contentWindow) {
+                iframe.contentWindow.document.open();
+                iframe.contentWindow.document.write(html);
+                iframe.contentWindow.document.close();
+                setTimeout(() => {
+                  iframe.contentWindow?.focus();
+                  iframe.contentWindow?.print();
+                  setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 1000);
+                }, 700);
+              }
+            } catch (e2) {
+              console.warn('All web print fallbacks failed', e2);
+            }
           }
         } else {
           const { uri } = await Print.printToFileAsync({ html });
