@@ -194,6 +194,30 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
       );
       setSuggestions(filteredSuggestions);
 
+      // Try server-side hybrid search first (fast when deployed). Fallback to grocService.
+      try {
+        const apiRes = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=${PAGE_SIZE}`);
+        if (apiRes.ok) {
+          const json = await apiRes.json();
+          const productsData = json.data || [];
+          // Use minimal intent keywords if provided by API
+          setIntentKeywords((json.intentKeywords || []) .filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
+          if (reset) {
+            setProducts(productsData || []);
+            setStores([]);
+          } else {
+            setProducts(prev => [...prev, ...(productsData || [])]);
+          }
+          setHasMore((productsData?.length || 0) === PAGE_SIZE);
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+      } catch (e) {
+        // ignore and fallback to grocService
+        console.warn('Hybrid API search failed, falling back to grocService', e);
+      }
+
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Timeout')), 10000);
       });
