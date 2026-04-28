@@ -20,28 +20,34 @@ import Animated, {
   Layout,
   SlideInRight,
   SlideInLeft,
-  FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  interpolate,
-  Extrapolate,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SearchBar } from '../components/SearchBar';
-import { ProductCard, StoreCard } from '../components/Card';
-import { EmptyState } from '../components/EmptyState';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { useSearchStore } from '../store/searchStore';
-import { SHADOWS } from '../config/theme';
-import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
-import { useTheme } from '../hooks/useTheme';
-import { RootStackParamList } from '../navigation/types';
-import { Store, Product } from '../lib/supabase';
-import { productService } from '../services/productService';
-import { storeService } from '../services/storeService';
-import { grocService } from '../services/grocService';
+      try {
+        const apiRes = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=${PAGE_SIZE}`);
+        if (apiRes.ok) {
+          const ct = (apiRes.headers.get('content-type') || '').toLowerCase();
+          if (!ct.includes('application/json')) {
+            // Dev server may return index.html (text/html) for unknown /api routes — treat as unavailable
+            console.warn('Hybrid API returned non-JSON response (falling back). Content-Type:', ct);
+            throw new Error('non-json');
+          }
+          const json = await apiRes.json();
+          const productsData = json.data || [];
+          // Use minimal intent keywords if provided by API
+          setIntentKeywords((json.intentKeywords || []).filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
+          if (reset) {
+            setProducts(productsData || []);
+            setStores([]);
+          } else {
+            setProducts(prev => [...prev, ...(productsData || [])]);
+          }
+          setHasMore((productsData?.length || 0) === PAGE_SIZE);
+          setLoading(false);
+          setLoadingMore(false);
+          return;
+        }
+      } catch (e) {
+        // ignore and fallback to grocService; keep log concise
+        console.warn('Hybrid API search unavailable, falling back to grocService');
+      }
 import { SortTabs } from '../components/SortTabs';
 import { categoryService } from '../services/categoryService';
 import { errorHandler } from '../utils/errorHandler';
@@ -198,10 +204,16 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
       try {
         const apiRes = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=${PAGE_SIZE}`);
         if (apiRes.ok) {
+          const ct = (apiRes.headers.get('content-type') || '').toLowerCase();
+          if (!ct.includes('application/json')) {
+            // Dev server may return index.html (text/html) for unknown /api routes — treat as unavailable
+            console.warn('Hybrid API returned non-JSON response (falling back). Content-Type:', ct);
+            throw new Error('non-json');
+          }
           const json = await apiRes.json();
           const productsData = json.data || [];
           // Use minimal intent keywords if provided by API
-          setIntentKeywords((json.intentKeywords || []) .filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
+          setIntentKeywords((json.intentKeywords || []).filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
           if (reset) {
             setProducts(productsData || []);
             setStores([]);
@@ -214,8 +226,8 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
           return;
         }
       } catch (e) {
-        // ignore and fallback to grocService
-        console.warn('Hybrid API search failed, falling back to grocService', e);
+        // ignore and fallback to grocService; keep log concise
+        console.warn('Hybrid API search unavailable, falling back to grocService');
       }
 
       const timeoutPromise = new Promise((_, reject) => {
