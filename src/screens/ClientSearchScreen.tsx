@@ -14,10 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import Animated, { FadeInDown, FadeOut, Layout, SlideInRight, SlideInLeft } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeOut, Layout, SlideInRight, SlideInLeft, useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
 import { SortTabs } from '../components/SortTabs';
 import { categoryService } from '../services/categoryService';
 import { errorHandler } from '../utils/errorHandler';
+import { useLegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
