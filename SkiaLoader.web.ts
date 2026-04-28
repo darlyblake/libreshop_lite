@@ -54,8 +54,8 @@ export async function initSkiaWeb(): Promise<void> {
       console.log('Skia Web initialized successfully via local public/canvaskit/bin/full');
       return;
     } catch (err) {
-      const msg = err && (err.message || err.toString) ? (err.message || String(err)) : String(err);
-      console.warn('Failed to load Skia Web from local public/canvaskit/bin/full, falling back...', msg);
+      const msg = (err && (err.message || err.toString())) || JSON.stringify(err) || String(err);
+      console.warn('Failed to load Skia Web from local public/canvaskit/bin/full, falling back...', { error: err, message: msg });
     }
   }
 
@@ -67,8 +67,8 @@ export async function initSkiaWeb(): Promise<void> {
       console.log('Skia Web initialized successfully via local root /canvaskit.wasm');
       return;
     } catch (err) {
-      const msg = err && (err.message || err.toString) ? (err.message || String(err)) : String(err);
-      console.warn('Failed to load Skia Web from local root /canvaskit.wasm, falling back...', msg);
+      const msg = (err && (err.message || err.toString())) || JSON.stringify(err) || String(err);
+      console.warn('Failed to load Skia Web from local root /canvaskit.wasm, falling back...', { error: err, message: msg });
     }
   }
 
@@ -79,7 +79,7 @@ export async function initSkiaWeb(): Promise<void> {
     console.log('Skia Web initialized successfully via CDN');
     return;
   } catch (err2) {
-    const msg2 = err2 && (err2.message || err2.toString) ? (err2.message || String(err2)) : String(err2);
-    console.error('Failed to load Skia Web completely (CDN):', msg2);
+    const msg2 = (err2 && (err2.message || err2.toString())) || JSON.stringify(err2) || String(err2);
+    console.error('Failed to load Skia Web completely (CDN):', { error: err2, message: msg2 });
   }
 }

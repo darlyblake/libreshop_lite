@@ -20,6 +20,7 @@ import { categoryService } from '../services/categoryService';
 import { errorHandler } from '../utils/errorHandler';
 import { useLegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
+import { SHADOWS } from '../config/theme';
 
 const { width, height } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
