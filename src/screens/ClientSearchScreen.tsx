@@ -14,40 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import Animated, { 
-  FadeInDown, 
-  FadeOut,
-  Layout,
-  SlideInRight,
-  SlideInLeft,
-      try {
-        const apiRes = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=${PAGE_SIZE}`);
-        if (apiRes.ok) {
-          const ct = (apiRes.headers.get('content-type') || '').toLowerCase();
-          if (!ct.includes('application/json')) {
-            // Dev server may return index.html (text/html) for unknown /api routes — treat as unavailable
-            console.warn('Hybrid API returned non-JSON response (falling back). Content-Type:', ct);
-            throw new Error('non-json');
-          }
-          const json = await apiRes.json();
-          const productsData = json.data || [];
-          // Use minimal intent keywords if provided by API
-          setIntentKeywords((json.intentKeywords || []).filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
-          if (reset) {
-            setProducts(productsData || []);
-            setStores([]);
-          } else {
-            setProducts(prev => [...prev, ...(productsData || [])]);
-          }
-          setHasMore((productsData?.length || 0) === PAGE_SIZE);
-          setLoading(false);
-          setLoadingMore(false);
-          return;
-        }
-      } catch (e) {
-        // ignore and fallback to grocService; keep log concise
-        console.warn('Hybrid API search unavailable, falling back to grocService');
-      }
+import Animated, { FadeInDown, FadeOut, Layout, SlideInRight, SlideInLeft } from 'react-native-reanimated';
 import { SortTabs } from '../components/SortTabs';
 import { categoryService } from '../services/categoryService';
 import { errorHandler } from '../utils/errorHandler';
