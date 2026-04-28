@@ -83,6 +83,14 @@ module.exports = async function (env, argv) {
         port: 19006,
       },
     };
+    // Proxy /api to a local dev API server (started with `npm run dev:api`)
+    config.devServer.proxy = {
+      '/api': {
+        target: 'http://localhost:3333',
+        secure: false,
+        changeOrigin: true,
+      },
+    };
   }
 
   return config;
