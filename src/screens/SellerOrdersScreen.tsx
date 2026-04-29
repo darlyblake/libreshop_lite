@@ -22,6 +22,7 @@ import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
+import { useSupabase } from '../lib/supabase';
 import { contactStore } from '../services/contactService';
 import { exportOrdersToPDF, exportOrderToPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
@@ -314,6 +315,34 @@ export const SellerOrdersScreen: React.FC = () => {
 
     loadOrders(true);
   }, [selectedFilter]);
+
+  // 🚀 Real-time subscription for new/updated orders
+  React.useEffect(() => {
+    if (!storeId) return;
+    
+    const client = useSupabase();
+    const channel = client
+      .channel(`orders:${storeId}`)
+      .on(
+        'postgres_changes' as any,
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `store_id=eq.${storeId}`
+        },
+        (payload: any) => {
+          console.log('📦 Order changed in real-time:', payload.eventType);
+          // Simple approach: reload the first page to get updates
+          loadOrders(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, [storeId, loadOrders]);
 
   // 🚀 Chargement initial
   React.useEffect(() => {

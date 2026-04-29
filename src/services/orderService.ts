@@ -232,9 +232,6 @@ export const orderService = {
   },
 
   async cancelOrderRobust(orderId: string) {
-    const order: any = await this.getById(orderId);
-    if (!order) throw new Error("Commande non trouvée");
-
     const client = useSupabase();
     console.log('❌ Cancelling order robustly...', orderId);
     try {
@@ -242,8 +239,9 @@ export const orderService = {
         p_order_id: orderId
       });
       if (error) throw error;
-      // Notification
+      // Notifications
       await this.sendCustomerNotification(order, 'cancelled');
+      await this.sendSellerNotification(order, 'cancelled');
       return data;
     } catch (e: any) {
       // If the RPC does not exist (404) or fails for other reasons, fall back to a direct update
@@ -257,7 +255,10 @@ export const orderService = {
         if (updErr) throw updErr;
 
         const updated = await this.getById(orderId);
-        try { await this.sendCustomerNotification(updated, 'cancelled'); } catch (nErr) { console.warn('sendCustomerNotification failed', nErr); }
+        try { 
+          await this.sendCustomerNotification(updated, 'cancelled'); 
+          await this.sendSellerNotification(updated, 'cancelled');
+        } catch (nErr) { console.warn('Notifications failed', nErr); }
         return updated;
       } catch (e2) {
         // rethrow original or fallback error
@@ -304,7 +305,7 @@ export const orderService = {
           break;
       }
 
-      if (title && body) {
+      if (title && body && order.user_id) {
         await notificationService.create({
           user_id: order.user_id,
           title,
@@ -315,6 +316,49 @@ export const orderService = {
       }
     } catch (e) {
       console.warn('Failed to send customer notification:', e);
+    }
+  },
+
+  async sendSellerNotification(order: any, type: 'new' | 'cancelled') {
+    try {
+      const client = useSupabase();
+      
+      // Obtenir le user_id du vendeur
+      let sellerId = order.stores?.user_id || order.store?.user_id;
+      if (!sellerId && order.store_id) {
+        const { data: store } = await client
+          .from('stores')
+          .select('user_id')
+          .eq('id', order.store_id)
+          .single();
+        sellerId = store?.user_id;
+      }
+
+      if (!sellerId) return;
+
+      const orderShortId = order.id.split('-')[0].toUpperCase();
+      let title = '';
+      let body = '';
+
+      if (type === 'new') {
+        title = 'Nouvelle commande ! 🛒';
+        body = `Vous avez reçu une nouvelle commande (#${orderShortId}).`;
+      } else if (type === 'cancelled') {
+        title = 'Commande annulée ❌';
+        body = `La commande #${orderShortId} a été annulée par le client.`;
+      }
+
+      if (title && body) {
+        await notificationService.create({
+          user_id: sellerId,
+          title,
+          body,
+          type: 'order',
+          data: { orderId: order.id, type }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to send seller notification:', e);
     }
   },
 
@@ -380,6 +424,14 @@ export const orderService = {
         }));
         await this.createItems(rows);
         createdOrders.push(created);
+        
+        // Notify seller and customer
+        try {
+          await this.sendSellerNotification(created, 'new');
+          await this.sendCustomerNotification(created, 'pending');
+        } catch (nErr) {
+          console.warn('Initial notifications failed', nErr);
+        }
       }
     }
     return createdOrders;

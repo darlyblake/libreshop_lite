@@ -37,6 +37,8 @@ if (Platform.OS === 'web') {
       msg.includes('PushTokenManager') ||
       msg.includes('onStartShouldSetResponder') ||
       msg.includes('onResponder') ||
+      msg.includes('recordTouchEnd') ||
+      msg.includes('touch start') ||
       msg.includes('transform-origin') ||
       msg.includes('TouchableMixin') ||
       msg.includes('None of the callbacks in the gesture are worklets') ||

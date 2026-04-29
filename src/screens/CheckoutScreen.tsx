@@ -487,11 +487,15 @@ export const CheckoutScreen: React.FC = () => {
                 return;
               }
 
-              await userService.upsertProfile(userId, {
+              const updatedUser = await userService.upsertProfile(userId, {
                 full_name: formData.name,
                 phone: formData.phone,
                 whatsapp_number: formData.phone,
+                address: formData.address,
               });
+
+              // Refresh global auth state with updated user data
+              useAuthStore.getState().setUser(updatedUser);
 
               const payload = {
                 user_id: userId,

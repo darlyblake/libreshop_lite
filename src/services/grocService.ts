@@ -1,9 +1,6 @@
-import { agentConfig } from '../config/theme';
 import { productService } from './productService';
 import { storeService } from './storeService';
 import { errorHandler } from '../utils/errorHandler';
-
-const GROC_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
 
 interface GrocSearchHint {
   query: string;
@@ -17,108 +14,76 @@ interface GrocSearchResult {
   category?: string;
 }
 
-const DEFAULT_HINT = (query: string): GrocSearchHint => ({
-  query,
-  keywords: [query],
-});
-
 const normalizeText = (text: string): string => text.trim();
 
-const extractFirstJsonObject = (text: string): string | null => {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  for (let i = start; i < text.length; i += 1) {
-    if (text[i] === '{') depth += 1;
-    if (text[i] === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        return text.slice(start, i + 1);
-      }
-    }
-  }
-  return null;
-};
-
-const parseGrocHint = (rawText: string, query: string): GrocSearchHint => {
-  const text = rawText?.trim() || '';
-
-  if (!text) return DEFAULT_HINT(query);
-
-  const jsonText = extractFirstJsonObject(text) || text;
-
-  try {
-    const parsed = JSON.parse(jsonText);
-    if (typeof parsed?.query === 'string' && Array.isArray(parsed?.keywords)) {
-      return {
-        query: normalizeText(parsed.query) || query,
-        keywords: parsed.keywords.map((keyword: string) => normalizeText(keyword)).filter(Boolean),
-        category: typeof parsed.category === 'string' ? normalizeText(parsed.category) : undefined,
-      };
-    }
-  } catch (error) {
-    // ignore parse errors; fallback below
-  }
-
-  // As a fallback, try to extract meaningful terms from the text.
-  const fallbackKeywords = text
-    .split(/[\n.,;:\-\/|]+/)
-    .map((term) => term.trim())
-    .filter((term) => term.length >= 2)
-    .slice(0, 5);
-
+const DEFAULT_HINT = (query: string): GrocSearchHint => {
+  const normalized = normalizeText(query).toLowerCase();
+  const tokens = normalized.split(/\s+/).filter(t => t.length >= 3);
+  
+  // Basic extraction: original query + individual meaningful words
+  const keywords = Array.from(new Set([normalized, ...tokens]));
+  
   return {
-    query,
-    keywords: fallbackKeywords.length > 0 ? fallbackKeywords : [query],
+    query: normalized,
+    keywords: keywords.slice(0, 6),
   };
 };
 
-const buildGrocPrompt = (query: string): string => `Tu es Groc, le moteur de recherche intelligent de LibreShop.
-Tu dois analyser la requête utilisateur, comprendre l'intention, l'occasion, le destinataire et le style, puis produire une recherche optimisée pour produits et boutiques.
-Réponds uniquement avec un objet JSON valide contenant les champs suivants :
-{
-  "query": "<requête améliorée>",
-  "keywords": ["mot1", "mot2", ...],
-  "category": "<catégorie prioritaire facultative>"
-}
-Le champ "query" doit être une version simplifiée et claire de la recherche.
-Le champ "keywords" doit contenir des synonymes, variantes et expressions proches qui aident à trouver des produits pertinents.
-Par exemple, si la recherche est "je veux un beau cadeau tendance pour ma femme", retourne des mots-clés tels que "cadeau femme", "cadeau tendance", "idée cadeau femme", "bijou", "accessoire femme".
-Ne renvoie jamais de texte hors du JSON.
-Si tu ne dois pas modifier la requête, renvoie la requête originale dans le champ query.
-Requête utilisateur : "${query}"
-`;
-
-const getGrocApiKey = (): string | null => {
-  return agentConfig.grocApiKey || agentConfig.geminiApiKey || null;
+const LOCAL_SEARCH_SYNONYMS: Record<string, string[]> = {
+  voiture: ['auto', 'automobile', 'véhicule', 'citadine', 'occasion'],
+  auto: ['voiture', 'automobile', 'véhicule'],
+  automobile: ['voiture', 'auto', 'véhicule'],
+  téléphone: ['smartphone', 'mobile', 'cellulaire', 'iphone', 'android', 'huawei', 'samsung'],
+  smartphone: ['téléphone', 'mobile', 'cellulaire', 'iphone', 'android'],
+  ordinateur: ['pc', 'portable', 'laptop', 'macbook', 'ordinateur'],
+  laptop: ['ordinateur', 'pc', 'portable'],
+  sac: ['sac à main', 'sacoche', 'cartable', 'bagagerie'],
+  cuisine: ['cuisine', 'cuisson', 'ustensiles', 'électroménager', 'four', 'frigo'],
+  habit: ['vêtement', 'habits', 'mode', 'prêt-à-porter', 'tenue'],
+  vêtement: ['habit', 'mode', 'prêt-à-porter', 'vêtements'],
+  chaussure: ['chaussures', 'baskets', 'sneakers', 'soulier', 'souliers'],
+  basket: ['chaussure', 'baskets', 'sneakers', 'sport'],
+  maison: ['déco', 'ameublement', 'meuble', 'habitat', 'intérieur'],
+  meuble: ['maison', 'déco', 'ameublement', 'canapé', 'table', 'chaise'],
+  beauté: ['maquillage', 'soin', 'cosmétique', 'parfum'],
+  cosmétique: ['beauté', 'maquillage', 'soin', 'parfum'],
+  sport: ['fitness', 'musculation', 'entraînement', 'équipement sportif'],
+  bébé: ['enfant', 'puériculture', 'nouveau-né', 'jouet'],
+  enfant: ['bébé', 'junior', 'jouet', 'école'],
+  montre: ['horlogerie', 'accessoire', 'bijou', 'watch'],
+  bijou: ['bague', 'collier', 'bracelet', 'montre', 'or', 'argent'],
+  ventilateur: ['ventilation', 'air', 'frais', 'climatiseur', 'ventilo'],
+  tv: ['télévision', 'écran', 'télé', 'smart tv', 'vidéo'],
+  télévision: ['tv', 'écran', 'télé', 'vidéo'],
+  écouteur: ['casque', 'audio', 'musique', 'airpods', 'écouteurs'],
+  santé: ['médicament', 'soin', 'bien-être', 'pharmacie', 'hygiène'],
+  déco: ['décoration', 'maison', 'ornement', 'habitat', 'intérieur'],
 };
 
-const fetchGrocSearchHint = async (query: string): Promise<GrocSearchHint> => {
-  const apiKey = getGrocApiKey();
-  if (!apiKey || !query.trim()) {
-    return DEFAULT_HINT(query);
-  }
+const buildLocalSearchTerms = (query: string) => {
+  const terms = new Set<string>();
+  const normalized = normalizeText(query).toLowerCase();
+  if (!normalized) return [];
 
-  try {
-    const res = await fetch(`${GROC_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: buildGrocPrompt(query) }] }],
-      }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Groc API HTTP ${res.status}`);
+  terms.add(normalized);
+  normalized.split(/\s+/).forEach((token) => {
+    const synonyms = LOCAL_SEARCH_SYNONYMS[token];
+    if (synonyms) {
+      synonyms.forEach((syn) => terms.add(syn.toLowerCase()));
     }
+  });
 
-    const data = await res.json();
-    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    return parseGrocHint(rawText, query);
-  } catch (error: any) {
-    errorHandler.handle(error, 'Erreur Groc');
-    return DEFAULT_HINT(query);
-  }
+  return Array.from(terms).filter((term) => term.length >= 2);
+};
+
+/**
+ * Enhanced Search Hint Service (Local-only version)
+ * This version uses the local synonym dictionary and keyword extraction 
+ * to enhance search without calling external AI APIs (Grok/Gemini).
+ */
+const fetchGrocSearchHint = async (query: string): Promise<GrocSearchHint> => {
+  // Directly return the enhanced local hint
+  return DEFAULT_HINT(query);
 };
 
 const mergeUniqueProducts = (resultsA: any[] = [], resultsB: any[] = [], pageSize: number) => {
@@ -132,9 +97,13 @@ const mergeUniqueProducts = (resultsA: any[] = [], resultsB: any[] = [], pageSiz
 };
 
 const getSearchTerms = (hint: GrocSearchHint, query: string) => {
-  const terms = [query, hint.query, ...hint.keywords]
+  const normalizedQuery = normalizeText(query);
+  const terms = [normalizedQuery, hint.query, ...hint.keywords, hint.category || '']
     .map((term) => normalizeText(term || ''))
     .filter((term) => term.length >= 2);
+
+  const localTerms = buildLocalSearchTerms(normalizedQuery);
+  localTerms.forEach((term) => terms.push(term));
 
   return Array.from(new Set(terms));
 };

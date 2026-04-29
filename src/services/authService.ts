@@ -49,7 +49,7 @@ export const authService = {
         // Attempt an upsert; ignore any error since RLS or other constraints may block it
         await client.from('users').upsert({
           id: user.id,
-          email: user.email || null,
+          email: user.email || null, // Migration 20260429160000 allows null email
           full_name: (user.user_metadata && user.user_metadata.full_name) || 'Anonyme',
           role: 'client',
         }, { onConflict: 'id' });
