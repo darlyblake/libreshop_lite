@@ -151,7 +151,7 @@ export const genericStorage = {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-      errorHandler.handle(`Error saving ${key}:`, error, 'UnknownContext');
+      errorHandler.handle(error, `Error saving ${key}`);
     }
   },
 
@@ -160,7 +160,7 @@ export const genericStorage = {
       const value = await AsyncStorage.getItem(key);
       return value ? JSON.parse(value) : null;
     } catch (error) {
-      errorHandler.handle(`Error getting ${key}:`, error, 'UnknownContext');
+      errorHandler.handle(error, `Error getting ${key}`);
       return null;
     }
   },
@@ -169,7 +169,7 @@ export const genericStorage = {
     try {
       await AsyncStorage.removeItem(key);
     } catch (error) {
-      errorHandler.handle(`Error removing ${key}:`, error, 'UnknownContext');
+      errorHandler.handle(error, `Error removing ${key}`);
     }
   },
 

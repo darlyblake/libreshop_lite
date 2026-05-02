@@ -28,7 +28,7 @@ export const PWAInstallButton: React.FC = () => {
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
   
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);

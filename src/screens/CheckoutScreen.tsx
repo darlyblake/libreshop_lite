@@ -100,7 +100,7 @@ export const CheckoutScreen: React.FC = () => {
         }
 
         // Mixed cart: gather unique store ids from items and fetch each store
-        const ids = Array.from(new Set((paramItems ?? items).map(i => (i.product as any)?.store_id).filter(Boolean)));
+        const ids = Array.from(new Set((paramItems ?? items).map((i: any) => (i.product as any)?.store_id).filter(Boolean)));
         if (ids.length === 0) {
           setStore(null);
           setStoresData([]);
@@ -109,14 +109,14 @@ export const CheckoutScreen: React.FC = () => {
           return;
         }
 
-        const stores = await Promise.all(ids.map((id) => storeService.getById(id)));
+        const stores = await Promise.all(ids.map((id: unknown) => storeService.getById(id as string)));
         if (!mounted) return;
         setStore(null);
         setStoresData(stores.filter(Boolean));
 
         // compute subtotal per store
         const subtotalByStore: Record<string, number> = {};
-        (paramItems ?? items).forEach((it) => {
+        (paramItems ?? items).forEach((it: any) => {
           const sid = (it.product as any)?.store_id || (it as any).store_id;
           if (!sid) return;
           subtotalByStore[sid] = (subtotalByStore[sid] || 0) + ((it.product?.price || 0) * (it.quantity || 0));
@@ -317,7 +317,7 @@ export const CheckoutScreen: React.FC = () => {
           </View>
           
           <View style={styles.summaryCard}>
-            {(paramItems ?? items).map((item) => (
+            {(paramItems ?? items).map((item: any) => (
               <View key={item.product.id} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel} numberOfLines={1}>
                   {item.product.name} × {item.quantity}
@@ -344,7 +344,7 @@ export const CheckoutScreen: React.FC = () => {
               // Mixed cart: show per-store tax lines
               storesData.map((s) => {
                 const sid = s?.id;
-                const storeSubtotal = (paramItems ?? items).reduce((sum, it) => {
+                const storeSubtotal = (paramItems ?? items).reduce((sum: number, it: any) => {
                   return sum + ((it.product as any)?.store_id === sid ? (it.product.price || 0) * (it.quantity || 0) : 0);
                 }, 0);
                 const tax = s?.tax_rate ? Math.round(storeSubtotal * (s.tax_rate / 100)) : 0;

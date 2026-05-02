@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useThemeContext } from '../context/ThemeContext';
-import { useIntegratedTheme } from '../hooks/useIntegratedTheme';
+import { useIntegratedCloudTheme } from '../hooks/useIntegratedTheme';
 import { ThemeToggle } from './ThemeToggle';
 import { Badge } from './Badge';
 import { ProgressBar } from './ProgressBar';
@@ -17,8 +17,8 @@ interface ThemeDashboardProps {
 }
 
 export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose }) => {
-  const { theme } = useThemeContext();
-  const integratedTheme = useIntegratedTheme(userId);
+  const { getColor, toggleTheme, isDark, theme } = useThemeContext();
+  const integratedTheme = useIntegratedCloudTheme(userId);
   
   const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'ai' | 'sync'>('overview');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -80,31 +80,31 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
   // Rendre l'onglet Vue d'ensemble
   const renderOverview = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <Text style={[styles.sectionTitle, { color: getColor.text }]}>
         Vue d'ensemble
       </Text>
       
-      <View style={[styles.card, { backgroundColor: theme.getColor.card }]}>
+      <View style={[styles.card, { backgroundColor: getColor.card }]}>
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}>
             Thème actuel:
           </Text>
-          <Text style={[styles.value, { color: theme.getColor.text }]}>
+          <Text style={[styles.value, { color: getColor.text }]}> 
             {integratedTheme.themeName.toUpperCase()}
           </Text>
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}>
             Plateforme:
           </Text>
-          <Text style={[styles.value, { color: theme.getColor.text }]}>
+          <Text style={[styles.value, { color: getColor.text }]}> 
             {integratedTheme.theme.platform}
           </Text>
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}>
             Synchronisation:
           </Text>
           <Badge 
@@ -115,7 +115,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}>
             IA:
           </Text>
           <Badge 
@@ -126,13 +126,13 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
         </View>
       </View>
 
-      <View style={[styles.card, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.cardTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.card, { backgroundColor: getColor.card }]}>
+        <Text style={[styles.cardTitle, { color: getColor.text }]}> 
           Actions rapides
         </Text>
         
         <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: theme.getColor.primary }]}
+          style={[styles.actionButton, { backgroundColor: getColor.primary }]}
           onPress={() => integratedTheme.toggleTheme()}
         >
           <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
@@ -141,7 +141,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: theme.getColor.accent }]}
+          style={[styles.actionButton, { backgroundColor: getColor.accent }]}
           onPress={handleForceSync}
         >
           <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
@@ -150,7 +150,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.actionButton, { backgroundColor: theme.getColor.warning }]}
+          style={[styles.actionButton, { backgroundColor: getColor.warning }]}
           onPress={handleClearData}
         >
           <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
@@ -164,17 +164,17 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
   // Rendre l'onglet Performance
   const renderPerformance = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <Text style={[styles.sectionTitle, { color: getColor.text }]}> 
         Performance
       </Text>
       
-      <View style={[styles.card, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.cardTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.card, { backgroundColor: getColor.card }]}>
+        <Text style={[styles.cardTitle, { color: getColor.text }]}> 
           Métriques en temps réel
         </Text>
         
         <View style={styles.metricRow}>
-          <Text style={[styles.metricLabel, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.metricLabel, { color: getColor.textSecondary }]}> 
             FPS:
           </Text>
           <Text style={[styles.metricValue, { color: theme.getColor.text }]}>
@@ -182,44 +182,44 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
           </Text>
           <ProgressBar 
             progress={integratedTheme.performance.metrics.fps / 60}
-            color={integratedTheme.performance.metrics.fps >= 55 ? theme.getColor.success : theme.getColor.error}
+            color={integratedTheme.performance.metrics.fps >= 55 ? getColor.success : getColor.error}
           />
         </View>
         
         <View style={styles.metricRow}>
-          <Text style={[styles.metricLabel, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.metricLabel, { color: getColor.textSecondary }]}> 
             Temps de rendu:
           </Text>
-          <Text style={[styles.metricValue, { color: theme.getColor.text }]}>
+          <Text style={[styles.metricValue, { color: getColor.text }]}> 
             {integratedTheme.performance.metrics.renderTime.toFixed(2)}ms
           </Text>
         </View>
         
         <View style={styles.metricRow}>
-          <Text style={[styles.metricLabel, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.metricLabel, { color: getColor.textSecondary }]}> 
             Cache hit rate:
           </Text>
-          <Text style={[styles.metricValue, { color: theme.getColor.text }]}>
+          <Text style={[styles.metricValue, { color: getColor.text }]}> 
             {integratedTheme.performance.metrics.cacheHitRate.toFixed(1)}%
           </Text>
           <ProgressBar 
             progress={integratedTheme.performance.metrics.cacheHitRate / 100}
-            color={theme.getColor.info}
+            color={getColor.info}
           />
         </View>
         
         <View style={styles.metricRow}>
-          <Text style={[styles.metricLabel, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.metricLabel, { color: getColor.textSecondary }]}> 
             Mémoire:
           </Text>
-          <Text style={[styles.metricValue, { color: theme.getColor.text }]}>
+          <Text style={[styles.metricValue, { color: getColor.text }]}> 
             {integratedTheme.performance.metrics.memoryUsage}MB
           </Text>
         </View>
       </View>
       
       <TouchableOpacity 
-        style={[styles.actionButton, { backgroundColor: theme.getColor.info }]}
+        style={[styles.actionButton, { backgroundColor: getColor.info }]}
         onPress={() => {
           const report = integratedTheme.performance.report();
           Alert.alert('Rapport de Performance', report);
@@ -235,17 +235,17 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
   // Rendre l'onglet IA
   const renderAI = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <Text style={[styles.sectionTitle, { color: getColor.text }]}> 
         Intelligence Artificielle
       </Text>
       
-      <View style={[styles.card, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.cardTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.card, { backgroundColor: getColor.card }]}>
+        <Text style={[styles.cardTitle, { color: getColor.text }]}> 
           Statistiques d'apprentissage
         </Text>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}> 
             Points de données:
           </Text>
           <Text style={[styles.value, { color: theme.getColor.text }]}>
@@ -254,25 +254,25 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}> 
             Précision:
           </Text>
-          <Text style={[styles.value, { color: theme.getColor.text }]}>
+          <Text style={[styles.value, { color: getColor.text }]}> 
             {integratedTheme.ai.stats.accuracy ? `${(integratedTheme.ai.stats.accuracy * 100).toFixed(1)}%` : 'N/A'}
           </Text>
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}> 
             Adaptations:
           </Text>
-          <Text style={[styles.value, { color: theme.getColor.text }]}>
+          <Text style={[styles.value, { color: getColor.text }]}> 
             {integratedTheme.ai.stats.adaptationCount}
           </Text>
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}> 
             Modèle prêt:
           </Text>
           <Badge 
@@ -284,25 +284,25 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
       </View>
       
       {integratedTheme.ai.suggestion && (
-        <View style={[styles.card, { backgroundColor: theme.getColor.card }]}>
-          <Text style={[styles.cardTitle, { color: theme.getColor.text }]}>
+        <View style={[styles.card, { backgroundColor: getColor.card }]}> 
+          <Text style={[styles.cardTitle, { color: getColor.text }]}> 
             Suggestion actuelle
           </Text>
           
           <View style={styles.suggestionBox}>
-            <Text style={[styles.suggestionText, { color: theme.getColor.text }]}>
+            <Text style={[styles.suggestionText, { color: getColor.text }]}> 
               Thème recommandé: {integratedTheme.ai.suggestion.recommendedTheme.toUpperCase()}
             </Text>
-            <Text style={[styles.suggestionReason, { color: theme.getColor.textSecondary }]}>
+            <Text style={[styles.suggestionReason, { color: getColor.textSecondary }]}> 
               {integratedTheme.ai.suggestion.reason}
             </Text>
-            <Text style={[styles.suggestionConfidence, { color: theme.getColor.info }]}>
+            <Text style={[styles.suggestionConfidence, { color: getColor.info }]}> 
               Confiance: {(integratedTheme.ai.suggestion.confidence * 100).toFixed(1)}%
             </Text>
           </View>
           
           <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: theme.getColor.success }]}
+            style={[styles.actionButton, { backgroundColor: getColor.success }]}
             onPress={handleApplyAISuggestion}
             disabled={!integratedTheme.ai.canApplySuggestion}
           >
@@ -314,7 +314,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
       )}
       
       <TouchableOpacity 
-        style={[styles.actionButton, { backgroundColor: theme.getColor.accent }]}
+        style={[styles.actionButton, { backgroundColor: getColor.accent }]}
         onPress={() => integratedTheme.ai.predict()}
       >
         <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
@@ -327,17 +327,17 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
   // Rendre l'onglet Synchronisation
   const renderSync = () => (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <Text style={[styles.sectionTitle, { color: getColor.text }]}> 
         Synchronisation Cloud
       </Text>
       
-      <View style={[styles.card, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.cardTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.card, { backgroundColor: getColor.card }]}> 
+        <Text style={[styles.cardTitle, { color: getColor.text }]}> 
           État de la synchronisation
         </Text>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}> 
             Statut:
           </Text>
           <Badge 
@@ -351,7 +351,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
           <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
             Dernière sync:
           </Text>
-          <Text style={[styles.value, { color: theme.getColor.text }]}>
+          <Text style={[styles.value, { color: getColor.text }]}> 
             {integratedTheme.sync.lastSync 
               ? new Date(integratedTheme.sync.lastSync).toLocaleString()
               : 'Jamais'
@@ -360,20 +360,20 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
         </View>
         
         <View style={styles.row}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}> 
             En attente:
           </Text>
-          <Text style={[styles.value, { color: theme.getColor.text }]}>
+          <Text style={[styles.value, { color: getColor.text }]}> 
             {integratedTheme.sync.status.pendingChanges}
           </Text>
         </View>
         
         {integratedTheme.sync.hasError && (
           <View style={styles.row}>
-            <Text style={[styles.label, { color: theme.getColor.error }]}>
+            <Text style={[styles.label, { color: getColor.error }]}> 
               Erreur:
             </Text>
-            <Text style={[styles.value, { color: theme.getColor.error }]}>
+            <Text style={[styles.value, { color: getColor.error }]}> 
               {integratedTheme.sync.error}
             </Text>
           </View>
@@ -381,7 +381,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
       </View>
       
       <TouchableOpacity 
-        style={[styles.actionButton, { backgroundColor: theme.getColor.primary }]}
+        style={[styles.actionButton, { backgroundColor: getColor.primary }]}
         onPress={handleForceSync}
         disabled={integratedTheme.sync.isSyncing}
       >
@@ -393,10 +393,10 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.getColor.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.getColor.card }]}>
-        <View style={styles.headerTop}>
-          <Text style={[styles.title, { color: theme.getColor.text }]}>
+    <View style={[styles.container, { backgroundColor: getColor.background }]}> 
+      <View style={[styles.header, { backgroundColor: getColor.card }]}> 
+        <View style={styles.headerTop}> 
+          <Text style={[styles.title, { color: getColor.text }]}> 
             Tableau de Bord Thème
           </Text>
           <ThemeToggle size={24} />
@@ -409,15 +409,15 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
               style={[
                 styles.tab,
                 { 
-                  backgroundColor: activeTab === tab ? theme.getColor.primary : theme.getColor.border,
-                  borderColor: theme.getColor.border,
+                  backgroundColor: activeTab === tab ? getColor.primary : getColor.border,
+                  borderColor: getColor.border,
                 }
               ]}
               onPress={() => setActiveTab(tab)}
             >
               <Text style={[
                 styles.tabText,
-                { color: activeTab === tab ? '#ffffff' : theme.getColor.text }
+                { color: activeTab === tab ? '#ffffff' : getColor.text }
               ]}>
                 {tab === 'overview' && 'Vue d\'ensemble'}
                 {tab === 'performance' && 'Performance'}

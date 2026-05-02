@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   logoWrapper: {
     width: 60,
     height: 60,
-    borderRadius: RADIUS.sm,
+      borderRadius: RADIUS.sm,
     backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 56,
     height: 56,
-    borderRadius: RADIUS.xs,
+    borderRadius: RADIUS.sm,
   },
   topRight: {
     flex: 1,

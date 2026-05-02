@@ -42,7 +42,7 @@ const AddUserModal: React.FC<Props> = ({
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const { isDesktop } = useResponsive();
   const [form, setForm] = useState<UserData>(

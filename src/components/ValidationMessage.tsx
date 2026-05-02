@@ -19,7 +19,7 @@ export const ValidationMessage: React.FC<ValidationMessageProps> = ({
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   if (!visible || !error) return null;
 

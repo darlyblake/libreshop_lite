@@ -22,7 +22,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const errorMessage = typeof error === 'string' ? error : error.message;
   

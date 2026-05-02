@@ -418,7 +418,7 @@ export const SellerStoreScreen: React.FC = () => {
     if (!value) return null;
     return (
       <View style={styles.infoRow}>
-        <Ionicons name={icon} size={20} color={getColor.accent} />
+        <Ionicons name={icon as any} size={20} color={getColor.accent} />
         <View style={{ marginLeft: spacing.md }}>
           <Text style={styles.infoLabel}>{label}</Text>
           <Text style={styles.infoValue}>{value}</Text>
@@ -429,7 +429,7 @@ export const SellerStoreScreen: React.FC = () => {
 
   const renderSettingItem = (icon: any, label: string, danger?: boolean, onPress?: () => void) => (
     <TouchableOpacity style={styles.settingItem} onPress={onPress} disabled={!onPress}>
-      <Ionicons name={icon} size={22} color={danger ? getColor.danger : getColor.accent} />
+      <Ionicons name={icon as any} size={22} color={danger ? getColor.danger : getColor.accent} />
       <Text style={[styles.settingLabel, danger && { color: getColor.danger }]}>{label}</Text>
       <Ionicons name="chevron-forward" size={20} color={getColor.textMuted} />
     </TouchableOpacity>

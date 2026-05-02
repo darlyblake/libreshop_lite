@@ -82,12 +82,12 @@ export const SearchExampleScreen: React.FC<SearchExampleProps> = ({
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: palette.background,
+      backgroundColor: palette.bg,
     },
     searchBarContainer: {
       paddingHorizontal: SPACING.lg,
       paddingVertical: SPACING.md,
-      backgroundMergeColor: palette.card,
+      backgroundColor: palette.card,
     },
     suggestionsContainer: {
       backgroundColor: palette.card,
@@ -142,7 +142,7 @@ export const SearchExampleScreen: React.FC<SearchExampleProps> = ({
     },
     historyContainer: {
       flex: 1,
-      backgroundColor: palette.background,
+      backgroundColor: palette.bg,
     },
     historyTitle: {
       fontSize: FONT_SIZE.lg,

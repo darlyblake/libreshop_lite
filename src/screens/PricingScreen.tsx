@@ -575,8 +575,27 @@ const styles = StyleSheet.create({
   ctaDescription: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textSoft,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.md,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  disabledBanner: {
+    backgroundColor: COLORS.warning + '20',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.warning,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderRadius: RADIUS.md,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    textAlign: 'center',
   },
 });

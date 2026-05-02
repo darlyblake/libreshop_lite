@@ -135,7 +135,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
   const [currentQuery, setCurrentQuery] = useState('');
   
   const abortControllerRef = useRef<AbortController | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1231,6 +1231,12 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     color: palette.accent,
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
   },
 });
 }

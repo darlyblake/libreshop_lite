@@ -18,7 +18,7 @@ interface OrderCardProps {
   style?: ViewStyle;
 }
 
-const getStatusColor = (status: OrderStatus): string => {
+const getStatusColorFactory = (COLORS: any) => (status: OrderStatus): string => {
   switch (status) {
     case 'pending':
       return COLORS.warning;
@@ -74,7 +74,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+  const getStatusColor = React.useMemo(() => getStatusColorFactory(COLORS), [COLORS]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   return (
     <TouchableOpacity

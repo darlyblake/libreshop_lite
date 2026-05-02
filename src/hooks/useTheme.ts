@@ -59,6 +59,8 @@ export const useTheme = () => {
     shadow: colors.functional.shadow,
     overlay: colors.functional.overlay,
     highlight: colors.functional.highlight,
+    // Alias utilisé par l'UI historique
+    star: colors.functional.accent,
     
     // Couleurs primaires
     primary: colors.primary[500],
@@ -66,9 +68,23 @@ export const useTheme = () => {
     primaryDark: colors.primary[700],
   }), [colors]);
 
+  // Fournir un objet `theme` enrichi pour compatibilité ascendante
+  const themeWithHelpers = useMemo(() => ({
+    ...currentTheme,
+    getColor,
+    spacing,
+    radius,
+    fontSize,
+    fontWeight,
+    isDark,
+    isLight,
+    toggleTheme,
+    setThemeMode,
+  }), [currentTheme, getColor, spacing, radius, fontSize, fontWeight, isDark, isLight, toggleTheme, setThemeMode]);
+
   return {
-    // Thème
-    theme: currentTheme,
+    // Thème (compatibilité: inclut getColor et helpers)
+    theme: themeWithHelpers,
     themeName: theme,
     colors,
     

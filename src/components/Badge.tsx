@@ -75,7 +75,7 @@ export const Badge: React.FC<BadgeProps> = ({
     ]}>
       {icon && (
         <Ionicons 
-          name={icon} 
+          name={icon as any} 
           size={sizeStyles.iconSize} 
           color={variantStyles.text} 
           style={styles.icon}

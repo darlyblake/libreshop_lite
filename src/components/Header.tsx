@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : {}, [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   return (
     <View style={[styles.container, transparent && styles.transparent]}>
