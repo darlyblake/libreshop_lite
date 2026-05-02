@@ -52,7 +52,7 @@ export const SellerProductsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const { width, isMobile, isTablet, isDesktop, spacing, fontSize } = useResponsive();
+  const { width, isMobile, isTablet, isDesktop, spacing, fontSize, grid } = useResponsive();
 
   // Core state
   const [searchQuery, setSearchQuery] = useState('');
@@ -379,6 +379,8 @@ export const SellerProductsScreen: React.FC = () => {
     const isSelected = selectedProducts.has(product.id);
     const isGrid = viewMode === 'grid';
 
+    const itemWidthStyle = isGrid ? { width: grid?.getColumnWidth ? grid.getColumnWidth(1) - 8 : Math.floor((width - spacing.md * 2) / (isDesktop ? 3 : isTablet ? 2 : 2)) } : undefined;
+
     return (
       <TouchableOpacity
         key={product.id}
@@ -386,6 +388,7 @@ export const SellerProductsScreen: React.FC = () => {
           styles.productCard,
           isGrid && styles.productCardGrid,
           isSelected && styles.productCardSelected,
+          itemWidthStyle,
         ]}
         onPress={() => {
           if (selectionMode) { toggleSelectProduct(product.id); return; }
@@ -571,8 +574,11 @@ export const SellerProductsScreen: React.FC = () => {
           <Text style={styles.headerTitle}>Mes Produits</Text>
           <View style={styles.planBadgeContainer}>
             <Text style={styles.headerSubtitle}>
-              {products.length}{store?.product_limit ? ` / ${store.product_limit}` : ''} produit{products.length !== 1 ? 's' : ''}
-              {products.length > 0 ? ' • Appuyez pour plus d\'options' : ''}
+              {products.length}
+              {typeof store?.product_limit === 'number' ? (
+                store.product_limit === -1 ? ` / ∞` : ` / ${store.product_limit}`
+              ) : ''} produit{products.length !== 1 ? 's' : ''}
+              {products.length > 0 ? " • Appuyez pour plus d'options" : ''}
             </Text>
             {store?.subscription_plan && (
               <View style={styles.planBadge}>
@@ -609,35 +615,35 @@ export const SellerProductsScreen: React.FC = () => {
       {/* Stats bar */}
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.accent }]}>{stats.inStock}</Text>
+          <Text style={[styles.statNumber, { color: COLORS.accent }]}>{Number(stats.inStock ?? 0).toLocaleString()}</Text>
           <Text style={styles.statLabel}>✅ En stock</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{stats.lowStock}</Text>
+          <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{Number(stats.lowStock ?? 0).toLocaleString()}</Text>
           <Text style={styles.statLabel}>⚠️ Stock faible</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.danger }]}>{stats.outOfStock}</Text>
+          <Text style={[styles.statNumber, { color: COLORS.danger }]}>{Number(stats.outOfStock ?? 0).toLocaleString()}</Text>
           <Text style={styles.statLabel}>❌ Rupture</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.textSoft }]}>{stats.inactive}</Text>
+          <Text style={[styles.statNumber, { color: COLORS.textSoft }]}>{Number(stats.inactive ?? 0).toLocaleString()}</Text>
           <Text style={styles.statLabel}>👁️‍🗨️ Masqués</Text>
         </View>
         {stats.promoCount > 0 && <>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>{stats.promoCount}</Text>
+            <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>{Number(stats.promoCount ?? 0).toLocaleString()}</Text>
             <Text style={styles.statLabel}>🏷️ Promo</Text>
           </View>
         </>}
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.accent }]}>
-             {stats.totalViews >= 1000 ? `${(stats.totalViews / 1000).toFixed(1)}K` : stats.totalViews}
+          <Text style={[styles.statNumber, { color: COLORS.accent }]}> 
+             {Number(stats.totalViews || 0) >= 1000 ? `${(Number(stats.totalViews || 0) / 1000).toFixed(1)}K` : Number(stats.totalViews || 0).toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>👁️ Vues</Text>
         </View>
@@ -659,6 +665,7 @@ export const SellerProductsScreen: React.FC = () => {
         renderItem={({ item }) => renderProduct(item)}
         keyExtractor={(item) => item.id}
         numColumns={viewMode === 'grid' ? 2 : 1}
+        columnWrapperStyle={viewMode === 'grid' ? { justifyContent: 'space-between', paddingHorizontal: spacing.md } : undefined}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.listContent, 

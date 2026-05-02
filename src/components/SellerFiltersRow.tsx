@@ -62,10 +62,10 @@ export const SellerFiltersRow: React.FC<Props> = ({
             <Text
               style={[
                 styles.statValue,
-                { color: selectedId === filter.id ? COLORS.text : COLORS.text },
+                { color: selectedId === filter.id ? '#fff' : COLORS.text },
               ]}
             >
-              {counts ? counts[filter.id] || 0 : 0}
+              {String(counts?.[filter.id] ?? 0)}
             </Text>
             <Text
               style={[
