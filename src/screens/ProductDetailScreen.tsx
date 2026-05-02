@@ -904,25 +904,29 @@ export const ProductDetailScreen: React.FC = () => {
             data={productData?.images || []}
             keyExtractor={(_, index) => index.toString()}
             contentContainerStyle={styles.thumbnailStrip}
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedImageIndex(index);
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-                style={[
-                  styles.thumb,
-                  selectedImageIndex === index && styles.thumbActive,
-                ]}
-                activeOpacity={0.85}
-              >
-                <Image
-                  source={{ uri: cloudinaryService.getOptimizedUrl(item, 800) }}
-                  style={styles.thumbImage}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-            )}
+            renderItem={({ item, index }) => {
+              const thumbSize = isDesktop ? 65 : Math.max(48, Math.round(width * 0.18));
+              return (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedImageIndex(index);
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={[
+                    styles.thumb,
+                    selectedImageIndex === index && styles.thumbActive,
+                    { width: thumbSize, height: thumbSize, borderRadius: Math.round(thumbSize * 0.22) },
+                  ]}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: cloudinaryService.getOptimizedUrl(item, 800) }}
+                    style={[styles.thumbImage, { width: '100%', height: '100%' }]}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
       </View>
@@ -1135,18 +1139,22 @@ export const ProductDetailScreen: React.FC = () => {
           { paddingBottom: 150 + insets.bottom },
         ]}
       >
-        <View style={styles.pageCenter}>
+        <View style={[styles.pageCenter, { paddingTop: isDesktop ? 110 : 20 }] }>
           <View
             style={[
               styles.productGrid,
               isWideScreen && styles.productGridDesktop,
             ]}
-          >{renderImageGallery()}<View style={styles.productInfo}>{renderStorePill()}
+          >{
+            renderImageGallery()
+          }<View style={[styles.productInfo, { paddingHorizontal: isDesktop ? SPACING.lg : SPACING.md, paddingTop: isDesktop ? SPACING.md : SPACING.sm }]}>{renderStorePill()}
               <Text
                 style={[
                   styles.productTitle,
                   isDesktop && styles.productTitleDesktop,
+                  !isDesktop && { fontSize: 22, lineHeight: 28 },
                 ]}
+                numberOfLines={2}
               >
                 {productData.name}
               </Text>
@@ -1360,7 +1368,7 @@ export const ProductDetailScreen: React.FC = () => {
       <View
         style={[
           styles.stickyBottomBar,
-          { paddingBottom: Math.max(insets.bottom, SPACING.md) },
+          { paddingBottom: Math.max(insets.bottom, SPACING.md), paddingTop: isDesktop ? SPACING.md : SPACING.sm },
         ]}
       >
         <View style={styles.stickyPriceCol}>
