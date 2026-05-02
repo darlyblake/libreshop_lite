@@ -41,8 +41,8 @@ const MENU_ITEMS: Array<{
   action?: string;
 }> = [
   { icon: 'storefront-outline', label: 'Ouvrir ma boutique', screen: 'SellerAuth' as any },
-  { icon: 'person-outline', label: 'Informations personnelles', soon: true },
-  { icon: 'location-outline', label: 'Adresses enregistrées', soon: true },
+  { icon: 'person-outline', label: 'Informations personnelles' },
+  { icon: 'location-outline', label: 'Adresses enregistrées' },
   { icon: 'heart-outline', label: 'Mes favoris', screen: 'Wishlist' },
   { icon: 'receipt-outline', label: 'Mes Commandes', screen: 'ClientOrders' },
   { icon: 'sync-outline', label: 'Restaurer mon historique', action: 'restore' },
@@ -88,7 +88,7 @@ export const ClientProfileScreen: React.FC = () => {
           setFavoritesCount(0);
         }
 
-        setAddressesCount(0);
+        setAddressesCount(user.address ? 1 : 0);
       } catch (error) {
         errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error loading user data:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
@@ -176,6 +176,20 @@ export const ClientProfileScreen: React.FC = () => {
   const handleMenuPress = (item: (typeof MENU_ITEMS)[number]) => {
     if (item.action === 'restore') {
       setShowRestoreModal(true);
+      return;
+    }
+    if (item.label === 'Informations personnelles') {
+      Alert.alert(
+        'Informations personnelles',
+        `Nom: ${user?.full_name || 'Non renseigné'}\nTéléphone: ${user?.whatsapp_number || user?.phone || 'Non renseigné'}\nEmail: ${user?.email || 'Guest'}`
+      );
+      return;
+    }
+    if (item.label === 'Adresses enregistrées') {
+      Alert.alert(
+        'Adresses enregistrées',
+        user?.address ? `Adresse actuelle :\n${user.address}` : "Aucune adresse enregistrée. Passez une commande pour enregistrer votre adresse."
+      );
       return;
     }
     if (item.soon) {
@@ -418,6 +432,11 @@ export const ClientProfileScreen: React.FC = () => {
             <Text style={styles.userPhone}>
               {user?.whatsapp_number || user?.phone || 'Téléphone non renseigné'}
             </Text>
+            {user?.address && (
+              <Text style={[styles.userPhone, { marginTop: 2 }]} numberOfLines={1}>
+                <Ionicons name="location-outline" size={12} color={getColor.textMuted} /> {user.address}
+              </Text>
+            )}
             <Text style={styles.joinDate}>
               Membre depuis {user?.created_at ? formatDate(user.created_at) : 'Date inconnue'}
             </Text>

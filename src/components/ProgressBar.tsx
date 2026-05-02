@@ -41,6 +41,6 @@ const styles = StyleSheet.create({
   progress: {
     height: '100%',
     borderRadius: 9999, // full radius
-    transition: 'width 0.3s ease',
+    // transition: 'width 0.3s ease', // Removed invalid RN style property
   },
 });

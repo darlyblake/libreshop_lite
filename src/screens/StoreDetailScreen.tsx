@@ -1726,6 +1726,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.md,
+    justifyContent: 'space-between',
   },
   productCardWrapper: {
     // width is set dynamically
@@ -1907,7 +1908,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   reviewFormContainer: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     marginBottom: SPACING.xl,
@@ -1966,7 +1967,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   reviewItem: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.md,
     padding: SPACING.lg,
     borderWidth: 1,
@@ -2012,12 +2013,6 @@ const styles = StyleSheet.create({
   homepageProductsSection: {
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.xl,
-  },
-  productsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.md,
-    justifyContent: 'space-between',
   },
   productCard: {
     width: '48%',

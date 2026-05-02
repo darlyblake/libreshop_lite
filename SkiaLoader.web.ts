@@ -1,85 +1,77 @@
 import { LoadSkiaWeb } from "@shopify/react-native-skia/lib/module/web";
 
-const CDN_BASE = 'https://cdn.jsdelivr.net/npm/canvaskit-wasm@0.41.0/bin/full';
+const CANVASKIT_VERSION = '0.41.0';
 
-async function localAvailable(localPath: string, timeout = 2000): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-
-    // Try to fetch a small portion and validate it's actually a WASM file.
-    const res = await fetch(localPath, { method: 'GET', signal: controller.signal });
-    clearTimeout(id);
-
-    if (!res.ok) return false;
-
-    // Check content-type when available
-    const ct = res.headers.get('content-type') || '';
-    if (ct && ct.indexOf('application/wasm') === -1 && ct.indexOf('application/octet-stream') === -1) {
-      // If content-type is not wasm/octet, still read first bytes to be sure
-    }
-
-    // Read first 4 bytes to verify the WASM magic header (0x00 0x61 0x73 0x6d)
-    try {
-      const ab = await res.arrayBuffer();
-      if (ab && ab.byteLength >= 4) {
-        const dv = new Uint8Array(ab.slice(0, 4));
-        if (dv[0] === 0x00 && dv[1] === 0x61 && dv[2] === 0x73 && dv[3] === 0x6d) {
-          return true;
-        }
-      }
-    } catch (e) {
-      // fallback to false
-      return false;
-    }
-
-    return false;
-  } catch (e) {
-    return false;
-  }
-}
+let initPromise: Promise<void> | null = null;
+let wasmBlobUrl: string | null = null;
 
 export async function initSkiaWeb(): Promise<void> {
-  // Prefer local copy. Check common local paths then fall back to CDN.
-  const localRootA = '/canvaskit.wasm';
-  const localRootB = '/canvaskit/bin/full/canvaskit.wasm';
-  const hasA = await localAvailable(localRootA);
-  const hasB = await localAvailable(localRootB);
+  if (initPromise) return initPromise;
 
-  if (hasB) {
-    try {
-      await LoadSkiaWeb({
-        locateFile: (file: string) => `/canvaskit/bin/full/${file}`,
-      });
-      console.log('Skia Web initialized successfully via local public/canvaskit/bin/full');
-      return;
-    } catch (err) {
-      const msg = err && (err.message || err.toString) ? (err.message || String(err)) : String(err);
-      console.warn('Failed to load Skia Web from local public/canvaskit/bin/full, falling back...', msg);
+  initPromise = (async () => {
+    // 1. Try to fetch and blobify WASM to bypass server MIME issues
+    if (!wasmBlobUrl) {
+      const sources = [
+        { url: '/canvaskit.wasm', name: 'local root' },
+        { url: `https://cdn.jsdelivr.net/npm/canvaskit-wasm@${CANVASKIT_VERSION}/bin/full/canvaskit.wasm`, name: 'jsDelivr' },
+        { url: `https://unpkg.com/canvaskit-wasm@${CANVASKIT_VERSION}/bin/full/canvaskit.wasm`, name: 'unpkg' }
+      ];
+
+      for (const source of sources) {
+        try {
+          console.log(`[SkiaLoader] Attempting to fetch WASM from: ${source.name}...`);
+          const res = await fetch(source.url, { mode: 'cors' });
+          if (res.ok) {
+            const buffer = await res.arrayBuffer();
+            if (buffer.byteLength < 1000) {
+              console.warn(`[SkiaLoader] WASM from ${source.name} seems too small (${buffer.byteLength} bytes), likely an error page.`);
+              continue;
+            }
+            const blob = new Blob([buffer], { type: 'application/wasm' });
+            wasmBlobUrl = URL.createObjectURL(blob);
+            console.log(`[SkiaLoader] Successfully blobified WASM from ${source.name}`);
+            break;
+          }
+        } catch (e) {
+          console.warn(`[SkiaLoader] Failed to fetch from ${source.name}:`, e);
+        }
+      }
     }
-  }
 
-  if (hasA) {
-    try {
-      await LoadSkiaWeb({
-        locateFile: (file: string) => `/${file}`,
-      });
-      console.log('Skia Web initialized successfully via local root /canvaskit.wasm');
-      return;
-    } catch (err) {
-      const msg = err && (err.message || err.toString) ? (err.message || String(err)) : String(err);
-      console.warn('Failed to load Skia Web from local root /canvaskit.wasm, falling back...', msg);
+    if (!wasmBlobUrl) {
+      console.error('[SkiaLoader] No valid WASM source found.');
+      throw new Error('Skia WASM loading failed: No valid source.');
     }
-  }
 
-  try {
-    await LoadSkiaWeb({
-      locateFile: (file: string) => `${CDN_BASE}/${file}`,
-    });
-    console.log('Skia Web initialized successfully via CDN');
-    return;
-  } catch (err2) {
-    const msg2 = err2 && (err2.message || err2.toString) ? (err2.message || String(err2)) : String(err2);
-    console.error('Failed to load Skia Web completely (CDN):', msg2);
-  }
+    try {
+      console.log('[SkiaLoader] Initializing LoadSkiaWeb with Blob URL...');
+      await LoadSkiaWeb({ 
+        locateFile: () => wasmBlobUrl! 
+      });
+      console.log('[SkiaLoader] Skia Web initialized successfully.');
+    } catch (err: any) {
+      // The 'Infinity' error often happens if the WASM is loaded but fails to initialize a context
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error('[SkiaLoader] CRITICAL: Failed to load Skia Web:', errorMsg, err?.stack || '');
+      
+      // Retry once with a direct CDN URL if Blob failed
+      if (errorMsg === 'Infinity') {
+        try {
+          console.log('[SkiaLoader] Retrying with direct jsDelivr URL due to Infinity error...');
+          await LoadSkiaWeb({ 
+            locateFile: () => `https://cdn.jsdelivr.net/npm/canvaskit-wasm@${CANVASKIT_VERSION}/bin/full/canvaskit.wasm` 
+          });
+          console.log('[SkiaLoader] Skia Web initialized successfully on retry.');
+        } catch (retryErr: any) {
+          initPromise = null;
+          throw retryErr;
+        }
+      } else {
+        initPromise = null;
+        throw err;
+      }
+    }
+  })();
+
+  return initPromise;
 }

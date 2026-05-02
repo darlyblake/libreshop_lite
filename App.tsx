@@ -37,6 +37,8 @@ if (Platform.OS === 'web') {
       msg.includes('PushTokenManager') ||
       msg.includes('onStartShouldSetResponder') ||
       msg.includes('onResponder') ||
+      msg.includes('recordTouchEnd') ||
+      msg.includes('touch start') ||
       msg.includes('transform-origin') ||
       msg.includes('TouchableMixin') ||
       msg.includes('None of the callbacks in the gesture are worklets') ||
@@ -64,6 +66,8 @@ if (Platform.OS === 'web') {
       msg.includes('onResponder') ||
       msg.includes('onStartShouldSetResponder') ||
       msg.includes('aria-hidden') ||
+      msg.includes('Blocked aria-hidden') ||
+      msg.includes('descendant retained focus') ||
       msg.includes('react-devtools') ||
       msg.includes('Failed to fetch') ||
       msg.includes('ERR_NAME_NOT_RESOLVED') ||

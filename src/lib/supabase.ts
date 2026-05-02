@@ -117,6 +117,7 @@ export interface User {
   whatsapp_number?: string;
   role: UserRole;
   avatar_url?: string;
+  address?: string;
   created_at: string;
 }
 

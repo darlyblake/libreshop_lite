@@ -441,7 +441,7 @@ const ActionCard = ({ title, desc, icon, color, onPress }: any) => {
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: color + '15' }]}>
-        <Ionicons name={icon} size={28} color={color} />
+        <Ionicons name={icon as any} size={28} color={color} />
       </View>
       <View style={styles.cardInfo}>
         <Text style={[styles.cardTitle, { color: getColor.text }]}>{title}</Text>

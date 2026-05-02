@@ -35,6 +35,7 @@ import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { adminService } from '../services/adminService';
 import { analyticsService, TimelineDataPoint, TopStoreData } from '../services/analyticsService';
+import { systemAlertService, SystemAlert } from '../services/systemAlertService';
 import { useAuthStore } from '../store';
 
 const { width } = Dimensions.get('window');
@@ -70,6 +71,7 @@ export const AdminDashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
   const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -132,6 +134,15 @@ export const AdminDashboardScreen: React.FC = () => {
       }
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'load unread notifications');
+    }
+  }, []);
+  
+  const loadSystemAlerts = useCallback(async () => {
+    try {
+      const alerts = await systemAlertService.getActiveAlerts();
+      setSystemAlerts(alerts);
+    } catch (e) {
+      // silent fail
     }
   }, []);
 
@@ -358,6 +369,7 @@ export const AdminDashboardScreen: React.FC = () => {
       await loadStats();
       await loadUnreadNotifications();
       await loadRecentActivity();
+      await loadSystemAlerts();
     } finally {
       setRefreshing(false);
     }
@@ -383,6 +395,7 @@ export const AdminDashboardScreen: React.FC = () => {
           await loadStats();
           await loadUnreadNotifications();
           await loadRecentActivity();
+          await loadSystemAlerts();
         } catch {
           if (mounted) setConnectionLabel('Non connecté');
         }
@@ -482,6 +495,36 @@ export const AdminDashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      {/* System Alerts Banner */}
+      {systemAlerts.map((alert) => (
+        <Animated.View 
+          key={alert.key}
+          entering={FadeInDown.duration(400)}
+          style={[
+            styles.alertBanner, 
+            { backgroundColor: alert.severity === 'danger' ? COLORS.danger + '20' : COLORS.warning + '20' }
+          ]}
+        >
+          <Ionicons 
+            name={alert.severity === 'danger' ? 'alert-circle' : 'warning'} 
+            size={20} 
+            color={alert.severity === 'danger' ? COLORS.danger : COLORS.warning} 
+          />
+          <Text style={[
+            styles.alertText, 
+            { color: alert.severity === 'danger' ? COLORS.danger : COLORS.warning }
+          ]}>
+            {alert.message}
+          </Text>
+          <TouchableOpacity 
+            onPress={() => systemAlertService.resolveAlert(alert.key).then(loadSystemAlerts)}
+            style={styles.alertClose}
+          >
+            <Ionicons name="close" size={18} color={alert.severity === 'danger' ? COLORS.danger : COLORS.warning} />
+          </TouchableOpacity>
+        </Animated.View>
+      ))}
 
       {/* Stats Cards avec animation */}
       <View style={styles.statsGrid}>
@@ -829,6 +872,30 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  retryButtonText: {
+    color: COLORS.text,
+    fontWeight: '600',
+    fontSize: FONT_SIZE.md,
+  },
+  alertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  alertText: {
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+  },
+  alertClose: {
+    padding: 4,
   },
   chartLink: {
     fontSize: FONT_SIZE.sm,

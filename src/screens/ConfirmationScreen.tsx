@@ -146,7 +146,7 @@ export const ConfirmationScreen: React.FC = () => {
             <Text style={styles.cardTitle}>Détails de la commande</Text>
           </View>
           
-          {orderItems.map((item, index) => (
+          {orderItems.map((item: any, index: number) => (
             <View key={index} style={styles.itemRow}>
               <Text style={styles.itemName}>{item.name}</Text>
               <Text style={styles.itemQty}>×{item.quantity}</Text>

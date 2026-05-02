@@ -53,4 +53,14 @@ Le fichier doit lister :
 
 ## Entrées récentes
 
-- Audit SEO : `modifications/SEO_audit_libreshop.shop.md` (2026-04-26)
+- Optimisation IA Recherche : `modifications/2026-04-28-search-ai-optimization.md` (2026-04-28)
+- Migrations Supabase & Fix Skia Web : `modifications/2026-04-29-supabase-migration-and-skia-web-fix.md` (2026-04-29)
+- Système Alertes Admin IA : `modifications/2026-04-29-admin-ai-notifications.md` (2026-04-29)
+- Migration vers Recherche Locale : `modifications/2026-04-29-switch-to-local-search.md` (2026-04-29)
+- Fix Skia (Infinity) & Supabase (400) : `modifications/2026-04-29-skia-and-supabase-fixes.md` (2026-04-29)
+- Stabilisation Skia (Blob URL) : `modifications/2026-04-29-skia-blob-fix.md` (2026-04-29)
+- Fix Annulation Commande (Web) : `modifications/2026-04-29-order-cancel-fix.md` (2026-04-29)
+- Fix Erreur Syntaxe JSX : `modifications/2026-04-29-jsx-syntax-fix.md` (2026-04-29)
+- Notifications & Temps Réel Vendeurs : `modifications/2026-04-29-seller-notifications.md` (2026-04-29)
+- Badges et Indicateurs Commandes Clients : `modifications/2026-04-29-order-badges.md` (2026-04-29)
+- Persistance Profil Client (Nom, Tél, Adresse) : `modifications/2026-04-29-profile-persistence.md` (2026-04-29)

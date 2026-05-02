@@ -290,7 +290,7 @@ export const SellerCollectionScreen: React.FC = () => {
           />
           
           <View style={[styles.gridIcon, { backgroundColor: iconColor + '20' }]}>
-            <Ionicons name={collection.icon} size={fontSize.xxxl} color={iconColor} />
+            <Ionicons name={collection.icon as any} size={fontSize.xxxl} color={iconColor} />
           </View>
           
           <Text style={[styles.gridName, { fontSize: fontSize.lg }]} numberOfLines={1}>
@@ -349,7 +349,7 @@ export const SellerCollectionScreen: React.FC = () => {
         <View style={styles.collectionHeader}>
           <View style={styles.collectionInfo}>
             <View style={[styles.collectionIcon, { backgroundColor: iconColor }]}>
-              <Ionicons name={collection.icon} size={fontSize.xl} color={COLORS.text} />
+              <Ionicons name={collection.icon as any} size={fontSize.xl} color={COLORS.text} />
             </View>
             
             <View style={styles.collectionDetails}>

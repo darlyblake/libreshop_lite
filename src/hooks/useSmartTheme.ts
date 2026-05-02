@@ -15,7 +15,7 @@ interface SmartThemeConfig {
 }
 
 export const useSmartTheme = (config: SmartThemeConfig) => {
-  const { theme, toggleTheme } = useThemeContext();
+  const { theme, themeName, toggleTheme } = useThemeContext();
   const deviceTheme = useColorScheme();
   
   // État pour la détection avancée
@@ -93,19 +93,19 @@ export const useSmartTheme = (config: SmartThemeConfig) => {
 
   // Auto-switch intelligent
   const enableSmartAutoSwitch = () => {
-    if (suggestedTheme !== theme.themeName) {
+    if (suggestedTheme !== themeName) {
       toggleTheme();
     }
   };
 
   // Statistiques d'utilisation
   const usageStats = useMemo(() => ({
-    isAutoSwitchRecommended: suggestedTheme !== theme.themeName,
+    isAutoSwitchRecommended: suggestedTheme !== themeName,
     inactivityTime: Date.now() - userActivity,
     brightnessLevel: ambientLight,
     timeBasedTheme: getOptimalThemeByTime(),
     deviceTheme: deviceTheme,
-  }), [suggestedTheme, theme.themeName, userActivity, ambientLight, deviceTheme]);
+  }), [suggestedTheme, themeName, userActivity, ambientLight, deviceTheme]);
 
   return {
     ...theme,

@@ -55,12 +55,16 @@ module.exports = async function (env, argv) {
     new CopyWebpackPlugin({
       patterns: [
         {
-          from: 'node_modules/canvaskit-wasm/bin/canvaskit.wasm',
+          from: 'node_modules/canvaskit-wasm/bin/full/canvaskit.wasm',
           to: 'canvaskit.wasm',
         },
       ],
     })
   );
+
+  // Support for Skia Web (.wasm)
+  // We use CopyWebpackPlugin to place it at the root, so we don't need an asset rule
+  // that might conflict or rename the file.
 
   // Fix for canvaskit-wasm trying to require Node.js modules on web
   if (!config.resolve) {
@@ -81,6 +85,16 @@ module.exports = async function (env, argv) {
         hostname: 'localhost',
         pathname: '/hot', // Expo Web specific
         port: 19006,
+      },
+    };
+    // Proxy /api to a local dev API server (started with `npm run dev:api`)
+    config.devServer.proxy = {
+      '/api': {
+        target: 'http://localhost:3333',
+        secure: false,
+        changeOrigin: true,
+        timeout: 2000,
+        proxyTimeout: 2000,
       },
     };
   }

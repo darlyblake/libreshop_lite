@@ -457,12 +457,17 @@ export const productService = {
 
   async search(query: string, page = 0, pageSize = 20) {
     const client = useSupabase();
+    const normalizedQuery = query.trim();
     const from = page * pageSize;
     const to = from + pageSize - 1;
+    const searchPattern = `%${normalizedQuery}%`;
+
     const { data, error } = await client
       .from('products')
       .select('*, stores(name, logo_url)')
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .or(
+        `name.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern},reference.ilike.${searchPattern}`
+      )
       .eq('is_active', true)
       .gt('stock', 0)
       .order('created_at', { ascending: false })

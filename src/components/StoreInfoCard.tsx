@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bg,
     borderRadius: RADIUS.lg,
   },
   iconContainer: {

@@ -14,41 +14,44 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import Animated, { 
-  FadeInDown, 
-  FadeOut,
-  Layout,
-  SlideInRight,
-  SlideInLeft,
-  FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  interpolate,
-  Extrapolate,
-} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeIn, FadeInDown, FadeOut, Layout, SlideInRight, SlideInLeft, useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
+import { SortTabs } from '../components/SortTabs';
 import { SearchBar } from '../components/SearchBar';
-import { ProductCard, StoreCard } from '../components/Card';
-import { EmptyState } from '../components/EmptyState';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ProductCard, StoreCard, EmptyState, LoadingSpinner } from '../components';
+import { categoryService } from '../services/categoryService';
+import { grocService } from '../services/grocService';
+import { productService } from '../services/productService';
+import { errorHandler } from '../utils/errorHandler';
+import { useLegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 import { useSearchStore } from '../store/searchStore';
 import { SHADOWS } from '../config/theme';
-import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
-import { useTheme } from '../hooks/useTheme';
-import { RootStackParamList } from '../navigation/types';
-import { Store, Product } from '../lib/supabase';
-import { productService } from '../services/productService';
-import { storeService } from '../services/storeService';
-import { grocService } from '../services/grocService';
-import { SortTabs } from '../components/SortTabs';
-import { categoryService } from '../services/categoryService';
-import { errorHandler } from '../utils/errorHandler';
 
 const { width, height } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
 const PAGE_SIZE = 20;
+
+// Types
+type Product = {
+  id: string;
+  name: string;
+  price: number;
+  images?: string[];
+  stores?: { name: string };
+  created_at?: string;
+  total_sales?: number;
+  view_count?: number;
+};
+
+type Store = {
+  id: string;
+  name: string;
+  category?: string;
+  description?: string;
+  logo_url?: string;
+  product_count?: number;
+};
 
 // Constantes optimisées
 const SEARCH_DEBOUNCE_DELAY = 300;
@@ -113,6 +116,9 @@ const useResponsiveGrid = () => {
 
 type NavigationProp = any;
 
+// Global flag to avoid repeated 504/timeouts if the dev API server is not running
+let isHybridApiAvailable = true;
+
 const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'popular') => {
   const [products, setProducts] = useState<any[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
@@ -129,7 +135,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
   const [currentQuery, setCurrentQuery] = useState('');
   
   const abortControllerRef = useRef<AbortController | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -195,27 +201,47 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
       setSuggestions(filteredSuggestions);
 
       // Try server-side hybrid search first (fast when deployed). Fallback to grocService.
-      try {
-        const apiRes = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=${PAGE_SIZE}`);
-        if (apiRes.ok) {
-          const json = await apiRes.json();
-          const productsData = json.data || [];
-          // Use minimal intent keywords if provided by API
-          setIntentKeywords((json.intentKeywords || []) .filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
-          if (reset) {
-            setProducts(productsData || []);
-            setStores([]);
+      if (isHybridApiAvailable) {
+        try {
+          const apiTimeout = 2000; // Shorter timeout for local dev
+          const apiController = new AbortController();
+          const apiTimeoutId = setTimeout(() => apiController.abort(), apiTimeout);
+          
+          const apiRes = await fetch(`/api/search?q=${encodeURIComponent(q)}&perPage=${PAGE_SIZE}`, {
+            signal: apiController.signal
+          });
+          clearTimeout(apiTimeoutId);
+          
+          if (apiRes.ok) {
+            const ct = (apiRes.headers.get('content-type') || '').toLowerCase();
+            if (!ct.includes('application/json')) {
+              throw new Error('non-json');
+            }
+            const json = await apiRes.json();
+            const productsData = json.data || [];
+            setIntentKeywords((json.intentKeywords || []).filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
+            if (reset) {
+              setProducts(productsData || []);
+              setStores([]);
+            } else {
+              setProducts(prev => [...prev, ...(productsData || [])]);
+            }
+            setHasMore((productsData?.length || 0) === PAGE_SIZE);
+            setLoading(false);
+            setLoadingMore(false);
+            return;
           } else {
-            setProducts(prev => [...prev, ...(productsData || [])]);
+            // If we get a 504 or 404, the API server is likely not running locally.
+            // Disable further attempts to avoid console pollution.
+            if (apiRes.status === 504 || apiRes.status === 404 || apiRes.status === 502) {
+              isHybridApiAvailable = false;
+              console.log('Hybrid API search unavailable (504/404), falling back to client-side grocService for this session.');
+            }
+            throw new Error('api-not-ok');
           }
-          setHasMore((productsData?.length || 0) === PAGE_SIZE);
-          setLoading(false);
-          setLoadingMore(false);
-          return;
+        } catch (e) {
+          // ignore and fallback to grocService
         }
-      } catch (e) {
-        // ignore and fallback to grocService
-        console.warn('Hybrid API search failed, falling back to grocService', e);
       }
 
       const timeoutPromise = new Promise((_, reject) => {
@@ -1205,6 +1231,12 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     color: palette.accent,
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
   },
 });
 }

@@ -11,101 +11,101 @@ import { Badge } from './Badge';
 import { ProgressBar } from './ProgressBar';
 
 export const ThemeDemo: React.FC = () => {
-  const { theme, toggleTheme, isDark, isLight } = useThemeContext();
+  const { getColor, spacing, fontSize, toggleTheme, isDark, isLight, theme } = useThemeContext();
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.getColor.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: getColor.background }]}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.getColor.text }]}>
+        <Text style={[styles.title, { color: getColor.text }]}>
           Démonstration du Thème
         </Text>
-        <Text style={[styles.subtitle, { color: theme.getColor.textSecondary }]}>
+        <Text style={[styles.subtitle, { color: getColor.textSecondary }]}>
           Thème actuel: {isDark ? 'Sombre' : 'Clair'}
         </Text>
         <ThemeToggle size={32} showLabel />
       </View>
 
       {/* Couleurs principales */}
-      <View style={[styles.section, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.section, { backgroundColor: getColor.card }]}>
+        <Text style={[styles.sectionTitle, { color: getColor.text }]}>
           Couleurs Principales
         </Text>
         <View style={styles.colorGrid}>
-          <View style={[styles.colorBox, { backgroundColor: theme.getColor.primary }]}>
+          <View style={[styles.colorBox, { backgroundColor: getColor.primary }]}>
             <Text style={[styles.colorLabel, { color: '#ffffff' }]}>Primary</Text>
           </View>
-          <View style={[styles.colorBox, { backgroundColor: theme.getColor.accent }]}>
+          <View style={[styles.colorBox, { backgroundColor: getColor.accent }]}>
             <Text style={[styles.colorLabel, { color: '#ffffff' }]}>Accent</Text>
           </View>
-          <View style={[styles.colorBox, { backgroundColor: theme.getColor.success }]}>
+          <View style={[styles.colorBox, { backgroundColor: getColor.success }]}>
             <Text style={[styles.colorLabel, { color: '#ffffff' }]}>Success</Text>
           </View>
-          <View style={[styles.colorBox, { backgroundColor: theme.getColor.warning }]}>
+          <View style={[styles.colorBox, { backgroundColor: getColor.warning }]}>
             <Text style={[styles.colorLabel, { color: '#ffffff' }]}>Warning</Text>
           </View>
-          <View style={[styles.colorBox, { backgroundColor: theme.getColor.error }]}>
+          <View style={[styles.colorBox, { backgroundColor: getColor.error }]}>
             <Text style={[styles.colorLabel, { color: '#ffffff' }]}>Error</Text>
           </View>
-          <View style={[styles.colorBox, { backgroundColor: theme.getColor.info }]}>
+          <View style={[styles.colorBox, { backgroundColor: getColor.info }]}>
             <Text style={[styles.colorLabel, { color: '#ffffff' }]}>Info</Text>
           </View>
         </View>
       </View>
 
       {/* Typographie */}
-      <View style={[styles.section, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.section, { backgroundColor: getColor.card }]}>
+        <Text style={[styles.sectionTitle, { color: getColor.text }]}>
           Typographie
         </Text>
-        <Text style={[styles.display, { color: theme.getColor.text, fontSize: theme.fontSize.display }]}>
+        <Text style={[styles.display, { color: getColor.text, fontSize: fontSize.display }]}> 
           Display Text
         </Text>
-        <Text style={[styles.title, { color: theme.getColor.text, fontSize: theme.fontSize.title }]}>
+        <Text style={[styles.title, { color: getColor.text, fontSize: fontSize.title }]}> 
           Title Text
         </Text>
-        <Text style={[styles.subtitle, { color: theme.getColor.textSecondary, fontSize: theme.fontSize.xl }]}>
+        <Text style={[styles.subtitle, { color: getColor.textSecondary, fontSize: fontSize.xl }]}> 
           Subtitle Large
         </Text>
-        <Text style={[styles.body, { color: theme.getColor.text, fontSize: theme.fontSize.md }]}>
+        <Text style={[styles.body, { color: getColor.text, fontSize: fontSize.md }]}> 
           Body text regular size with proper contrast for readability.
         </Text>
-        <Text style={[styles.caption, { color: theme.getColor.textTertiary, fontSize: theme.fontSize.sm }]}>
+        <Text style={[styles.caption, { color: getColor.textTertiary, fontSize: fontSize.sm }]}> 
           Caption text muted color
         </Text>
       </View>
 
       {/* Espacements */}
-      <View style={[styles.section, { backgroundColor: theme.getColor.card }]}>
+      <View style={[styles.section, { backgroundColor: getColor.card }]}>
         <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
           Espacements
         </Text>
         <View style={styles.spacingDemo}>
-          <View style={[styles.spacingBox, { height: theme.spacing.xs, backgroundColor: theme.getColor.primary }]}>
-            <Text style={[styles.spacingLabel, { color: theme.getColor.text }]}>xs: {theme.spacing.xs}</Text>
+          <View style={[styles.spacingBox, { height: spacing.xs, backgroundColor: getColor.primary }]}> 
+            <Text style={[styles.spacingLabel, { color: getColor.text }]}>xs: {spacing.xs}</Text>
           </View>
-          <View style={[styles.spacingBox, { height: theme.spacing.sm, backgroundColor: theme.getColor.accent }]}>
-            <Text style={[styles.spacingLabel, { color: theme.getColor.text }]}>sm: {theme.spacing.sm}</Text>
+          <View style={[styles.spacingBox, { height: spacing.sm, backgroundColor: getColor.accent }]}> 
+            <Text style={[styles.spacingLabel, { color: getColor.text }]}>sm: {spacing.sm}</Text>
           </View>
-          <View style={[styles.spacingBox, { height: theme.spacing.md, backgroundColor: theme.getColor.success }]}>
-            <Text style={[styles.spacingLabel, { color: theme.getColor.text }]}>md: {theme.spacing.md}</Text>
+          <View style={[styles.spacingBox, { height: spacing.md, backgroundColor: getColor.success }]}> 
+            <Text style={[styles.spacingLabel, { color: getColor.text }]}>md: {spacing.md}</Text>
           </View>
-          <View style={[styles.spacingBox, { height: theme.spacing.lg, backgroundColor: theme.getColor.warning }]}>
-            <Text style={[styles.spacingLabel, { color: theme.getColor.text }]}>lg: {theme.spacing.lg}</Text>
+          <View style={[styles.spacingBox, { height: spacing.lg, backgroundColor: getColor.warning }]}> 
+            <Text style={[styles.spacingLabel, { color: getColor.text }]}>lg: {spacing.lg}</Text>
           </View>
-          <View style={[styles.spacingBox, { height: theme.spacing.xl, backgroundColor: theme.getColor.error }]}>
-            <Text style={[styles.spacingLabel, { color: theme.getColor.text }]}>xl: {theme.spacing.xl}</Text>
+          <View style={[styles.spacingBox, { height: spacing.xl, backgroundColor: getColor.error }]}> 
+            <Text style={[styles.spacingLabel, { color: getColor.text }]}>xl: {spacing.xl}</Text>
           </View>
         </View>
       </View>
 
       {/* Composants migrés */}
-      <View style={[styles.section, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.section, { backgroundColor: getColor.card }]}>
+        <Text style={[styles.sectionTitle, { color: getColor.text }]}> 
           Composants Migrés
         </Text>
         
         <View style={styles.componentRow}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>Badges:</Text>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}>Badges:</Text>
           <View style={styles.badgeContainer}>
             <Badge label="Success" variant="success" size="small" />
             <Badge label="Warning" variant="warning" size="medium" />
@@ -114,20 +114,20 @@ export const ThemeDemo: React.FC = () => {
         </View>
 
         <View style={styles.componentRow}>
-          <Text style={[styles.label, { color: theme.getColor.textSecondary }]}>Progress:</Text>
+          <Text style={[styles.label, { color: getColor.textSecondary }]}>Progress:</Text>
           <ProgressBar progress={0.3} />
-          <ProgressBar progress={0.7} color={theme.getColor.success} />
-          <ProgressBar progress={1.0} color={theme.getColor.error} />
+          <ProgressBar progress={0.7} color={getColor.success} />
+          <ProgressBar progress={1.0} color={getColor.error} />
         </View>
       </View>
 
       {/* Boutons d'action */}
-      <View style={[styles.section, { backgroundColor: theme.getColor.card }]}>
-        <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
+      <View style={[styles.section, { backgroundColor: getColor.card }]}> 
+        <Text style={[styles.sectionTitle, { color: getColor.text }]}> 
           Actions
         </Text>
         <TouchableOpacity 
-          style={[styles.button, { backgroundColor: theme.getColor.primary }]}
+          style={[styles.button, { backgroundColor: getColor.primary }]}
           onPress={toggleTheme}
         >
           <Text style={[styles.buttonText, { color: '#ffffff' }]}>
@@ -141,18 +141,10 @@ export const ThemeDemo: React.FC = () => {
         <Text style={[styles.sectionTitle, { color: theme.getColor.text }]}>
           Informations Système
         </Text>
-        <Text style={[styles.info, { color: theme.getColor.textSecondary }]}>
-          Platform: {theme.platform}
-        </Text>
-        <Text style={[styles.info, { color: theme.getColor.textSecondary }]}>
-          Theme: {theme.name}
-        </Text>
-        <Text style={[styles.info, { color: theme.getColor.textSecondary }]}>
-          High Contrast: {theme.accessibility.highContrast ? 'Oui' : 'Non'}
-        </Text>
-        <Text style={[styles.info, { color: theme.getColor.textSecondary }]}>
-          Reduced Motion: {theme.accessibility.reducedMotion ? 'Oui' : 'Non'}
-        </Text>
+        <Text style={[styles.info, { color: getColor.textSecondary }]}>Platform: {theme.platform}</Text>
+        <Text style={[styles.info, { color: getColor.textSecondary }]}>Theme: {theme.name}</Text>
+        <Text style={[styles.info, { color: getColor.textSecondary }]}>High Contrast: {theme.accessibility.highContrast ? 'Oui' : 'Non'}</Text>
+        <Text style={[styles.info, { color: getColor.textSecondary }]}>Reduced Motion: {theme.accessibility.reducedMotion ? 'Oui' : 'Non'}</Text>
       </View>
     </ScrollView>
   );

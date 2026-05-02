@@ -19,3 +19,13 @@ html, body, #root {
 body {
   background-color: #fafafa;
 }
+
+/* Prevent pathological single-character wrapping on very small computed widths
+   Some mobile/webview combos or injected CSS can force tiny container widths
+   causing each character to wrap. These rules make text wrapping behave
+   normally and avoid break-all behavior. */
+html, body, #root, .css-app-root {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  white-space: normal !important;
+}

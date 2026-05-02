@@ -4,6 +4,10 @@
   "installCommand": "npm install",
   "routes": [
     {
+      "src": "/api/search",
+      "dest": "/api/search.ts"
+    },
+    {
       "src": "/service-worker.js",
       "dest": "/service-worker.js",
       "headers": {

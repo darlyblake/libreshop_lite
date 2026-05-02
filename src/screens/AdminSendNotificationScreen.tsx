@@ -39,7 +39,7 @@ export const AdminSendNotificationScreen: React.FC = () => {
     }
 
     setLoading(true);
-    const recipients = [];
+    const recipients: string[] = [];
     if (sendToClients) recipients.push('Clients');
     if (sendToSellers) recipients.push('Vendeurs');
     if (sendToAdmins) recipients.push('Admins');

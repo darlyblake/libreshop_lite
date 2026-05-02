@@ -85,7 +85,7 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   const themeContext = useTheme();
   const { theme, getColor: COLORS, spacing: SPACING } = themeContext;
   
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const [liked, setLiked] = useState(initialLiked);
   const [likeCount, setLikeCount] = useState(initialCount);

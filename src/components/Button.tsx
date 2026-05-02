@@ -62,7 +62,7 @@ export const Button: React.FC<ButtonProps> = ({
       const iconColor = variant === 'outline' ? COLORS.text : COLORS.text;
       const iconSize = size === 'small' ? 16 : size === 'large' ? 24 : 20;
       
-      return <Ionicons name={icon} size={iconSize} color={iconColor} />;
+      return <Ionicons name={icon as any} size={iconSize} color={iconColor} />;
     }
     
     // Sinon, rendre le nœud React directement

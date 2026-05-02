@@ -28,6 +28,8 @@ export type RootStackParamList = {
   AdminCities: { countryId?: string };
   AdminBanners: undefined;
   AdminBannerForm: { bannerId?: string };
+  AgentChat: undefined;
+  AdminAgentChat: undefined;
   Payment: { amount?: number; orderId?: string };
   BulkPayment: { orders?: any[] };
   ClientTabs: NavigatorScreenParams<ClientTabParamList>;

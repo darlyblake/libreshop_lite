@@ -490,12 +490,15 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
   itemInfo: {
     flex: 1,
     marginLeft: SPACING.md,
+    marginRight: SPACING.sm,
     justifyContent: 'space-between',
   },
   itemName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     color: palette.text,
+    flexWrap: 'wrap',
+    marginBottom: SPACING.xs,
   },
   itemStore: {
     fontSize: FONT_SIZE.sm,
@@ -505,6 +508,8 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
   },
   itemPrice: {
     fontSize: FONT_SIZE.md,
@@ -531,6 +536,7 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
   },
   removeButton: {
     padding: SPACING.xs,
+    flexShrink: 0,
   },
   summarySection: {
     padding: SPACING.xl,
@@ -547,14 +553,19 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.md,
+    gap: SPACING.sm,
   },
   summaryLabel: {
     fontSize: FONT_SIZE.md,
     color: palette.textSoft,
+    flex: 1,
+    flexWrap: 'wrap',
   },
   summaryValue: {
     fontSize: FONT_SIZE.md,
     color: palette.text,
+    fontWeight: '600',
+    flexShrink: 0,
   },
   divider: {
     height: 1,
@@ -640,9 +651,13 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
     backgroundColor: palette.bg,
     borderTopWidth: 1,
     borderTopColor: palette.border,
+    gap: SPACING.md,
+    flexWrap: 'wrap',
   },
   totalContainer: {
     flex: 1,
+    minWidth: 0,
+    flexBasis: '60%',
   },
   bottomTotalLabel: {
     fontSize: FONT_SIZE.sm,
@@ -652,6 +667,7 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
     fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
     color: palette.text,
+    flexWrap: 'wrap',
   },
   checkoutButton: {
     flexDirection: 'row',
@@ -660,6 +676,9 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.full,
+    flexShrink: 0,
+    alignSelf: 'flex-end',
+    minWidth: 140,
   },
   checkoutButtonText: {
     color: palette.text,

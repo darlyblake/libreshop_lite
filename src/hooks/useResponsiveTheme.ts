@@ -9,7 +9,7 @@ import { getBreakpoint, getResponsiveSpacing, getResponsiveFontSize } from '../c
 import { useThemeContext } from '../context/ThemeContext';
 
 export const useResponsiveTheme = () => {
-  const { theme } = useThemeContext();
+  const { theme, getColor, radius } = useThemeContext();
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   
   // Breakpoint actuel
@@ -32,8 +32,8 @@ export const useResponsiveTheme = () => {
   // Styles responsives
   const getResponsiveStyles = useMemo(() => ({
     container: {
-      flex: 1,
-      backgroundColor: theme.getColor.background,
+    flex: 1,
+    backgroundColor: getColor.background,
       padding: spacing.md,
       // Ajustements spécifiques par breakpoint
       ...(breakpoint === 'phone' && { paddingHorizontal: spacing.sm }),
@@ -42,8 +42,8 @@ export const useResponsiveTheme = () => {
     },
     
     card: {
-      backgroundColor: theme.getColor.card,
-      borderRadius: theme.radius.md,
+      backgroundColor: getColor.card,
+      borderRadius: radius.md,
       padding: spacing.md,
       margin: spacing.sm,
       // Ombres adaptatives
@@ -53,7 +53,7 @@ export const useResponsiveTheme = () => {
     },
     
     text: {
-      color: theme.getColor.text,
+      color: getColor.text,
       fontSize: fontSize.md,
       lineHeight: fontSize.md * 1.5,
       // Ajustements de lecture
@@ -61,10 +61,10 @@ export const useResponsiveTheme = () => {
     },
     
     button: {
-      backgroundColor: theme.getColor.primary,
+      backgroundColor: getColor.primary,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
-      borderRadius: theme.radius.sm,
+      borderRadius: radius.sm,
       // Tailles adaptatives
       ...(breakpoint === 'phone' && { minHeight: 44 }), // Touch target minimum
       ...(breakpoint === 'tablet' && { minHeight: 48 }),

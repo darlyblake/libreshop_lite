@@ -612,8 +612,13 @@ export const SellerProductsScreen: React.FC = () => {
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* Stats bar */}
-      <View style={styles.statsBar}>
+      {/* Stats bar - scrollable on mobile */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.statsBar}
+        contentContainerStyle={{ gap: 0, paddingHorizontal: spacing.md }}
+      >
         <View style={styles.statItem}>
           <Text style={[styles.statNumber, { color: COLORS.accent }]}>{Number(stats.inStock ?? 0).toLocaleString()}</Text>
           <Text style={styles.statLabel}>✅ En stock</Text>
@@ -647,7 +652,7 @@ export const SellerProductsScreen: React.FC = () => {
           </Text>
           <Text style={styles.statLabel}>👁️ Vues</Text>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Collection filters */}
       <SellerFiltersRow
@@ -969,26 +974,26 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
 
   // Header
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg },
-  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: '#fff' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg, gap: SPACING.md },
+  headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: '#fff', flex: 1 },
   planBadgeContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   headerSubtitle: { fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.8)' },
   planBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   planBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
-  addButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center' },
+  addButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.25)', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
 
   // Stats bar
-  statsBar: { flexDirection: 'row', backgroundColor: COLORS.card, paddingVertical: SPACING.md, paddingHorizontal: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  statItem: { flex: 1, alignItems: 'center' },
+  statsBar: { flexDirection: 'row', backgroundColor: COLORS.card, paddingVertical: SPACING.md, paddingHorizontal: 0, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  statItem: { minWidth: 70, alignItems: 'center', paddingHorizontal: SPACING.sm },
   statNumber: { fontSize: FONT_SIZE.xl, fontWeight: '800' },
-  statLabel: { fontSize: 10, color: COLORS.textMuted, marginTop: 2, textAlign: 'center' },
+  statLabel: { fontSize: 9, color: COLORS.textMuted, marginTop: 2, textAlign: 'center' },
   statDivider: { width: 1, backgroundColor: COLORS.border, marginVertical: 4 },
 
   // Controls
   controlsBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, gap: SPACING.xs, backgroundColor: COLORS.bg },
-  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderWidth: 1, borderColor: COLORS.border, gap: SPACING.sm },
+  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.card, borderRadius: RADIUS.lg, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderWidth: 1, borderColor: COLORS.border, gap: SPACING.sm, minWidth: 200 },
   searchInput: { flex: 1, color: COLORS.text, fontSize: FONT_SIZE.md },
-  controlBtn: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center' },
+  controlBtn: { width: 40, height: 40, borderRadius: RADIUS.md, backgroundColor: COLORS.card, borderWidth: 1, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   controlBtnActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
   filterDot: { position: 'absolute', top: 8, right: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.danger },
 

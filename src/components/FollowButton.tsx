@@ -102,7 +102,7 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   const themeContext = useTheme();
   const { theme, getColor: COLORS, spacing: SPACING, radius: RADIUS } = themeContext;
   
-  const styles = React.useMemo(() => typeof getStyles === 'function' ? getStyles(themeContext) : ({} as any), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const [following, setFollowing] = useState(initialFollowing);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);

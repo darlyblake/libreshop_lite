@@ -53,6 +53,8 @@ export const ProductDetailScreen: React.FC = () => {
     radius: RADIUS,
   } = useTheme();
 
+  const isDarkTheme = Boolean((theme as any)?.isDark ?? false);
+  const STAR_COLOR = (COLORS as any)?.star ?? '#f1c40f';
   const { addItem, items } = useCartStore();
   const { user } = useAuthStore();
 
@@ -902,25 +904,29 @@ export const ProductDetailScreen: React.FC = () => {
             data={productData?.images || []}
             keyExtractor={(_, index) => index.toString()}
             contentContainerStyle={styles.thumbnailStrip}
-            renderItem={({ item, index }) => (
-              <TouchableOpacity
-                onPress={() => {
-                  setSelectedImageIndex(index);
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-                style={[
-                  styles.thumb,
-                  selectedImageIndex === index && styles.thumbActive,
-                ]}
-                activeOpacity={0.85}
-              >
-                <Image
-                  source={{ uri: cloudinaryService.getOptimizedUrl(item, 800) }}
-                  style={styles.thumbImage}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-            )}
+            renderItem={({ item, index }) => {
+              const thumbSize = isDesktop ? 65 : Math.max(48, Math.round(width * 0.18));
+              return (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedImageIndex(index);
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  style={[
+                    styles.thumb,
+                    selectedImageIndex === index && styles.thumbActive,
+                    { width: thumbSize, height: thumbSize, borderRadius: Math.round(thumbSize * 0.22) },
+                  ]}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: cloudinaryService.getOptimizedUrl(item, 800) }}
+                    style={[styles.thumbImage, { width: '100%', height: '100%' }]}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              );
+            }}
           />
         )}
       </View>
@@ -933,24 +939,24 @@ export const ProductDetailScreen: React.FC = () => {
       <TouchableOpacity
         style={styles.shopBrand}
         onPress={() =>
-          navigation.navigate("StoreDetail", { storeId: productData.store.id })
+            navigation.navigate("StoreDetail", { storeId: productData?.store?.id })
         }
         activeOpacity={0.85}
       >
-        {productData.store.logoUrl ? (
-          <Image
-            source={{ uri: cloudinaryService.getOptimizedUrl(productData.store.logoUrl, 800) }}
-            style={styles.shopImg}
-          />
-        ) : (
-          <View style={styles.shopImgPlaceholder} />
-        )}
-        <Text style={styles.shopName} numberOfLines={1}>
-          {productData.store.name}
-        </Text>
-        {productData.store.verified && (
-          <Ionicons name="checkmark-circle" size={16} color={COLORS.info} />
-        )}
+          {productData?.store?.logoUrl ? (
+            <Image
+              source={{ uri: cloudinaryService.getOptimizedUrl(productData?.store?.logoUrl, 800) }}
+              style={styles.shopImg}
+            />
+          ) : (
+            <View style={styles.shopImgPlaceholder} />
+          )}
+          <Text style={styles.shopName} numberOfLines={1}>
+            {productData?.store?.name}
+          </Text>
+          {productData?.store?.verified && (
+            <Ionicons name="checkmark-circle" size={16} color={(COLORS as any).info} />
+          )}
       </TouchableOpacity>
     );
   };
@@ -1018,7 +1024,7 @@ export const ProductDetailScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <StatusBar
-          barStyle={theme.isDark ? "light-content" : "dark-content"}
+          barStyle={isDarkTheme ? "light-content" : "dark-content"}
           backgroundColor="transparent"
           translucent
         />
@@ -1079,7 +1085,7 @@ export const ProductDetailScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <StatusBar
-          barStyle={theme.isDark ? "light-content" : "dark-content"}
+          barStyle={isDarkTheme ? "light-content" : "dark-content"}
           backgroundColor="transparent"
           translucent
         />
@@ -1104,7 +1110,7 @@ export const ProductDetailScreen: React.FC = () => {
 
   if (Platform.OS === 'web' && !loading && productData) {
     return (
-      <View style={[styles.container, { backgroundColor: (theme && theme.bg) || COLORS.bg }] as any}>
+      <View style={[styles.container, { backgroundColor: (theme && (theme as any).bg) || (COLORS as any).bg }] as any}>
         <WebProductView />
       </View>
     );
@@ -1112,8 +1118,8 @@ export const ProductDetailScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle={theme.isDark ? "light-content" : "dark-content"}
+        <StatusBar
+          barStyle={isDarkTheme ? "light-content" : "dark-content"}
         backgroundColor="transparent"
         translucent
       />
@@ -1133,18 +1139,22 @@ export const ProductDetailScreen: React.FC = () => {
           { paddingBottom: 150 + insets.bottom },
         ]}
       >
-        <View style={styles.pageCenter}>
+        <View style={[styles.pageCenter, { paddingTop: isDesktop ? 110 : 20 }] }>
           <View
             style={[
               styles.productGrid,
               isWideScreen && styles.productGridDesktop,
             ]}
-          >{renderImageGallery()}<View style={styles.productInfo}>{renderStorePill()}
+          >{
+            renderImageGallery()
+          }<View style={[styles.productInfo, { paddingHorizontal: isDesktop ? SPACING.lg : SPACING.md, paddingTop: isDesktop ? SPACING.md : SPACING.sm }]}>{renderStorePill()}
               <Text
                 style={[
                   styles.productTitle,
                   isDesktop && styles.productTitleDesktop,
+                  !isDesktop && { fontSize: 22, lineHeight: 28 },
                 ]}
+                numberOfLines={2}
               >
                 {productData.name}
               </Text>
@@ -1160,7 +1170,7 @@ export const ProductDetailScreen: React.FC = () => {
                           filled ? "star" : half ? "star-half" : "star-outline"
                         }
                         size={18}
-                        color={COLORS.star}
+                        color={STAR_COLOR}
                       />
                     );
                   })}
@@ -1243,7 +1253,7 @@ export const ProductDetailScreen: React.FC = () => {
               <Ionicons name="chatbubbles" size={18} color={COLORS.accent2} />
               <Text style={styles.sectionTitle}>
                 Commentaires
-                {productData?.store?.name ? ` · ${productData.store.name}` : ""}
+                {productData?.store?.name ? ` · ${productData?.store?.name}` : ""}
               </Text>
               <View style={styles.sectionBadge}>
                 <Text style={styles.sectionBadgeText}>
@@ -1304,7 +1314,7 @@ export const ProductDetailScreen: React.FC = () => {
                       <Ionicons
                         name={r <= reviewRating ? "star" : "star-outline"}
                         size={18}
-                        color={COLORS.star}
+                        color={STAR_COLOR}
                       />
                     </TouchableOpacity>
                   ))}
@@ -1358,7 +1368,7 @@ export const ProductDetailScreen: React.FC = () => {
       <View
         style={[
           styles.stickyBottomBar,
-          { paddingBottom: Math.max(insets.bottom, SPACING.md) },
+          { paddingBottom: Math.max(insets.bottom, SPACING.md), paddingTop: isDesktop ? SPACING.md : SPACING.sm },
         ]}
       >
         <View style={styles.stickyPriceCol}>
@@ -2089,6 +2099,11 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     gap: SPACING.sm,
+  },
+  headerLikeContainer: {
+    marginLeft: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cartIconContainer: {
     position: "relative",

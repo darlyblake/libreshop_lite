@@ -22,6 +22,8 @@ import { Order, OrderItem, Product, Store, User } from '../lib/supabase';
 import { orderService } from '../services/orderService';
 import { contactStore } from '../services/contactService';
 import { useAuthStore } from '../store';
+import { useNotificationStore } from '../store/notificationStore';
+import { notificationService } from '../services/notificationService';
 
 // Types étendus
 interface OrderWithDetails extends Order {
@@ -119,6 +121,7 @@ export const ClientOrdersScreen: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
   const [markingAsReceived, setMarkingAsReceived] = useState<string | null>(null);
   const [cancelingOrder, setCancelingOrder] = useState<string | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<OrderWithDetails | null>(null);
 
   const palette = useLegacyPalette();
   const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
@@ -246,7 +249,7 @@ export const ClientOrdersScreen: React.FC = () => {
 
   // Annuler une commande (client)
   const cancelOrder = async (orderId: string) => {
-    // Optimistic UI: mark cancelled locally immediately, revert on failure
+    console.log('❌ Cancelling order robustly...', orderId);
     const prevOrders = [...orders];
     const prevSelected = selectedOrder ? { ...selectedOrder } : null;
     try {
@@ -289,34 +292,8 @@ export const ClientOrdersScreen: React.FC = () => {
       Alert.alert('Annulation impossible', 'Cette commande ne peut pas être annulée.');
       return;
     }
-
-    // Web: use native window.confirm for reliable dialog
-    if (typeof window !== 'undefined' && Platform.OS === 'web') {
-      try {
-        const ok = window.confirm(`Souhaitez‑vous vraiment annuler la commande #${order.id} ?`);
-        if (ok) void cancelOrder(order.id);
-      } catch (e) {
-        // fallback to Alert
-        Alert.alert(
-          'Annuler la commande',
-          `Souhaitez‑vous vraiment annuler la commande #${order.id} ?`,
-          [
-            { text: 'Non', style: 'cancel' },
-            { text: 'Oui, annuler', style: 'destructive', onPress: () => void cancelOrder(order.id) },
-          ],
-        );
-      }
-      return;
-    }
-
-    Alert.alert(
-      'Annuler la commande',
-      `Souhaitez‑vous vraiment annuler la commande #${order.id} ?`,
-      [
-        { text: 'Non', style: 'cancel' },
-        { text: 'Oui, annuler', style: 'destructive', onPress: () => void cancelOrder(order.id) },
-      ],
-    );
+    // Improved confirmation using a custom modal state
+    setOrderToCancel(order);
   };
 
   // Contacter le vendeur
@@ -330,6 +307,17 @@ export const ClientOrdersScreen: React.FC = () => {
   // Voir les détails
   const viewOrderDetails = (order: OrderWithDetails) => {
     setSelectedOrder(order);
+    
+    // Mark related notifications as read
+    const unreadNotifs = useNotificationStore.getState().notifications.filter(
+      n => !n.read && n.type === 'order' && n.data?.orderId === order.id
+    );
+    if (unreadNotifs.length > 0) {
+      unreadNotifs.forEach(n => {
+        notificationService.markAsRead(n.id).catch(console.error);
+        useNotificationStore.getState().markAsRead(n.id);
+      });
+    }
   };
 
   // Rafraîchir
@@ -393,12 +381,31 @@ export const ClientOrdersScreen: React.FC = () => {
     return steps;
   };
 
-  const renderOrder = (order: OrderWithDetails) => (
-    <View key={order.id} style={styles.orderCard}>
-      {/* Header avec statut */}
-      <View style={styles.orderHeader}>
-        <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>Commande #{String(order.id).split('-')[0].toUpperCase()}</Text>
+  const renderOrder = (order: OrderWithDetails) => {
+    const unreadNotifs = useNotificationStore.getState().notifications.filter(
+      n => !n.read && n.type === 'order' && n.data?.orderId === order.id
+    );
+    const hasUpdate = unreadNotifs.length > 0;
+
+    return (
+      <View 
+        key={order.id} 
+        style={[
+          styles.orderCard,
+          hasUpdate && { borderColor: palette.accent, borderWidth: 2, backgroundColor: palette.accent + '05' }
+        ]}
+      >
+        {/* Header avec statut */}
+        <View style={styles.orderHeader}>
+          <View style={styles.orderInfo}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.orderId}>Commande #{String(order.id).split('-')[0].toUpperCase()}</Text>
+              {hasUpdate && (
+                <View style={{ backgroundColor: palette.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>MAJ</Text>
+                </View>
+              )}
+            </View>
           <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
           {order.store?.name ? (
             <Text style={styles.storeInline} numberOfLines={1}>{order.store.name}</Text>
@@ -510,7 +517,8 @@ export const ClientOrdersScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
     </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -842,6 +850,44 @@ export const ClientOrdersScreen: React.FC = () => {
           </View>
         </Modal>
       )}
+      {/* Modal de confirmation d'annulation */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={!!orderToCancel}
+        onRequestClose={() => setOrderToCancel(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.filterModal, { padding: SPACING.lg, alignItems: 'center' }]}>
+            <Ionicons name="warning-outline" size={48} color={palette.danger} style={{ marginBottom: SPACING.md }} />
+            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: SPACING.md }]}>
+              Annuler la commande ?
+            </Text>
+            <Text style={[styles.emptySubtitle, { marginBottom: SPACING.xl }]}>
+              Souhaitez-vous vraiment annuler la commande #{orderToCancel ? String(orderToCancel.id).split('-')[0].toUpperCase() : ''} ?
+              Cette action est irréversible.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: SPACING.md, width: '100%' }}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.detailsButton, { flex: 1 }]} 
+                onPress={() => setOrderToCancel(null)}
+              >
+                <Text style={[styles.actionButtonText, { color: palette.accent, marginLeft: 0 }]}>Non, garder</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.cancelButton, { flex: 1 }]} 
+                onPress={() => {
+                  const id = orderToCancel?.id;
+                  setOrderToCancel(null);
+                  if (id) cancelOrder(id);
+                }}
+              >
+                <Text style={[styles.actionButtonText, { color: palette.text, marginLeft: 0 }]}>Oui, annuler</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1101,7 +1147,7 @@ function createClientOrdersStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     backgroundColor: palette.success,
   },
   contactButton: {
-    backgroundColor: 'palette.whatsapp',
+    backgroundColor: palette.whatsapp || '#25D366',
   },
   detailsButton: {
     backgroundColor: palette.accent + '10',

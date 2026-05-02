@@ -156,6 +156,37 @@ export const orderService = {
     }
   },
 
+  async getCountsByStoreByStatus(storeId: string) {
+    const client = useSupabase();
+    const statuses = ['pending', 'accepted', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'];
+    try {
+      const promises = statuses.map((s) =>
+        client
+          .from('orders')
+          .select('id', { head: true, count: 'exact' })
+          .eq('store_id', storeId)
+          .eq('status', s)
+      );
+
+      const results = await Promise.all(promises);
+      const counts: Record<string, number> = {};
+      statuses.forEach((s, i) => {
+        counts[s] = Number(results[i].count || 0);
+      });
+
+      // total count
+      const totalResp: any = await client
+        .from('orders')
+        .select('id', { head: true, count: 'exact' })
+        .eq('store_id', storeId);
+      counts.total = Number(totalResp.count || 0);
+      return counts;
+    } catch (e) {
+      console.warn('getCountsByStoreByStatus failed', e);
+      return {} as Record<string, number>;
+    }
+  },
+
   async getDeliveredTotalByStore(storeId: string) {
     const client = useSupabase();
     try {
@@ -198,18 +229,41 @@ export const orderService = {
 
     const client = useSupabase();
     console.log('🔄 Accepting order...', orderId);
-    
-    const { data, error } = await client.rpc('accept_order', {
-      p_order_id: orderId,
-      p_inventory_only: inventoryOnly
-    });
-    
-    if (error) throw error;
-    
-    // Notification
-    await this.sendCustomerNotification(order, 'accepted');
+    try {
+      const { data, error } = await client.rpc('accept_order', {
+        p_order_id: orderId,
+        p_inventory_only: inventoryOnly
+      });
+      if (error) throw error;
+      // Notification
+      await this.sendCustomerNotification(order, 'accepted');
+      return data;
+    } catch (e: any) {
+      // Fallback for environments where the RPC does not exist OR RPC fails due to constraint errors.
+      const errMsg = String(e?.message || e || '').toLowerCase();
+      const isMissingRpc = e?.code === 'PGRST202' || errMsg.includes('could not find the function') || errMsg.includes('accept_order');
+      const isConstraintViolation = e?.code === '23514' || (errMsg.includes('violates check constraint') && errMsg.includes('orders_status_check'));
 
-    return data;
+      if (isMissingRpc || isConstraintViolation) {
+        console.warn('accept_order RPC missing or failed with constraint, falling back to direct status update', e?.message || e);
+        try {
+          const { data: updated, error: updErr } = await client
+            .from('orders')
+            .update({ status: 'accepted' })
+            .eq('id', orderId)
+            .select('*')
+            .single();
+          if (updErr) throw updErr;
+          // Send notifications similarly to RPC
+          await this.sendCustomerNotification(updated, 'accepted');
+          try { await this.sendSellerNotification(updated, 'new'); } catch (_) { /* ignore */ }
+          return updated;
+        } catch (e2) {
+          throw e2 || e;
+        }
+      }
+      throw e;
+    }
   },
 
   async confirmOrderPayment(orderId: string) {
@@ -232,9 +286,6 @@ export const orderService = {
   },
 
   async cancelOrderRobust(orderId: string) {
-    const order: any = await this.getById(orderId);
-    if (!order) throw new Error("Commande non trouvée");
-
     const client = useSupabase();
     console.log('❌ Cancelling order robustly...', orderId);
     try {
@@ -242,9 +293,15 @@ export const orderService = {
         p_order_id: orderId
       });
       if (error) throw error;
-      // Notification
-      await this.sendCustomerNotification(order, 'cancelled');
-      return data;
+      // Fetch full order for notifications
+      const fullOrder = Array.isArray(data) ? data[0] : data;
+      if (fullOrder) {
+        try {
+          await this.sendCustomerNotification(fullOrder, 'cancelled');
+          await this.sendSellerNotification(fullOrder, 'cancelled');
+        } catch (nErr) { console.warn('Notifications failed', nErr); }
+      }
+      return fullOrder || data;
     } catch (e: any) {
       // If the RPC does not exist (404) or fails for other reasons, fall back to a direct update
       console.warn('cancel_order_robust RPC failed, falling back to direct update', e?.message || e);
@@ -257,7 +314,10 @@ export const orderService = {
         if (updErr) throw updErr;
 
         const updated = await this.getById(orderId);
-        try { await this.sendCustomerNotification(updated, 'cancelled'); } catch (nErr) { console.warn('sendCustomerNotification failed', nErr); }
+        try { 
+          await this.sendCustomerNotification(updated, 'cancelled'); 
+          await this.sendSellerNotification(updated, 'cancelled');
+        } catch (nErr) { console.warn('Notifications failed', nErr); }
         return updated;
       } catch (e2) {
         // rethrow original or fallback error
@@ -304,7 +364,7 @@ export const orderService = {
           break;
       }
 
-      if (title && body) {
+      if (title && body && order.user_id) {
         await notificationService.create({
           user_id: order.user_id,
           title,
@@ -315,6 +375,49 @@ export const orderService = {
       }
     } catch (e) {
       console.warn('Failed to send customer notification:', e);
+    }
+  },
+
+  async sendSellerNotification(order: any, type: 'new' | 'cancelled') {
+    try {
+      const client = useSupabase();
+      
+      // Obtenir le user_id du vendeur
+      let sellerId = order.stores?.user_id || order.store?.user_id;
+      if (!sellerId && order.store_id) {
+        const { data: store } = await client
+          .from('stores')
+          .select('user_id')
+          .eq('id', order.store_id)
+          .single();
+        sellerId = store?.user_id;
+      }
+
+      if (!sellerId) return;
+
+      const orderShortId = order.id.split('-')[0].toUpperCase();
+      let title = '';
+      let body = '';
+
+      if (type === 'new') {
+        title = 'Nouvelle commande ! 🛒';
+        body = `Vous avez reçu une nouvelle commande (#${orderShortId}).`;
+      } else if (type === 'cancelled') {
+        title = 'Commande annulée ❌';
+        body = `La commande #${orderShortId} a été annulée par le client.`;
+      }
+
+      if (title && body) {
+        await notificationService.create({
+          user_id: sellerId,
+          title,
+          body,
+          type: 'order',
+          data: { orderId: order.id, type }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to send seller notification:', e);
     }
   },
 
@@ -380,8 +483,92 @@ export const orderService = {
         }));
         await this.createItems(rows);
         createdOrders.push(created);
+        
+        // Notify seller and customer
+        try {
+          await this.sendSellerNotification(created, 'new');
+          await this.sendCustomerNotification(created, 'pending');
+        } catch (nErr) {
+          console.warn('Initial notifications failed', nErr);
+        }
       }
     }
     return createdOrders;
+  },
+
+  // Stuck order detection and management
+  async getStatusThresholds() {
+    const client = useSupabase();
+    const { data, error } = await client
+      .from('order_status_thresholds')
+      .select('*')
+      .order('status', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getStuckOrders(storeId: string) {
+    const client = useSupabase();
+    const { data, error } = await client.rpc('get_stuck_orders', {
+      p_store_id: storeId,
+    });
+    if (error) throw error;
+    return data || [];
+  },
+
+  calculateDaysInStatus(order: any): number {
+    if (!order.status_changed_at) return 0;
+    const changedAt = new Date(order.status_changed_at);
+    const now = new Date();
+    const diffMs = now.getTime() - changedAt.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    return Math.floor(diffDays);
+  },
+
+  calculateHoursInStatus(order: any): number {
+    if (!order.status_changed_at) return 0;
+    const changedAt = new Date(order.status_changed_at);
+    const now = new Date();
+    const diffMs = now.getTime() - changedAt.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    return Math.floor(diffHours);
+  },
+
+  isOrderStuck(order: any, thresholds: any[]): { isStuck: boolean; threshold?: any; hoursOver?: number } {
+    const threshold = thresholds.find((t) => t.status === order.status);
+    if (!threshold) return { isStuck: false };
+
+    const hoursInStatus = this.calculateHoursInStatus(order);
+    const isStuck = hoursInStatus > threshold.threshold_hours;
+    const hoursOver = isStuck ? hoursInStatus - threshold.threshold_hours : 0;
+
+    return { isStuck, threshold, hoursOver };
+  },
+
+  async getOrdersNeedingNotification(storeId: string) {
+    const client = useSupabase();
+    const thresholds = await this.getStatusThresholds();
+    
+    // Get all non-terminal orders for the store
+    const { data: orders, error } = await client
+      .from('orders')
+      .select('*')
+      .eq('store_id', storeId)
+      .in('status', ['pending', 'accepted', 'paid', 'shipped'])
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+
+    // Filter orders that are stuck and should trigger notification
+    const needNotification = orders?.filter((order: any) => {
+      const stuck = this.isOrderStuck(order, thresholds);
+      if (!stuck.isStuck) return false;
+
+      const threshold = stuck.threshold;
+      // Only notify if past threshold and notification is enabled
+      return threshold?.should_notify_vendor || threshold?.should_notify_customer;
+    }) || [];
+
+    return needNotification;
   },
 };

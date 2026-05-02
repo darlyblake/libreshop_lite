@@ -162,6 +162,9 @@ const useSubscriptionCheck = () => {
 const ClientTabs: React.FC = React.memo(() => {
   const { getColor } = useTheme();
   const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels } = useResponsiveTabBar();
+  const unreadOrdersCount = useNotificationStore((state) => 
+    state.notifications.filter(n => !n.read && n.type === 'order').length
+  );
 
   const getIconName = (routeName: string, focused: boolean): keyof typeof Ionicons.glyphMap => {
     const icons: Record<string, [string, string]> = {
@@ -214,7 +217,15 @@ const ClientTabs: React.FC = React.memo(() => {
       })}
     >
       <ClientTab.Screen name="ClientHome" component={Screens.ClientHomeScreen} options={{ title: 'Accueil' }} />
-      <ClientTab.Screen name="ClientOrders" component={Screens.ClientOrdersScreen} options={{ title: 'Commandes' }} />
+      <ClientTab.Screen 
+        name="ClientOrders" 
+        component={Screens.ClientOrdersScreen} 
+        options={{ 
+          title: 'Commandes',
+          tabBarBadge: unreadOrdersCount > 0 ? unreadOrdersCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: getColor.accent, fontSize: 10 }
+        }} 
+      />
       <ClientTab.Screen name="ClientSearch" component={Screens.ClientSearchScreen} options={{ title: 'Recherche' }} />
       <ClientTab.Screen name="Wishlist" component={Screens.WishlistScreen} options={{ title: 'Favoris' }} />
       <ClientTab.Screen name="ClientProfile" component={Screens.ClientProfileScreen} options={{ title: 'Profil' }} />

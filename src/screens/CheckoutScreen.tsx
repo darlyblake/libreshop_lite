@@ -100,7 +100,7 @@ export const CheckoutScreen: React.FC = () => {
         }
 
         // Mixed cart: gather unique store ids from items and fetch each store
-        const ids = Array.from(new Set((paramItems ?? items).map(i => (i.product as any)?.store_id).filter(Boolean)));
+        const ids = Array.from(new Set((paramItems ?? items).map((i: any) => (i.product as any)?.store_id).filter(Boolean)));
         if (ids.length === 0) {
           setStore(null);
           setStoresData([]);
@@ -109,14 +109,14 @@ export const CheckoutScreen: React.FC = () => {
           return;
         }
 
-        const stores = await Promise.all(ids.map((id) => storeService.getById(id)));
+        const stores = await Promise.all(ids.map((id: unknown) => storeService.getById(id as string)));
         if (!mounted) return;
         setStore(null);
         setStoresData(stores.filter(Boolean));
 
         // compute subtotal per store
         const subtotalByStore: Record<string, number> = {};
-        (paramItems ?? items).forEach((it) => {
+        (paramItems ?? items).forEach((it: any) => {
           const sid = (it.product as any)?.store_id || (it as any).store_id;
           if (!sid) return;
           subtotalByStore[sid] = (subtotalByStore[sid] || 0) + ((it.product?.price || 0) * (it.quantity || 0));
@@ -317,7 +317,7 @@ export const CheckoutScreen: React.FC = () => {
           </View>
           
           <View style={styles.summaryCard}>
-            {(paramItems ?? items).map((item) => (
+            {(paramItems ?? items).map((item: any) => (
               <View key={item.product.id} style={styles.summaryRow}>
                 <Text style={styles.summaryLabel} numberOfLines={1}>
                   {item.product.name} × {item.quantity}
@@ -344,7 +344,7 @@ export const CheckoutScreen: React.FC = () => {
               // Mixed cart: show per-store tax lines
               storesData.map((s) => {
                 const sid = s?.id;
-                const storeSubtotal = (paramItems ?? items).reduce((sum, it) => {
+                const storeSubtotal = (paramItems ?? items).reduce((sum: number, it: any) => {
                   return sum + ((it.product as any)?.store_id === sid ? (it.product.price || 0) * (it.quantity || 0) : 0);
                 }, 0);
                 const tax = s?.tax_rate ? Math.round(storeSubtotal * (s.tax_rate / 100)) : 0;
@@ -487,11 +487,15 @@ export const CheckoutScreen: React.FC = () => {
                 return;
               }
 
-              await userService.upsertProfile(userId, {
+              const updatedUser = await userService.upsertProfile(userId, {
                 full_name: formData.name,
                 phone: formData.phone,
                 whatsapp_number: formData.phone,
+                address: formData.address,
               });
+
+              // Refresh global auth state with updated user data
+              useAuthStore.getState().setUser(updatedUser);
 
               const payload = {
                 user_id: userId,
@@ -517,6 +521,12 @@ export const CheckoutScreen: React.FC = () => {
                   price: it.product.price,
                 }));
                 await orderService.createItems(rows);
+                // Envoi best-effort d'une notification vendeur côté client
+                try {
+                  await orderService.sendSellerNotification(created, 'new');
+                } catch (nErr) {
+                  console.warn('sendSellerNotification failed', nErr);
+                }
               } catch (e: any) {
                 // best-effort
                 console.warn('order_items insert failed', e);
@@ -726,13 +736,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.xl,
+    padding: SPACING.lg,
     backgroundColor: COLORS.bg,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    flexWrap: 'wrap',
   },
   totalContainer: {
     flex: 1,
+    minWidth: 0,
+    flexBasis: '60%',
   },
   bottomTotalLabel: {
     fontSize: FONT_SIZE.sm,
@@ -745,9 +758,12 @@ const styles = StyleSheet.create({
   },
   orderButton: {
     backgroundColor: COLORS.accent,
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.full,
+    flexShrink: 0,
+    alignSelf: 'flex-end',
+    minWidth: 140,
   },
   orderButtonText: {
     color: COLORS.text,
