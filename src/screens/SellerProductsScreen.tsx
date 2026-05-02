@@ -612,56 +612,7 @@ export const SellerProductsScreen: React.FC = () => {
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* Stats bar - scrollable on mobile */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.statsBar}
-        contentContainerStyle={{ gap: 0, paddingHorizontal: spacing.md }}
-      >
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.accent }]}>{Number(stats.inStock ?? 0).toLocaleString()}</Text>
-          <Text style={styles.statLabel}>✅ En stock</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{Number(stats.lowStock ?? 0).toLocaleString()}</Text>
-          <Text style={styles.statLabel}>⚠️ Stock faible</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.danger }]}>{Number(stats.outOfStock ?? 0).toLocaleString()}</Text>
-          <Text style={styles.statLabel}>❌ Rupture</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.textSoft }]}>{Number(stats.inactive ?? 0).toLocaleString()}</Text>
-          <Text style={styles.statLabel}>👁️‍🗨️ Masqués</Text>
-        </View>
-        {stats.promoCount > 0 && <>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>{Number(stats.promoCount ?? 0).toLocaleString()}</Text>
-            <Text style={styles.statLabel}>🏷️ Promo</Text>
-          </View>
-        </>}
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: COLORS.accent }]}> 
-             {Number(stats.totalViews || 0) >= 1000 ? `${(Number(stats.totalViews || 0) / 1000).toFixed(1)}K` : Number(stats.totalViews || 0).toLocaleString()}
-          </Text>
-          <Text style={styles.statLabel}>👁️ Vues</Text>
-        </View>
-      </ScrollView>
-
-      {/* Collection filters */}
-      <SellerFiltersRow
-        filters={filters}
-        selectedId={selectedCollection}
-        onSelect={setSelectedCollection}
-        counts={collectionStats as any}
-        isMobile={isMobile}
-      />
+      {/* Stats and filters are rendered inside FlatList header to prevent overlap while scrolling */}
 
       {/* Product list with pagination */}
       <FlatList
@@ -678,6 +629,57 @@ export const SellerProductsScreen: React.FC = () => {
         ]}
         ListHeaderComponent={
           <View>
+            {/* Stats bar - scrollable on mobile */}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.statsBar}
+              contentContainerStyle={{ gap: 0, paddingHorizontal: spacing.md }}
+            >
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: COLORS.accent }]}>{Number(stats.inStock ?? 0).toLocaleString()}</Text>
+                <Text style={styles.statLabel}>✅ En stock</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: '#F59E0B' }]}>{Number(stats.lowStock ?? 0).toLocaleString()}</Text>
+                <Text style={styles.statLabel}>⚠️ Stock faible</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: COLORS.danger }]}>{Number(stats.outOfStock ?? 0).toLocaleString()}</Text>
+                <Text style={styles.statLabel}>❌ Rupture</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: COLORS.textSoft }]}>{Number(stats.inactive ?? 0).toLocaleString()}</Text>
+                <Text style={styles.statLabel}>👁️‍🗨️ Masqués</Text>
+              </View>
+              {stats.promoCount > 0 && <>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>{Number(stats.promoCount ?? 0).toLocaleString()}</Text>
+                  <Text style={styles.statLabel}>🏷️ Promo</Text>
+                </View>
+              </>}
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: COLORS.accent }]}> 
+                   {Number(stats.totalViews || 0) >= 1000 ? `${(Number(stats.totalViews || 0) / 1000).toFixed(1)}K` : Number(stats.totalViews || 0).toLocaleString()}
+                </Text>
+                <Text style={styles.statLabel}>👁️ Vues</Text>
+              </View>
+            </ScrollView>
+
+            {/* Collection filters */}
+            <SellerFiltersRow
+              filters={filters}
+              selectedId={selectedCollection}
+              onSelect={setSelectedCollection}
+              counts={collectionStats as any}
+              isMobile={isMobile}
+            />
+
             {loading ? (
               <View style={styles.centered}>
                 <ActivityIndicator size="large" color={COLORS.accent} />
