@@ -46,6 +46,10 @@ interface Order {
   paymentStatus?: 'pending' | 'paid' | 'failed';
   deliveryAddress?: string;
   isoDate?: string;
+  status_changed_at?: string;
+  isStuck?: boolean;
+  daysInStatus?: number;
+  hoursInStatus?: number;
 }
 
 const formatTimeAgo = (isoDate?: string) => {
@@ -147,8 +151,12 @@ export const SellerOrdersScreen: React.FC = () => {
   const [storeId, setStoreId] = React.useState<string | null>(null);
   const [storeName, setStoreName] = React.useState<string | null>(null);
   const [summaryCounts, setSummaryCounts] = React.useState<{ total: number; pending: number }>({ total: 0, pending: 0 });
+  const [statusCounts, setStatusCounts] = React.useState<Record<string, number>>({});
   const [deliveredRevenue, setDeliveredRevenue] = React.useState<number>(0);
   const [updatingOrderId, setUpdatingOrderId] = React.useState<string | null>(null);
+  const [thresholds, setThresholds] = React.useState<any[]>([]);
+  const [stuckOrderCount, setStuckOrderCount] = React.useState<number>(0);
+  const [showStuckOnly, setShowStuckOnly] = React.useState(false);
   
   // 🚀 États pour la pagination optimisée
   const [hasMore, setHasMore] = React.useState(true);
@@ -158,13 +166,20 @@ export const SellerOrdersScreen: React.FC = () => {
 
   const filtersWithCounts = useMemo(() => {
     return FILTERS.map((filter) => {
-      const count =
-        filter.id === 'all'
-          ? orders.length
-          : orders.filter((o) => o.status === filter.id).length;
+      // Use server-provided summary counts for global/important filters to avoid
+      // showing only the current page's items (which can be limited by cursor)
+      if (filter.id === 'all') {
+        const total = (statusCounts && typeof statusCounts.total === 'number') ? statusCounts.total : (summaryCounts.total || orders.length);
+        return { ...filter, count: total };
+      }
+      if (filter.id === 'pending') {
+        const pending = (statusCounts && typeof statusCounts.pending === 'number') ? statusCounts.pending : (summaryCounts.pending || orders.filter((o) => o.status === 'pending').length);
+        return { ...filter, count: pending };
+      }
+      const count = orders.filter((o) => o.status === filter.id).length;
       return { ...filter, count };
     });
-  }, [orders]);
+  }, [orders, summaryCounts, statusCounts]);
 
   // 🚀 Fonction de chargement optimisée avec cursor pagination
   const loadOrders = React.useCallback(async (reset = true) => {
@@ -206,10 +221,20 @@ export const SellerOrdersScreen: React.FC = () => {
         setSummaryCounts({ total: 0, pending: 0 });
       });
 
+      // Charger comptes par statut (pour afficher des badges précis même si la page est paginée)
+      orderService.getCountsByStoreByStatus(store.id).then(cnts => {
+        if (cnts) setStatusCounts(cnts || {});
+      }).catch(() => setStatusCounts({}));
+
       // Charger le chiffre d'affaire des commandes livrées
       orderService.getDeliveredTotalByStore(store.id).then(total => {
         setDeliveredRevenue(Number(total || 0));
       }).catch(() => setDeliveredRevenue(0));
+
+      // Charger les seuils de commandes bloquées
+      orderService.getStatusThresholds().then(thresh => {
+        if (thresh) setThresholds(thresh);
+      }).catch(() => setThresholds([]));
 
       // 🎯 Requête optimisée avec cursor et filtres
       const result = await orderService.getByStore(store.id, {
@@ -240,6 +265,11 @@ export const SellerOrdersScreen: React.FC = () => {
         const customerName = String(o?.customer_name || o?.users?.full_name || '').trim();
         const customerPhone = String(o?.customer_phone || o?.users?.phone || '').trim();
 
+        // Calculate stuck order info
+        const daysInStatus = orderService.calculateDaysInStatus(o);
+        const hoursInStatus = orderService.calculateHoursInStatus(o);
+        const stuckInfo = orderService.isOrderStuck(o, thresholds);
+
         return {
           id: String(o.id),
           customer: customerName || (customerPhone ? customerPhone : 'Client'),
@@ -252,6 +282,10 @@ export const SellerOrdersScreen: React.FC = () => {
           paymentStatus: o.payment_status,
           deliveryAddress: o.shipping_address,
           isoDate: o.created_at,
+          status_changed_at: o.status_changed_at,
+          isStuck: stuckInfo.isStuck,
+          daysInStatus,
+          hoursInStatus,
         };
       });
 
@@ -263,6 +297,10 @@ export const SellerOrdersScreen: React.FC = () => {
       } else {
         setOrders(prev => [...prev, ...mapped]);
       }
+
+      // Count stuck orders
+      const stuckCount = mapped.filter(o => o.isStuck).length;
+      setStuckOrderCount(stuckCount);
 
       // 🔄 Mise à jour du curseur et hasMore
       setHasMore(result.hasMore);
@@ -350,8 +388,47 @@ export const SellerOrdersScreen: React.FC = () => {
     loadOrders();
   }, []);
 
+  // 🔔 Notifier vendeur des commandes bloquées tous les 15 min
+  React.useEffect(() => {
+    if (!storeId || orders.length === 0) return;
+
+    const notifyStuckOrders = async () => {
+      try {
+        const stuckOrders = orders.filter(o => o.isStuck && !['delivered', 'cancelled'].includes(o.status));
+        if (stuckOrders.length === 0) return;
+
+        // Créer une notification pour chaque commande bloquée
+        for (const order of stuckOrders) {
+          try {
+            await notificationService.create({
+              user_id: user?.id,
+              type: 'stuck_order',
+              title: `Commande bloquée depuis ${order.daysInStatus}j`,
+              message: `Commande #${order.id.slice(0, 8)} bloquée en ${order.status}. Action requise.`,
+              order_id: order.id,
+              store_id: storeId,
+              data: { orderId: order.id, status: order.status },
+            });
+          } catch (e) {
+            console.warn('Failed to notify stuck order', e);
+          }
+        }
+      } catch (e) {
+        console.warn('Stuck orders notification error:', e);
+      }
+    };
+
+    // Notifier au chargement
+    notifyStuckOrders();
+
+    // Puis toutes les 15 minutes
+    const interval = setInterval(notifyStuckOrders, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [storeId, orders, user?.id]);
+
   // 🚀 Plus besoin de filtrage local - tout est géré par le backend optimisé !
-  const filteredOrders = orders;
+  // Mais on filtre les commandes bloquées côté client si demandé
+  const filteredOrders = showStuckOnly ? orders.filter(o => o.isStuck) : orders;
 
   const stats = useMemo(() => ({
     total: orders.reduce((sum, order) => sum + order.total, 0),
@@ -466,7 +543,7 @@ Merci.`;
   };
 
   const renderOrder = (order: Order) => {
-    const statusColor = getStatusColor(order.status);
+    const statusColor = order.isStuck ? COLORS.danger : getStatusColor(order.status);
     const paymentStatusColor = getPaymentStatusColor(order.paymentStatus);
 
     return (
@@ -479,6 +556,8 @@ Merci.`;
             marginBottom: spacing.md,
             backgroundColor: COLORS.card,
             borderRadius: component.cardBorderRadius,
+            borderWidth: order.isStuck ? 2 : 0,
+            borderColor: order.isStuck ? COLORS.danger : 'transparent',
           }
         ]}
       >
@@ -529,6 +608,32 @@ Merci.`;
               </Text>
             </View>
           </View>
+
+          {/* Alert for stuck orders */}
+          {order.isStuck && (
+            <View style={{
+              backgroundColor: COLORS.danger + '10',
+              borderLeftWidth: 3,
+              borderLeftColor: COLORS.danger,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              borderRadius: 4,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                  <Ionicons name="alert-circle" size={fontSize.lg} color={COLORS.danger} style={{ marginRight: spacing.sm }} />
+                  <View>
+                    <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: COLORS.danger }}>
+                      ⏱️ Bloquée depuis {order.daysInStatus} {order.daysInStatus > 1 ? 'jours' : 'jour'}
+                    </Text>
+                    <Text style={{ fontSize: fontSize.xs, color: COLORS.textMuted, marginTop: 2 }}>
+                      Action requise pour avancer
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
 
           <View style={styles.customerSection}>
             <View style={styles.customerInfo}>
@@ -1159,17 +1264,28 @@ Merci.`;
                   Total livré: <Text style={styles.statValue}>{deliveredRevenue?.toLocaleString() || '0'} F</Text>
                 </Text>
               </View>
-              {summaryCounts.pending > 0 && (
+              {((statusCounts && typeof statusCounts.pending === 'number') ? statusCounts.pending : summaryCounts.pending) > 0 && (
                 <View style={[styles.statBadge, { backgroundColor: COLORS.warning + '10' }]}>
                   <Ionicons name="time" size={fontSize.xs} color={COLORS.warning} />
                   <Text style={[styles.statText, { fontSize: fontSize.xs }]}>
-                    <Text style={{ color: COLORS.warning }}>{summaryCounts.pending}</Text> en attente
+                    <Text style={{ color: COLORS.warning }}>{(statusCounts && typeof statusCounts.pending === 'number') ? statusCounts.pending : summaryCounts.pending}</Text> en attente
                   </Text>
                 </View>
               )}
+              {stuckOrderCount > 0 && (
+                <TouchableOpacity 
+                  style={[styles.statBadge, { backgroundColor: COLORS.danger + '20' }]}
+                  onPress={() => setShowStuckOnly(!showStuckOnly)}
+                >
+                  <Ionicons name="alert-circle" size={fontSize.xs} color={COLORS.danger} />
+                  <Text style={[styles.statText, { fontSize: fontSize.xs }]}>
+                    <Text style={{ color: COLORS.danger, fontWeight: '600' }}>{stuckOrderCount}</Text> bloquée{stuckOrderCount > 1 ? 's' : ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
-          
+
           <View style={styles.headerRight}>
             <TouchableOpacity 
               style={[styles.headerButton, { backgroundColor: COLORS.card }]}

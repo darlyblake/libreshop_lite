@@ -521,6 +521,12 @@ export const CheckoutScreen: React.FC = () => {
                   price: it.product.price,
                 }));
                 await orderService.createItems(rows);
+                // Envoi best-effort d'une notification vendeur côté client
+                try {
+                  await orderService.sendSellerNotification(created, 'new');
+                } catch (nErr) {
+                  console.warn('sendSellerNotification failed', nErr);
+                }
               } catch (e: any) {
                 // best-effort
                 console.warn('order_items insert failed', e);
@@ -730,13 +736,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.xl,
+    padding: SPACING.lg,
     backgroundColor: COLORS.bg,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    flexWrap: 'wrap',
   },
   totalContainer: {
     flex: 1,
+    minWidth: 0,
+    flexBasis: '60%',
   },
   bottomTotalLabel: {
     fontSize: FONT_SIZE.sm,
@@ -749,9 +758,12 @@ const styles = StyleSheet.create({
   },
   orderButton: {
     backgroundColor: COLORS.accent,
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.full,
+    flexShrink: 0,
+    alignSelf: 'flex-end',
+    minWidth: 140,
   },
   orderButtonText: {
     color: COLORS.text,
