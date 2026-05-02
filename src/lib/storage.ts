@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { errorHandler } from '../utils/errorHandler';
 
 const STORAGE_KEYS = {
   USER_SESSION: '@libreshop_user_session',

@@ -27,7 +27,7 @@ interface CloudSyncStatus {
 }
 
 export const useCloudTheme = (userId: string) => {
-  const { theme, toggleTheme } = useThemeContext();
+  const { theme, themeName, isDark, isLight, toggleTheme } = useThemeContext();
   const netInfo = useNetInfo();
   
   const [syncStatus, setSyncStatus] = useState<CloudSyncStatus>({
@@ -60,7 +60,7 @@ export const useCloudTheme = (userId: string) => {
       // Simulation de données pour le moment
       const cloudPrefs = {
         userId,
-        theme: theme.themeName as 'light' | 'dark',
+        theme: themeName as 'light' | 'dark',
         autoSwitch: false,
         scheduleEnabled: false,
         reducedMotion: false,
@@ -73,11 +73,11 @@ export const useCloudTheme = (userId: string) => {
         setPreferences(cloudPrefs);
         
         // Appliquer le thème
-        if (cloudPrefs.theme !== theme.themeName) {
+        if (cloudPrefs.theme !== themeName) {
           // Appliquer le thème du cloud
-          if (cloudPrefs.theme === 'light' && theme.isDark) {
+          if (cloudPrefs.theme === 'light' && isDark) {
             toggleTheme();
-          } else if (cloudPrefs.theme === 'dark' && theme.isLight) {
+          } else if (cloudPrefs.theme === 'dark' && isLight) {
             toggleTheme();
           }
         }
@@ -98,7 +98,7 @@ export const useCloudTheme = (userId: string) => {
       }));
       return false;
     }
-  }, [netInfo.isConnected, userId, preferences, theme.themeName, theme.isDark, theme.isLight, toggleTheme, getDeviceId]);
+  }, [netInfo.isConnected, userId, preferences, themeName, isDark, isLight, toggleTheme, getDeviceId]);
 
   // Sauvegarder les préférences dans le cloud
   const saveToCloud = useCallback(async (prefs: Partial<CloudThemePreferences>) => {
@@ -156,11 +156,11 @@ export const useCloudTheme = (userId: string) => {
   useEffect(() => {
     if (preferences && netInfo.isConnected) {
       saveToCloud({
-        theme: theme.themeName as 'light' | 'dark',
+        theme: themeName as 'light' | 'dark',
         lastUpdated: new Date().toISOString(),
       });
     }
-  }, [theme.themeName]);
+  }, [themeName]);
 
   return {
     ...theme,

@@ -53,6 +53,8 @@ export const ProductDetailScreen: React.FC = () => {
     radius: RADIUS,
   } = useTheme();
 
+  const isDarkTheme = Boolean((theme as any)?.isDark ?? false);
+  const STAR_COLOR = (COLORS as any)?.star ?? '#f1c40f';
   const { addItem, items } = useCartStore();
   const { user } = useAuthStore();
 
@@ -933,24 +935,24 @@ export const ProductDetailScreen: React.FC = () => {
       <TouchableOpacity
         style={styles.shopBrand}
         onPress={() =>
-          navigation.navigate("StoreDetail", { storeId: productData.store.id })
+            navigation.navigate("StoreDetail", { storeId: productData?.store?.id })
         }
         activeOpacity={0.85}
       >
-        {productData.store.logoUrl ? (
-          <Image
-            source={{ uri: cloudinaryService.getOptimizedUrl(productData.store.logoUrl, 800) }}
-            style={styles.shopImg}
-          />
-        ) : (
-          <View style={styles.shopImgPlaceholder} />
-        )}
-        <Text style={styles.shopName} numberOfLines={1}>
-          {productData.store.name}
-        </Text>
-        {productData.store.verified && (
-          <Ionicons name="checkmark-circle" size={16} color={COLORS.info} />
-        )}
+          {productData?.store?.logoUrl ? (
+            <Image
+              source={{ uri: cloudinaryService.getOptimizedUrl(productData?.store?.logoUrl, 800) }}
+              style={styles.shopImg}
+            />
+          ) : (
+            <View style={styles.shopImgPlaceholder} />
+          )}
+          <Text style={styles.shopName} numberOfLines={1}>
+            {productData?.store?.name}
+          </Text>
+          {productData?.store?.verified && (
+            <Ionicons name="checkmark-circle" size={16} color={(COLORS as any).info} />
+          )}
       </TouchableOpacity>
     );
   };
@@ -1018,7 +1020,7 @@ export const ProductDetailScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <StatusBar
-          barStyle={theme.isDark ? "light-content" : "dark-content"}
+          barStyle={isDarkTheme ? "light-content" : "dark-content"}
           backgroundColor="transparent"
           translucent
         />
@@ -1079,7 +1081,7 @@ export const ProductDetailScreen: React.FC = () => {
     return (
       <View style={styles.container}>
         <StatusBar
-          barStyle={theme.isDark ? "light-content" : "dark-content"}
+          barStyle={isDarkTheme ? "light-content" : "dark-content"}
           backgroundColor="transparent"
           translucent
         />
@@ -1104,7 +1106,7 @@ export const ProductDetailScreen: React.FC = () => {
 
   if (Platform.OS === 'web' && !loading && productData) {
     return (
-      <View style={[styles.container, { backgroundColor: (theme && theme.bg) || COLORS.bg }] as any}>
+      <View style={[styles.container, { backgroundColor: (theme && (theme as any).bg) || (COLORS as any).bg }] as any}>
         <WebProductView />
       </View>
     );
@@ -1112,8 +1114,8 @@ export const ProductDetailScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar
-        barStyle={theme.isDark ? "light-content" : "dark-content"}
+        <StatusBar
+          barStyle={isDarkTheme ? "light-content" : "dark-content"}
         backgroundColor="transparent"
         translucent
       />
@@ -1160,7 +1162,7 @@ export const ProductDetailScreen: React.FC = () => {
                           filled ? "star" : half ? "star-half" : "star-outline"
                         }
                         size={18}
-                        color={COLORS.star}
+                        color={STAR_COLOR}
                       />
                     );
                   })}
@@ -1243,7 +1245,7 @@ export const ProductDetailScreen: React.FC = () => {
               <Ionicons name="chatbubbles" size={18} color={COLORS.accent2} />
               <Text style={styles.sectionTitle}>
                 Commentaires
-                {productData?.store?.name ? ` · ${productData.store.name}` : ""}
+                {productData?.store?.name ? ` · ${productData?.store?.name}` : ""}
               </Text>
               <View style={styles.sectionBadge}>
                 <Text style={styles.sectionBadgeText}>
@@ -1304,7 +1306,7 @@ export const ProductDetailScreen: React.FC = () => {
                       <Ionicons
                         name={r <= reviewRating ? "star" : "star-outline"}
                         size={18}
-                        color={COLORS.star}
+                        color={STAR_COLOR}
                       />
                     </TouchableOpacity>
                   ))}
@@ -2089,6 +2091,11 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     gap: SPACING.sm,
+  },
+  headerLikeContainer: {
+    marginLeft: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cartIconContainer: {
     position: "relative",

@@ -61,7 +61,7 @@ export const useIntegratedCloudTheme = (
     enableRealTimeSync: false,
   }
 ) => {
-  const { theme, toggleTheme, setThemeMode } = useThemeContext();
+  const { theme, themeName, toggleTheme, setThemeMode } = useThemeContext();
   const aiTheme = useAITheme();
   const performance = useThemePerformance();
   const netInfo = useNetInfo();
@@ -88,7 +88,7 @@ export const useIntegratedCloudTheme = (
   const createPreferences = useCallback((): ThemePreferences => {
     return {
       userId,
-      theme: theme.themeName as 'light' | 'dark' | 'amoled',
+      theme: themeName as 'light' | 'dark' | 'amoled',
       autoSwitch: false,
       scheduleEnabled: false,
       reducedMotion: false,
@@ -99,7 +99,7 @@ export const useIntegratedCloudTheme = (
       deviceId,
       version: '1.0.0',
     };
-  }, [userId, theme.themeName, aiTheme.learningStats.learningEnabled, deviceId]);
+  }, [userId, themeName, aiTheme.learningStats.learningEnabled, deviceId]);
 
   // Charger les préférences depuis le stockage local
   const loadLocalPreferences = useCallback(async (): Promise<ThemePreferences | null> => {
@@ -271,15 +271,17 @@ export const useIntegratedCloudTheme = (
   // Appliquer les préférences cloud
   const applyCloudPreferences = useCallback(async (cloudPrefs: ThemePreferences) => {
     // Appliquer le thème
-    if (cloudPrefs.theme !== theme.themeName) {
-      setThemeMode(cloudPrefs.theme);
+    if (cloudPrefs.theme !== themeName) {
+      // mapir 'amoled' to a ThemeMode value acceptable by setThemeMode
+      const mapped: any = cloudPrefs.theme === 'amoled' ? 'dark' : cloudPrefs.theme;
+      setThemeMode(mapped as any);
     }
 
     // Appliquer les autres préférences
     // ... autres préférences
 
     await saveLocalPreferences(cloudPrefs);
-  }, [theme.themeName, setThemeMode, saveLocalPreferences]);
+  }, [themeName, setThemeMode, saveLocalPreferences]);
 
   // Synchronisation automatique
   useEffect(() => {
@@ -305,11 +307,11 @@ export const useIntegratedCloudTheme = (
   useEffect(() => {
     if (preferences && netInfo.isConnected) {
       saveToCloud({
-        theme: theme.themeName as 'light' | 'dark' | 'amoled',
+        theme: themeName as 'light' | 'dark' | 'amoled',
         aiEnabled: aiTheme.learningStats.learningEnabled,
       });
     }
-  }, [theme.themeName, aiTheme.learningStats.learningEnabled, preferences, netInfo.isConnected, saveToCloud]);
+  }, [themeName, aiTheme.learningStats.learningEnabled, preferences, netInfo.isConnected, saveToCloud]);
 
   // Initialisation
   useEffect(() => {
@@ -362,7 +364,7 @@ export const useIntegratedCloudTheme = (
   const integratedState = useMemo(() => ({
     // Thème
     theme,
-    themeName: theme.themeName,
+    themeName: themeName,
     
     // IA
     ai: {
@@ -397,11 +399,12 @@ export const useIntegratedCloudTheme = (
     // Actions combinées
     toggleTheme: () => {
       toggleTheme();
-      aiTheme.recordUserAction(theme.themeName === 'light' ? 'dark' : 'light');
+      aiTheme.recordUserAction(themeName === 'light' ? 'dark' : 'light');
     },
     
     setTheme: (mode: 'light' | 'dark' | 'amoled') => {
-      setThemeMode(mode);
+      const mapped = mode === 'amoled' ? 'dark' : mode;
+      setThemeMode(mapped as any);
       aiTheme.recordUserAction(mode);
     },
   }), [theme, aiTheme, performance, syncStatus, toggleTheme, setThemeMode, forceSync, clearCloudData]);
