@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-                    onPress={() => navigation.navigate('SellerCollection')}
   Image,
   ActivityIndicator,
   Platform,
