@@ -7,7 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
+                    onPress={() => navigation.navigate('SellerCollection')}
   Image,
   ActivityIndicator,
   Platform,
@@ -590,7 +590,15 @@ export const SellerProductsScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
+            console.log('[SellerProducts] addButton pressed', { hasAnyCollection, storeProductLimit: store?.product_limit, productsLength: products.length });
             if (!hasAnyCollection) {
+              if (Platform.OS === 'web') {
+                // web-friendly fallback
+                if (window.confirm("Aucune collection trouvée. Voulez-vous créer une collection maintenant ?")) {
+                  navigation.navigate('SellerCollection');
+                }
+                return;
+              }
               Alert.alert('Collections requises', 'Créez d\'abord une collection pour organiser vos produits.', [
                 { text: 'Créer une collection', onPress: () => navigation.navigate('SellerCollection') },
                 { text: 'Annuler', style: 'cancel' },
@@ -598,6 +606,10 @@ export const SellerProductsScreen: React.FC = () => {
               return;
             }
             if (store?.product_limit && products.length >= store.product_limit) {
+              if (Platform.OS === 'web') {
+                window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`);
+                return;
+              }
               Alert.alert(
                 'Limite atteinte',
                 `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
@@ -711,7 +723,12 @@ export const SellerProductsScreen: React.FC = () => {
                   <TouchableOpacity
                     style={styles.emptyBtn}
                     onPress={() => {
+                      console.log('[SellerProducts] emptyState add button pressed', { hasAnyCollection, storeProductLimit: store?.product_limit, productsLength: products.length });
                       if (store?.product_limit && products.length >= store.product_limit) {
+                        if (Platform.OS === 'web') {
+                          window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`);
+                          return;
+                        }
                         Alert.alert(
                           'Limite atteinte',
                           `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
@@ -829,8 +846,14 @@ export const SellerProductsScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.fab, { bottom: spacing.xxl + 25, right: spacing.lg }]}
           onPress={() => {
-            if (!hasAnyCollection) { navigation.navigate('SellerCollection'); return; }
+            console.log('[SellerProducts] FAB pressed', { hasAnyCollection, storeProductLimit: store?.product_limit, productsLength: products.length });
+            if (!hasAnyCollection) { 
+              if (Platform.OS === 'web') { if (window.confirm("Aucune collection trouvée. Voulez-vous créer une collection maintenant ?")) navigation.navigate('SellerCollection'); return; }
+              navigation.navigate('SellerCollection');
+              return; 
+            }
             if (store?.product_limit && products.length >= store.product_limit) {
+              if (Platform.OS === 'web') { window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`); return; }
               Alert.alert(
                 'Limite atteinte',
                 `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
