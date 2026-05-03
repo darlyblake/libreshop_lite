@@ -45,3 +45,29 @@ body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
   .similar-item{flex:0 0 140px}
   .similar img{width:140px;height:140px}
 }
+
+/* Utility classes to replace inline styles */
+.muted-small { color: #666; font-size: 14px; }
+.pos-relative { position: relative; }
+.cursor-pointer { cursor: pointer; }
+.store-name { color: var(--accent); font-weight: 700; }
+.like-heart.liked { color: #e11d48; font-size: 16px; }
+.like-heart.not-liked { color: #666; font-size: 16px; }
+.like-count { font-weight: 700; }
+.flex-gap-center { display:flex; align-items:center; gap:12px; }
+.compare-line { text-decoration: line-through; color: #aaa; }
+.mt-12 { margin-top: 12px; }
+.mb-12 { margin-bottom: 12px; }
+.flex-gap-8 { display:flex; gap:8px; align-items:center; }
+.review-comment { color: #444; }
+.bt-top { border-top: 1px solid #f4f4f4; padding-top: 12px; }
+.bold { font-weight: 700; }
+.input-full { width: 100%; padding: 8px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #eee; }
+.select-style { padding: 8px; margin-bottom: 8px; border-radius: 8px; }
+.textarea-style { width: 100%; padding: 8px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #eee; }
+.flex-gap-8-2 { display:flex; gap:8px; }
+.similar-section { margin-top: 18px; }
+
+.compare-small { font-size: 12px; }
+.wl-inner { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+

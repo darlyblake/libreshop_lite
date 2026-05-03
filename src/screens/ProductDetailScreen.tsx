@@ -239,7 +239,7 @@ export const ProductDetailScreen: React.FC = () => {
             <button class="btn btn-cart" onclick="alert('Ajouté au panier: ${qty} × ${title}')">🛒 Ajouter au panier</button>
             <a class="whatsapp-btn" href="#" onclick="openContact(${waNumber ? `'${waNumber}'` : 'null'}, ${JSON.stringify(waMessage)}); return false;">💬 Discuter sur WhatsApp</a>
             <div class="tabs"><div class="tab active">Description</div><div class="tab">Caractéristiques</div><div class="tab">Avis (128)</div></div>
-            <div class="reviews"><div><strong>Ce que disent nos clientes</strong><br/><span style="color:#666;font-size:14px;">⭐ 98% recommandent</span></div><div class="review-avatars"></div></div>
+            <div class="reviews"><div><strong>Ce que disent nos clientes</strong><br/><span class="muted-small">⭐ 98% recommandent</span></div><div class="review-avatars"></div></div>
             <div class="similar-title"><span>✨ Vous pourriez aimer</span></div>
             <div class="similar">
               <div class="similar-item"><img src="https://images.pexels.com/photos/1152077/pexels-photo-1152077.jpeg?auto=compress&cs=tinysrgb&w=400" alt="s"/><div class="similar-price">72 000 FCFA</div></div>
@@ -541,7 +541,7 @@ export const ProductDetailScreen: React.FC = () => {
             <button className="btn-back" onClick={handleBack} aria-label="Retour" title="Retour">
               <Ionicons name="arrow-back" size={18} color="#111" />
             </button>
-            <button className="btn-cart" onClick={goToCart} aria-label="Panier" title="Panier" style={{position:'relative'}}>
+            <button className="btn-cart pos-relative" onClick={goToCart} aria-label="Panier" title="Panier">
               <Ionicons name="cart-outline" size={18} color="#111" />
               {cartCount > 0 && (
                 <span className="cart-badge" aria-hidden>{cartCount}</span>
@@ -549,7 +549,7 @@ export const ProductDetailScreen: React.FC = () => {
             </button>
           </div>
           <div className="web-image-wrapper">
-            <img className="web-image" style={{cursor:'pointer'}} onClick={() => setWebLightboxVisible(true)} src={(productData.images && productData.images[selectedImageIndex]) || (productData.images && productData.images[0]) || 'https://images.pexels.com/photos/2529157/pexels-photo-2529157.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={productData.name} />
+            <img className="web-image cursor-pointer" onClick={() => setWebLightboxVisible(true)} src={(productData.images && productData.images[selectedImageIndex]) || (productData.images && productData.images[0]) || 'https://images.pexels.com/photos/2529157/pexels-photo-2529157.jpeg?auto=compress&cs=tinysrgb&w=800'} alt={productData.name} />
             {productData.images && productData.images.length > 1 && (
               <div className="web-thumbs">
                 {productData.images.map((src: string, idx: number) => (
@@ -561,7 +561,7 @@ export const ProductDetailScreen: React.FC = () => {
             )}
           </div>
           <div className="web-content">
-            <div style={{color:'#6b21a8',fontWeight:700}}>{(productData.store && (productData.store as any).name) || 'Savelle • Paris'}</div>
+            <div className="store-name">{(productData.store && (productData.store as any).name) || 'Savelle • Paris'}</div>
 
             <div className="web-top-actions">
               <div className="left">
@@ -569,23 +569,23 @@ export const ProductDetailScreen: React.FC = () => {
               </div>
               <div>
                 <button className={`like-web-btn ${webLikeAnim ? 'like-anim' : ''}`} onClick={() => void toggleWebLike()}>
-                  <span style={{color: webLiked ? '#e11d48' : '#666', fontSize: 16}}>{webLiked ? '❤' : '♡'}</span>
-                  <span style={{fontWeight:700}}>{webLikeCount}</span>
+                  <span className={`like-heart ${webLiked ? 'liked' : 'not-liked'}`}>{webLiked ? '❤' : '♡'}</span>
+                  <span className="like-count">{webLikeCount}</span>
                 </button>
               </div>
             </div>
 
             <div className="web-title">{productData.name}</div>
-            <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div className="flex-gap-center">
               <div className="web-price">{productData.price?.toLocaleString()} FCFA</div>
               {productData.comparePrice && productData.comparePrice > productData.price ? (
                 <>
-                  <div style={{textDecoration:'line-through',color:'#aaa'}}>{productData.comparePrice.toLocaleString()} FCFA</div>
+                  <div className="compare-line">{productData.comparePrice.toLocaleString()} FCFA</div>
                   <span className="promo-badge">Promo</span>
                 </>
               ) : null}
             </div>
-            <div className="description" style={{marginTop:12}}>{productData.description}</div>
+            <div className="description mt-12">{productData.description}</div>
 
             <div className="web-actions">
               <div className="web-qty">
@@ -596,11 +596,11 @@ export const ProductDetailScreen: React.FC = () => {
               <button className="web-btn web-buy" onClick={handleBuyNowWeb}>⚡ Acheter maintenant</button>
             </div>
 
-            <div style={{marginTop:12,display:'flex',gap:8,alignItems:'center'}}>
+            <div className="mt-12 flex-gap-8">
               <button className={`web-btn web-cart ${cartButtonAnimation ? 'btn-pulse' : ''}`} onClick={handleAddToCartWeb}>🛒 Ajouter au panier</button>
               <a className={`web-btn web-discuss`} href="#" target="_blank" rel="noreferrer" onClick={(e:any) => { e.preventDefault(); void contactStore({ rawPhone: waNumberRaw, message: waMessage, fallback: 'tel-or-copy' }); }}>💬 Discuter</a>
             </div>
-            <div style={{marginTop:12}}>
+            <div className="mt-12">
               <div className="web-tabs">
                 <div className={`web-tab ${activeTab === 'description' ? 'active' : ''}`} onClick={() => setActiveTab('description')}>Description</div>
                 <div className={`web-tab ${activeTab === 'characteristics' ? 'active' : ''}`} onClick={() => setActiveTab('characteristics')}>Caractéristiques</div>
@@ -622,7 +622,7 @@ export const ProductDetailScreen: React.FC = () => {
 
                 {activeTab === 'reviews' && (
                   <div>
-                    <div style={{marginBottom:12}}>
+                    <div className="mb-12">
                       {reviews.length === 0 ? (
                         <div>Aucun avis pour le moment.</div>
                       ) : (
@@ -630,25 +630,25 @@ export const ProductDetailScreen: React.FC = () => {
                           <div key={r.id || Math.random()} className="review">
                             <img className="review-avatar" src={((r as any).avatar_url) || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={r.user_name || 'client'} />
                             <div className="review-body">
-                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                              <div className="flex-gap-8">
                                 <div className="review-name">{r.user_name || 'Anonyme'}</div>
                                 <div className="review-rating">{'★'.repeat(Math.round(Number(r.rating) || 0))}</div>
                               </div>
-                              <div style={{color:'#444'}}>{r.comment}</div>
+                              <div className="review-comment">{r.comment}</div>
                             </div>
                           </div>
                         ))
                       )}
                     </div>
 
-                    <div style={{borderTop:'1px solid #f4f4f4',paddingTop:12}}>
-                      <div style={{marginBottom:8,fontWeight:700}}>Laissez un avis</div>
-                      <input placeholder="Votre nom" value={reviewName} onChange={(e: any) => setReviewName(e.target.value)} style={{width:'100%',padding:8,marginBottom:8,borderRadius:8,border:'1px solid #eee'}} />
-                      <select value={String(reviewRating)} onChange={(e: any) => setReviewRating(Number(e.target.value))} style={{padding:8,marginBottom:8,borderRadius:8}}>
+                    <div className="bt-top">
+                      <div className="bold mb-8">Laissez un avis</div>
+                      <input placeholder="Votre nom" value={reviewName} onChange={(e: any) => setReviewName(e.target.value)} className="input-full" />
+                      <select value={String(reviewRating)} onChange={(e: any) => setReviewRating(Number(e.target.value))} className="select-style">
                         {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} étoiles</option>)}
                       </select>
-                      <textarea placeholder="Votre commentaire" value={reviewComment} onChange={(e: any) => setReviewComment(e.target.value)} style={{width:'100%',padding:8,marginBottom:8,borderRadius:8,border:'1px solid #eee'}} />
-                      <div style={{display:'flex',gap:8}}>
+                      <textarea placeholder="Votre commentaire" value={reviewComment} onChange={(e: any) => setReviewComment(e.target.value)} className="textarea-style" />
+                      <div className="flex-gap-8-2">
                         <button className="web-btn web-buy" onClick={() => void submitReview()} disabled={submittingReview}>{submittingReview ? 'Envoi...' : 'Envoyer'}</button>
                       </div>
                     </div>
@@ -658,11 +658,11 @@ export const ProductDetailScreen: React.FC = () => {
             </div>
 
             {similarProducts.length > 0 && (
-              <div style={{marginTop:18}}>
+              <div className="similar-section">
                 <div className="similar-title">Produits similaires</div>
                     <div className="similar-grid">
                   {similarProducts.map((sp) => (
-                    <div key={sp.id} className="similar-card" onClick={() => handleOpenProduct(sp.id)} style={{cursor:'pointer'}}>
+                    <div key={sp.id} className="similar-card cursor-pointer" onClick={() => handleOpenProduct(sp.id)}>
                       {(sp.comparePrice && sp.comparePrice > sp.price) && (
                         <div className="promo-badge">Promo</div>
                       )}
@@ -670,7 +670,7 @@ export const ProductDetailScreen: React.FC = () => {
                       <div className="similar-name">{sp.name}</div>
                       <div className="similar-price">
                         {sp.price?.toLocaleString()} FCFA
-                        {sp.comparePrice && sp.comparePrice > sp.price ? <div style={{textDecoration:'line-through',color:'#aaa',fontSize:12}}>{sp.comparePrice.toLocaleString()} FCFA</div> : null}
+                        {sp.comparePrice && sp.comparePrice > sp.price ? <div className="compare-line compare-small">{sp.comparePrice.toLocaleString()} FCFA</div> : null}
                       </div>
                     </div>
                   ))}
@@ -683,7 +683,7 @@ export const ProductDetailScreen: React.FC = () => {
 
         {webLightboxVisible && productData.images && productData.images.length > 0 && (
           <div className="web-lightbox" onClick={() => setWebLightboxVisible(false)}>
-            <div className="web-lightbox-inner" onClick={(e) => e.stopPropagation()} style={{position:'relative',display:'flex',alignItems:'center',justifyContent:'center',width:'100%',height:'100%'}}>
+            <div className="web-lightbox-inner wl-inner" onClick={(e) => e.stopPropagation()}>
               <div className="close" onClick={() => setWebLightboxVisible(false)}>✕</div>
               <div className="nav left" onClick={(e) => { e.stopPropagation(); setSelectedImageIndex((i) => (i - 1 + productData.images.length) % productData.images.length); }} onTouchStart={(e) => e.stopPropagation()}>&larr;</div>
               <img src={cloudinaryService.getOptimizedUrl(productData.images[selectedImageIndex], 1200)} alt="lightbox" onClick={(e) => e.stopPropagation()} />
