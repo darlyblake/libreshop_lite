@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   },
   bannerContainer: {
     position: 'relative',
-    height: 240,
+    height: 340,
     overflow: 'visible',
   },
   banner: {
@@ -161,12 +161,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: SPACING.lg,
-    paddingLeft: SPACING.lg + 110,
+    paddingLeft: SPACING.lg + 130,
   },
   logoWrapper: {
     position: 'absolute',
     left: SPACING.lg,
-    bottom: -42,
+    bottom: SPACING.lg,
     width: 84,
     height: 84,
     borderRadius: 42,
