@@ -143,6 +143,10 @@ export const SellerAuthScreen: React.FC = () => {
 
   const isRateLimited = countdown > 0;
 
+  // Password reset cooldown (seconds)
+  const RESET_COOLDOWN = 600; // 10 minutes default between reset requests
+
+
   const handleSubmit = async () => {
     // Prevent double submission
     if (loading || isSubmittingRef.current) {
@@ -650,22 +654,59 @@ export const SellerAuthScreen: React.FC = () => {
               <TouchableOpacity
                 style={styles.forgotPassword}
                 onPress={async () => {
-                  if (!normalizedEmail) {
-                    Alert.alert('Email requis', 'Entre ton email pour recevoir le lien de réinitialisation.');
-                    return;
-                  }
-                  try {
-                    setLoading(true);
-                    await authService.resetPassword(normalizedEmail);
-                    Alert.alert(
-                      'Email envoyé',
-                      "Si cet email existe, tu vas recevoir un lien pour réinitialiser ton mot de passe. Vérifie aussi les spams."
-                    );
-                  } catch (e: any) {
-                    Alert.alert('Erreur', e?.message || 'Impossible de réinitialiser le mot de passe');
-                  } finally {
-                    setLoading(false);
-                  }
+                    if (!normalizedEmail) {
+                      Alert.alert('Email requis', 'Entre ton email pour recevoir le lien de réinitialisation.');
+                      return;
+                    }
+
+                    // Check last reset timestamp to avoid spamming the reset endpoint
+                    try {
+                      const stored = await AsyncStorage.getItem('@libreshop_password_reset_ts');
+                      if (stored) {
+                        const expiresAt = parseInt(stored, 10);
+                        const now = Date.now();
+                        if (!isNaN(expiresAt) && expiresAt > now) {
+                          const remaining = Math.ceil((expiresAt - now) / 1000);
+                          Alert.alert('Patientez', `Vous avez récemment demandé une réinitialisation. Réessayez dans ${remaining} seconde${remaining > 1 ? 's' : ''}.`);
+                          return;
+                        }
+                      }
+                    } catch (e) {
+                      // ignore storage read errors
+                    }
+
+                    try {
+                      setLoading(true);
+                      await authService.resetPassword(normalizedEmail);
+
+                      // store cooldown timestamp to prevent immediate retries
+                      try {
+                        const ts = Date.now() + RESET_COOLDOWN * 1000;
+                        await AsyncStorage.setItem('@libreshop_password_reset_ts', String(ts));
+                      } catch (e) {
+                        // ignore storage write errors
+                      }
+
+                      Alert.alert(
+                        'Email envoyé',
+                        "Si cet email existe, tu vas recevoir un lien pour réinitialiser ton mot de passe. Vérifie aussi les spams."
+                      );
+                    } catch (e: any) {
+                      // If server returned rate-limit, store a longer cooldown and show friendly message
+                      const msg = e?.message || '';
+                      if (String(msg).toLowerCase().includes('rate') || String(msg).includes('Too Many Requests')) {
+                        const longer = 60 * 10; // default 10 minutes
+                        try {
+                          const ts = Date.now() + longer * 1000;
+                          await AsyncStorage.setItem('@libreshop_password_reset_ts', String(ts));
+                        } catch (_err) {}
+                        Alert.alert('Trop de requêtes', `Trop de demandes ont été envoyées. Réessayez dans quelques minutes.`);
+                      } else {
+                        Alert.alert('Erreur', msg || 'Impossible de réinitialiser le mot de passe');
+                      }
+                    } finally {
+                      setLoading(false);
+                    }
                 }}
               >
                 <Text style={styles.forgotPasswordText}>
