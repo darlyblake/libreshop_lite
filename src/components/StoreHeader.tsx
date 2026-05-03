@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
@@ -43,6 +44,17 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
   const logoUrl = store.logo_url || FALLBACK_LOGO;
   const rating = store.rating || 4.7;
   const ratingCount = store.rating_count || 312;
+
+  const logoAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.spring(logoAnim, {
+      toValue: 1,
+      friction: 8,
+      tension: 80,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [logoAnim]);
 
   const renderStarRating = (avg: number) => {
     const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
@@ -97,10 +109,19 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
         {/* Content INSIDE banner */}
         <View style={styles.bannerContent}>
           {/* Logo top-left */}
-          <View style={styles.logoWrapper}>
-            <Image
+          <View style={styles.logoWrapper} pointerEvents="none">
+            <Animated.Image
               source={{ uri: logoUrl }}
-              style={styles.logo}
+              style={[
+                styles.logo,
+                {
+                  transform: [
+                    { translateY: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+                    { scale: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) },
+                  ],
+                  opacity: logoAnim,
+                },
+              ]}
               resizeMode="cover"
             />
           </View>
