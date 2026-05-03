@@ -103,7 +103,13 @@ export const authService = {
 
   async resetPassword(email: string) {
     const client = useSupabase();
-    const { error } = await client.auth.resetPasswordForEmail(email);
+    // Determine redirect URL for password reset emails
+    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    const emailRedirectTo = webBaseUrl ? `${webBaseUrl}/auth/reset` : 'http://localhost:19006/auth/reset';
+
+    const { error } = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: emailRedirectTo,
+    } as any);
     if (error) throw error;
   },
 
