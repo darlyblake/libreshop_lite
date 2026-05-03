@@ -100,10 +100,11 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
         {
           backgroundColor: getColor.card,
           borderColor: getColor.border,
-          width: Math.max(size * 5, 160),
+          minWidth: Math.max(size * 3.5, 140),
           height: size * 1.5,
           borderRadius: size * 0.75,
-          marginLeft: 8,
+          paddingHorizontal: 8,
+          alignSelf: 'flex-end',
         },
         style,
       ]}
@@ -199,7 +200,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   leftArea: {
-    width: 48,
+    width: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -209,11 +210,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   segmentButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 0,
-    marginLeft: 6,
+    marginLeft: 8,
+    minWidth: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   segmentText: {
     fontSize: 12,
