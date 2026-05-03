@@ -315,8 +315,9 @@ export const ProductDetailScreen: React.FC = () => {
       let mounted = true;
       (async () => {
         try {
-          if (!productData) return;
-          const sims = await productService.getSimilarProducts(productData, 6);
+          // getSimilarProducts expects a full Product object from the DB (with store_id, collection_id, etc.)
+          if (!product) return;
+          const sims = await productService.getSimilarProducts(product, 6);
           if (mounted && Array.isArray(sims)) setSimilarProducts(sims);
         } catch (e) {
           console.error('failed to load similar products', e);
@@ -325,7 +326,7 @@ export const ProductDetailScreen: React.FC = () => {
       return () => {
         mounted = false;
       };
-    }, [productData]);
+    }, [product]);
 
     const [webLightboxVisible, setWebLightboxVisible] = React.useState(false);
     const [webLikeAnim, setWebLikeAnim] = React.useState(false);
@@ -675,7 +676,7 @@ export const ProductDetailScreen: React.FC = () => {
                       ) : (
                         reviews.map((r) => (
                           <div key={r.id || Math.random()} className="review">
-                            <img className="review-avatar" src={(r.avatar_url) || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={r.user_name || 'client'} />
+                            <img className="review-avatar" src={((r as any).avatar_url) || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={r.user_name || 'client'} />
                             <div className="review-body">
                               <div style={{display:'flex',alignItems:'center',gap:8}}>
                                 <div className="review-name">{r.user_name || 'Anonyme'}</div>
