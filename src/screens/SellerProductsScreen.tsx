@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Alert,
   Image,
   ActivityIndicator,
   Platform,
