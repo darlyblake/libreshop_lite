@@ -201,55 +201,7 @@ export const ProductDetailScreen: React.FC = () => {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>${title} | Boutique</title>
-        <style>
-          :root{--bg:#fcfcfc;--card:#fff;--accent:#6b21a8;--accent-dark:#4c1d95;--text:#1e1e1e}
-          html,body{height:100%;}
-          body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--text); padding:24px; margin:0; min-height:100vh; display:flex; align-items:flex-start; justify-content:center}
-          .web-container{width:100%;max-width:1200px;padding:12px}
-          .product-card{background:var(--card);border-radius:20px;padding:0;box-shadow:0 12px 30px rgba(0,0,0,0.06);overflow:hidden;width:100%;display:flex;flex-direction:column}
-          .product-image{position:relative;border-radius:0;overflow:hidden;width:100%}
-          .product-image img{width:100%;height:auto;display:block;object-fit:cover}
-          .badge-new{position:absolute;top:16px;left:16px;background:rgba(20,20,20,0.8);color:#fff;padding:6px 16px;border-radius:999px;font-size:13px}
-          .magnifier{position:absolute;right:16px;bottom:16px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer}
-          .content-inner{padding:18px}
-          .brand{font-size:13px;color:var(--accent);font-weight:700;margin-bottom:6px}
-          .title{font-size:26px;font-weight:800;margin-bottom:6px}
-          .subtitle{font-size:15px;color:#5e5e5e;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap}
-          .limited-tag{background:#f3e8ff;color:var(--accent-dark);padding:4px 10px;border-radius:20px;font-size:13px}
-          .rating{display:flex;align-items:center;gap:10px;margin-bottom:18px}
-          .price{font-size:28px;font-weight:800;color:var(--accent-dark)}
-          .old-price{font-size:16px;color:#aaa;text-decoration:line-through}
-          .installment{font-size:13px;background:#f0e6ff;padding:2px 8px;border-radius:16px}
-          .color-option{display:flex;align-items:center;gap:12px;margin-bottom:20px;background:#f8f8f8;padding:10px 12px;border-radius:18px}
-          .color-dot{width:26px;height:26px;border-radius:50%;background:#1a1a1a}
-          .description{font-size:15px;color:#333;margin-bottom:20px}
-          .actions{display:flex;gap:12px;margin-bottom:12px}
-          .quantity{min-width:64px;height:48px;background:#f4f4f4;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:18px;font-weight:700}
-          .btn{flex:1;height:48px;border-radius:12px;border:none;font-size:15px;font-weight:700;cursor:pointer}
-          .btn-buy{background:var(--accent);color:#fff}
-          .btn-cart{background:#fff;color:var(--accent-dark);border:1px solid #e6d9ff}
-          .whatsapp-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:#25D366;color:#fff;height:48px;border-radius:12px;text-decoration:none;padding:0 14px}
-          .tabs{display:flex;border-bottom:1px solid #f0f0f0;margin:18px 0 16px}
-          .tab{flex:1;padding:10px 0;text-align:center;color:#7c7c7c}
-          .tab.active{color:#000;border-bottom:3px solid var(--accent)}
-          .similar{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px}
-          .similar-item{flex:0 0 110px;text-align:center}
-          .similar img{width:110px;height:110px;object-fit:cover;border-radius:12px}
-          .footer-note{margin-top:18px;font-size:13px;color:#888;text-align:center}
-
-          /* Desktop layout: image left, content right, full-width feel */
-          @media (min-width:900px){
-            body{align-items:center}
-            .product-card{flex-direction:row;border-radius:20px}
-            .product-image{flex:1;max-width:55%;height:calc(100vh - 120px);min-height:420px}
-            .product-image img{height:100%;width:100%;object-fit:cover}
-            .content-inner{flex:1;padding:32px 36px}
-            .title{font-size:34px}
-            .price{font-size:36px}
-            .similar-item{flex:0 0 140px}
-            .similar img{width:140px;height:140px}
-          }
-        </style>
+        <link rel="stylesheet" href="/product-detail.css" />
         <script>
           function openContact(phone, message){
             try{
