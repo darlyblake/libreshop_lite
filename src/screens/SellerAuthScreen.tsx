@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Modal,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -38,6 +39,16 @@ export const SellerAuthScreen: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [requireEmailConfirmation, setRequireEmailConfirmation] = useState(true);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetStep, setResetStep] = useState<'request' | 'verify' | 'set'>('request');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [resetSentViaLink, setResetSentViaLink] = useState(false);
+  
 
   // Charger les paramètres au montage
   useEffect(() => {
@@ -51,6 +62,43 @@ export const SellerAuthScreen: React.FC = () => {
     };
     loadSettings();
   }, []);
+
+  const RESET_COOLDOWN = 600; // 10 minutes default between reset requests
+
+  const setRateLimit = async (seconds: number) => {
+    try {
+      setCountdown(seconds);
+      const timestamp = Date.now() + seconds * 1000;
+      await AsyncStorage.setItem('@libreshop_auth_rate_limit', timestamp.toString());
+      if (!countdownIntervalRef.current) {
+        countdownIntervalRef.current = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              if (countdownIntervalRef.current) {
+                clearInterval(countdownIntervalRef.current as NodeJS.Timeout);
+                countdownIntervalRef.current = null;
+              }
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } catch (e) {
+      // ignore storage errors
+    }
+  };
+
+  const closeResetModal = () => {
+    try {
+      if (typeof document !== 'undefined' && document.activeElement) {
+        try { (document.activeElement as HTMLElement).blur(); } catch (err) {}
+      }
+    } catch (e) {
+      // ignore in native
+    }
+    setShowResetModal(false);
+  };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -101,78 +149,40 @@ export const SellerAuthScreen: React.FC = () => {
           const remaining = Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
           if (remaining > 0) {
             setCountdown(remaining);
-          } else {
-            await AsyncStorage.removeItem('@libreshop_auth_rate_limit');
+            // start a ticking interval to update the countdown
+            if (!countdownIntervalRef.current) {
+              countdownIntervalRef.current = setInterval(() => {
+                setCountdown((prev) => {
+                  if (prev <= 1) {
+                    if (countdownIntervalRef.current) {
+                      clearInterval(countdownIntervalRef.current as NodeJS.Timeout);
+                      countdownIntervalRef.current = null;
+                    }
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
+            }
           }
         }
-      } catch (e: any) {
-        errorHandler.handle(e, 'Error checking rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+      } catch (e) {
+        console.error('Error reading rate limit from storage', e);
       }
     };
-    checkStoredCountdown();
-  }, []);
 
-  // Cleanup interval on unmount
-  useEffect(() => {
+    checkStoredCountdown();
+
     return () => {
       if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
+        clearInterval(countdownIntervalRef.current as NodeJS.Timeout);
+        countdownIntervalRef.current = null;
       }
     };
   }, []);
 
-  // Countdown effect
-  useEffect(() => {
-    if (countdown > 0) {
-      countdownIntervalRef.current = setTimeout(() => {
-        setCountdown(countdown - 1);
-      }, 1000);
-      // Store countdown timestamp for persistence
-      const timestamp = Date.now() + (countdown - 1) * 1000;
-      AsyncStorage.setItem('@libreshop_auth_rate_limit', timestamp.toString()).catch(e =>
-        errorHandler.handle(e, 'Error storing rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW)
-      );
-    } else if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-      AsyncStorage.removeItem('@libreshop_auth_rate_limit').catch(e =>
-        errorHandler.handle(e, 'Error removing rate limit countdown:', ErrorCategory.SYSTEM, ErrorSeverity.LOW)
-      );
-    }
-  }, [countdown]);
-
-  const isRateLimited = countdown > 0;
-
-  // Password reset cooldown (seconds)
-  const RESET_COOLDOWN = 600; // 10 minutes default between reset requests
-
-
+  // Submit handler
   const handleSubmit = async () => {
-    // Prevent double submission
-    if (loading || isSubmittingRef.current) {
-      errorHandler.handle('handleSubmit called while already loading/submitting', 'UnknownContext', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-      return;
-    }
-
-    // Rate limiting check
-    if (isRateLimited) {
-      Alert.alert(
-        'Patientez',
-        `Veuillez patienter ${countdown} seconde${countdown > 1 ? 's' : ''} avant de réessayer.`
-      );
-      return;
-    }
-
-    // Validate form before submitting
-    if (!validateForm()) {
-      return;
-    }
-
-    if (!normalizedEmail || !formData.password) {
-      setError('Veuillez remplir tous les champs');
-      return;
-    }
-
     // Mark as submitting immediately to prevent race conditions
     // IMPORTANT: Set ref BEFORE state update to block subsequent clicks immediately
     isSubmittingRef.current = true;
@@ -333,7 +343,7 @@ export const SellerAuthScreen: React.FC = () => {
         }
         
         setError(`⏳ Trop de tentatives. Veuillez patienter ${waitTime} avant de réessayer.`);
-        setCountdown(countdownSeconds);
+        setRateLimit(countdownSeconds);
         
         Alert.alert(
           'Trop de tentatives',
@@ -653,60 +663,11 @@ export const SellerAuthScreen: React.FC = () => {
             {isLogin && (
               <TouchableOpacity
                 style={styles.forgotPassword}
-                onPress={async () => {
-                    if (!normalizedEmail) {
-                      Alert.alert('Email requis', 'Entre ton email pour recevoir le lien de réinitialisation.');
-                      return;
-                    }
-
-                    // Check last reset timestamp to avoid spamming the reset endpoint
-                    try {
-                      const stored = await AsyncStorage.getItem('@libreshop_password_reset_ts');
-                      if (stored) {
-                        const expiresAt = parseInt(stored, 10);
-                        const now = Date.now();
-                        if (!isNaN(expiresAt) && expiresAt > now) {
-                          const remaining = Math.ceil((expiresAt - now) / 1000);
-                          Alert.alert('Patientez', `Vous avez récemment demandé une réinitialisation. Réessayez dans ${remaining} seconde${remaining > 1 ? 's' : ''}.`);
-                          return;
-                        }
-                      }
-                    } catch (e) {
-                      // ignore storage read errors
-                    }
-
-                    try {
-                      setLoading(true);
-                      await authService.resetPassword(normalizedEmail);
-
-                      // store cooldown timestamp to prevent immediate retries
-                      try {
-                        const ts = Date.now() + RESET_COOLDOWN * 1000;
-                        await AsyncStorage.setItem('@libreshop_password_reset_ts', String(ts));
-                      } catch (e) {
-                        // ignore storage write errors
-                      }
-
-                      Alert.alert(
-                        'Email envoyé',
-                        "Si cet email existe, tu vas recevoir un lien pour réinitialiser ton mot de passe. Vérifie aussi les spams."
-                      );
-                    } catch (e: any) {
-                      // If server returned rate-limit, store a longer cooldown and show friendly message
-                      const msg = e?.message || '';
-                      if (String(msg).toLowerCase().includes('rate') || String(msg).includes('Too Many Requests')) {
-                        const longer = 60 * 10; // default 10 minutes
-                        try {
-                          const ts = Date.now() + longer * 1000;
-                          await AsyncStorage.setItem('@libreshop_password_reset_ts', String(ts));
-                        } catch (_err) {}
-                        Alert.alert('Trop de requêtes', `Trop de demandes ont été envoyées. Réessayez dans quelques minutes.`);
-                      } else {
-                        Alert.alert('Erreur', msg || 'Impossible de réinitialiser le mot de passe');
-                      }
-                    } finally {
-                      setLoading(false);
-                    }
+                onPress={() => {
+                  setResetEmail(normalizedEmail);
+                  setResetStep('request');
+                  setResetError('');
+                  setShowResetModal(true);
                 }}
               >
                 <Text style={styles.forgotPasswordText}>
@@ -719,6 +680,137 @@ export const SellerAuthScreen: React.FC = () => {
             {error ? (
               <Text style={styles.errorText}>{error}</Text>
             ) : null}
+
+            {/* Reset password modal (request -> verify -> set new password) */}
+            <Modal visible={showResetModal} transparent animationType="slide">
+              <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, { width: '92%', maxWidth: 520 }]}>
+                  <Text style={[styles.modalTitle, { marginBottom: 8 }]}>Réinitialiser le mot de passe</Text>
+                  {resetStep === 'request' && (
+                    <>
+                      <Text style={{ marginBottom: 8 }}>Entrez votre email pour recevoir un code de réinitialisation.</Text>
+                      <Input
+                        label="Email"
+                        placeholder="votre@email.com"
+                        value={resetEmail}
+                        onChangeText={setResetEmail}
+                        keyboardType="email-address"
+                      />
+                      {resetError ? <Text style={styles.errorText}>{resetError}</Text> : null}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={closeResetModal}>
+                          <Text style={styles.cancelText}>Annuler</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.button, styles.submitButton]}
+                          onPress={async () => {
+                            if (!resetEmail || !/\S+@\S+\.\S+/.test(resetEmail)) { setResetError('Email invalide'); return; }
+                            setResetLoading(true); setResetError('');
+                            try {
+                              // try sending OTP (email) for recovery
+                              const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+                              const redirectTo = webBaseUrl ? `${webBaseUrl}/auth/reset` : 'http://localhost:19006/auth/reset';
+                              // Request an email OTP (numeric code) if supported by the Supabase instance
+                              await authService.signInWithOtp({
+                                email: resetEmail,
+                                options: { emailRedirectTo: redirectTo, type: 'otp' },
+                              });
+                              // Supabase often sends a magic link instead of a numeric code.
+                              // Treat this as "sent via link" and inform the user.
+                              setResetSentViaLink(true);
+                              setResetStep('verify');
+                              setRateLimit(RESET_COOLDOWN);
+                            } catch (e: any) {
+                              // fallback to reset link if OTP not supported
+                              try {
+                                await authService.resetPassword(resetEmail);
+                                setResetStep('verify');
+                                setRateLimit(RESET_COOLDOWN);
+                              } catch (err: any) {
+                                setResetError(err?.message || 'Impossible d\'envoyer le code');
+                              }
+                            } finally { setResetLoading(false); }
+                          }}
+                        >
+                          <Text style={styles.submitText}>{resetLoading ? 'Envoi...' : 'Envoyer le code'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+
+                  {resetStep === 'verify' && (
+                    <>
+                      <Text style={{ marginBottom: 8 }}>Saisissez le code reçu par email (si présent), ou cliquez sur le lien dans l'email envoyé.</Text>
+                      <Input label="Code" placeholder="123456" value={resetCode} onChangeText={setResetCode} />
+                      {resetError ? <Text style={styles.errorText}>{resetError}</Text> : null}
+                      {resetSentViaLink && (
+                        <Text style={{ marginTop: 8, color: '#444' }}>
+                          Astuce: si l'email ne contient pas de code mais un lien, cliquez dessus pour revenir à l'application.
+                        </Text>
+                      )}
+                      <TouchableOpacity style={{ marginTop: 8 }} onPress={() => {
+                        // User reports they clicked the link — close modal and prompt to re-open login
+                        closeResetModal();
+                        Alert.alert('Ok', 'Si vous avez cliqué sur le lien, essayez de vous reconnecter maintenant.');
+                      }}>
+                        <Text style={{ color: '#0b69ff' }}>J'ai cliqué sur le lien dans l'email</Text>
+                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={closeResetModal}>
+                          <Text style={styles.cancelText}>Annuler</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.button, styles.submitButton]}
+                          onPress={async () => {
+                            if (!resetCode) { setResetError('Entrez le code'); return; }
+                            setResetLoading(true); setResetError('');
+                            try {
+                              await authService.verifyOtp({ token: resetCode, type: 'recovery', email: resetEmail });
+                              setResetStep('set');
+                            } catch (e: any) {
+                              setResetError(e?.message || 'Code invalide');
+                            } finally { setResetLoading(false); }
+                          }}
+                        >
+                          <Text style={styles.submitText}>{resetLoading ? 'Vérification...' : 'Vérifier le code'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+
+                  {resetStep === 'set' && (
+                    <>
+                      <Text style={{ marginBottom: 8 }}>Entrez votre nouveau mot de passe.</Text>
+                      <Input label="Nouveau mot de passe" placeholder="••••••••" value={resetNewPassword} onChangeText={setResetNewPassword} secureTextEntry />
+                      <Input label="Confirmer" placeholder="••••••••" value={resetConfirmPassword} onChangeText={setResetConfirmPassword} secureTextEntry />
+                      {resetError ? <Text style={styles.errorText}>{resetError}</Text> : null}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={closeResetModal}>
+                          <Text style={styles.cancelText}>Annuler</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.button, styles.submitButton]}
+                          onPress={async () => {
+                            if (!resetNewPassword || resetNewPassword.length < 6) { setResetError('Mot de passe trop court'); return; }
+                            if (resetNewPassword !== resetConfirmPassword) { setResetError('Les mots de passe ne correspondent pas'); return; }
+                            setResetLoading(true); setResetError('');
+                            try {
+                              await authService.updatePassword(resetNewPassword);
+                              Alert.alert('Mot de passe modifié', 'Votre mot de passe a été mis à jour. Vous pouvez maintenant vous connecter.');
+                              closeResetModal();
+                            } catch (e: any) {
+                              setResetError(e?.message || 'Impossible de mettre à jour le mot de passe');
+                            } finally { setResetLoading(false); }
+                          }}
+                        >
+                          <Text style={styles.submitText}>{resetLoading ? 'En cours...' : 'Mettre à jour'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            </Modal>
 
             <Button
               title={isLogin ? 'Se connecter' : 'Créer un compte'}
@@ -982,6 +1074,46 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     color: COLORS.accent,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  modalContent: {
+    backgroundColor: COLORS.bgElevated || COLORS.bg,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  button: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  submitButton: {
+    backgroundColor: COLORS.accent,
+  },
+  cancelText: {
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  submitText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
 
