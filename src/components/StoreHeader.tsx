@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   bannerContainer: {
     position: 'relative',
     height: 240,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   banner: {
     width: '100%',
@@ -181,6 +181,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
+    zIndex: 20,
   },
   logo: {
     width: 78,
