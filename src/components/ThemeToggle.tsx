@@ -100,9 +100,10 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
         {
           backgroundColor: getColor.card,
           borderColor: getColor.border,
-          width: Math.max(size * 3.5, 120),
+          width: Math.max(size * 5, 160),
           height: size * 1.5,
           borderRadius: size * 0.75,
+          marginLeft: 8,
         },
         style,
       ]}
