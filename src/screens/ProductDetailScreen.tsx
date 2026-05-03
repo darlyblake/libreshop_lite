@@ -644,7 +644,7 @@ export const ProductDetailScreen: React.FC = () => {
                     <div className="bt-top">
                       <div className="bold mb-8">Laissez un avis</div>
                       <input placeholder="Votre nom" value={reviewName} onChange={(e: any) => setReviewName(e.target.value)} className="input-full" />
-                      <select value={String(reviewRating)} onChange={(e: any) => setReviewRating(Number(e.target.value))} className="select-style">
+                      <select title="Note" aria-label="Note" value={String(reviewRating)} onChange={(e: any) => setReviewRating(Number(e.target.value))} className="select-style">
                         {[5,4,3,2,1].map(n => <option key={n} value={n}>{n} étoiles</option>)}
                       </select>
                       <textarea placeholder="Votre commentaire" value={reviewComment} onChange={(e: any) => setReviewComment(e.target.value)} className="textarea-style" />
