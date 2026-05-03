@@ -47,6 +47,17 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
 
   const logoAnim = React.useRef(new Animated.Value(0)).current;
 
+  const pulseAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 1200, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
   React.useEffect(() => {
     Animated.spring(logoAnim, {
       toValue: 1,
@@ -110,6 +121,15 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
         <View style={styles.bannerContent}>
           {/* Logo top-left */}
           <View style={styles.logoWrapper} pointerEvents="none">
+            <Animated.View
+              style={[
+                styles.logoPulse,
+                {
+                  transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
+                  opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
+                },
+              ]}
+            />
             <Animated.Image
               source={{ uri: logoUrl }}
               style={[
@@ -208,6 +228,16 @@ const styles = StyleSheet.create({
     width: 78,
     height: 78,
     borderRadius: 39,
+  },
+  logoPulse: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+    left: -8,
+    top: -8,
   },
   topRight: {
     flex: 1,
