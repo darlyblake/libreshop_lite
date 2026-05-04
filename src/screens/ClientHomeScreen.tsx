@@ -854,9 +854,10 @@ export const ClientHomeScreen: React.FC = () => {
                     ))}
                   </View>
                 ) : (
-                  <View style={styles.productsGrid}>
-                    {products.map((item) => (
-                      <View key={item.id} style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
+                  <FlatList
+                    data={products}
+                    renderItem={({ item }) => (
+                      <View style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
                         <ProductCard
                           name={item.name}
                           price={item.price}
@@ -868,8 +869,20 @@ export const ClientHomeScreen: React.FC = () => {
                           {item.stores?.name || 'Boutique'}
                         </Text>
                       </View>
-                    ))}
-                  </View>
+                    )}
+                    keyExtractor={(item) => item.id}
+                    numColumns={numProductColumns}
+                    key={numProductColumns}
+                    columnWrapperStyle={styles.productsGrid}
+                    contentContainerStyle={styles.productsList}
+                    initialNumToRender={numProductColumns * 2}
+                    maxToRenderPerBatch={numProductColumns}
+                    updateCellsBatchingPeriod={50}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                    windowSize={3}
+                    scrollEnabled={false}
+                    nestedScrollEnabled={false}
+                  />
                 )}
               </View>
 
@@ -1232,6 +1245,10 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
     productsList: {
       paddingHorizontal: SPACING.xl,
       gap: SPACING.md,
+      ...(Platform.OS === 'web' && {
+        WebkitOverflowScrolling: 'touch',
+        overflow: 'visible',
+      }),
     },
     productsGrid: {
       justifyContent: 'flex-start',
@@ -1427,6 +1444,20 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       color: palette.text,
       fontWeight: '600',
       fontSize: FONT_SIZE.md,
+    },
+
+    // Empty States
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: SPACING.xl,
+      paddingHorizontal: SPACING.xl,
+    },
+    emptyText: {
+      fontSize: FONT_SIZE.md,
+      color: palette.textMuted,
+      textAlign: 'center',
     },
   });
 }
