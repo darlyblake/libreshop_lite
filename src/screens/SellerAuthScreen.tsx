@@ -19,6 +19,7 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { Button, Input } from '../components';
 // import { supabase } from '../lib/supabase'; // Removed unused import
 import { authService } from '../services/authService';
+import { supabase } from '../lib/supabase';
 import { storeService } from '../services/storeService';
 import { userService } from '../services/userService';
 import { sessionStorage } from '../lib/storage';
@@ -707,28 +708,17 @@ export const SellerAuthScreen: React.FC = () => {
                             if (!resetEmail || !/\S+@\S+\.\S+/.test(resetEmail)) { setResetError('Email invalide'); return; }
                             setResetLoading(true); setResetError('');
                             try {
-                              // try sending OTP (email) for recovery
                               const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-                              const redirectTo = webBaseUrl ? `${webBaseUrl}/auth/reset` : 'http://localhost:19006/auth/reset';
-                              // Request an email OTP (numeric code) if supported by the Supabase instance
-                              await authService.signInWithOtp({
-                                email: resetEmail,
-                                options: { emailRedirectTo: redirectTo, type: 'otp' },
-                              });
-                              // Supabase often sends a magic link instead of a numeric code.
-                              // Treat this as "sent via link" and inform the user.
+                              const redirectTo = webBaseUrl ? `${webBaseUrl}/auth/reset` : Linking.createURL('auth/reset');
+                              // Use Supabase server to generate & send OTP (server-side)
+                              const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo } as any);
+                              if (error) throw error;
+                              // Server sent the email (may be OTP or link depending on template)
                               setResetSentViaLink(true);
                               setResetStep('verify');
                               setRateLimit(RESET_COOLDOWN);
                             } catch (e: any) {
-                              // fallback to reset link if OTP not supported
-                              try {
-                                await authService.resetPassword(resetEmail);
-                                setResetStep('verify');
-                                setRateLimit(RESET_COOLDOWN);
-                              } catch (err: any) {
-                                setResetError(err?.message || 'Impossible d\'envoyer le code');
-                              }
+                              setResetError(e?.message || 'Impossible d\'envoyer le code');
                             } finally { setResetLoading(false); }
                           }}
                         >
@@ -748,7 +738,7 @@ export const SellerAuthScreen: React.FC = () => {
                           Astuce: si l'email ne contient pas de code mais un lien, cliquez dessus pour revenir à l'application.
                         </Text>
                       )}
-                      <TouchableOpacity style={{ marginTop: 8 }} onPress={() => {
+                        <TouchableOpacity style={{ marginTop: 8 }} onPress={() => {
                         // User reports they clicked the link — close modal and prompt to re-open login
                         closeResetModal();
                         Alert.alert('Ok', 'Si vous avez cliqué sur le lien, essayez de vous reconnecter maintenant.');
@@ -765,7 +755,8 @@ export const SellerAuthScreen: React.FC = () => {
                             if (!resetCode) { setResetError('Entrez le code'); return; }
                             setResetLoading(true); setResetError('');
                             try {
-                              await authService.verifyOtp({ token: resetCode, type: 'recovery', email: resetEmail });
+                              const { error } = await supabase.auth.verifyOtp({ email: resetEmail, token: resetCode, type: 'recovery' } as any);
+                              if (error) throw error;
                               setResetStep('set');
                             } catch (e: any) {
                               setResetError(e?.message || 'Code invalide');
@@ -795,7 +786,8 @@ export const SellerAuthScreen: React.FC = () => {
                             if (resetNewPassword !== resetConfirmPassword) { setResetError('Les mots de passe ne correspondent pas'); return; }
                             setResetLoading(true); setResetError('');
                             try {
-                              await authService.updatePassword(resetNewPassword);
+                              const { error } = await supabase.auth.updateUser({ password: resetNewPassword } as any);
+                              if (error) throw error;
                               Alert.alert('Mot de passe modifié', 'Votre mot de passe a été mis à jour. Vous pouvez maintenant vous connecter.');
                               closeResetModal();
                             } catch (e: any) {

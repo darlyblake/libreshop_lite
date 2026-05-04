@@ -30,8 +30,10 @@ import { useCartStore } from "../store";
 import { useAuthStore } from "../store";
 import { useTheme } from "../hooks/useTheme";
 import { LikeButton, SkeletonLoader, TabContent } from "../components";
+import { ProductSchema } from "../components/ProductSchema";
 import { type Product, type ProductReview, type Store } from '../lib/supabase';
 import { productService } from '../services/productService';
+import { setProductPageMeta } from '../services/seoService';
 import { reviewService } from '../services/reviewService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { storeService } from '../services/storeService';
@@ -106,6 +108,19 @@ export const ProductDetailScreen: React.FC = () => {
           if (!mounted) return;
           setStore(s);
         }
+
+        // Update SEO meta tags
+        setProductPageMeta({
+          productId: p.id,
+          name: p.name,
+          description: p.description || '',
+          price: p.price,
+          rating: p.rating || 0,
+          ratingCount: p.review_count || 0,
+          imageUrl: (p.images && Array.isArray(p.images) && p.images[0]) || '',
+          inStock: (p.stock || 0) > 0,
+          currency: 'XOF',
+        });
       } catch (e) {
         errorHandler.handle(
           e,
@@ -534,7 +549,22 @@ export const ProductDetailScreen: React.FC = () => {
     `;
 
     return (
-      <div className="web-container">
+      <>
+        <ProductSchema
+          product={{
+            id: productData.id,
+            name: productData.name,
+            description: productData.description,
+            price: productData.price,
+            rating: averageRating || 0,
+            ratingCount: reviews.length,
+            imageUrl: (productData.images && productData.images[0]) || '',
+            inStock: productData.inStock,
+            slug: product?.slug || '',
+            sku: (product as any)?.sku || '',
+          }}
+        />
+        <div className="web-container">
         <style>{webCss}</style>
         <div className="web-card">
           <div className="web-top-left" role="toolbar" aria-label="Actions">
@@ -544,7 +574,7 @@ export const ProductDetailScreen: React.FC = () => {
             <button className="btn-cart pos-relative" onClick={goToCart} aria-label="Panier" title="Panier">
               <Ionicons name="cart-outline" size={18} color="#111" />
               {cartCount > 0 && (
-                <span className="cart-badge" aria-hidden>{cartCount}</span>
+                <span className="cart-badge" aria-hidden={true}>{cartCount}</span>
               )}
             </button>
           </div>
@@ -692,7 +722,8 @@ export const ProductDetailScreen: React.FC = () => {
           </div>
         )}
 
-      </div>
+        </div>
+        </>
     );
   };
 

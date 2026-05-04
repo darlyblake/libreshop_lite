@@ -47,9 +47,11 @@ const linking = (() => {
       screens: {
         ClientTabs: '',
         Landing: 'welcome',
+        About: 'about',
         SellerEmailConfirm: 'auth/confirm',
-        StoreDetail: 'store/:slug?',
+            StoreDetail: 'store/:slug?',
         ProductDetail: 'product/:productId',
+            // Password reset via deep link
       },
     },
   } as const;
@@ -548,7 +550,9 @@ export const AppNavigator: React.FC = () => {
       >
         {/* Routes publiques */}
         <Stack.Screen name="Landing" component={Screens.LandingScreen} />
+        <Stack.Screen name="About" component={Screens.AboutStaticScreen} options={{ title: 'À propos' }} />
         <Stack.Screen name="SellerAuth" component={Screens.SellerAuthScreen} />
+        <Stack.Screen name="ResetPassword" component={Screens.ResetPasswordScreen} />
         <Stack.Screen name="SellerEmailConfirm" component={Screens.SellerEmailConfirmScreen} />
         <Stack.Screen name="SubscriptionExpired" component={Screens.SubscriptionExpiredScreen} />
         

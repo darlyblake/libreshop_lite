@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { Dimensions, View, LogBox, Platform } from 'react-native';
 import { initSkiaWeb } from './SkiaLoader';
+import { resetMetaTags } from './src/services/seoService';
 
 // Configuration des notifications (uniquement sur mobile)
 if (Platform.OS !== 'web') {
@@ -128,6 +129,11 @@ const { width, height } = Dimensions.get('window');
 
 export default function App() {
   const [skiaReady, setSkiaReady] = React.useState(Platform.OS !== 'web');
+
+  useEffect(() => {
+    // Initialize SEO meta tags
+    resetMetaTags();
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') {

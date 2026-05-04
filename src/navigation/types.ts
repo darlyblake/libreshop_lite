@@ -3,6 +3,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 // Stack Navigator param lists
 export type RootStackParamList = {
   Landing: undefined;
+  About: undefined;
   SellerAuth: undefined;
   SellerEmailConfirm: { token?: string; type?: string; email?: string };
   SubscriptionExpired: undefined;

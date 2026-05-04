@@ -1,4 +1,5 @@
 export { LandingScreen } from './LandingScreen';
+export { AboutStaticScreen } from './AboutStaticScreen';
 export { SellerAuthScreen } from './SellerAuthScreen';
 export { SellerEmailConfirmScreen } from './SellerEmailConfirmScreen';
 export { SubscriptionExpiredScreen } from './SubscriptionExpiredScreen';
@@ -64,3 +65,4 @@ export { SellerChangePlanScreen } from './SellerChangePlanScreen';
 export { SellerAgentChatScreen } from './SellerAgentChatScreen';
 
 export { NotificationsScreen } from './NotificationsScreen';
+export { ResetPasswordScreen } from './ResetPasswordScreen';

@@ -1,5 +1,25 @@
-User-agent: *
-Disallow:
+# LibreShop Marketplace - Robot Instructions
+# For more information about this file, see https://www.robotstxt.org/
 
-# Référence au sitemap
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/auth/
+Disallow: /api/private/
+
+# Sitemap location
 Sitemap: https://libreshop.shop/sitemap.xml
+Sitemap: https://libreshop.vercel.app/sitemap.xml
+
+# Crawl delay (allow aggressively to index faster)
+Crawl-delay: 0
+
+# Google is welcome to crawl everything
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Bing is welcome
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1

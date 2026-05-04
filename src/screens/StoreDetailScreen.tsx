@@ -26,8 +26,10 @@ import { openURL } from '../utils/platformUtils';
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from "../config/theme";
 import { ProductCard, FollowButton, StoreHeader, StoreTabs, StoreInfoCard } from "../components";
+import { StoreSchema } from "../components/ProductSchema";
 import { collectionService } from '../services/collectionService';
 import { productService } from '../services/productService';
+import { setStorePageMeta } from '../services/seoService';
 import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { storeStatsService } from '../services/storeStatsService';
@@ -246,6 +248,17 @@ export const StoreDetailScreen: React.FC = () => {
       }
 
       setStore(s);
+
+      // Update SEO meta tags
+      setStorePageMeta({
+        storeId: s.id,
+        storeName: s.name,
+        description: s.description || '',
+        imageUrl: s.logo_url || '',
+        rating: s.rating || 0,
+        ratingCount: s.review_count || 0,
+        location: s.city || '',
+      });
 
       // Check following status for current user
       if (user?.id && s?.id) {
@@ -684,7 +697,20 @@ export const StoreDetailScreen: React.FC = () => {
     typeof storeStats?.rating_count === "number" ? storeStats.rating_count : 0;
 
   return (
-    <View style={styles.container}>
+    <>
+      <StoreSchema
+        store={{
+          id: store?.id || '',
+          name: store?.name || '',
+          description: store?.description || '',
+          imageUrl: store?.logo_url || '',
+          rating: store?.rating || 0,
+          ratingCount: store?.review_count || 0,
+          location: store?.city || '',
+          slug: store?.slug || '',
+        }}
+      />
+      <View style={styles.container}>
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={COLORS.bg}
@@ -1372,6 +1398,7 @@ export const StoreDetailScreen: React.FC = () => {
         )}
       </ScrollView>
     </View>
+    </>
   );
 };
 
