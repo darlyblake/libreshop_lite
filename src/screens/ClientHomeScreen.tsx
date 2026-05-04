@@ -854,10 +854,18 @@ export const ClientHomeScreen: React.FC = () => {
                     ))}
                   </View>
                 ) : (
-                  <FlatList
-                    data={products}
-                    renderItem={({ item }) => (
-                      <View style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
+                  <View style={styles.productsList}>
+                    {products.map((item, index) => (
+                      <View 
+                        key={item.id} 
+                        style={[
+                          styles.productCardWrapper, 
+                          { 
+                            width: responsiveProductCardWidth,
+                            marginRight: (index + 1) % numProductColumns !== 0 ? SPACING.md : 0
+                          }
+                        ]}
+                      >
                         <ProductCard
                           name={item.name}
                           price={item.price}
@@ -869,20 +877,8 @@ export const ClientHomeScreen: React.FC = () => {
                           {item.stores?.name || 'Boutique'}
                         </Text>
                       </View>
-                    )}
-                    keyExtractor={(item) => item.id}
-                    numColumns={numProductColumns}
-                    key={numProductColumns}
-                    columnWrapperStyle={styles.productsGrid}
-                    contentContainerStyle={styles.productsList}
-                    initialNumToRender={numProductColumns * 2}
-                    maxToRenderPerBatch={numProductColumns}
-                    updateCellsBatchingPeriod={50}
-                    removeClippedSubviews={Platform.OS === 'android'}
-                    windowSize={3}
-                    scrollEnabled={false}
-                    nestedScrollEnabled={false}
-                  />
+                    ))}
+                  </View>
                 )}
               </View>
 
@@ -1244,6 +1240,8 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
     },
     productsList: {
       paddingHorizontal: SPACING.xl,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: SPACING.md,
       ...(Platform.OS === 'web' && {
         WebkitOverflowScrolling: 'touch',
