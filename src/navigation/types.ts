@@ -67,6 +67,10 @@ export type RootStackParamList = {
   Features: undefined;
   Pricing: undefined;
   SellerChangePlan: undefined;
+  PersonalInfo: undefined;
+  Address: undefined;
+  Security: undefined;
+  Help: undefined;
 };
 
 export type ClientTabParamList = {

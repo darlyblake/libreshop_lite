@@ -575,6 +575,10 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="BulkPayment" component={Screens.BulkPaymentScreen} />
         <Stack.Screen name="Confirmation" component={Screens.ConfirmationScreen} />
         <Stack.Screen name="Notifications" component={Screens.NotificationsScreen} />
+        <Stack.Screen name="PersonalInfo" component={Screens.PersonalInfoScreen} />
+        <Stack.Screen name="Address" component={Screens.AddressScreen} />
+        <Stack.Screen name="Security" component={Screens.SecurityScreen} />
+        <Stack.Screen name="Help" component={Screens.HelpScreen} />
         
         {/* Routes vendeurs */}
         <Stack.Screen name="SellerAddStore" component={Screens.SellerAddStoreScreen} />

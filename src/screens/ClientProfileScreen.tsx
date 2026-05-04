@@ -47,8 +47,8 @@ const MENU_ITEMS: Array<{
   { icon: 'receipt-outline', label: 'Mes Commandes', screen: 'ClientOrders' },
   { icon: 'sync-outline', label: 'Restaurer mon historique', action: 'restore' },
   { icon: 'notifications-outline', label: 'Notifications', screen: 'Notifications' },
-  { icon: 'shield-checkmark-outline', label: 'Sécurité', soon: true },
-  { icon: 'help-circle-outline', label: 'Aide et support', soon: true },
+  { icon: 'shield-checkmark-outline', label: 'Sécurité', screen: 'Security' },
+  { icon: 'help-circle-outline', label: 'Aide et support', screen: 'Help' },
 ];
 
 export const ClientProfileScreen: React.FC = () => {
@@ -179,17 +179,11 @@ export const ClientProfileScreen: React.FC = () => {
       return;
     }
     if (item.label === 'Informations personnelles') {
-      Alert.alert(
-        'Informations personnelles',
-        `Nom: ${user?.full_name || 'Non renseigné'}\nTéléphone: ${user?.whatsapp_number || user?.phone || 'Non renseigné'}\nEmail: ${user?.email || 'Guest'}`
-      );
+      navigation.navigate('PersonalInfo');
       return;
     }
     if (item.label === 'Adresses enregistrées') {
-      Alert.alert(
-        'Adresses enregistrées',
-        user?.address ? `Adresse actuelle :\n${user.address}` : "Aucune adresse enregistrée. Passez une commande pour enregistrer votre adresse."
-      );
+      navigation.navigate('Address');
       return;
     }
     if (item.soon) {

@@ -66,3 +66,7 @@ export { SellerAgentChatScreen } from './SellerAgentChatScreen';
 
 export { NotificationsScreen } from './NotificationsScreen';
 export { ResetPasswordScreen } from './ResetPasswordScreen';
+export { PersonalInfoScreen } from './PersonalInfoScreen';
+export { AddressScreen } from './AddressScreen';
+export { SecurityScreen } from './SecurityScreen';
+export { HelpScreen } from './HelpScreen';

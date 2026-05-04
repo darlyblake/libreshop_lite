@@ -134,8 +134,26 @@ export const authService = {
     return data;
   },
 
-  async updatePassword(newPassword: string) {
+  async updateProfile(userId: string, data: { full_name?: string; phone?: string; whatsapp_number?: string; address?: string }) {
     const client = useSupabase();
+    const { error } = await client.from('users').update(data).eq('id', userId);
+    if (error) throw error;
+  },
+
+  async updatePassword(currentPassword: string, newPassword: string) {
+    const client = useSupabase();
+    
+    // First verify current password by attempting to sign in
+    const { data: signInData, error: signInError } = await client.auth.signInWithPassword({
+      email: (await client.auth.getUser()).data.user?.email || '',
+      password: currentPassword,
+    });
+    
+    if (signInError) {
+      throw new Error('Mot de passe actuel incorrect');
+    }
+    
+    // Update password
     const { error } = await client.auth.updateUser({
       password: newPassword
     });
