@@ -272,7 +272,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   return (
-    <TouchableOpacity style={styles.productCard} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity 
+      style={styles.productCard} 
+      onPress={onPress} 
+      activeOpacity={0.8}
+    >
       <View style={styles.productImageContainer}>
         {imageUrl ? (
           <Image source={{ uri: cloudinaryService.getOptimizedUrl(imageUrl, 400) }} style={styles.productImage} resizeMode="cover" />

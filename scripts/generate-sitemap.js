@@ -7,6 +7,7 @@ const urlsFile = path.join(__dirname, 'urls.json');
 
 const staticRoutes = [
   '/',
+  '/about',
   '/landing',
   '/features',
   '/pricing',
@@ -16,8 +17,9 @@ const staticRoutes = [
   '/wishlist',
   '/cart',
   '/checkout',
-  '/confirmation',
-  '/account'
+  '/account',
+  '/contact',
+  '/faq'
 ];
 
 function formatUrl(loc, opts = {}){

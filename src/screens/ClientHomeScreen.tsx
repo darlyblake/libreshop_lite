@@ -854,22 +854,22 @@ export const ClientHomeScreen: React.FC = () => {
                     ))}
                   </View>
                 ) : (
-                  <FlatList
-                    data={products}
-                    renderItem={renderProductCard}
-                    keyExtractor={(item) => item.id}
-                    numColumns={numProductColumns}
-                    key={numProductColumns}
-                    scrollEnabled={false}
-                    nestedScrollEnabled={false}
-                    columnWrapperStyle={styles.productsGrid}
-                    contentContainerStyle={styles.productsList}
-                    initialNumToRender={numProductColumns * 2}
-                    maxToRenderPerBatch={numProductColumns}
-                    updateCellsBatchingPeriod={50}
-                    removeClippedSubviews={Platform.OS === 'android'}
-                    windowSize={3}
-                  />
+                  <View style={styles.productsGrid}>
+                    {products.map((item) => (
+                      <View key={item.id} style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
+                        <ProductCard
+                          name={item.name}
+                          price={item.price}
+                          comparePrice={item.compare_price}
+                          imageUrl={item.images?.[0]}
+                          onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+                        />
+                        <Text style={styles.storeNameLabel} numberOfLines={1}>
+                          {item.stores?.name || 'Boutique'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
 
