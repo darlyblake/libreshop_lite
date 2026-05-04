@@ -146,8 +146,8 @@ export const ClientHomeScreen: React.FC = () => {
     };
   }, []);
 
-  // Calculer le nombre de colonnes et la largeur des cartes dynamiquement
-  const numProductColumns = isLargeDesktop ? 6 : isDesktop ? 4 : isTablet ? 3 : 2;
+  // Grille fixe 2x2 pour tous les écrans
+  const numProductColumns = 2;
   const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
 
   const responsiveProductCardWidth = useMemo(() => {
@@ -855,15 +855,12 @@ export const ClientHomeScreen: React.FC = () => {
                   </View>
                 ) : (
                   <View style={styles.productsList}>
-                    {products.map((item, index) => (
+                    {products.map((item) => (
                       <View 
                         key={item.id} 
                         style={[
                           styles.productCardWrapper, 
-                          { 
-                            width: responsiveProductCardWidth,
-                            marginRight: (index + 1) % numProductColumns !== 0 ? SPACING.md : 0
-                          }
+                          { width: responsiveProductCardWidth }
                         ]}
                       >
                         <ProductCard
@@ -1242,6 +1239,7 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       paddingHorizontal: SPACING.xl,
       flexDirection: 'row',
       flexWrap: 'wrap',
+      justifyContent: 'space-between',
       gap: SPACING.md,
       ...(Platform.OS === 'web' && {
         WebkitOverflowScrolling: 'touch',
