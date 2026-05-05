@@ -3,12 +3,26 @@
  * Et gérer la persistance du choix utilisateur
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeName } from '../config/theme_new';
 
 const THEME_STORAGE_KEY = '@libreshop_theme_mode';
+
+// Écouteurs globaux pour les changements de thème
+let themeChangeListeners: (() => void)[] = [];
+
+export const addThemeChangeListener = (listener: () => void) => {
+  themeChangeListeners.push(listener);
+  return () => {
+    themeChangeListeners = themeChangeListeners.filter(l => l !== listener);
+  };
+};
+
+const notifyThemeChange = () => {
+  themeChangeListeners.forEach(listener => listener());
+};
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -66,6 +80,7 @@ export const useColorScheme = () => {
     const resolved = resolveTheme(newMode);
     setTheme(resolved);
     saveMode(newMode);
+    notifyThemeChange(); // Notifie tous les composants du changement
   };
 
   // basculer entre clair et sombre (ne passe pas en system)

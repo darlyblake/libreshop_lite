@@ -19,6 +19,7 @@ import { useAuthStore } from '../store';
 import { orderService } from '../services/orderService';
 import { wishlistService } from '../services/wishlistService';
 import { useTheme } from '../hooks/useTheme';
+import { useThemeRefresh } from '../hooks/useThemeRefresh';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { authService } from '../services/authService';
@@ -55,6 +56,7 @@ export const ClientProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
   const { getColor, spacing, radius, fontSize, isDark } = useTheme();
+  useThemeRefresh(); // Force le re-rendu au changement de thème
   
   const [ordersCount, setOrdersCount] = useState(0);
   const [favoritesCount, setFavoritesCount] = useState(0);

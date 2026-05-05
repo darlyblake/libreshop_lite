@@ -23,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
+import { useThemeRefresh } from '../hooks/useThemeRefresh';
 import { navigateToClientTab } from '../navigation/clientNavigation';
 import { errorHandler } from '../utils/errorHandler';
 import { StoreCard, ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase, SearchBar } from '../components';
@@ -77,10 +78,11 @@ export const ClientHomeScreen: React.FC = () => {
   const { width, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
   const { items } = useCartStore();
   const palette = useLegacyPalette();
-  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE, isDark } = useTheme();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE, isDark, getColor } = useTheme();
+  useThemeRefresh(); // Force le re-rendu au changement de thème
   const styles = useMemo(
     () => createClientHomeStyles(palette, SPACING, RADIUS, FONT_SIZE),
-    [palette, SPACING, RADIUS, FONT_SIZE]
+    [palette, SPACING, RADIUS, FONT_SIZE, isDark] // Ajoute isDark pour forcer le re-rendu au changement de thème
   );
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);

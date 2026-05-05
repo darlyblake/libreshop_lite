@@ -31,7 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
 
   return (
     <View style={[styles.container, transparent && styles.transparent]}>
@@ -71,7 +71,7 @@ export const LandingHeader: React.FC = () => {
   const SPACING = themeContext.spacing;
   const RADIUS = themeContext.radius;
   const FONT_SIZE = themeContext.fontSize;
-  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
 
   return (
     <View style={styles.landingContainer}>

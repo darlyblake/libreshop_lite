@@ -174,7 +174,7 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, style, onPress }) => {
   const themeContext = useTheme();
-  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
 
   const Wrapper = onPress ? TouchableOpacity : View;
   return (
@@ -212,7 +212,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({
 }) => {
   const themeContext = useTheme();
   const COLORS = themeContext.getColor;
-  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
 
   return (
     <TouchableOpacity style={styles.storeCard} onPress={onPress} activeOpacity={0.8}>
@@ -269,7 +269,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const themeContext = useTheme();
   const COLORS = themeContext.getColor;
-  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
 
   return (
     <TouchableOpacity 
