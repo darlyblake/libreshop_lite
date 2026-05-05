@@ -503,7 +503,7 @@ export const PaymentScreen: React.FC = () => {
             <Text style={styles.sectionTitle}>Détails Mobile Money</Text>
             <TextInput
               style={styles.input}
-              placeholder="Numéro tél. (ex: +229 90123456)"
+              placeholder="Numéro tél. (ex: +241 90123456)"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="phone-pad"
               value={phoneNumber}

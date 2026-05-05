@@ -222,7 +222,7 @@ export const CheckoutScreen: React.FC = () => {
             <Text style={styles.label}>Téléphone WhatsApp</Text>
             <TextInput
               style={[styles.input, errors.phone ? { borderColor: COLORS.danger } : null]}
-              placeholder="+229 XX XXX XXXX"
+              placeholder="+241 XX XXX XXXX"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="phone-pad"
               value={formData.phone}

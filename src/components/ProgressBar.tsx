@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle } from 'react-native';
-import { useThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../hooks/useTheme';
 
 interface ProgressBarProps {
   progress: number;
@@ -15,11 +15,11 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   height = 8,
   style,
 }) => {
-  const { theme } = useThemeContext();
-  const progressColor = color || theme.getColor.primary;
+  const { getColor } = useTheme();
+  const progressColor = color || getColor.primary;
 
   return (
-    <View style={[styles.container, { height, backgroundColor: theme.getColor.border }, style]}>
+    <View style={[styles.container, { height, backgroundColor: getColor.border }, style]}>
       <View 
         style={[
           styles.progress, 

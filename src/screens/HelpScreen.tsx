@@ -132,8 +132,8 @@ export const HelpScreen: React.FC = () => {
       'Contacter le support',
       'Choisissez une option pour nous contacter',
       [
-        { text: 'Appeler', onPress: () => Linking.openURL('tel:+229XXXXXXXX') },
-        { text: 'WhatsApp', onPress: () => Linking.openURL('https://wa.me/229XXXXXXXX') },
+        { text: 'Appeler', onPress: () => Linking.openURL('tel:+241XXXXXXXX') },
+        { text: 'WhatsApp', onPress: () => Linking.openURL('https://wa.me/241XXXXXXXX') },
         { text: 'Email', onPress: () => Linking.openURL('mailto:support@libreshop.com') },
         { text: 'Annuler', style: 'cancel' },
       ]

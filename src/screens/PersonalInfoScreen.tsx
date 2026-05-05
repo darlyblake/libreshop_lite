@@ -182,7 +182,7 @@ export const PersonalInfoScreen: React.FC = () => {
               style={styles.input}
               value={formData.phone}
               onChangeText={(text) => setFormData(prev => ({ ...prev, phone: text }))}
-              placeholder="+229 XX XX XX XX"
+              placeholder="+241 XX XX XX XX"
               placeholderTextColor={getColor.textMuted}
               keyboardType="phone-pad"
             />
@@ -194,7 +194,7 @@ export const PersonalInfoScreen: React.FC = () => {
               style={styles.input}
               value={formData.whatsapp_number}
               onChangeText={(text) => setFormData(prev => ({ ...prev, whatsapp_number: text }))}
-              placeholder="+229 XX XX XX XX"
+              placeholder="+241 XX XX XX XX"
               placeholderTextColor={getColor.textMuted}
               keyboardType="phone-pad"
             />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../hooks/useTheme';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 type BadgeSize = 'small' | 'medium' | 'large';
@@ -59,9 +59,9 @@ export const Badge: React.FC<BadgeProps> = ({
   icon,
   style,
 }) => {
-  const { theme } = useThemeContext();
-  const variantStyles = getVariantStyles(variant, theme);
-  const sizeStyles = getSizeStyles(size, theme);
+  const { getColor, spacing, fontSize } = useTheme();
+  const variantStyles = getVariantStyles(variant, { getColor });
+  const sizeStyles = getSizeStyles(size, { spacing, fontSize });
 
   return (
     <View style={[

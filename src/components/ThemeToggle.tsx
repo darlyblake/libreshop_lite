@@ -14,7 +14,7 @@ import {
   Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '../context/ThemeContext';
+import { useTheme } from '../hooks/useTheme';
 
 interface ThemeToggleProps {
   size?: number;
@@ -27,8 +27,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({
   style, 
   showLabel = false 
 }) => {
-  const themeContext = useThemeContext();
-  const { toggleTheme, getColor, themeName, isDark, setThemeMode, mode } = themeContext;
+  const { toggleTheme, getColor, themeName, isDark, setThemeMode, mode } = useTheme();
   
   // Animation pour la rotation du soleil/lune
   const rotationAnim = useRef(new Animated.Value(0)).current;

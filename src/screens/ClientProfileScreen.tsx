@@ -144,7 +144,7 @@ export const ClientProfileScreen: React.FC = () => {
       setRestoreStep(2);
     } catch (error: any) {
       errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Send OTP Error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-      Alert.alert('Erreur', 'Impossible d\'envoyer le code. Vérifiez le format (ex: +229XXXXXXXX).');
+      Alert.alert('Erreur', 'Impossible d\'envoyer le code. Vérifiez le format (ex: +241XXXXXXXX).');
     } finally {
       setVerifying(false);
     }
@@ -521,7 +521,7 @@ export const ClientProfileScreen: React.FC = () => {
                 </Text>
                 <TextInput
                   style={[modalStyles.input, { borderColor: getColor.border, color: getColor.text }]}
-                  placeholder="+229 XX XX XX XX"
+                  placeholder="+241 XX XX XX XX"
                   placeholderTextColor={getColor.textMuted}
                   keyboardType="phone-pad"
                   value={phoneNumber}
