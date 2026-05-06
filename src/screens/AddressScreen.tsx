@@ -82,10 +82,10 @@ export const AddressScreen: React.FC = () => {
       setAddresses(prev => [...prev, newAddress]);
       
       // Mettre à jour l'adresse principale de l'utilisateur
-      if (newAddress.is_default) {
-        await authService.updateProfile(user?.id, { address: newAddress.address });
-        const { updateUser } = useAuthStore.getState();
-        updateUser({ ...user, address: newAddress.address });
+      if (newAddress.is_default && user) {
+        await authService.updateProfile(user.id, { address: newAddress.address });
+        const { setUser } = useAuthStore.getState();
+        setUser({ ...user, address: newAddress.address });
       }
 
       setFormData({ label: '', address: '', is_default: false });
@@ -109,9 +109,11 @@ export const AddressScreen: React.FC = () => {
         is_default: addr.id === addressId
       })));
 
-      await authService.updateProfile(user?.id, { address: address.address });
-      const { updateUser } = useAuthStore.getState();
-      updateUser({ ...user, address: address.address });
+      if (user) {
+        await authService.updateProfile(user.id, { address: address.address });
+        const { setUser } = useAuthStore.getState();
+        setUser({ ...user, address: address.address });
+      }
 
       Alert.alert('Succès', 'Adresse principale mise à jour');
     } catch (error) {

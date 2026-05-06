@@ -18,7 +18,7 @@ import { errorHandler } from '../utils/errorHandler';
 
 export const PersonalInfoScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { user, updateUser } = useAuthStore();
+  const { user, setUser } = useAuthStore();
   const { getColor, spacing, radius, fontSize } = useTheme();
   
   const [loading, setLoading] = useState(false);
@@ -37,14 +37,18 @@ export const PersonalInfoScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await authService.updateProfile(user?.id, {
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      await authService.updateProfile(user.id, {
         full_name: formData.full_name,
         phone: formData.phone,
         whatsapp_number: formData.whatsapp_number,
         address: formData.address,
       });
       
-      updateUser({
+      setUser({
         ...user,
         ...formData
       });

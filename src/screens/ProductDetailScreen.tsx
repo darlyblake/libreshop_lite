@@ -29,7 +29,7 @@ import { useResponsive } from "../utils/responsive";
 import { useCartStore } from "../store";
 import { useAuthStore } from "../store";
 import { useTheme } from "../hooks/useTheme";
-import { LikeButton, SkeletonLoader, TabContent } from "../components";
+import { LikeButton, SkeletonLoader, TabContent, shareContent } from "../components";
 import { ProductSchema } from "../components/ProductSchema";
 import { type Product, type ProductReview, type Store } from '../lib/supabase';
 import { productService } from '../services/productService';
@@ -985,7 +985,19 @@ export const ProductDetailScreen: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => Alert.alert("Partager", "Fonctionnalité à venir")}
+            onPress={() => {
+              if (product) {
+                const shareUrl = `https://libreshop.shop/product/${product.id}`;
+                shareContent({
+                  title: product.name,
+                  description: product.description || '',
+                  url: shareUrl,
+                  imageUrl: product.images?.[0] || undefined,
+                  price: `${product.price.toLocaleString()} XOF`,
+                  type: 'product',
+                });
+              }
+            }}
           >
             <Ionicons name="share-outline" size={22} color="white" />
           </TouchableOpacity>

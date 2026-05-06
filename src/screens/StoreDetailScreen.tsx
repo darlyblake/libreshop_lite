@@ -25,7 +25,7 @@ import { contactStore } from '../services/contactService';
 import { openURL } from '../utils/platformUtils';
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from "../config/theme";
-import { ProductCard, FollowButton, StoreHeader, StoreTabs, StoreInfoCard } from "../components";
+import { ProductCard, FollowButton, StoreHeader, StoreTabs, StoreInfoCard, shareContent } from "../components";
 import { StoreSchema } from "../components/ProductSchema";
 import { collectionService } from '../services/collectionService';
 import { productService } from '../services/productService';
@@ -823,6 +823,30 @@ export const StoreDetailScreen: React.FC = () => {
                   color={isFollowing ? COLORS.accent : COLORS.text}
                 />
                 <Text style={styles.followButtonText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.followButton}
+                onPress={() => {
+                  if (store) {
+                    const shareUrl = `https://libreshop.shop/store/${store.id}`;
+                    shareContent({
+                      title: store.name,
+                      description: store.description || '',
+                      url: shareUrl,
+                      imageUrl: store.avatar_url || store.banner_url || undefined,
+                      type: 'store',
+                    });
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name="share-outline" 
+                  size={18} 
+                  color={COLORS.text}
+                />
+                <Text style={styles.followButtonText}>Partager</Text>
               </TouchableOpacity>
             </View>
 

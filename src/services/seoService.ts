@@ -13,6 +13,9 @@ interface MetaTagConfig {
   author?: string;
   keywords?: string;
   canonicalUrl?: string;
+  price?: number;
+  currency?: string;
+  availability?: string;
 }
 
 /**
@@ -46,6 +49,9 @@ export function updateMetaTags(config: MetaTagConfig): void {
     author,
     keywords,
     canonicalUrl,
+    price,
+    currency = 'XOF',
+    availability = 'InStock',
   } = config;
 
   // 1. Mettre à jour le titre
@@ -138,6 +144,22 @@ export function updateMetaTags(config: MetaTagConfig): void {
       content: imageUrl,
     });
   }
+
+  // 8. Add product-specific meta tags if price is provided
+  if (price && type === 'product') {
+    updateOrCreateMetaTag('meta[property="product:price:amount"]', {
+      property: 'product:price:amount',
+      content: price.toString(),
+    });
+    updateOrCreateMetaTag('meta[property="product:price:currency"]', {
+      property: 'product:price:currency',
+      content: currency,
+    });
+    updateOrCreateMetaTag('meta[property="product:availability"]', {
+      property: 'product:availability',
+      content: availability,
+    });
+  }
 }
 
 /**
@@ -195,13 +217,16 @@ export function setProductPageMeta(product: ProductPageMeta): void {
   const description = product.description.substring(0, 160);
 
   updateMetaTags({
-    title: `${product.name} - ${product.price}${product.currency || 'XOF'} | LibreShop`,
+    title: `${product.name} - ${product.price.toLocaleString()} ${product.currency || 'XOF'} | LibreShop`,
     description: description + (description.length < product.description.length ? '...' : ''),
     url: productUrl,
     imageUrl: product.imageUrl,
     type: 'product',
     canonicalUrl: productUrl,
     keywords: `${product.name}, achat en ligne, marketplace africaine, LibreShop`,
+    price: product.price,
+    currency: product.currency || 'XOF',
+    availability: product.inStock ? 'InStock' : 'OutOfStock',
   });
 }
 

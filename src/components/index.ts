@@ -26,4 +26,6 @@ export { StoreHeader } from './StoreHeader';
 export { StoreTabs } from './StoreTabs';
 export { StoreInfoCard } from './StoreInfoCard';
 export { TabContent } from './TabContent';
+export { MetaTags, useMetaTags } from './MetaTags';
+export { ShareButton, shareContent } from './ShareButton';
 
