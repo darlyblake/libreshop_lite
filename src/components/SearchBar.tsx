@@ -7,6 +7,7 @@ import {
   ViewStyle,
   Platform,
   ActivityIndicator,
+  useWindowDimensions,
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -60,6 +61,10 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     () => createSearchBarStyles(palette, theme.spacing, theme.radius, theme.fontSize),
     [palette, theme.spacing, theme.radius, theme.fontSize]
   );
+
+  const { width: windowWidth } = useWindowDimensions();
+  const compact = windowWidth <= 420; // threshold for small phones
+  const iconSize = compact ? 18 : 20;
 
   const handleFocus = useCallback(() => {
     setIsFocused(true);
@@ -130,19 +135,28 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   }, []);
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[
+        styles.container,
+        style,
+        compact && { paddingHorizontal: 10, paddingVertical: 6 },
+      ]}
+    >
       {/* Icon de recherche */}
       <Ionicons
         name="search"
-        size={20}
+        size={iconSize}
         color={isFocused ? palette.accent : palette.textMuted}
-        style={styles.icon}
+        style={[styles.icon, compact && { marginRight: 6 }]}
       />
 
       {/* Input */}
       <TextInput
         testID={testID}
-        style={styles.input}
+        style={[
+          styles.input,
+          compact && { fontSize: theme.fontSize.sm, paddingVertical: 0 },
+        ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
