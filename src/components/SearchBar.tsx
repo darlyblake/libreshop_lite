@@ -213,14 +213,17 @@ const createSearchBarStyles = (palette: any, SPACING: any, RADIUS: any, FONT_SIZ
       borderWidth: 1,
       borderColor: palette.border,
       paddingHorizontal: SPACING.lg,
-      height: 48,
+      paddingVertical: Platform.OS === 'web' ? SPACING.sm : SPACING.xs,
       gap: SPACING.sm,
+      flex: 1,
+      minWidth: 0, // allow shrinking inside flex containers on small screens
     },
     icon: {
       marginRight: SPACING.xs,
     },
     input: {
       flex: 1,
+      minWidth: 0,
       fontSize: FONT_SIZE.md,
       color: palette.text,
       paddingVertical: 0,
