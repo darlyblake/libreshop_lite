@@ -17,6 +17,7 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import OptimizedImage from '../components/OptimizedImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -278,14 +279,12 @@ export const ClientHomeScreen: React.FC = () => {
               // Prefetch carousel images to avoid reloads during scroll
               try {
                 const urls = (carousel || []).map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
-                // Use Image.prefetch where available; fall back silently on errors
-                await Promise.all(urls.map((u: string) => {
-                  try {
-                    return Image.prefetch(u);
-                  } catch (e) {
-                    return Promise.resolve(false);
-                  }
-                }));
+                // Try FastImage.preload when available, else Image.prefetch
+                try {
+                  await (OptimizedImage as any).preload(urls);
+                } catch (e) {
+                  // ignore prefetch errors
+                }
               } catch (e) {
                 // ignore prefetch errors
               }
@@ -478,13 +477,13 @@ export const ClientHomeScreen: React.FC = () => {
         style={{ width: bannerWidth }}
       >
         <Animated.View style={[styles.bannerCard, { transform: [{ scale }], opacity }]}>
-          {item.image_url ? (
-            <Image 
-              source={{ uri: cloudinaryService.getOptimizedUrl(item.image_url, 800) }} 
-              style={styles.bannerImage}
-              resizeMode="cover"
-            />
-          ) : null}
+            {item.image_url ? (
+              <OptimizedImage
+                uri={cloudinaryService.getOptimizedUrl(item.image_url, 800)}
+                style={styles.bannerImage}
+                resizeMode="cover"
+              />
+            ) : null}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
             style={styles.bannerGradient}

@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import { copyToClipboard } from '../services/contactService';
+import { shareContent } from '../components';
 import { useAuthStore } from '../store';
 import { Product } from '../lib/supabase';
 import { productService } from '../services/productService';
@@ -135,17 +136,19 @@ export const SellerProductActionsScreen: React.FC = () => {
       : Linking.createURL(`/product/${product.id}`);
 
     try {
-      if (Platform.OS === 'web' && navigator.clipboard) {
-        await copyToClipboard(url, 'Le lien du produit a été copié dans le presse-papier.');
-      } else {
-        await Share.share({
-          title: product.name,
-          message: `Découvrez ${product.name} sur LibreShop : ${url}`,
-          url: url,
-        });
-      }
+      await shareContent({
+        title: product.name,
+        description: product.description || '',
+        url,
+        imageUrl: product.images && product.images[0] ? cloudinaryService.getOptimizedUrl(product.images[0], 800) : undefined,
+        price: product.price ? String(product.price) : undefined,
+        type: 'product',
+      });
     } catch (error) {
       console.error('Share error:', error);
+      if (Platform.OS === 'web' && navigator.clipboard) {
+        await copyToClipboard(url, 'Le lien du produit a été copié dans le presse-papier.');
+      }
     }
   };
 

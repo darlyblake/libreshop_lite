@@ -33,6 +33,7 @@ import { useCategoryStore } from '../store/categoryStore';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useTheme } from '../hooks/useTheme';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { shareContent } from '../components';
 import { qrCodeService } from '../services/qrCodeService';
 
 /* =========================
@@ -269,18 +270,39 @@ export const SellerStoreScreen: React.FC = () => {
       return;
     }
     try {
-      if (Platform.OS === 'web' || !Share?.share) {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          await copyToClipboard(storePublicUrl, `Lien copié:\n${storePublicUrl}`);
-        } else {
-          Alert.alert('Lien boutique', storePublicUrl);
-        }
-      } else {
-        await Share.share({ message: storePublicUrl });
-      }
+      await shareContent({
+        title: store?.name || 'Boutique',
+        description: store?.description || '',
+        url: storePublicUrl,
+        imageUrl: (store as any)?.logo_url || (store as any)?.banner_url || undefined,
+        type: 'store',
+      });
     } catch (e: any) {
-      Alert.alert('Lien boutique', storePublicUrl);
+      Alert.alert('Partager', storePublicUrl);
     }
+  };
+
+  const handleDownloadQr = async () => {
+    if (!store?.slug) return;
+    const qrDataUrl = qrCodeService.getStoreUrl(store.slug);
+    const qrImageUrl = qrCodeService.getQrImageUrl(qrDataUrl, 600);
+
+    if (Platform.OS === 'web') {
+      try {
+        const a = document.createElement('a');
+        a.href = qrImageUrl;
+        a.download = `qr-${store.slug}.png`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (e: any) {
+        Alert.alert('Erreur', 'Impossible de télécharger le QR code');
+      }
+      return;
+    }
+
+    await handleSaveQrToGallery();
   };
 
   const handleShowQrLink = () => {
@@ -723,6 +745,13 @@ export const SellerStoreScreen: React.FC = () => {
             <Text style={{ color: getColor.textMuted, fontSize: 12, textAlign: 'center', marginBottom: 20 }}>
               {storePublicUrl}
             </Text>
+
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton, { width: '100%', marginBottom: 10 }]}
+              onPress={handleDownloadQr}
+            >
+              <Text style={[styles.submitText, { color: getColor.text }]}>Télécharger le QR code</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.button, styles.submitButton, { width: '100%' }]}

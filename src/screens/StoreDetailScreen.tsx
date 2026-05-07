@@ -522,7 +522,7 @@ export const StoreDetailScreen: React.FC = () => {
     return (width - horizontalPad - gaps) / numColumns;
   }, [numColumns]);
 
-  // BUG FIX: Use storeId in URL if slug is undefined/empty
+  // Unified share: prefer native/shareContent util to get rich preview where possible
   const handleShareStore = useCallback(async () => {
     try {
       if (!store?.id) return;
@@ -542,29 +542,13 @@ export const StoreDetailScreen: React.FC = () => {
             queryParams: { storeId: String(store.id) },
           });
 
-      if (Platform.OS === "web") {
-        try {
-          const nav: any = typeof navigator !== "undefined" ? navigator : null;
-          if (nav?.clipboard?.writeText) {
-            await nav.clipboard.writeText(link);
-            Alert.alert(
-              "Lien copié",
-              "Le lien de la boutique a été copié dans le presse-papiers.",
-            );
-            return;
-          }
-        } catch {}
-
-        try {
-          const w: any = typeof window !== "undefined" ? window : null;
-          if (w?.prompt) {
-            w.prompt("Copiez le lien de la boutique :", link);
-            return;
-          }
-        } catch {}
-      }
-
-      await Share.share({ message: link });
+      await shareContent({
+        title: store.name || 'Boutique',
+        description: store.description || '',
+        url: link,
+        imageUrl: (store as any)?.avatar_url || (store as any)?.banner_url || undefined,
+        type: 'store',
+      });
     } catch (e: any) {
       errorHandler.handle(
         e,
