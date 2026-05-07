@@ -102,12 +102,18 @@ export const PWAInstallButton: React.FC = () => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
+    // prefer the component-captured prompt, otherwise try a global fallback
+    const promptEvent = deferredPrompt || (window as any).deferredPrompt || null;
+    console.log('PWA install click, deferredPrompt (component):', deferredPrompt, 'global:', (window as any).deferredPrompt);
+
+    if (promptEvent) {
       try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
+        await promptEvent.prompt();
+        const { outcome } = await promptEvent.userChoice;
         if (outcome !== 'accepted') setShowInstallPrompt(false);
+        // clear both component state and global fallback
         setDeferredPrompt(null);
+        try { delete (window as any).deferredPrompt; } catch (e) { (window as any).deferredPrompt = null; }
       } catch (error: any) {
         errorHandler.handle(error, 'PWA installation error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       }
