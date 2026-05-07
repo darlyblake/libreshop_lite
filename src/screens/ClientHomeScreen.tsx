@@ -87,6 +87,7 @@ export const ClientHomeScreen: React.FC = () => {
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const logoAnim = useRef(new Animated.Value(1)).current;
 
   // Initialize state with reducer
   const { state, dispatch } = useClientHomeState();
@@ -137,6 +138,16 @@ export const ClientHomeScreen: React.FC = () => {
     };
     startPulse();
   }, []);
+
+  // Logo subtle pulsing animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoAnim, { toValue: 1.03, duration: 1400, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(logoAnim, { toValue: 1, duration: 1400, useNativeDriver: Platform.OS !== 'web' }),
+      ])
+    ).start();
+  }, [logoAnim]);
 
   // Start cache monitoring for performance metrics
   useEffect(() => {
@@ -543,10 +554,10 @@ export const ClientHomeScreen: React.FC = () => {
             style={styles.header}
           >
             <View style={styles.headerContent}>
-              <View style={styles.logoContainer}>
-                <Text style={styles.logoText} numberOfLines={1} adjustsFontSizeToFit>libreshop</Text>
+              <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoAnim }] }]}> 
+                <Animated.Text style={[styles.logoText, { transform: [{ scale: pulseAnim }] }]} numberOfLines={1} adjustsFontSizeToFit>Libreshop</Animated.Text>
                 <Text style={styles.logoSlogan} numberOfLines={1}>Achetez local, vivez mieux</Text>
-              </View>
+              </Animated.View>
               <TouchableOpacity
                 style={styles.openShopButton}
                 onPress={() => navigation.navigate('SellerAuth')}
