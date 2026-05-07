@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, Alert, Platform, Share, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 interface ShareButtonProps {
   title: string;
@@ -58,19 +59,48 @@ export const shareContent = async (options: ShareOptions) => {
       }
     } else {
       // Sur mobile, utiliser expo-sharing
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(url, {
-          dialogTitle: `Partager ${type === 'product' ? 'ce produit' : 'cette boutique'}`,
-          subject: title,
-          message: shareMessage,
-        });
-      } else {
-        // Fallback: utiliser React Native Share
-        await Share.share({
-          message: shareMessage,
-          title: title,
-          url: url,
-        });
+      try {
+        // If there's an image URL, try to download it and share the local file for richer previews
+        if (options.imageUrl) {
+          try {
+            const extMatch = String(options.imageUrl).match(/\.(png|jpg|jpeg)$/i);
+            const ext = extMatch ? extMatch[1] : 'jpg';
+            const localPath = `${FileSystem.cacheDirectory}share-${Date.now()}.${ext}`;
+            const downloaded = await FileSystem.downloadAsync(options.imageUrl, localPath);
+            const fileUri = downloaded?.uri || localPath;
+            if (await Sharing.isAvailableAsync()) {
+              await Sharing.shareAsync(fileUri, {
+                dialogTitle: `Partager ${type === 'product' ? 'ce produit' : 'cette boutique'}`,
+                mimeType: `image/${ext}`,
+                UTI: `public.image`,
+              });
+              // attempt to remove cached file
+              try { await FileSystem.deleteAsync(fileUri, { idempotent: true }); } catch (_) {}
+              return;
+            } else {
+              // Fallback to RN Share with message + url
+              await Share.share({ message: shareMessage, title, url });
+              try { await FileSystem.deleteAsync(fileUri, { idempotent: true }); } catch (_) {}
+              return;
+            }
+          } catch (imgErr) {
+            console.warn('Image share failed, falling back to text share', imgErr);
+            // continue to fallback below
+          }
+        }
+
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(url, {
+            dialogTitle: `Partager ${type === 'product' ? 'ce produit' : 'cette boutique'}`,
+            subject: title,
+            message: shareMessage,
+          });
+        } else {
+          // Fallback: utiliser React Native Share
+          await Share.share({ message: shareMessage, title: title, url: url });
+        }
+      } catch (err) {
+        throw err;
       }
     }
   } catch (error) {
