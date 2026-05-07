@@ -17,6 +17,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { copyToClipboard } from '../services/contactService';
+import * as FileSystem from 'expo-file-system';
+
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -284,6 +286,41 @@ export const SellerStoreScreen: React.FC = () => {
   const handleShowQrLink = () => {
     if (!storePublicUrl) return;
     setShowQrModal(true);
+  };
+
+  const handleSaveQrToGallery = async () => {
+    if (!store?.slug) return;
+
+    try {
+      if (Platform.OS === 'web') {
+        Alert.alert('QR Code', 'Enregistrer dans la galerie n\u2019est pas support\u00e9 sur le web.');
+        return;
+      }
+
+      const qrDataUrl = qrCodeService.getStoreUrl(store.slug);
+      const qrImageUrl = qrCodeService.getQrImageUrl(qrDataUrl, 600);
+
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Galerie', 'Autorisation d\u2019acc\u00e8s \u00e0 la galerie refus\u00e9e.');
+        return;
+      }
+
+      const fileExt = 'png';
+      const baseDir = FileSystem.Paths.documentDirectory;
+      if (!baseDir) throw new Error("Répertoire cache indisponible");
+      const localUri = `${baseDir}qr-boutique-${store.slug}-${Date.now()}.${fileExt}`;
+
+      const downloaded = await (FileSystem as any).downloadAsync(qrImageUrl, localUri);
+      const savedUri = downloaded?.uri || downloaded;
+      if (!savedUri) throw new Error('Download du QR code impossible');
+
+
+      await MediaLibrary.saveToLibraryAsync(savedUri);
+      Alert.alert('Succ\u00e8s', 'QR Code enregistr\u00e9 dans votre galerie.');
+    } catch (e: any) {
+      Alert.alert('Erreur', e?.message || 'Impossible d\u2019enregistrer le QR code');
+    }
   };
 
   const handleQuickImageUpdate = async (type: 'logoUrl' | 'bannerUrl') => {
