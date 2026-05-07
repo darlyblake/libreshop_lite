@@ -1261,7 +1261,7 @@ Merci.`;
               <View style={styles.statBadge}>
                 <Ionicons name="cart" size={fontSize.xs} color={COLORS.accent} />
                 <Text style={[styles.statText, { fontSize: fontSize.xs }]}>
-                  Total livré: <Text style={styles.statValue}>{deliveredRevenue?.toLocaleString() || '0'} F</Text>
+                  Revenu total: <Text style={styles.statValue}>{deliveredRevenue?.toLocaleString() || '0'} F</Text>
                 </Text>
               </View>
               {((statusCounts && typeof statusCounts.pending === 'number') ? statusCounts.pending : summaryCounts.pending) > 0 && (

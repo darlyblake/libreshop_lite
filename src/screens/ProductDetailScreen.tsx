@@ -115,8 +115,8 @@ export const ProductDetailScreen: React.FC = () => {
           name: p.name,
           description: p.description || '',
           price: p.price,
-          rating: p.rating || 0,
-          ratingCount: p.review_count || 0,
+          rating: (p as any).rating || 0,
+          ratingCount: (p as any).review_count || (p as any).view_count || 0,
           imageUrl: (p.images && Array.isArray(p.images) && p.images[0]) || '',
           inStock: (p.stock || 0) > 0,
           currency: 'XOF',
@@ -560,7 +560,7 @@ export const ProductDetailScreen: React.FC = () => {
             ratingCount: reviews.length,
             imageUrl: (productData.images && productData.images[0]) || '',
             inStock: productData.inStock,
-            slug: product?.slug || '',
+            slug: (product as any)?.slug || '',
             sku: (product as any)?.sku || '',
           }}
         />
@@ -987,7 +987,7 @@ export const ProductDetailScreen: React.FC = () => {
             style={styles.headerButton}
             onPress={() => {
               if (product) {
-                const shareUrl = `https://libreshop.shop/product/${product.id}`;
+                const shareUrl = `https://libreshop.shop/meta/product/${product.id}`;
                 shareContent({
                   title: product.name,
                   description: product.description || '',

@@ -829,7 +829,7 @@ export const StoreDetailScreen: React.FC = () => {
                 style={styles.followButton}
                 onPress={() => {
                   if (store) {
-                    const shareUrl = `https://libreshop.shop/store/${store.id}`;
+const shareUrl = `https://libreshop.shop/meta/store/${store.id}`;
                     shareContent({
                       title: store.name,
                       description: store.description || '',

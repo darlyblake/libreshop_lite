@@ -309,8 +309,8 @@ export const SellerDashboardScreen: React.FC = () => {
     try {
       const cacheKey = `seller_dashboard_${store.id}_${timeRange}`;
       
-      // Try to load from cache if not refreshing
-      if (!isRefreshing) {
+      // Try to load from cache if not refreshing (ignorer cache pour forcer recalcul)
+      if (false && !isRefreshing) {
         const cached = await cacheService.get<any>(cacheKey);
         if (cached) {
           if (cached.stats) setStats(cached.stats);
@@ -346,7 +346,7 @@ export const SellerDashboardScreen: React.FC = () => {
         return Number.isFinite(t) && t >= prevStart.getTime() && t < prevEnd.getTime();
       });
 
-      const confirmedStatuses = new Set(['paid', 'shipped', 'delivered']);
+      const confirmedStatuses = new Set(['delivered']);
       const confirmedOrdersInRange = ordersInRange.filter((o: any) => confirmedStatuses.has(o.status));
       const confirmedOrdersPrevRange = ordersPrevRange.filter((o: any) => confirmedStatuses.has(o.status));
 
@@ -357,12 +357,7 @@ export const SellerDashboardScreen: React.FC = () => {
       const totalRevenue = confirmedOrdersInRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
       const totalRevenuePrev = confirmedOrdersPrevRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
-      const revenueLabel =
-        totalRevenue >= 1000000
-          ? `${Math.round(totalRevenue / 1000000)}M`
-          : totalRevenue >= 1000
-            ? `${Math.round(totalRevenue / 1000)}K`
-            : String(Math.round(totalRevenue));
+      const revenueLabel = String(Math.round(totalRevenue)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
       const totalViews = (products as any[]).reduce((sum, p) => sum + (Number(p?.view_count) || 0), 0);
 

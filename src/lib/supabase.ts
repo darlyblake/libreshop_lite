@@ -15,27 +15,33 @@ const globalForSupabase = globalThis as unknown as {
  */
 const getStorageAdapter = () => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+    // Supabase expects async storage methods (returning Promises).
+    // Wrap localStorage calls in Promises to ensure compatibility and reliable persistence.
     return {
-      getItem: (key: string) => {
+      getItem: async (key: string) => {
         try {
-          return window.localStorage.getItem(key);
+          return Promise.resolve(window.localStorage.getItem(key));
         } catch (error) {
           console.error(`[StorageAdapter] Error getting ${key}:`, error);
-          return null;
+          return Promise.resolve(null);
         }
       },
-      setItem: (key: string, value: string) => {
+      setItem: async (key: string, value: string) => {
         try {
           window.localStorage.setItem(key, value);
+          return Promise.resolve();
         } catch (error) {
           console.error(`[StorageAdapter] Error setting ${key}:`, error);
+          return Promise.resolve();
         }
       },
-      removeItem: (key: string) => {
+      removeItem: async (key: string) => {
         try {
           window.localStorage.removeItem(key);
+          return Promise.resolve();
         } catch (error) {
           console.error(`[StorageAdapter] Error removing ${key}:`, error);
+          return Promise.resolve();
         }
       },
     };
