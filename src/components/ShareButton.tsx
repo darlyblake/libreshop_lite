@@ -65,7 +65,8 @@ export const shareContent = async (options: ShareOptions) => {
           try {
             const extMatch = String(options.imageUrl).match(/\.(png|jpg|jpeg)$/i);
             const ext = extMatch ? extMatch[1] : 'jpg';
-            const localPath = `${FileSystem.cacheDirectory}share-${Date.now()}.${ext}`;
+            const baseDir = (FileSystem as any).Paths?.documentDirectory || '';
+            const localPath = `${baseDir}share-${Date.now()}.${ext}`;
             const downloaded = await FileSystem.downloadAsync(options.imageUrl, localPath);
             const fileUri = downloaded?.uri || localPath;
             if (await Sharing.isAvailableAsync()) {
