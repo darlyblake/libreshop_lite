@@ -561,12 +561,6 @@ export const ClientHomeScreen: React.FC = () => {
               <View style={styles.headerActions}>
                 <TouchableOpacity
                   style={styles.iconButton}
-                  onPress={() => navigateToClientTab(navigation, 'Wishlist')}
-                >
-                  <Ionicons name="heart-outline" size={22} color="white" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconButton}
                   onPress={() => navigation.navigate('Cart')}
                 >
                   <Ionicons name="cart-outline" size={22} color="white" />
