@@ -273,8 +273,23 @@ export const ClientHomeScreen: React.FC = () => {
             homeBannerService.getActiveByPlacement('carousel').catch(() => []),
             homeBannerService.getActiveByPlacement('promo').catch(() => []),
             categoryService.getPopularCategories(6).catch(() => []),
-          ]).then(([carousel, promo, cats]) => {
+          ]).then(async ([carousel, promo, cats]) => {
             if (carousel?.length) {
+              // Prefetch carousel images to avoid reloads during scroll
+              try {
+                const urls = (carousel || []).map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
+                // Use Image.prefetch where available; fall back silently on errors
+                await Promise.all(urls.map((u: string) => {
+                  try {
+                    return Image.prefetch(u);
+                  } catch (e) {
+                    return Promise.resolve(false);
+                  }
+                }));
+              } catch (e) {
+                // ignore prefetch errors
+              }
+
               dispatch({
                 type: 'SET_BANNERS',
                 payload: {
@@ -666,9 +681,9 @@ export const ClientHomeScreen: React.FC = () => {
                         flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
                       });
                     }}
-                    windowSize={3}
-                    initialNumToRender={2}
-                    maxToRenderPerBatch={2}
+                    windowSize={5}
+                    initialNumToRender={3}
+                    maxToRenderPerBatch={3}
                     removeClippedSubviews={Platform.OS !== 'web'}
                   />
 
