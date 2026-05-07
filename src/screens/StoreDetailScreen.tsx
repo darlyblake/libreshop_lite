@@ -872,18 +872,24 @@ const shareUrl = `https://libreshop.shop/meta/store/${store.id}`;
                 {/* Promo Banner */}
                 {shouldShowPromo && (
                   <TouchableOpacity
-                    style={styles.promoCard}
+                    style={[
+                      styles.promoCard,
+                      isMobile ? { marginHorizontal: SPACING.md } : undefined,
+                    ]}
                     onPress={handlePromoPress}
                     activeOpacity={0.85}
                   >
                     {!!storeData.promoImageUrl && (
                       <Image
                         source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
-                        style={styles.promoImage}
+                        style={[
+                          styles.promoImage,
+                          isMobile ? { aspectRatio: 4 / 3 } : { aspectRatio: 16 / 9 },
+                        ]}
                         resizeMode="cover"
                       />
                     )}
-                    <View style={styles.promoContent}>
+                    <View style={[styles.promoContent, isMobile ? { padding: SPACING.md } : undefined]}>
                       {!!String(storeData.promoTitle || "").trim() && (
                         <Text style={styles.promoTitle}>
                           {String(storeData.promoTitle)}
@@ -1521,7 +1527,7 @@ const styles = StyleSheet.create({
   },
   promoImage: {
     width: "100%",
-    height: 120,
+    // Use aspectRatio instead of fixed height so images scale responsively.
   },
   promoContent: {
     padding: SPACING.lg,
