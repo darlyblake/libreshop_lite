@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONT_SIZE, RADIUS, SPACING } from '../config/theme';
 import { locationService, LocationCoords, Address } from '../services/locationService';
@@ -101,6 +101,15 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         </Text>
       </View>
 
+      {Platform.OS === 'web' && (
+        <View style={styles.webNotice}>
+          <Ionicons name="information-circle" size={20} color={COLORS.accent} />
+          <Text style={styles.webNoticeText}>
+            La carte interactive n'est pas disponible sur le web. Utilisez "Utiliser ma position actuelle" pour définir votre localisation.
+          </Text>
+        </View>
+      )}
+
       <TouchableOpacity
         style={styles.currentLocationButton}
         onPress={handleGetCurrentLocation}
@@ -118,7 +127,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         )}
       </TouchableOpacity>
 
-      {currentLocation && (
+      {currentLocation && Platform.OS !== 'web' && (
         <>
           <StoreMap
             mode="select"
@@ -136,6 +145,29 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               <Text style={styles.addressText}>{address}</Text>
             </View>
           )}
+
+          <TouchableOpacity
+            style={styles.confirmButton}
+            onPress={handleConfirmLocation}
+            disabled={loadingAddress}
+          >
+            {loadingAddress ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.confirmButtonText}>Confirmer la localisation</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
+
+      {currentLocation && Platform.OS === 'web' && (
+        <>
+          <View style={styles.addressContainer}>
+            <Ionicons name="location-outline" size={16} color={COLORS.textMuted} />
+            <Text style={styles.addressText}>
+              Position : {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+            </Text>
+          </View>
 
           <TouchableOpacity
             style={styles.confirmButton}
@@ -186,6 +218,20 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
+  },
+  webNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.accent + '15',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  webNoticeText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    flex: 1,
   },
   currentLocationButton: {
     flexDirection: 'row',
