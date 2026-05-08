@@ -58,12 +58,12 @@ cd ios && pod install && cd ..
 ---
 
 ### Étape 4: Création des Composants
-- [ ] Créer src/components/StoreMap.tsx
-- [ ] Créer src/components/LocationPicker.tsx
+- [x] Créer src/components/StoreMap.tsx
+- [x] Créer src/components/LocationPicker.tsx
 - [ ] Tester StoreMap en mode 'view'
 - [ ] Tester StoreMap en mode 'select'
 - [ ] Tester LocationPicker
-- [ ] Ajouter les exports dans src/components/index.ts
+- [x] Ajouter les exports dans src/components/index.ts
 
 ---
 
@@ -129,8 +129,8 @@ cd ios && pod install && cd ..
 
 ## 📊 Progression Globale
 
-**Étapes complétées : 3 / 10**  
-**Pourcentage : 30%**
+**Étapes complétées : 4 / 10**  
+**Pourcentage : 40%**
 
 ---
 

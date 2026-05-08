@@ -28,4 +28,6 @@ export { StoreInfoCard } from './StoreInfoCard';
 export { TabContent } from './TabContent';
 export { MetaTags, useMetaTags } from './MetaTags';
 export { ShareButton, shareContent } from './ShareButton';
+export { StoreMap } from './StoreMap';
+export { LocationPicker } from './LocationPicker';
 
