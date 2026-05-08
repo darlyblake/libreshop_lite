@@ -44,18 +44,39 @@ export const shareContent = async (options: ShareOptions) => {
       shareMessage += `Découvrez cette boutique sur LibreShop 🛒`;
     }
 
+    console.log('[shareContent] platform=', Platform.OS, 'navigator.share=', typeof navigator !== 'undefined' && !!(navigator as any).share, 'imageUrl=', options.imageUrl);
     if (Platform.OS === 'web') {
-      // Sur web, utiliser l'API Web Share si disponible, sinon copier dans le presse-papiers
-      if (navigator.share) {
+      // Sur web: ouvrir le native share sheet via Web Share API quand elle est supportée.
+      // Important: ne pas faire de copier-coller au lieu du share sheet.
+      // Certains environnements (WebView/PWA) peuvent exposer navigator.share mais
+      // avec des contraintes de sécurité; on tente quand même.
+      const canUseWebShare =
+        typeof navigator !== 'undefined' &&
+        typeof (navigator as any).share === 'function' &&
+        // canShare est optionnel
+        (typeof (navigator as any).canShare === 'function'
+          ? (navigator as any).canShare({ url })
+          : true);
+
+      if (canUseWebShare) {
         await navigator.share({
-          title: title,
+          title,
           text: shareMessage,
-          url: url,
+          url,
         });
       } else {
-        // Fallback: copier dans le presse-papiers
-        await navigator.clipboard.writeText(shareMessage);
-        Alert.alert('Lien copié !', 'Le lien a été copié dans votre presse-papiers.');
+        // Fallback: copier dans le presse-papiers (si Web Share indisponible)
+        try {
+          await navigator.clipboard.writeText(url);
+          Alert.alert('Lien copié !', 'Le lien a été copié dans votre presse-papiers.');
+        } catch {
+          // dernier recours: copier le texte complet
+          try {
+            await navigator.clipboard.writeText(shareMessage);
+          } catch (e) {
+            Alert.alert('Partager', 'Impossible de partager automatiquement.');
+          }
+        }
       }
     } else {
       // Sur mobile, utiliser expo-sharing
@@ -90,16 +111,9 @@ export const shareContent = async (options: ShareOptions) => {
           }
         }
 
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(url, {
-            dialogTitle: `Partager ${type === 'product' ? 'ce produit' : 'cette boutique'}`,
-            subject: title,
-            message: shareMessage,
-          });
-        } else {
-          // Fallback: utiliser React Native Share
-          await Share.share({ message: shareMessage, title: title, url: url });
-        }
+        // For URL/text sharing prefer React Native Share which reliably opens the native share sheet
+        console.log('[shareContent] no image - using Share.share');
+        await Share.share({ message: shareMessage, title: title, url: url });
       } catch (err) {
         throw err;
       }

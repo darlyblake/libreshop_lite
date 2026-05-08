@@ -89,16 +89,28 @@ export const SellerProductsScreen: React.FC = () => {
 
   const shareOrCopyProductUrl = useCallback(async (productId: string) => {
     const url = getProductPublicUrl(productId);
-    if (Platform.OS === 'web') {
-      const clipboard = (globalThis as any)?.navigator?.clipboard;
-      if (clipboard?.writeText) {
-        await clipboard.writeText(url);
-        Alert.alert('✅ Copié !', 'Le lien du produit a été copié.');
-        return;
-      }
+
+    const product = products.find(p => p.id === productId);
+    if (!product) {
+      Alert.alert('Partager', 'Produit introuvable.');
+      return;
     }
-    await Share.share({ message: url, url });
-  }, [getProductPublicUrl]);
+
+    // Reuse the central share util:
+    // - Web: opens native Share Sheet via Web Share API when available
+    // - Fallback: will copy only when native share isn't available
+    const { shareContent } = await import('../components/ShareButton');
+    await shareContent({
+      title: product.name || 'Produit',
+      description: (product as any).description || '',
+      url,
+      price: `${Number(product.price || 0).toLocaleString()} FCFA`,
+      type: 'product',
+      imageUrl: Array.isArray((product as any).images) ? (product as any).images[0] : undefined,
+    });
+  }, [getProductPublicUrl, products]);
+
+
 
   // 🚀 Fonction de chargement avec pagination professionnelle
   const loadProducts = useCallback(async (reset = true) => {

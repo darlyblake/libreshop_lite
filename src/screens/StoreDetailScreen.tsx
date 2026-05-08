@@ -178,6 +178,12 @@ export const StoreDetailScreen: React.FC = () => {
   const { isMobile, isTablet } = useResponsive();
   const { isDark } = useTheme();
 
+  // Debug logs
+  console.log('[StoreDetail] Route params:', route.params);
+  console.log('[StoreDetail] storeIdParam:', storeIdParam);
+  console.log('[StoreDetail] slugParam:', slugParam);
+  console.log('[StoreDetail] Platform:', Platform.OS);
+
   const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [homepageProducts, setHomepageProducts] = useState<any[]>([]);
@@ -225,6 +231,7 @@ export const StoreDetailScreen: React.FC = () => {
       parsedStoreIdFromUrl !== "null"
     )
       return String(parsedStoreIdFromUrl);
+    console.log('[StoreDetail] effectiveStoreId is null - params:', { storeIdParam, parsedStoreIdFromUrl });
     return null;
   }, [storeIdParam, parsedStoreIdFromUrl]);
 
@@ -331,23 +338,36 @@ export const StoreDetailScreen: React.FC = () => {
     let mounted = true;
     const loadHomepageProducts = async () => {
       if (!mounted) return;
-      if (!effectiveStoreId) return;
+      
+      // Use store.id if available, otherwise fallback to effectiveStoreId
+      const storeIdToUse = store?.id || effectiveStoreId;
+      
+      if (!storeIdToUse) {
+        console.warn('[StoreDetail] No storeId available, skipping homepage products load');
+        return;
+      }
       
       try {
-        const products = await productService.getStoreHomepageProducts(effectiveStoreId, 8);
+        console.log('[StoreDetail] Loading homepage products for store:', storeIdToUse);
+        const products = await productService.getStoreHomepageProducts(storeIdToUse, 8);
+        console.log('[StoreDetail] Homepage products loaded:', products?.length);
         if (mounted) {
-          setHomepageProducts(products);
+          setHomepageProducts(products || []);
         }
       } catch (error) {
         console.error('[StoreDetail] Error loading homepage products:', error);
       }
     };
     
-    loadHomepageProducts();
+    // Load when store is loaded or effectiveStoreId changes
+    if (store?.id || effectiveStoreId) {
+      loadHomepageProducts();
+    }
+    
     return () => {
       mounted = false;
     };
-  }, [effectiveStoreId]);
+  }, [store?.id, effectiveStoreId]);
 
   const storeData = store
     ? {
@@ -522,7 +542,7 @@ export const StoreDetailScreen: React.FC = () => {
     return (width - horizontalPad - gaps) / numColumns;
   }, [numColumns]);
 
-  // Unified share: prefer native/shareContent util to get rich preview where possible
+  // BUG FIX: Use storeId in URL if slug is undefined/empty
   const handleShareStore = useCallback(async () => {
     try {
       if (!store?.id) return;
@@ -542,13 +562,29 @@ export const StoreDetailScreen: React.FC = () => {
             queryParams: { storeId: String(store.id) },
           });
 
-      await shareContent({
-        title: store.name || 'Boutique',
-        description: store.description || '',
-        url: link,
-        imageUrl: (store as any)?.avatar_url || (store as any)?.banner_url || undefined,
-        type: 'store',
-      });
+      if (Platform.OS === "web") {
+        try {
+          const nav: any = typeof navigator !== "undefined" ? navigator : null;
+          if (nav?.clipboard?.writeText) {
+            await nav.clipboard.writeText(link);
+            Alert.alert(
+              "Lien copié",
+              "Le lien de la boutique a été copié dans le presse-papiers.",
+            );
+            return;
+          }
+        } catch {}
+
+        try {
+          const w: any = typeof window !== "undefined" ? window : null;
+          if (w?.prompt) {
+            w.prompt("Copiez le lien de la boutique :", link);
+            return;
+          }
+        } catch {}
+      }
+
+      await Share.share({ message: link });
     } catch (e: any) {
       errorHandler.handle(
         e,
@@ -813,7 +849,7 @@ export const StoreDetailScreen: React.FC = () => {
                 style={styles.followButton}
                 onPress={() => {
                   if (store) {
-const shareUrl = `https://libreshop.shop/meta/store/${store.id}`;
+                    const shareUrl = `https://libreshop.shop/store/${store.id}`;
                     shareContent({
                       title: store.name,
                       description: store.description || '',
@@ -856,24 +892,18 @@ const shareUrl = `https://libreshop.shop/meta/store/${store.id}`;
                 {/* Promo Banner */}
                 {shouldShowPromo && (
                   <TouchableOpacity
-                    style={[
-                      styles.promoCard,
-                      isMobile ? { marginHorizontal: SPACING.md } : undefined,
-                    ]}
+                    style={styles.promoCard}
                     onPress={handlePromoPress}
                     activeOpacity={0.85}
                   >
                     {!!storeData.promoImageUrl && (
                       <Image
                         source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
-                        style={[
-                          styles.promoImage,
-                          isMobile ? { aspectRatio: 4 / 3 } : { aspectRatio: 16 / 9 },
-                        ]}
+                        style={styles.promoImage}
                         resizeMode="cover"
                       />
                     )}
-                    <View style={[styles.promoContent, isMobile ? { padding: SPACING.md } : undefined]}>
+                    <View style={styles.promoContent}>
                       {!!String(storeData.promoTitle || "").trim() && (
                         <Text style={styles.promoTitle}>
                           {String(storeData.promoTitle)}
@@ -1511,7 +1541,7 @@ const styles = StyleSheet.create({
   },
   promoImage: {
     width: "100%",
-    // Use aspectRatio instead of fixed height so images scale responsively.
+    height: 120,
   },
   promoContent: {
     padding: SPACING.lg,
