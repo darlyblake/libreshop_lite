@@ -31,10 +31,10 @@ CREATE INDEX idx_stores_location ON stores(latitude, longitude) WHERE latitude I
 ---
 
 ### Étape 2: Installation des Packages
-- [ ] Installer @maplibre/maplibre-react-native
-- [ ] Installer expo-location
-- [ ] Exécuter pod install pour iOS
-- [ ] Vérifier que les packages sont installés
+- [x] Installer @maplibre/maplibre-react-native
+- [x] Installer expo-location
+- [ ] Exécuter pod install pour iOS (pod non installé - faire plus tard si nécessaire)
+- [x] Vérifier que les packages sont installés
 
 **Commandes :**
 ```bash
@@ -129,8 +129,8 @@ cd ios && pod install && cd ..
 
 ## 📊 Progression Globale
 
-**Étapes complétées : 1 / 10**  
-**Pourcentage : 10%**
+**Étapes complétées : 2 / 10**  
+**Pourcentage : 20%**
 
 ---
 
