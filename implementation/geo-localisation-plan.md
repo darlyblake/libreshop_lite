@@ -68,10 +68,10 @@ cd ios && pod install && cd ..
 ---
 
 ### Étape 5: Intégration SellerSettingsScreen (PRIORITÉ)
-- [ ] Ouvrir src/screens/SellerSettingsScreen.tsx
-- [ ] Ajouter l'option "Localisation de la boutique"
-- [ ] Ajouter le modal avec LocationPicker
-- [ ] Implémenter la mise à jour de localisation
+- [x] Créer src/screens/SellerSettingsScreen.tsx
+- [x] Ajouter l'option "Localisation de la boutique"
+- [x] Ajouter le modal avec LocationPicker
+- [x] Implémenter la mise à jour de localisation
 - [ ] Tester avec une boutique existante
 - [ ] Vérifier que les données sont sauvegardées en BDD
 
@@ -129,8 +129,8 @@ cd ios && pod install && cd ..
 
 ## 📊 Progression Globale
 
-**Étapes complétées : 4 / 10**  
-**Pourcentage : 40%**
+**Étapes complétées : 5 / 10**  
+**Pourcentage : 50%**
 
 ---
 

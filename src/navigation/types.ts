@@ -88,6 +88,7 @@ export type SellerTabParamList = {
   SellerCollection: undefined;
   SellerClients: undefined;
   SellerStore: undefined;
+  SellerSettings: undefined;
 };
 
 // Declare global types for useNavigation
