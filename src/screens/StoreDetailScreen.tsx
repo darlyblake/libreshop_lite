@@ -187,6 +187,7 @@ export const StoreDetailScreen: React.FC = () => {
   const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [homepageProducts, setHomepageProducts] = useState<any[]>([]);
+  const [promotionProducts, setPromotionProducts] = useState<any[]>([]);
   const [displayedCount, setDisplayedCount] = useState(PAGE_SIZE);
   const [collections, setCollections] = useState<any[]>([]);
   const [storeStats, setStoreStats] = useState<any>(null);
@@ -362,6 +363,41 @@ export const StoreDetailScreen: React.FC = () => {
     // Load when store is loaded or effectiveStoreId changes
     if (store?.id || effectiveStoreId) {
       loadHomepageProducts();
+    }
+    
+    return () => {
+      mounted = false;
+    };
+  }, [store?.id, effectiveStoreId]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadPromotionProducts = async () => {
+      if (!mounted) return;
+      
+      // Use store.id if available, otherwise fallback to effectiveStoreId
+      const storeIdToUse = store?.id || effectiveStoreId;
+      
+      if (!storeIdToUse) {
+        console.warn('[StoreDetail] No storeId available, skipping promotion products load');
+        return;
+      }
+      
+      try {
+        console.log('[StoreDetail] Loading promotion products for store:', storeIdToUse);
+        const products = await productService.getStorePromotionProducts(storeIdToUse);
+        console.log('[StoreDetail] Promotion products loaded:', products?.length);
+        if (mounted) {
+          setPromotionProducts(products || []);
+        }
+      } catch (error) {
+        console.error('[StoreDetail] Error loading promotion products:', error);
+      }
+    };
+    
+    // Load when store is loaded or effectiveStoreId changes
+    if (store?.id || effectiveStoreId) {
+      loadPromotionProducts();
     }
     
     return () => {
@@ -877,6 +913,7 @@ export const StoreDetailScreen: React.FC = () => {
               tabs={[
                 { id: "accueil", label: "Accueil" },
                 { id: "produits", label: "Produits" },
+                { id: "promotions", label: "Promotions" },
                 { id: "apropos", label: "À propos" },
                 { id: "avis", label: "Avis" },
               ]}
@@ -1167,6 +1204,67 @@ export const StoreDetailScreen: React.FC = () => {
               </View>
             )}
               </>
+            )}
+
+            {/* PROMOTIONS TAB */}
+            {activeTab === "promotions" && (
+              <View style={styles.promotionsSection}>
+                <View style={styles.promotionsHeader}>
+                  <Ionicons name="pricetag" size={24} color={COLORS.accent} />
+                  <Text style={styles.promotionsTitle}>Promotions</Text>
+                  <Text style={styles.promotionsSubtitle}>
+                    {promotionProducts.length} produit{promotionProducts.length !== 1 ? 's' : ''} en promotion
+                  </Text>
+                </View>
+
+                {promotionProducts.length === 0 ? (
+                  <View style={styles.emptyPromotions}>
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={48}
+                      color={COLORS.textMuted}
+                    />
+                    <Text style={styles.emptyPromotionsText}>
+                      Aucune promotion disponible pour le moment
+                    </Text>
+                    <Text style={styles.emptyPromotionsSubtext}>
+                      Revenez bientôt pour voir les offres spéciales !
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.productsGrid}>
+                    {promotionProducts.map((product, idx) => {
+                      const card = mapProductToCard(product);
+                      const discountPercent = product.discount_percent || 0;
+                      return (
+                        <View
+                          key={card.id || `promo-${idx}`}
+                          style={[styles.productCardWrapper, { width: cardWidth, position: 'relative' }]}
+                        >
+                          {discountPercent > 0 && (
+                            <View style={styles.discountBadge}>
+                              <Text style={styles.discountBadgeText}>
+                                -{discountPercent}%
+                              </Text>
+                            </View>
+                          )}
+                          <ProductCard
+                            name={card.name}
+                            price={card.price}
+                            comparePrice={card.comparePrice}
+                            imageUrl={card.imageUrl}
+                            onPress={() =>
+                              navigation.navigate("ProductDetail", {
+                                productId: card.id,
+                              })
+                            }
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
             )}
 
             {/* À PROPOS TAB */}
@@ -2111,6 +2209,59 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.accent,
+  },
+  // Promotions section
+  promotionsSection: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
+  },
+  promotionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  promotionsTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  promotionsSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    marginLeft: 'auto',
+  },
+  emptyPromotions: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xxxl,
+    gap: SPACING.md,
+  },
+  emptyPromotionsText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  emptyPromotionsSubtext: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+  discountBadge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    right: SPACING.sm,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+    zIndex: 1,
+  },
+  discountBadgeText: {
+    color: COLORS.white,
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
   },
 });
 

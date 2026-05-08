@@ -434,6 +434,63 @@ export const productService = {
     return recent || [];
   },
 
+  async getStorePromotionProducts(storeId: string) {
+    const client = useSupabase();
+    
+    console.log('[ProductService] Loading promotion products for store:', storeId);
+    
+    // Get all active products for the store
+    const { data: allProducts, error } = await client
+      .from('products')
+      .select('*')
+      .eq('store_id', storeId)
+      .eq('is_active', true);
+    
+    if (error) throw error;
+    
+    console.log('[ProductService] Total active products:', allProducts?.length);
+    
+    // Filter products with promotions on client side
+    const promotionProducts = (allProducts || []).filter(product => {
+      // Product has active sale
+      if (product.sale_active === true) {
+        console.log('[ProductService] Product with sale_active:', product.name, product.sale_active);
+        return true;
+      }
+      
+      // Product has compare_price greater than price (indicates discount)
+      if (product.compare_price && product.compare_price > product.price) {
+        console.log('[ProductService] Product with compare_price > price:', product.name, { price: product.price, compare_price: product.compare_price });
+        return true;
+      }
+      
+      return false;
+    });
+    
+    console.log('[ProductService] Products after filtering:', promotionProducts.length);
+    
+    // Calculate discount percent for products with compare_price but no discount_percent
+    const productsWithDiscount = promotionProducts.map(product => {
+      if (!product.discount_percent && product.compare_price && product.compare_price > product.price) {
+        const discountPercent = Math.round(((product.compare_price - product.price) / product.compare_price) * 100);
+        console.log('[ProductService] Calculated discount for', product.name, ':', discountPercent + '%');
+        return { ...product, discount_percent: discountPercent };
+      }
+      return product;
+    });
+    
+    // Sort by discount percent (highest first)
+    productsWithDiscount.sort((a, b) => {
+      const discountA = a.discount_percent || 0;
+      const discountB = b.discount_percent || 0;
+      return discountB - discountA;
+    });
+    
+    console.log('[ProductService] Final promotion products:', productsWithDiscount.length);
+    
+    return productsWithDiscount;
+  },
+
   async update(id: string, product: Partial<Product>) {
     const client = useSupabase();
     const { data, error } = await client
