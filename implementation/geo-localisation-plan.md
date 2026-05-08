@@ -45,14 +45,14 @@ cd ios && pod install && cd ..
 ---
 
 ### Étape 3: Création des Services
-- [ ] Créer src/services/locationService.ts
-- [ ] Implémenter getCurrentPosition()
-- [ ] Implémenter geocodeAddress()
-- [ ] Implémenter reverseGeocode()
-- [ ] Implémenter calculateDistance()
-- [ ] Implémenter openDirections()
-- [ ] Ajouter updateStoreLocation() dans storeService
-- [ ] Ajouter findNearbyStores() dans storeService
+- [x] Créer src/services/locationService.ts
+- [x] Implémenter getCurrentPosition()
+- [x] Implémenter geocodeAddress()
+- [x] Implémenter reverseGeocode()
+- [x] Implémenter calculateDistance()
+- [x] Implémenter openDirections()
+- [x] Ajouter updateStoreLocation() dans storeService
+- [x] Ajouter findNearbyStores() dans storeService
 - [ ] Tester les services
 
 ---
@@ -129,8 +129,8 @@ cd ios && pod install && cd ..
 
 ## 📊 Progression Globale
 
-**Étapes complétées : 2 / 10**  
-**Pourcentage : 20%**
+**Étapes complétées : 3 / 10**  
+**Pourcentage : 30%**
 
 ---
 

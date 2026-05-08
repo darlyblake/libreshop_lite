@@ -3,6 +3,7 @@ import { Store, StoreStats } from '../lib/supabase';
 import { planService } from './planService';
 import { errorHandler } from '../utils/errorHandler';
 import { notificationService } from '../services/notificationService';
+import { locationService } from './locationService';
 
 export interface StoreFollower {
   id: string;
@@ -587,6 +588,79 @@ export const storeService = {
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
+  },
+
+  /**
+   * Mettre à jour la localisation d'une boutique
+   */
+  async updateStoreLocation(storeId: string, location: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+    city?: string;
+  }) {
+    const client = useSupabase();
+    
+    const { data, error } = await client
+      .from('stores')
+      .update({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.address,
+        city: location.city,
+        location_set_at: new Date().toISOString(),
+      })
+      .eq('id', storeId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Trouver les boutiques près d'une position
+   */
+  async findNearbyStores(
+    lat: number, 
+    lon: number, 
+    radiusKm: number = 10
+  ): Promise<Store[]> {
+    const client = useSupabase();
+    
+    // Récupérer toutes les boutiques avec localisation
+    const { data, error } = await client
+      .from('stores')
+      .select('*')
+      .not('latitude', 'is', null)
+      .not('longitude', 'is', null)
+      .eq('status', 'active');
+    
+    if (error) throw error;
+    
+    // Filtrer par distance côté client
+    const nearbyStores = (data || []).filter(store => {
+      const distance = locationService.calculateDistance(
+        lat, lon,
+        store.latitude || 0,
+        store.longitude || 0
+      );
+      return distance <= radiusKm;
+    });
+    
+    // Trier par distance et ajouter la distance calculée
+    const storesWithDistance = nearbyStores.map(store => {
+      const distance = locationService.calculateDistance(
+        lat, lon,
+        store.latitude || 0,
+        store.longitude || 0
+      );
+      return { ...store, distance };
+    });
+    
+    storesWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    
+    return storesWithDistance as Store[];
   },
 };
 
