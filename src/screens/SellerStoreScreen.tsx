@@ -35,6 +35,7 @@ import { useTheme } from '../hooks/useTheme';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { shareContent } from '../components';
 import { qrCodeService } from '../services/qrCodeService';
+import { LocationPicker } from '../components/LocationPicker';
 
 /* =========================
    TYPES & MOCK DATA
@@ -96,6 +97,8 @@ export const SellerStoreScreen: React.FC = () => {
   const [signingOut, setSigningOut] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [updatingLocation, setUpdatingLocation] = useState(false);
 
   const tabs = useMemo(
     () => [
@@ -279,6 +282,33 @@ export const SellerStoreScreen: React.FC = () => {
       });
     } catch (e: any) {
       Alert.alert('Partager', storePublicUrl);
+    }
+  };
+
+  const handleLocationUpdate = async (location: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+    city?: string;
+  }) => {
+    if (!store?.id) return;
+
+    setUpdatingLocation(true);
+    try {
+      await storeService.updateStoreLocation(store.id, location);
+      Alert.alert('Succès', 'Localisation de la boutique mise à jour avec succès');
+      setShowLocationPicker(false);
+      
+      // Recharger les données de la boutique
+      const updatedStore = await storeService.getByUser(user?.id || '');
+      if (updatedStore) {
+        setStore(updatedStore);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de la localisation:', error);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la localisation');
+    } finally {
+      setUpdatingLocation(false);
     }
   };
 
@@ -467,9 +497,13 @@ export const SellerStoreScreen: React.FC = () => {
     categoryChipText: { color: getColor.textSoft, fontWeight: '600', fontSize: fontSize.sm },
     categoryChipTextActive: { color: getColor.accent },
     signOutModalContent: { backgroundColor: getColor.card, borderRadius: radius.xl, padding: spacing.xl, width: '90%', maxWidth: 400 },
-    signOutModalTitle: { fontSize: fontSize.xl, fontWeight: '700', color: getColor.text, marginTop: spacing.md },
+    signOutModalTitle: { fontSize: fontSize.xxl, fontWeight: '700', color: getColor.text, marginTop: spacing.md },
     signOutModalMessage: { fontSize: fontSize.md, color: getColor.textSoft, textAlign: 'center', lineHeight: 22 },
     signOutConfirmButton: { backgroundColor: getColor.error },
+    fullScreenModal: { flex: 1, backgroundColor: getColor.bg },
+    locationModalContent: { flex: 1 },
+    loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', gap: spacing.md },
+    loadingText: { color: getColor.white, fontSize: fontSize.md, fontWeight: '600' },
   }), [getColor, spacing, radius, fontSize, isDark]);
 
   // Helpers
@@ -671,6 +705,7 @@ export const SellerStoreScreen: React.FC = () => {
                 <View style={styles.card}>
                   {renderSettingItem('qr-code-outline', 'QR Code boutique', false, handleShowQrLink)}
                   {renderSettingItem('share-social-outline', 'Partager la boutique', false, handleShareStore)}
+                  {renderSettingItem('location-outline', 'Localisation de la boutique', false, () => setShowLocationPicker(true))}
                   
                   <View style={styles.settingItem}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -760,6 +795,40 @@ export const SellerStoreScreen: React.FC = () => {
               <Text style={styles.submitText}>Partager le lien</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      {/* Location Picker Modal */}
+      <Modal
+        visible={showLocationPicker}
+        animationType="slide"
+        onRequestClose={() => setShowLocationPicker(false)}
+      >
+        <View style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Modifier la localisation</Text>
+            <TouchableOpacity onPress={() => setShowLocationPicker(false)}>
+              <Ionicons name="close" size={24} color={getColor.text} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.locationModalContent}>
+            <LocationPicker
+              initialLocation={
+                store?.latitude && store?.longitude
+                  ? { latitude: store.latitude, longitude: store.longitude }
+                  : undefined
+              }
+              onLocationSelect={handleLocationUpdate}
+            />
+          </ScrollView>
+
+          {updatingLocation && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={getColor.white} />
+              <Text style={styles.loadingText}>Mise à jour en cours...</Text>
+            </View>
+          )}
         </View>
       </Modal>
     </View>
