@@ -171,6 +171,12 @@ export interface Store {
   rating_avg?: number;
   rating_count?: number;
   products_count?: number; // Calculé ou via trigger
+  // Geolocation fields
+  latitude?: number;
+  longitude?: number;
+  city?: string;
+  country?: string;
+  location_set_at?: string;
   created_at: string;
   store_stats?: any;
 }
