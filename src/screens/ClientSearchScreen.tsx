@@ -9,6 +9,7 @@ import {
   Keyboard,
   StatusBar,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,10 +28,18 @@ import { useLegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
 import { useSearchStore } from '../store/searchStore';
 import { SHADOWS } from '../config/theme';
+import { locationService } from '../services/locationService';
 
 const { width, height } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
 const PAGE_SIZE = 20;
+
+// Nearby radius options
+const NEARBY_RADIUS_OPTIONS = [
+  { id: 5, label: '5 km' },
+  { id: 10, label: '10 km' },
+  { id: 20, label: '20 km' },
+];
 
 // Types
 type Product = {
@@ -365,6 +374,13 @@ export const ClientSearchScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('popular');
 
+  // Nearby filter state
+  const [nearbyEnabled, setNearbyEnabled] = useState(false);
+  const [nearbyRadius, setNearbyRadius] = useState(10);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [loadingNearby, setLoadingNearby] = useState(false);
+  const [nearbyStores, setNearbyStores] = useState<Store[]>([]);
+
   const { 
     products, 
     stores, 
@@ -383,6 +399,27 @@ export const ClientSearchScreen: React.FC = () => {
 
   const route = useRoute<any>();
   const recognitionRef = useRef<any>(null);
+
+  // Update nearbyStores when stores change and filter is enabled
+  useEffect(() => {
+    if (nearbyEnabled && userLocation) {
+      const storesWithDistance = stores
+        .filter(store => store.latitude && store.longitude)
+        .map(store => ({
+          ...store,
+          distance: locationService.calculateDistance(
+            userLocation.latitude, 
+            userLocation.longitude, 
+            store.latitude, 
+            store.longitude
+          )
+        }))
+        .filter(store => store.distance <= nearbyRadius)
+        .sort((a, b) => (a as any).distance - (b as any).distance);
+      
+      setNearbyStores(storesWithDistance);
+    }
+  }, [stores, nearbyEnabled, userLocation, nearbyRadius]);
 
   const startVoiceInSearch = useCallback((lang = 'fr-FR') => {
     if (Platform.OS !== 'web') return;
@@ -513,6 +550,76 @@ export const ClientSearchScreen: React.FC = () => {
     Keyboard.dismiss();
   }, []);
 
+  // Handle nearby filter toggle
+  const handleToggleNearby = useCallback(async () => {
+    if (!nearbyEnabled) {
+      // Enable nearby filter
+      setLoadingNearby(true);
+      try {
+        const location = await locationService.getCurrentPosition();
+        setUserLocation(location);
+        
+        // Filter existing stores by distance
+        const storesWithDistance = stores
+          .filter(store => store.latitude && store.longitude)
+          .map(store => ({
+            ...store,
+            distance: locationService.calculateDistance(
+              location.latitude, 
+              location.longitude, 
+              store.latitude, 
+              store.longitude
+            )
+          }))
+          .filter(store => store.distance <= nearbyRadius)
+          .sort((a, b) => (a as any).distance - (b as any).distance);
+        
+        setNearbyStores(storesWithDistance);
+        setNearbyEnabled(true);
+      } catch (error) {
+        console.error('Error getting nearby stores:', error);
+        Alert.alert('Erreur', 'Impossible d\'accéder à votre position');
+      } finally {
+        setLoadingNearby(false);
+      }
+    } else {
+      // Disable nearby filter
+      setNearbyEnabled(false);
+      setNearbyStores([]);
+      setUserLocation(null);
+    }
+  }, [nearbyEnabled, nearbyRadius, stores]);
+
+  // Handle radius change
+  const handleRadiusChange = useCallback(async (radius: number) => {
+    setNearbyRadius(radius);
+    if (nearbyEnabled && userLocation) {
+      setLoadingNearby(true);
+      try {
+        // Filter existing stores by distance with new radius
+        const storesWithDistance = stores
+          .filter(store => store.latitude && store.longitude)
+          .map(store => ({
+            ...store,
+            distance: locationService.calculateDistance(
+              userLocation.latitude, 
+              userLocation.longitude, 
+              store.latitude, 
+              store.longitude
+            )
+          }))
+          .filter(store => store.distance <= radius)
+          .sort((a, b) => (a as any).distance - (b as any).distance);
+        
+        setNearbyStores(storesWithDistance);
+      } catch (error) {
+        console.error('Error updating nearby stores:', error);
+      } finally {
+        setLoadingNearby(false);
+      }
+    }
+  }, [nearbyEnabled, userLocation, stores]);
+
   // Renderers
   const renderProductItem = useCallback(({ item, index }: { item: Product & { comparePrice?: number }; index: number }) => (
     <Animated.View
@@ -542,24 +649,39 @@ export const ClientSearchScreen: React.FC = () => {
     </Animated.View>
   ), [productItemWidth, handleProductPress]);
 
-  const renderStoreItem = useCallback(({ item, index }: { item: Store; index: number }) => (
-    <Animated.View
-      entering={SlideInLeft
-        .delay(index * 30)
-        .springify()
-        .damping(14)
-      }
-    >
-      <StoreCard
-        name={item.name}
-        category={item.category || 'Boutique'}
-        description={item.description}
-        logoUrl={item.logo_url}
-        productCount={item.product_count}
-        onPress={() => handleStorePress(item)}
-      />
-    </Animated.View>
-  ), [handleStorePress]);
+  const renderStoreItem = useCallback(({ item, index }: { item: Store; index: number }) => {
+    let distance: number | null = null;
+    
+    if (nearbyEnabled && userLocation && item.latitude && item.longitude) {
+      distance = locationService.calculateDistance(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude);
+    }
+
+    return (
+      <Animated.View
+        entering={SlideInLeft
+          .delay(index * 30)
+          .springify()
+          .damping(14)
+        }
+        style={{ position: 'relative' }}
+      >
+        <StoreCard
+          name={item.name}
+          category={item.category || 'Boutique'}
+          description={item.description}
+          logoUrl={item.logo_url}
+          productCount={item.product_count}
+          onPress={() => handleStorePress(item)}
+        />
+        {distance !== null && (
+          <View style={styles.distanceBadge}>
+            <Ionicons name="location-outline" size={12} color={palette.accent} />
+            <Text style={styles.distanceBadgeText}>{distance.toFixed(1)} km</Text>
+          </View>
+        )}
+      </Animated.View>
+    );
+  }, [handleStorePress, nearbyEnabled, userLocation, palette.accent, styles.distanceBadge, styles.distanceBadgeText]);
 
   const renderCategoryItem = useCallback(({ item, index }: { item: Category; index: number }) => (
     <Animated.View
@@ -819,13 +941,48 @@ export const ClientSearchScreen: React.FC = () => {
                 <Ionicons name="storefront-outline" size={22} color={palette.accent} />
                 <Text style={styles.sectionTitle}>Boutiques</Text>
               </View>
-              <View style={styles.sectionBadge}>
-                <Text style={styles.sectionCount}>{stores.length}</Text>
+              <View style={styles.sectionHeaderActions}>
+                <TouchableOpacity 
+                  style={[styles.nearbyButton, nearbyEnabled && styles.nearbyButtonActive]}
+                  onPress={handleToggleNearby}
+                  disabled={loadingNearby}
+                >
+                  <Ionicons 
+                    name="navigate" 
+                    size={16} 
+                    color={nearbyEnabled ? 'white' : palette.text} 
+                  />
+                  <Text style={[styles.nearbyButtonText, nearbyEnabled && styles.nearbyButtonTextActive]}>
+                    {loadingNearby ? '...' : nearbyEnabled ? 'Près de moi' : 'Près de chez moi'}
+                  </Text>
+                </TouchableOpacity>
+                <View style={styles.sectionBadge}>
+                  <Text style={styles.sectionCount}>{nearbyEnabled ? nearbyStores.length : stores.length}</Text>
+                </View>
               </View>
             </View>
+            {nearbyEnabled && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.radiusSelector}
+              >
+                {NEARBY_RADIUS_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[styles.radiusChip, nearbyRadius === option.id && styles.radiusChipActive]}
+                    onPress={() => handleRadiusChange(option.id)}
+                  >
+                    <Text style={[styles.radiusChipText, nearbyRadius === option.id && styles.radiusChipTextActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
             
             <FlatList
-              data={stores}
+              data={nearbyEnabled ? nearbyStores : stores}
               renderItem={renderStoreItem}
               keyExtractor={(item) => `store-${item.id}`}
               scrollEnabled={false}
@@ -1034,6 +1191,78 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     fontSize: FONT_SIZE.sm,
     color: palette.accent,
     fontWeight: '600',
+  },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  nearbyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  nearbyButtonActive: {
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
+  },
+  nearbyButtonText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+    color: palette.textSoft,
+  },
+  nearbyButtonTextActive: {
+    color: 'white',
+  },
+  radiusSelector: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  radiusChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.full,
+    backgroundColor: palette.card,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  radiusChipActive: {
+    backgroundColor: palette.accent,
+    borderColor: palette.accent,
+  },
+  radiusChipText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+    color: palette.textSoft,
+  },
+  radiusChipTextActive: {
+    color: 'white',
+  },
+  distanceBadge: {
+    position: 'absolute',
+    top: SPACING.xs,
+    right: SPACING.xs,
+    backgroundColor: palette.card,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: palette.accent,
+  },
+  distanceBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: palette.accent,
   },
   categoriesList: {
     gap: SPACING.md,

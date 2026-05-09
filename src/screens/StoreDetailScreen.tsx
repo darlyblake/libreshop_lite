@@ -18,6 +18,7 @@ import {
   Platform,
   Share,
   TextInput,
+  Modal,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ExpoLinking from "expo-linking";
@@ -37,6 +38,8 @@ import { storeReviewService } from '../services/storeReviewService';
 import { useAuthStore } from "../store";
 import { useResponsive } from "../utils/responsive";
 import { useTheme } from "../hooks/useTheme";
+import { StoreMap } from "../components/StoreMap";
+import { locationService } from "../services/locationService";
 
 const { width } = Dimensions.get("window");
 
@@ -202,6 +205,7 @@ export const StoreDetailScreen: React.FC = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
 
   const parsedStoreIdFromUrl = useMemo(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -709,22 +713,30 @@ export const StoreDetailScreen: React.FC = () => {
           const after = newState ? before + 1 : Math.max(0, before - 1);
           return { ...prev, followers_count: after, total_followers: after };
         });
-      } catch {}
-
-      Alert.alert(
-        "Suivi",
-        newState ? "Vous suivez maintenant cette boutique! ❤️" : "Abonnement annulé.",
-      );
-    } catch (e: any) {
-      errorHandler.handle(
-        e,
-        "follow failed",
-        ErrorCategory.SYSTEM,
-        ErrorSeverity.LOW,
-      );
-      Alert.alert("Suivi", "Impossible de modifier l'abonnement. Réessayez plus tard.");
+      } catch (e) {
+        console.warn('Failed to update local followers count', e);
+      }
+    } catch (error: any) {
+      console.error('Error following store:', error);
+      Alert.alert("Erreur", "Impossible de mettre à jour le suivi.");
     }
   }, [store?.id, user?.id]);
+
+  const handleOpenMap = () => {
+    if (!store?.latitude || !store?.longitude) {
+      Alert.alert("Localisation", "Cette boutique n'a pas de localisation renseignée.");
+      return;
+    }
+    setShowMapModal(true);
+  };
+
+  const handleOpenDirections = () => {
+    if (!store?.latitude || !store?.longitude) {
+      Alert.alert("Localisation", "Cette boutique n'a pas de localisation renseignée.");
+      return;
+    }
+    locationService.openDirections(store.latitude, store.longitude, store.name);
+  };
 
   const mapProductToCard = useCallback((p: any) => {
     const images = Array.isArray(p?.images) ? p.images : [];
@@ -851,59 +863,93 @@ export const StoreDetailScreen: React.FC = () => {
 
             {/* Action Buttons: Contact & Follow */}
             <View style={styles.actionButtonsSection}>
-              <TouchableOpacity 
-                style={styles.contactButton}
-                onPress={() => {
-                  if (hasPhone) {
-                    handleWhatsAppContact();
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name="call" 
-                  size={18} 
-                  color={COLORS.white}
-                />
-                <Text style={styles.contactButtonText}>Contacter</Text>
-              </TouchableOpacity>
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity 
+                  style={styles.contactButton}
+                  onPress={() => {
+                    if (hasPhone) {
+                      handleWhatsAppContact();
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name="call" 
+                    size={18} 
+                    color={COLORS.white}
+                  />
+                  <Text style={styles.contactButtonText}>Contacter</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.followButton}
-                onPress={handleFollowStore}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name={isFollowing ? 'heart' : 'heart-outline'} 
-                  size={18} 
-                  color={isFollowing ? COLORS.accent : COLORS.text}
-                />
-                <Text style={styles.followButtonText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.followButton}
+                  onPress={handleFollowStore}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name={isFollowing ? 'heart' : 'heart-outline'} 
+                    size={18} 
+                    color={isFollowing ? COLORS.accent : COLORS.text}
+                  />
+                  <Text style={styles.followButtonText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
+                </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity 
-                style={styles.followButton}
-                onPress={() => {
-                  if (store) {
-                    const shareUrl = `https://libreshop.shop/store/${store.id}`;
-                    shareContent({
-                      title: store.name,
-                      description: store.description || '',
-                      url: shareUrl,
-                      imageUrl: store.avatar_url || store.banner_url || undefined,
-                      type: 'store',
-                    });
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons 
-                  name="share-outline" 
-                  size={18} 
-                  color={COLORS.text}
-                />
-                <Text style={styles.followButtonText}>Partager</Text>
-              </TouchableOpacity>
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity 
+                  style={styles.followButton}
+                  onPress={() => {
+                    if (store) {
+                      const shareUrl = `https://libreshop.shop/store/${store.id}`;
+                      shareContent({
+                        title: store.name,
+                        description: store.description || '',
+                        url: shareUrl,
+                        imageUrl: store.avatar_url || store.banner_url || undefined,
+                        type: 'store',
+                      });
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name="share-outline" 
+                    size={18} 
+                    color={COLORS.text}
+                  />
+                  <Text style={styles.followButtonText}>Partager</Text>
+                </TouchableOpacity>
+
+                {store?.latitude && store?.longitude && (
+                  <TouchableOpacity 
+                    style={styles.followButton}
+                    onPress={handleOpenMap}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name="map-outline" 
+                      size={18} 
+                      color={COLORS.text}
+                    />
+                    <Text style={styles.followButtonText}>Carte</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {store?.latitude && store?.longitude && (
+                <TouchableOpacity 
+                  style={styles.directionButton}
+                  onPress={handleOpenDirections}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name="navigate" 
+                    size={18} 
+                    color={COLORS.white}
+                  />
+                  <Text style={styles.directionButtonText}>Itinéraire</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* NEW: Store Tabs Navigation */}
@@ -1539,6 +1585,42 @@ export const StoreDetailScreen: React.FC = () => {
           </>
         )}
       </ScrollView>
+
+      {/* Map Modal */}
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={styles.mapModal}>
+          <View style={styles.mapModalHeader}>
+            <TouchableOpacity onPress={() => setShowMapModal(false)}>
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+            <Text style={styles.mapModalTitle}>Localisation</Text>
+            <View style={{ width: 24 }} />
+          </View>
+          
+          {store?.latitude && store?.longitude && (
+            <StoreMap
+              stores={[
+                {
+                  id: store.id,
+                  name: store.name,
+                  latitude: store.latitude,
+                  longitude: store.longitude,
+                }
+              ]}
+              mode="view"
+              initialCenter={{
+                latitude: store.latitude,
+                longitude: store.longitude,
+              }}
+              height={Dimensions.get('window').height - 60}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
     </>
   );
@@ -1952,18 +2034,6 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     gap: SPACING.md,
   },
-  suggestedCard: {
-    width: 160,
-  },
-  // Action Buttons
-  actionButtonsSection: {
-    flexDirection: "row",
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
   contactButton: {
     flex: 1,
     flexDirection: "row",
@@ -1980,20 +2050,44 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
   },
   followButton: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: SPACING.sm,
     backgroundColor: COLORS.card,
     paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.lg,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    flex: 1,
   },
   followButtonText: {
-    color: COLORS.accent,
-    fontWeight: "700",
+    color: COLORS.text,
+    fontWeight: "600",
+    fontSize: FONT_SIZE.sm,
+  },
+  actionButtonsSection: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  directionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.accent,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.lg,
+  },
+  directionButtonText: {
+    color: COLORS.white,
+    fontWeight: '700',
     fontSize: FONT_SIZE.sm,
   },
   // Welcome section (Accueil tab)
@@ -2262,6 +2356,24 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONT_SIZE.xs,
     fontWeight: '700',
+  },
+  mapModal: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  mapModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  mapModalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    color: COLORS.text,
   },
 });
 

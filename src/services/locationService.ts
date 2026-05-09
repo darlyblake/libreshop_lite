@@ -45,11 +45,19 @@ export const locationService = {
    */
   async geocodeAddress(address: string): Promise<LocationCoords | null> {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`
-      );
-      const data = await response.json();
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
       
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'LibreShop/1.0',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Nominatim API error: ${response.status}`);
+      }
+
+      const data = await response.json();
       if (data && data.length > 0) {
         return {
           latitude: parseFloat(data[0].lat),
@@ -67,22 +75,26 @@ export const locationService = {
    * Reverse Geocoding : Coordonnées → Adresse
    * Utilise l'API Nominatim d'OpenStreetMap
    */
-  async reverseGeocode(lat: number, lon: number): Promise<Address | null> {
+  async reverseGeocode(latitude: number, longitude: number): Promise<Address | null> {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
-      );
-      const data = await response.json();
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
       
-      if (data && data.address) {
-        return {
-          street: data.address.road || data.address.display_name,
-          city: data.address.city || data.address.town || data.address.village,
-          country: data.address.country,
-          postalCode: data.address.postcode,
-        };
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'LibreShop/1.0',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Nominatim API error: ${response.status}`);
       }
-      return null;
+
+      const data = await response.json();
+      return {
+        street: data.display_name,
+        city: data.address?.city || data.address?.town || data.address?.village,
+        country: data.address?.country,
+      };
     } catch (error) {
       console.error('[LocationService] Erreur de reverse geocoding:', error);
       return null;

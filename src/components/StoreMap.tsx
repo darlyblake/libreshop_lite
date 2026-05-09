@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Text, Platform, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { View, StyleSheet, Platform } from 'react-native';
+import { COLORS, SPACING, RADIUS } from '../config/theme';
+import { WebMap } from './WebMap';
 
 // Conditionally import MapLibre only on mobile (not web)
 let MapLibreGL: any = null;
@@ -31,6 +31,7 @@ interface StoreMapProps {
   mode?: 'view' | 'select';
   initialCenter?: { latitude: number; longitude: number };
   height?: number;
+  selectedLocation?: { latitude: number; longitude: number };
 }
 
 export const StoreMap: React.FC<StoreMapProps> = ({
@@ -41,6 +42,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({
   mode = 'view',
   initialCenter = { latitude: 0.375, longitude: 9.45 }, // Centre du Gabon par défaut
   height = 300,
+  selectedLocation,
 }) => {
   const [region, setRegion] = useState({
     latitude: initialCenter.latitude,
@@ -48,33 +50,19 @@ export const StoreMap: React.FC<StoreMapProps> = ({
     zoomLevel: 12,
   });
 
-  // Web fallback - MapLibre doesn't work on web
-  if (Platform.OS === 'web' || !MapLibreGL) {
+  // Use WebMap on web, MapLibre on mobile
+  if (Platform.OS === 'web') {
     return (
-      <View style={[styles.container, styles.webFallback, { height }]}>
-        <View style={styles.webFallbackContent}>
-          <Ionicons name="map-outline" size={48} color={COLORS.textMuted} />
-          <Text style={styles.webFallbackTitle}>
-            {mode === 'select' ? 'Sélection de localisation' : 'Carte'}
-          </Text>
-          <Text style={styles.webFallbackText}>
-            {mode === 'select' 
-              ? 'Veuillez utiliser l\'application mobile pour sélectionner la localisation sur la carte'
-              : 'La carte est disponible uniquement sur l\'application mobile'
-            }
-          </Text>
-          {mode === 'select' && onLocationSelect && (
-            <TouchableOpacity
-              style={styles.webFallbackButton}
-              onPress={() => onLocationSelect(region)}
-            >
-              <Text style={styles.webFallbackButtonText}>
-                Utiliser la position par défaut
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      <WebMap
+        stores={stores}
+        onStorePress={onStorePress}
+        selectedStore={selectedStore}
+        onLocationSelect={onLocationSelect}
+        mode={mode}
+        initialCenter={initialCenter}
+        height={height}
+        selectedLocation={selectedLocation}
+      />
     );
   }
 
@@ -140,39 +128,6 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
-  },
-  webFallback: {
-    backgroundColor: COLORS.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  webFallbackContent: {
-    alignItems: 'center',
-    padding: SPACING.xl,
-    gap: SPACING.md,
-  },
-  webFallbackTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-    textAlign: 'center',
-  },
-  webFallbackText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-  },
-  webFallbackButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-  },
-  webFallbackButtonText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
   },
   marker: {
     width: 32,

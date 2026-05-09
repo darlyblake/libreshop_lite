@@ -34,9 +34,17 @@ import { useResponsive } from '../utils/responsive';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { SearchBar } from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
+import { locationService } from '../services/locationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
+
+// Nearby radius options
+const NEARBY_RADIUS_OPTIONS = [
+  { id: 5, label: '5 km' },
+  { id: 10, label: '10 km' },
+  { id: 20, label: '20 km' },
+];
 
 export const ClientAllStoresScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -79,9 +87,37 @@ export const ClientAllStoresScreen: React.FC = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // Nearby filter state
+  const [nearbyEnabled, setNearbyEnabled] = useState(false);
+  const [nearbyRadius, setNearbyRadius] = useState(10);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [loadingNearby, setLoadingNearby] = useState(false);
+  const [nearbyStores, setNearbyStores] = useState<Store[]>([]);
+
   useEffect(() => {
     loadStores();
   }, []);
+
+  // Update nearbyStores when stores change and filter is enabled
+  useEffect(() => {
+    if (nearbyEnabled && userLocation) {
+      const storesWithDistance = stores
+        .filter(store => store.latitude && store.longitude)
+        .map(store => ({
+          ...store,
+          distance: locationService.calculateDistance(
+            userLocation.latitude, 
+            userLocation.longitude, 
+            store.latitude, 
+            store.longitude
+          )
+        }))
+        .filter(store => store.distance <= nearbyRadius)
+        .sort((a, b) => (a as any).distance - (b as any).distance);
+      
+      setNearbyStores(storesWithDistance);
+    }
+  }, [stores, nearbyEnabled, userLocation, nearbyRadius]);
 
   const loadStores = async (reset = true) => {
     try {
@@ -152,6 +188,76 @@ export const ClientAllStoresScreen: React.FC = () => {
     loadStores();
   }, []);
 
+  // Handle nearby filter toggle
+  const handleToggleNearby = useCallback(async () => {
+    if (!nearbyEnabled) {
+      // Enable nearby filter
+      setLoadingNearby(true);
+      try {
+        const location = await locationService.getCurrentPosition();
+        setUserLocation(location);
+        
+        // Filter existing stores by distance
+        const storesWithDistance = stores
+          .filter(store => store.latitude && store.longitude)
+          .map(store => ({
+            ...store,
+            distance: locationService.calculateDistance(
+              location.latitude, 
+              location.longitude, 
+              store.latitude, 
+              store.longitude
+            )
+          }))
+          .filter(store => store.distance <= nearbyRadius)
+          .sort((a, b) => (a as any).distance - (b as any).distance);
+        
+        setNearbyStores(storesWithDistance);
+        setNearbyEnabled(true);
+      } catch (error) {
+        console.error('Error getting nearby stores:', error);
+        Alert.alert('Erreur', 'Impossible d\'accéder à votre position');
+      } finally {
+        setLoadingNearby(false);
+      }
+    } else {
+      // Disable nearby filter
+      setNearbyEnabled(false);
+      setNearbyStores([]);
+      setUserLocation(null);
+    }
+  }, [nearbyEnabled, nearbyRadius, stores]);
+
+  // Handle radius change
+  const handleRadiusChange = useCallback(async (radius: number) => {
+    setNearbyRadius(radius);
+    if (nearbyEnabled && userLocation) {
+      setLoadingNearby(true);
+      try {
+        // Filter existing stores by distance with new radius
+        const storesWithDistance = stores
+          .filter(store => store.latitude && store.longitude)
+          .map(store => ({
+            ...store,
+            distance: locationService.calculateDistance(
+              userLocation.latitude, 
+              userLocation.longitude, 
+              store.latitude, 
+              store.longitude
+            )
+          }))
+          .filter(store => store.distance <= radius)
+          .sort((a, b) => (a as any).distance - (b as any).distance);
+        
+        setNearbyStores(storesWithDistance);
+      } catch (error) {
+        console.error('Error updating nearby stores:', error);
+      } finally {
+        setLoadingNearby(false);
+      }
+    }
+  }, [nearbyEnabled, userLocation, stores]);
+
   const dynamicStyles = useMemo(() => ({
     listContent: {
       paddingHorizontal: SPACING.lg,
@@ -165,7 +271,7 @@ export const ClientAllStoresScreen: React.FC = () => {
   }), [insets.bottom, numColumns]);
 
   const filteredStores = useMemo(() => {
-    let storesList = stores;
+    let storesList = nearbyEnabled ? nearbyStores : stores;
 
     if (selectedCategory !== 'Toutes') {
       storesList = storesList.filter((store) => store.category === selectedCategory);
@@ -200,7 +306,7 @@ export const ClientAllStoresScreen: React.FC = () => {
     }
 
     return storesList;
-  }, [query, selectedCategory, stores, filters, statsByStoreId]);
+  }, [query, selectedCategory, stores, filters, statsByStoreId, nearbyEnabled, nearbyStores]);
 
   const renderStars = useCallback((avg: number) => {
     const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
@@ -270,6 +376,16 @@ export const ClientAllStoresScreen: React.FC = () => {
                   <Ionicons name="checkmark-circle" size={16} color={COLORS.info} />
                 </View>
               )}
+
+              {/* Distance badge */}
+              {nearbyEnabled && userLocation && item.latitude && item.longitude && (
+                <View style={styles.distanceBadge}>
+                  <Ionicons name="location-outline" size={12} color={COLORS.accent} />
+                  <Text style={styles.distanceBadgeText}>
+                    {locationService.calculateDistance(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude).toFixed(1)} km
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.storeBody}>
@@ -314,7 +430,7 @@ export const ClientAllStoresScreen: React.FC = () => {
         </Animated.View>
       );
     },
-    [navigation, renderStars, statsByStoreId, dynamicStyles.cardWidth]
+    [navigation, renderStars, statsByStoreId, dynamicStyles.cardWidth, nearbyEnabled, userLocation]
   );
 
   const handleSelectCategory = useCallback((cat: string) => {
@@ -371,6 +487,18 @@ export const ClientAllStoresScreen: React.FC = () => {
               <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilters(true)}>
                 <Ionicons name="options-outline" size={22} color="white" />
               </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.filterBtn, nearbyEnabled && styles.filterBtnActive]}
+                onPress={handleToggleNearby}
+                disabled={loadingNearby}
+              >
+                <Ionicons 
+                  name="navigate" 
+                  size={22} 
+                  color={nearbyEnabled ? COLORS.accent : "white"} 
+                />
+              </TouchableOpacity>
             </View>
           </LinearGradient>
 
@@ -395,6 +523,29 @@ export const ClientAllStoresScreen: React.FC = () => {
               {categories.map(renderCategoryChip)}
             </ScrollView>
           </View>
+
+          {/* Sélecteur de rayon pour le filtre proximité */}
+          {nearbyEnabled && (
+            <View style={styles.radiusWrapper}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.radiusList}
+              >
+                {NEARBY_RADIUS_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[styles.radiusChip, nearbyRadius === option.id && styles.radiusChipActive]}
+                    onPress={() => handleRadiusChange(option.id)}
+                  >
+                    <Text style={[styles.radiusChipText, nearbyRadius === option.id && styles.radiusChipTextActive]}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* En-tête des résultats */}
           <View style={styles.resultsHeader}>
@@ -776,6 +927,54 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     borderRadius: 12,
     padding: 2,
+  },
+  distanceBadge: {
+    position: 'absolute',
+    top: SPACING.sm,
+    left: SPACING.sm,
+    backgroundColor: COLORS.card,
+    borderRadius: 12,
+    padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+  },
+  distanceBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  filterBtnActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  radiusWrapper: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  radiusList: {
+    gap: SPACING.sm,
+  },
+  radiusChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  radiusChipActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  radiusChipText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '500',
+    color: COLORS.text,
+  },
+  radiusChipTextActive: {
+    color: 'white',
   },
   storeBody: {
     paddingHorizontal: SPACING.md,

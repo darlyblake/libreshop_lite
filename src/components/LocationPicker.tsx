@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONT_SIZE, RADIUS, SPACING } from '../config/theme';
 import { locationService, LocationCoords, Address } from '../services/locationService';
@@ -34,16 +34,24 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
     try {
       const location = await locationService.getCurrentPosition();
       if (location) {
+        console.log('[LocationPicker] Position GPS obtenue:', location);
         setCurrentLocation(location);
+        setAddress(`Position: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`);
         
-        // Reverse geocoding pour obtenir l'adresse
+        // Reverse geocoding en arrière-plan (ne bloque pas l'affichage)
         setLoadingAddress(true);
-        const addr = await locationService.reverseGeocode(
-          location.latitude,
-          location.longitude
-        );
-        setAddress(addr?.street || addr?.city || 'Localisation obtenue');
-        setLoadingAddress(false);
+        locationService.reverseGeocode(location.latitude, location.longitude)
+          .then(addr => {
+            if (addr) {
+              setAddress(addr?.street || addr?.city || 'Localisation obtenue');
+            }
+          })
+          .catch(geocodeError => {
+            console.warn('Reverse geocoding failed (CORS on web)');
+          })
+          .finally(() => {
+            setLoadingAddress(false);
+          });
       } else {
         Alert.alert(
           'Permission refusée',
@@ -69,10 +77,15 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
 
     setLoadingAddress(true);
     try {
-      const addr = await locationService.reverseGeocode(
-        currentLocation.latitude,
-        currentLocation.longitude
-      );
+      let addr = null;
+      try {
+        addr = await locationService.reverseGeocode(
+          currentLocation.latitude,
+          currentLocation.longitude
+        );
+      } catch (geocodeError) {
+        console.warn('Reverse geocoding failed during confirm');
+      }
 
       onLocationSelect({
         latitude: currentLocation.latitude,
@@ -81,7 +94,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         city: addr?.city,
       });
     } catch (error) {
-      console.error('Erreur lors du reverse geocoding:', error);
+      console.error('Erreur lors de la confirmation:', error);
       // Confirmer même sans adresse
       onLocationSelect({
         latitude: currentLocation.latitude,
@@ -101,15 +114,6 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         </Text>
       </View>
 
-      {Platform.OS === 'web' && (
-        <View style={styles.webNotice}>
-          <Ionicons name="information-circle" size={20} color={COLORS.accent} />
-          <Text style={styles.webNoticeText}>
-            La carte interactive n'est pas disponible sur le web. Utilisez "Utiliser ma position actuelle" pour définir votre localisation.
-          </Text>
-        </View>
-      )}
-
       <TouchableOpacity
         style={styles.currentLocationButton}
         onPress={handleGetCurrentLocation}
@@ -127,7 +131,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
         )}
       </TouchableOpacity>
 
-      {currentLocation && Platform.OS !== 'web' && (
+      {currentLocation && (
         <>
           <StoreMap
             mode="select"
@@ -137,6 +141,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               setCurrentLocation(coords);
               setAddress('Position mise à jour');
             }}
+            selectedLocation={currentLocation}
           />
 
           {address && (
@@ -145,29 +150,6 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({
               <Text style={styles.addressText}>{address}</Text>
             </View>
           )}
-
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={handleConfirmLocation}
-            disabled={loadingAddress}
-          >
-            {loadingAddress ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.confirmButtonText}>Confirmer la localisation</Text>
-            )}
-          </TouchableOpacity>
-        </>
-      )}
-
-      {currentLocation && Platform.OS === 'web' && (
-        <>
-          <View style={styles.addressContainer}>
-            <Ionicons name="location-outline" size={16} color={COLORS.textMuted} />
-            <Text style={styles.addressText}>
-              Position : {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
-            </Text>
-          </View>
 
           <TouchableOpacity
             style={styles.confirmButton}
@@ -219,20 +201,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
   },
-  webNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    backgroundColor: COLORS.accent + '15',
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.lg,
-  },
-  webNoticeText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
-    flex: 1,
-  },
   currentLocationButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -253,18 +221,18 @@ const styles = StyleSheet.create({
   },
   addressContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: SPACING.sm,
-    marginTop: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
     backgroundColor: COLORS.bg,
     borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginTop: SPACING.md,
   },
   addressText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: COLORS.text,
     flex: 1,
+    flexWrap: 'wrap',
   },
   confirmButton: {
     backgroundColor: COLORS.primary,

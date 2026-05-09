@@ -29,5 +29,6 @@ export { TabContent } from './TabContent';
 export { MetaTags, useMetaTags } from './MetaTags';
 export { ShareButton, shareContent } from './ShareButton';
 export { StoreMap } from './StoreMap';
+export { WebMap } from './WebMap';
 export { LocationPicker } from './LocationPicker';
 

@@ -99,5 +99,14 @@ module.exports = async function (env, argv) {
     };
   }
 
+  // Exclude MapLibre from web build (it's React Native only)
+  if (!config.resolve) {
+    config.resolve = {};
+  }
+  if (!config.resolve.alias) {
+    config.resolve.alias = {};
+  }
+  config.resolve.alias['@maplibre/maplibre-react-native'] = path.resolve(__dirname, 'src/utils/maplibre-mock.js');
+
   return config;
 };

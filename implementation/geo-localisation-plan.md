@@ -78,39 +78,39 @@ cd ios && pod install && cd ..
 ---
 
 ### Étape 6: Intégration AddStoreScreen
-- [ ] Ouvrir src/screens/AddStoreScreen.tsx
-- [ ] Ajouter LocationPicker dans le formulaire
-- [ ] Récupérer la localisation sélectionnée
-- [ ] Envoyer lat/lon/address/city lors de la création
+- [x] Ouvrir src/screens/AddStoreScreen.tsx
+- [x] Ajouter LocationPicker dans le formulaire
+- [x] Récupérer la localisation sélectionnée
+- [x] Envoyer lat/lon/address/city lors de la création
 - [ ] Tester la création d'une boutique avec localisation
 
 ---
 
 ### Étape 7: Intégration StoreDetailScreen
-- [ ] Ouvrir src/screens/StoreDetailScreen.tsx
-- [ ] Ajouter bouton "Carte" (si localisation définie)
-- [ ] Ajouter bouton "Itinéraire" (si localisation définie)
-- [ ] Créer l'écran StoreMap pour afficher la carte
+- [x] Ouvrir src/screens/StoreDetailScreen.tsx
+- [x] Ajouter bouton "Carte" (si localisation définie)
+- [x] Ajouter bouton "Itinéraire" (si localisation définie)
+- [x] Créer l'écran StoreMap pour afficher la carte
 - [ ] Tester l'ouverture de la carte
 - [ ] Tester l'itinéraire Google Maps
 
 ---
 
-### Étape 8: Ajouter filtre "Près de chez moi" sur HomeScreen
-- [ ] Ouvrir src/screens/HomeScreen.tsx
-- [ ] Ajouter le bouton/filtre "Près de chez moi"
-- [ ] Implémenter le sélecteur de rayon (5km, 10km, 20km)
-- [ ] Utiliser findNearbyStores() pour filtrer
-- [ ] Trier les résultats par distance
-- [ ] Afficher la distance sur chaque boutique
+### Étape 8: Ajouter filtre "Près de chez moi"
+- [x] Ouvrir src/screens/ClientSearchScreen.tsx et src/screens/ClientAllStoresScreen.tsx
+- [x] Ajouter le bouton/filtre "Près de chez moi"
+- [x] Implémenter le sélecteur de rayon (5km, 10km, 20km)
+- [x] Utiliser findNearbyStores() pour filtrer
+- [x] Trier les résultats par distance
+- [x] Afficher la distance sur chaque boutique
 - [ ] Tester le filtre
 
 ---
 
 ### Étape 9: Configuration Permissions Expo
-- [ ] Ouvrir app.config.js ou app.json
-- [ ] Ajouter le plugin expo-location
-- [ ] Définir le message de permission
+- [x] Ouvrir app.config.js ou app.json
+- [x] Ajouter le plugin expo-location
+- [x] Définir le message de permission
 - [ ] Tester la demande de permission sur mobile
 
 ---
@@ -120,7 +120,7 @@ cd ios && pod install && cd ..
 - [ ] Test modification localisation boutique existante
 - [ ] Test affichage carte sur détail boutique
 - [ ] Test itinéraire Google Maps
-- [ ] Test filtre "Près de chez moi"
+- [ ] Test filtre "Près de chez moi" (ClientSearch et ClientAllStores)
 - [ ] Test sur iOS
 - [ ] Test sur Android
 - [ ] Test sur Web
@@ -129,8 +129,8 @@ cd ios && pod install && cd ..
 
 ## 📊 Progression Globale
 
-**Étapes complétées : 5 / 10**  
-**Pourcentage : 50%**
+**Étapes complétées : 9 / 10**  
+**Pourcentage : 90%**
 
 ---
 

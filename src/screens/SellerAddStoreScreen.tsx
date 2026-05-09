@@ -32,6 +32,7 @@ import { useAuthStore } from '../store';
 import { storeCreationDraftStorage } from '../lib/storage';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { LocationPicker } from '../components/LocationPicker';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme'; // Gardé pour compatibilité temporaire si besoin
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
@@ -72,7 +73,7 @@ const STORE_VALIDATION_RULES = {
   city_id: { required: true },
 };
 
-export const SellerAddStoreScreen: React.FC = () => {
+const SellerAddStoreScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user } = useAuthStore();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -89,6 +90,14 @@ export const SellerAddStoreScreen: React.FC = () => {
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
   const [cityResults, setCityResults] = useState<City[]>([]);
+  
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address?: string;
+    city?: string;
+  } | null>(null);
   
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [submissionStatus, setSubmissionStatus] = useState<{
@@ -243,6 +252,13 @@ export const SellerAddStoreScreen: React.FC = () => {
         logo_url: uploadedLogoUrl,
         banner_url: uploadedBannerUrl,
         subcategory: selectedSubcategory || undefined,
+        // Add location data if selected
+        ...(selectedLocation && {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+          city: selectedLocation.city || values.city_name,
+          country: countries.find(c => c.id === values.country_id)?.name || 'Gabon',
+        }),
       };
 
       await storeService.createWithPlanSlugRetry(user.id, createArgs as any, trial?.id || 'trial');
@@ -491,6 +507,24 @@ export const SellerAddStoreScreen: React.FC = () => {
         onChangeText={(v) => handleChange('address', v)}
         error={touched.address ? errors.address : undefined}
       />
+      
+      <TouchableOpacity 
+        style={styles.locationButton} 
+        onPress={() => setShowLocationPicker(true)}
+      >
+        <Ionicons name="map-outline" size={20} color={COLORS.accent} />
+        <View style={styles.locationButtonContent}>
+          <Text style={styles.locationButtonText}>
+            {selectedLocation ? 'Localisation sélectionnée' : 'Sélectionner la localisation sur la carte'}
+          </Text>
+          {selectedLocation && (
+            <Text style={styles.locationButtonSubtext}>
+              {selectedLocation.address || `${selectedLocation.latitude.toFixed(6)}, ${selectedLocation.longitude.toFixed(6)}`}
+            </Text>
+          )}
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+      </TouchableOpacity>
     </View>
   );
 
@@ -639,6 +673,32 @@ export const SellerAddStoreScreen: React.FC = () => {
             />
             <Button title="Fermer" onPress={() => setCountryPickerVisible(false)} />
           </View>
+        </View>
+      </Modal>
+
+      {/* Location Picker Modal */}
+      <Modal
+        visible={showLocationPicker}
+        animationType="slide"
+        onRequestClose={() => setShowLocationPicker(false)}
+      >
+        <View style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Localisation de la boutique</Text>
+            <TouchableOpacity onPress={() => setShowLocationPicker(false)}>
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <LocationPicker
+              initialLocation={selectedLocation || undefined}
+              onLocationSelect={(location) => {
+                setSelectedLocation(location);
+                setShowLocationPicker(false);
+              }}
+            />
+          </ScrollView>
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -968,6 +1028,51 @@ const getStyles = (themeContext: any) => {
     color: COLORS.text,
     marginBottom: SPACING.lg,
     textAlign: 'center',
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  locationButtonContent: {
+    flex: 1,
+  },
+  locationButtonText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  locationButtonSubtext: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  fullScreenModal: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  modalContent: {
+    flex: 1,
   },
 });
 };

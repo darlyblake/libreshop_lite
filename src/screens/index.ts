@@ -27,7 +27,7 @@ export { SellerEditProductScreen } from './SellerEditProductScreen';
 export { SellerOrdersScreen } from './SellerOrdersScreen';
 export { SellerOrderDetailScreen } from './SellerOrderDetailScreen';
 export { SellerStoreScreen } from './SellerStoreScreen';
-export { SellerAddStoreScreen } from './SellerAddStoreScreen';
+export { default as SellerAddStoreScreen } from './SellerAddStoreScreen';
 export { SellerCaisseScreen } from './SellerCaisseScreen';
 export { FeaturesScreen } from './FeaturesScreen';
 export { PricingScreen } from './PricingScreen';
