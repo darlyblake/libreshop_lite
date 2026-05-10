@@ -546,6 +546,30 @@ export const ProductDetailScreen: React.FC = () => {
         .web-image{width:100%;height:auto;max-height:100%;object-fit:cover}
         .web-content{width:45%}
       }
+      /* Mobile responsive styles */
+      @media(max-width:768px){
+        .web-container{padding:8px}
+        .web-content{padding:16px}
+        .web-title{font-size:22px}
+        .web-price{font-size:24px}
+        .web-actions{flex-direction:column;gap:8px}
+        .web-btn{padding:14px 16px;font-size:16px}
+        .web-qty{padding:10px 16px}
+        .web-tabs{overflow-x:auto;white-space:nowrap}
+        .web-tab{padding:8px 10px;font-size:14px}
+        .similar-grid{gap:8px}
+        .similar-card{width:45%;min-width:140px}
+        .similar-img{height:100px}
+      }
+      @media(max-width:480px){
+        .web-content{padding:12px}
+        .web-title{font-size:20px}
+        .web-price{font-size:22px}
+        .web-btn{padding:12px 14px;font-size:15px}
+        .similar-card{width:48%;min-width:130px}
+        .similar-img{height:90px}
+        .similar-name{font-size:12px}
+      }
     `;
 
     return (

@@ -454,7 +454,7 @@ const SellerAddStoreScreen: React.FC = () => {
       />
       <Input
         icon="call-outline"
-        placeholder="Numéro WhatsApp (ex: +225...)"
+        placeholder="Numéro WhatsApp (ex: +241...)"
         value={values.phone}
         onChangeText={(v) => handleChange('phone', v)}
         keyboardType="phone-pad"

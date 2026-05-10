@@ -67,25 +67,50 @@ export const AdminSubscriptionsScreen: React.FC = () => {
     const load = async () => {
       try {
         const plans = await planService.getAll();
+        
+        // Fetch stores with their subscription plans to calculate user count and revenue
+        const { adminService } = await import('../services/adminService');
+        const stores = await adminService.getStoresWithDetails();
+        
+        // Calculate user count and revenue per plan
+        const planStats: Record<string, { userCount: number; revenue: number }> = {};
+        stores.forEach((store: any) => {
+          const planName = store.plan || '-';
+          if (!planStats[planName]) {
+            planStats[planName] = { userCount: 0, revenue: 0 };
+          }
+          planStats[planName].userCount += 1;
+        });
+        
+        // Calculate revenue based on plan price * user count (subscription payments)
+        plans.forEach((plan: any) => {
+          const stats = planStats[plan.name] || { userCount: 0, revenue: 0 };
+          stats.revenue = plan.price * stats.userCount;
+          planStats[plan.name] = stats;
+        });
+        
         // map plan fields to our local Subscription type for display
         setSubscriptions(
-          plans.map(p => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            duration: p.duration || (p.months ? `${p.months} mois` : ''),
-            months: p.months,
-            trialDays: p.trial_days,
-            productLimit: p.product_limit,
-            hasCaisse: p.has_caisse,
-            hasOnlineStore: p.has_online_store,
-            hasAnalytics: p.has_analytics,
-            features: p.features || [],
-            userCount: 0,
-            status: p.status === 'inactive' ? 'inactive' : 'active',
-            revenue: 0,
-            createdAt: p.created_at || '',
-          }))
+          plans.map(p => {
+            const stats = planStats[p.name] || { userCount: 0, revenue: 0 };
+            return {
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              duration: p.duration || (p.months ? `${p.months} mois` : ''),
+              months: p.months,
+              trialDays: p.trial_days,
+              productLimit: p.product_limit,
+              hasCaisse: p.has_caisse,
+              hasOnlineStore: p.has_online_store,
+              hasAnalytics: p.has_analytics,
+              features: p.features || [],
+              userCount: stats.userCount,
+              status: p.status === 'inactive' ? 'inactive' : 'active',
+              revenue: stats.revenue,
+              createdAt: p.created_at || '',
+            };
+          })
         );
       } catch (err: any) {
         errorHandler.handleDatabaseError(err, 'fetch plans');
@@ -599,26 +624,90 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.statsModalContainer}>
             <View style={styles.addModalHeader}>
-              <Text style={styles.addModalTitle}>Statistiques</Text>
+              <Text style={styles.addModalTitle}>Statistiques du plan</Text>
               <TouchableOpacity onPress={closeStatsModal} style={{ padding: 6 }}>
                 <Ionicons name="close" size={22} color={COLORS.text} />
               </TouchableOpacity>
             </View>
-            <View style={styles.addModalBody}>
+            <ScrollView style={styles.addModalBody}>
               {statsSubscription ? (
                 <>
-                  <Text style={styles.statLine}>Nom: {statsSubscription.name}</Text>
-                  <Text style={styles.statLine}>Utilisateurs: {statsSubscription.userCount}</Text>
-                  <Text style={styles.statLine}>Revenus: {statsSubscription.revenue.toLocaleString()} FCFA</Text>
-                  <Text style={styles.statLine}>Créé le: {statsSubscription.createdAt}</Text>
-                  {statsSubscription.months !== undefined && <Text style={styles.statLine}>Durée (mois): {statsSubscription.months}</Text>}
-                  {statsSubscription.productLimit !== undefined && <Text style={styles.statLine}>Limite produits: {statsSubscription.productLimit || '∞'}</Text>}
-                  <Text style={styles.statLine}>Caisse physique: {statsSubscription.hasCaisse ? 'Oui' : 'Non'}</Text>
-                  <Text style={styles.statLine}>Boutique en ligne: {statsSubscription.hasOnlineStore ? 'Oui' : 'Non'}</Text>
-                  <Text style={styles.statLine}>Analytique détaillée: {statsSubscription.hasAnalytics ? 'Oui' : 'Non'}</Text>
+                  <View style={styles.statSection}>
+                    <Text style={styles.statSectionTitle}>Informations générales</Text>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Nom du plan</Text>
+                      <Text style={styles.statValue}>{statsSubscription.name}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Prix</Text>
+                      <Text style={styles.statValue}>
+                        {statsSubscription.price === 0 ? 'GRATUIT' : `${statsSubscription.price.toLocaleString()} FCFA`}
+                      </Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Durée</Text>
+                      <Text style={styles.statValue}>{statsSubscription.duration}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Date de création</Text>
+                      <Text style={styles.statValue}>
+                        {statsSubscription.createdAt ? statsSubscription.createdAt.split('T')[0] : '-'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.statSection}>
+                    <Text style={styles.statSectionTitle}>Statistiques</Text>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Utilisateurs actifs</Text>
+                      <Text style={styles.statValue}>{statsSubscription.userCount}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Revenus générés</Text>
+                      <Text style={[styles.statValue, { color: COLORS.success }]}>
+                        {statsSubscription.price > 0 
+                          ? `${(statsSubscription.price * statsSubscription.userCount).toLocaleString()} FCFA` 
+                          : 'GRATUIT'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.statSection}>
+                    <Text style={styles.statSectionTitle}>Fonctionnalités</Text>
+                    {statsSubscription.features.map((feature, index) => (
+                      <View key={index} style={styles.featureRow}>
+                        <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                        <Text style={styles.featureRowText}>{feature}</Text>
+                      </View>
+                    ))}
+                    {statsSubscription.months !== undefined && (
+                      <View style={styles.statRow}>
+                        <Text style={styles.statLabel}>Durée (mois)</Text>
+                        <Text style={styles.statValue}>{statsSubscription.months}</Text>
+                      </View>
+                    )}
+                    {statsSubscription.productLimit !== undefined && (
+                      <View style={styles.statRow}>
+                        <Text style={styles.statLabel}>Limite produits</Text>
+                        <Text style={styles.statValue}>{statsSubscription.productLimit || '∞'}</Text>
+                      </View>
+                    )}
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Caisse physique</Text>
+                      <Text style={styles.statValue}>{statsSubscription.hasCaisse ? 'Oui' : 'Non'}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Boutique en ligne</Text>
+                      <Text style={styles.statValue}>{statsSubscription.hasOnlineStore ? 'Oui' : 'Non'}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Analytique détaillée</Text>
+                      <Text style={styles.statValue}>{statsSubscription.hasAnalytics ? 'Oui' : 'Non'}</Text>
+                    </View>
+                  </View>
                 </>
               ) : null}
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -719,12 +808,16 @@ export const AdminSubscriptionsScreen: React.FC = () => {
               </View>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
-                  {(subscription.revenue / 1000000).toFixed(1)}M
+                  {subscription.price > 0 
+                    ? `${(subscription.price * subscription.userCount / 1000000).toFixed(1)}M` 
+                    : 'GRATUIT'}
                 </Text>
                 <Text style={styles.statLabel}>Revenus</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{subscription.createdAt}</Text>
+                <Text style={styles.statValue}>
+                  {subscription.createdAt ? subscription.createdAt.split('T')[0] : '-'}
+                </Text>
                 <Text style={styles.statLabel}>Créé</Text>
               </View>
             </View>
@@ -915,6 +1008,45 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.sm,
     fontSize: FONT_SIZE.md,
+  },
+  statSection: {
+    marginBottom: SPACING.lg,
+  },
+  statSectionTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  statLabel: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    flex: 1,
+  },
+  statValue: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    flex: 1,
+    textAlign: 'right',
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    gap: SPACING.sm,
+  },
+  featureRowText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
   },
   subscriptionsList: {
     flex: 1,

@@ -50,7 +50,7 @@ export const authService = {
         await client.from('users').upsert({
           id: user.id,
           email: user.email || null, // Migration 20260429160000 allows null email
-          full_name: (user.user_metadata && user.user_metadata.full_name) || 'Anonyme',
+          full_name: (user.user_metadata && user.user_metadata.full_name) || user.email || 'Utilisateur',
           role: 'client',
         }, { onConflict: 'id' });
       }

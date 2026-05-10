@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { copyToClipboard } from '../services/contactService';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -359,7 +360,7 @@ export const SellerStoreScreen: React.FC = () => {
       }
 
       const fileExt = 'png';
-      const baseDir = FileSystem.Paths.documentDirectory;
+      const baseDir = FileSystem.Paths.cacheDirectory;
       if (!baseDir) throw new Error("Répertoire cache indisponible");
       const localUri = `${baseDir}qr-boutique-${store.slug}-${Date.now()}.${fileExt}`;
 
@@ -423,7 +424,7 @@ export const SellerStoreScreen: React.FC = () => {
     try {
       setChangingPassword(true);
       if (user?.email) await authService.signIn(user.email, passwordData.currentPassword);
-      await authService.updatePassword(passwordData.newPassword);
+      await authService.updatePassword(passwordData.currentPassword, passwordData.newPassword);
       Alert.alert('Succès', 'Mot de passe mis à jour avec succès', [
         { text: 'OK', onPress: () => {
           setShowPasswordModal(false);
@@ -503,7 +504,7 @@ export const SellerStoreScreen: React.FC = () => {
     fullScreenModal: { flex: 1, backgroundColor: getColor.bg },
     locationModalContent: { flex: 1 },
     loadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', gap: spacing.md },
-    loadingText: { color: getColor.white, fontSize: fontSize.md, fontWeight: '600' },
+    loadingText: { color: getColor.textInverse, fontSize: fontSize.md, fontWeight: '600' },
   }), [getColor, spacing, radius, fontSize, isDark]);
 
   // Helpers
@@ -782,7 +783,7 @@ export const SellerStoreScreen: React.FC = () => {
             </Text>
 
             <TouchableOpacity
-              style={[styles.button, styles.secondaryButton, { width: '100%', marginBottom: 10 }]}
+              style={[styles.button, styles.cancelButton, { width: '100%', marginBottom: 10 }]}
               onPress={handleDownloadQr}
             >
               <Text style={[styles.submitText, { color: getColor.text }]}>Télécharger le QR code</Text>
@@ -825,7 +826,7 @@ export const SellerStoreScreen: React.FC = () => {
 
           {updatingLocation && (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={getColor.white} />
+              <ActivityIndicator size="large" color={getColor.textInverse} />
               <Text style={styles.loadingText}>Mise à jour en cours...</Text>
             </View>
           )}

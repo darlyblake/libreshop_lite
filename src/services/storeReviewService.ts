@@ -1,4 +1,6 @@
 import { useSupabase, StoreReview } from '../lib/supabase';
+import { notificationService } from './notificationService';
+import { storeService } from './storeService';
 
 export const storeReviewService = {
   async getByStore(storeId: string) {
@@ -25,6 +27,28 @@ export const storeReviewService = {
       .select('*')
       .single();
     if (error) throw error;
+    
+    // Send notification to store owner
+    try {
+      const store = await storeService.getById(review.store_id);
+      if (store && (store as any).user_id) {
+        await notificationService.create({
+          user_id: (store as any).user_id,
+          title: '💬 Nouveau commentaire sur votre boutique',
+          body: `${review.user_name} a laissé un avis de ${review.rating} étoiles${review.comment ? ': "' + review.comment.substring(0, 50) + (review.comment.length > 50 ? '...' : '') + '"' : ''}`,
+          type: 'comment',
+          read: false,
+          data: {
+            storeId: review.store_id,
+            reviewId: data.id,
+            rating: review.rating,
+          },
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to send review notification:', e);
+    }
+    
     return data as StoreReview;
   },
 

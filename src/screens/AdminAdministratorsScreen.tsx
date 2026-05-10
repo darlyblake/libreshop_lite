@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,15 @@ import {
   Modal,
   TextInput,
   FlatList,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
+import { adminService } from '../services/adminService';
+import { errorHandler } from '../utils/errorHandler';
 
 interface Administrator {
   id: string;
@@ -43,6 +46,7 @@ export const AdminAdministratorsScreen: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [filterRole, setFilterRole] = useState<'all' | 'super-admin' | 'support' | 'finance' | 'moderator'>('all');
+  const [loading, setLoading] = useState(false);
 
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -50,156 +54,41 @@ export const AdminAdministratorsScreen: React.FC = () => {
   const [newAdminRole, setNewAdminRole] = useState<'super-admin' | 'support' | 'finance' | 'moderator'>('support');
   const [editingAdmin, setEditingAdmin] = useState<Administrator | null>(null);
 
-  const [administrators, setAdministrators] = useState<Administrator[]>([
-    {
-      id: '1',
-      name: 'Kofi Mensah',
-      email: 'kofi@libreshop.com',
-      password: 'secret',
-      role: 'super-admin',
-      status: 'active',
-      joinDate: '2025-01-15',
-      lastActivity: '2026-02-27 10:30',
-    },
-    {
-      id: '2',
-      name: 'Ama Owusu',
-      email: 'ama@libreshop.com',
-      password: 'finance123',
-      role: 'finance',
-      status: 'active',
-      joinDate: '2025-06-20',
-      lastActivity: '2026-02-27 09:15',
-    },
-    {
-      id: '3',
-      name: 'Kwesi Boateng',
-      email: 'kwesi@libreshop.com',
-      password: 'support456',
-      role: 'support',
-      status: 'active',
-      joinDate: '2025-08-10',
-      lastActivity: '2026-02-26 16:45',
-    },
-    {
-      id: '4',
-      name: 'Yaw Adomako',
-      email: 'yaw@libreshop.com',
-      password: 'mod789',
-      role: 'moderator',
-      status: 'active',
-      joinDate: '2025-09-05',
-      lastActivity: '2026-02-27 11:20',
-    },
-    {
-      id: '5',
-      name: 'Akosua Mensah',
-      email: 'akosua@libreshop.com',
-      password: 'support789',
-      role: 'support',
-      status: 'inactive',
-      joinDate: '2025-10-12',
-      lastActivity: '2026-02-20 14:30',
-    },
-    {
-      id: '6',
-      name: 'Nana Sekyere',
-      email: 'nana@libreshop.com',
-      password: 'mod321',
-      role: 'moderator',
-      status: 'active',
-      joinDate: '2025-11-01',
-      lastActivity: '2026-02-27 08:00',
-    },
-    {
-      id: '7',
-      name: 'Araba Owusu',
-      email: 'araba@libreshop.com',
-      password: 'finance456',
-      role: 'finance',
-      status: 'active',
-      joinDate: '2025-12-15',
-      lastActivity: '2026-02-27 13:00',
-    },
-    {
-      id: '8',
-      name: 'Kwame Asare',
-      email: 'kwame@libreshop.com',
-      password: 'support123',
-      role: 'support',
-      status: 'active',
-      joinDate: '2026-01-08',
-      lastActivity: '2026-02-27 12:15',
-    },
-    {
-      id: '9',
-      name: 'Otuo Mensah',
-      email: 'otuo@libreshop.com',
-      password: 'support234',
-      role: 'support',
-      status: 'active',
-      joinDate: '2026-01-20',
-      lastActivity: '2026-02-27 15:30',
-    },
-    {
-      id: '10',
-      name: 'Adebayo Okonkwo',
-      email: 'adebayo@libreshop.com',
-      password: 'mod654',
-      role: 'moderator',
-      status: 'active',
-      joinDate: '2026-02-01',
-      lastActivity: '2026-02-27 10:45',
-    },
-    {
-      id: '11',
-      name: 'Chioma Nwankwo',
-      email: 'chioma@libreshop.com',
-      password: 'finance789',
-      role: 'finance',
-      status: 'active',
-      joinDate: '2026-02-10',
-      lastActivity: '2026-02-27 14:20',
-    },
-  ]);
+  const [administrators, setAdministrators] = useState<Administrator[]>([]);
 
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([
-    {
-      id: '1',
-      adminName: 'Kofi Mensah',
-      action: 'Création de boutique',
-      timestamp: '2026-02-27 10:30',
-      details: 'Boutique "TechStore Benin" créée',
-    },
-    {
-      id: '2',
-      adminName: 'Ama Owusu',
-      action: 'Validation de paiement',
-      timestamp: '2026-02-27 09:15',
-      details: 'Paiement de 49,990 FCFA validé pour "Fresh Market"',
-    },
-    {
-      id: '3',
-      adminName: 'Kwesi Boateng',
-      action: 'Support client',
-      timestamp: '2026-02-26 16:45',
-      details: 'Ticket de support #3425 fermé',
-    },
-    {
-      id: '4',
-      adminName: 'Yaw Adomako',
-      action: 'Suppression de contenu',
-      timestamp: '2026-02-27 11:20',
-      details: 'Produit "Contenu interdit" supprimé',
-    },
-    {
-      id: '5',
-      adminName: 'Araba Owusu',
-      action: 'Rapport financier',
-      timestamp: '2026-02-27 13:00',
-      details: 'Rapport mensuel de février généré',
-    },
-  ]);
+  const loadAdministrators = async () => {
+    setLoading(true);
+    try {
+      const data = await adminService.getAdministrators();
+      setAdministrators(
+        (data || []).map((a: any) => ({
+          id: String(a.id),
+          name: a.name,
+          email: a.email,
+          password: a.password,
+          role: a.role,
+          status: a.status,
+          joinDate: a.join_date ? String(a.join_date).split('T')[0] : '-',
+          lastActivity: a.last_activity ? String(a.last_activity).split('T')[0] : '-',
+        }))
+      );
+    } catch (e: any) {
+      errorHandler.handleDatabaseError(e, 'load administrators');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert('❌ Impossible de charger les administrateurs');
+      } else {
+        Alert.alert('Erreur', 'Impossible de charger les administrateurs');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAdministrators();
+  }, []);
+
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
   const filteredAdministrators = useMemo(() => {
     return administrators.filter(admin => {
@@ -211,9 +100,10 @@ export const AdminAdministratorsScreen: React.FC = () => {
     });
   }, [administrators, searchQuery, filterRole]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
+    await loadAdministrators();
+    setRefreshing(false);
   };
 
   const getRoleColor = (role: string) => {
@@ -260,51 +150,41 @@ export const AdminAdministratorsScreen: React.FC = () => {
     setEditingAdmin(null);
   };
 
-  const submitAdmin = () => {
+  const submitAdmin = async () => {
     if (!newAdminName.trim() || !newAdminEmail.trim() || !newAdminPassword.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs, y compris le mot de passe');
       return;
     }
 
-    if (editingAdmin) {
-      setAdministrators(
-        administrators.map(a =>
-          a.id === editingAdmin.id
-            ? {
-                ...a,
-                name: newAdminName.trim(),
-                email: newAdminEmail.trim(),
-                role: newAdminRole,
-                password: newAdminPassword,
-              }
-            : a
-        )
-      );
-      Alert.alert('Succès', `${newAdminName} a été modifié`);
-    } else {
-      const newAdmin: Administrator = {
-        id: String(Date.now()),
-        name: newAdminName.trim(),
-        email: newAdminEmail.trim(),
-        password: newAdminPassword,
-        role: newAdminRole,
-        status: 'active',
-        joinDate: new Date().toISOString().split('T')[0],
-        lastActivity: new Date().toISOString().split('T')[0] + ' ' + new Date().toLocaleTimeString('fr-FR'),
-      };
-      setAdministrators([newAdmin, ...administrators]);
-
-      // Log activity
-      const log: ActivityLog = {
-        id: String(Date.now()),
-        adminName: 'System',
-        action: 'Création d\'administrateur',
-        timestamp: new Date().toLocaleString('fr-FR'),
-        details: `Administrateur "${newAdminName}" créé avec le rôle ${getRoleLabel(newAdminRole)}`,
-      };
-      setActivityLogs([log, ...activityLogs]);
+    try {
+      if (editingAdmin) {
+        await adminService.updateAdministrator(editingAdmin.id, {
+          name: newAdminName.trim(),
+          email: newAdminEmail.trim(),
+          role: newAdminRole,
+          password: newAdminPassword,
+        });
+        Alert.alert('Succès', `${newAdminName} a été modifié`);
+      } else {
+        await adminService.addAdministrator({
+          name: newAdminName.trim(),
+          email: newAdminEmail.trim(),
+          password: newAdminPassword,
+          role: newAdminRole,
+          status: 'active',
+        });
+        Alert.alert('Succès', `${newAdminName} a été ajouté`);
+      }
+      await loadAdministrators();
+      closeAddModal();
+    } catch (e: any) {
+      errorHandler.handleDatabaseError(e, editingAdmin ? 'update administrator' : 'add administrator');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(`❌ Impossible de ${editingAdmin ? 'modifier' : 'ajouter'} l'administrateur`);
+      } else {
+        Alert.alert('Erreur', `Impossible de ${editingAdmin ? 'modifier' : 'ajouter'} l'administrateur`);
+      }
     }
-    closeAddModal();
   };
 
   const deleteAdmin = (adminId: string) => {
@@ -314,20 +194,42 @@ export const AdminAdministratorsScreen: React.FC = () => {
       {
         text: 'Supprimer',
         style: 'destructive',
-        onPress: () => {
-          setAdministrators(administrators.filter(a => a.id !== adminId));
-          Alert.alert('Succès', `${admin?.name} a été supprimé`);
+        onPress: async () => {
+          try {
+            await adminService.deleteAdministrator(adminId);
+            Alert.alert('Succès', `${admin?.name} a été supprimé`);
+            await loadAdministrators();
+          } catch (e: any) {
+            errorHandler.handleDatabaseError(e, 'delete administrator');
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.alert('❌ Impossible de supprimer l\'administrateur');
+            } else {
+              Alert.alert('Erreur', 'Impossible de supprimer l\'administrateur');
+            }
+          }
         },
       },
     ]);
   };
 
-  const toggleStatus = (adminId: string) => {
-    setAdministrators(
-      administrators.map(a =>
-        a.id === adminId ? { ...a, status: a.status === 'active' ? 'inactive' : 'active' } : a
-      )
-    );
+  const toggleStatus = async (adminId: string) => {
+    const admin = administrators.find(a => a.id === adminId);
+    if (!admin) return;
+    
+    try {
+      await adminService.updateAdministrator(adminId, {
+        status: admin.status === 'active' ? 'inactive' : 'active',
+        last_activity: new Date().toISOString(),
+      });
+      await loadAdministrators();
+    } catch (e: any) {
+      errorHandler.handleDatabaseError(e, 'toggle administrator status');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert('❌ Impossible de modifier le statut');
+      } else {
+        Alert.alert('Erreur', 'Impossible de modifier le statut');
+      }
+    }
   };
 
   return (
@@ -601,11 +503,11 @@ const styles = StyleSheet.create({
   headerTitleText: {
     fontSize: FONT_SIZE.xxl,
     fontWeight: '700',
-    color: COLORS.text,
+    color: COLORS.accent,
   },
   headerSubtitle: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: COLORS.text,
     marginTop: 2,
   },
   addButton: {
@@ -634,7 +536,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: SPACING.sm,
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: '#000000',
     paddingVertical: SPACING.md,
   },
   filterScroll: {
@@ -655,11 +557,11 @@ const styles = StyleSheet.create({
   },
   filterText: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: '#64748b',
     fontWeight: '500',
   },
   filterTextActive: {
-    color: COLORS.text,
+    color: '#000000',
   },
   adminsList: {
     flex: 1,
@@ -688,16 +590,16 @@ const styles = StyleSheet.create({
   adminName: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#000000',
   },
   adminEmail: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: '#475569',
     marginTop: 2,
   },
   lastActivity: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: '#64748b',
     marginTop: 2,
   },
   statusBadge: {
@@ -729,10 +631,11 @@ const styles = StyleSheet.create({
   roleTagText: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
+    color: '#000000',
   },
   joinDate: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: '#64748b',
   },
   actionRow: {
     flexDirection: 'row',
@@ -753,7 +656,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: FONT_SIZE.xs,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#000000',
   },
   emptyState: {
     alignItems: 'center',
@@ -762,7 +665,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textMuted,
+    color: '#64748b',
     marginTop: SPACING.md,
   },
   activitySection: {
@@ -780,7 +683,7 @@ const styles = StyleSheet.create({
   activityTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#000000',
   },
   viewAllLink: {
     fontSize: FONT_SIZE.sm,
@@ -808,16 +711,16 @@ const styles = StyleSheet.create({
   logAction: {
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#000000',
   },
   logDetails: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
+    color: '#475569',
     marginTop: 2,
   },
   logTime: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: '#64748b',
     marginTop: 4,
   },
   modalOverlay: {
@@ -843,24 +746,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
-    color: COLORS.text,
+    color: '#000000',
   },
   modalBody: {
     padding: SPACING.lg,
   },
   input: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: SPACING.md,
-    color: COLORS.text,
+    color: '#000000',
     marginBottom: SPACING.md,
   },
   roleLabel: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#000000',
     marginBottom: SPACING.md,
   },
   roleOption: {
@@ -894,7 +797,7 @@ const styles = StyleSheet.create({
   },
   roleOptionText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
+    color: '#000000',
   },
   submitButton: {
     backgroundColor: COLORS.accent,
@@ -904,7 +807,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   submitButtonText: {
-    color: COLORS.text,
+    color: '#000000',
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
   },
@@ -922,20 +825,20 @@ const styles = StyleSheet.create({
   logActionFull: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: '#000000',
   },
   logTimeFull: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: '#64748b',
   },
   logDetailsFull: {
     fontSize: FONT_SIZE.sm,
-    color: COLORS.text,
+    color: '#475569',
     marginBottom: SPACING.sm,
   },
   logAdminName: {
     fontSize: FONT_SIZE.xs,
-    color: COLORS.textMuted,
+    color: '#64748b',
     fontStyle: 'italic',
   },
 });

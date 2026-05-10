@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   Switch,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,6 +16,8 @@ import { RootStackParamList } from '../navigation/types';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { Ionicons } from '@expo/vector-icons';
+import { notificationService } from '../services/notificationService';
+import { errorHandler } from '../utils/errorHandler';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -27,7 +30,7 @@ export const AdminSendNotificationScreen: React.FC = () => {
   const [sendToAdmins, setSendToAdmins] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSendNotification = () => {
+  const handleSendNotification = async () => {
     if (!title.trim() || !message.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir le titre et le message');
       return;
@@ -44,7 +47,26 @@ export const AdminSendNotificationScreen: React.FC = () => {
     if (sendToSellers) recipients.push('Vendeurs');
     if (sendToAdmins) recipients.push('Admins');
 
-    setTimeout(() => {
+    try {
+      const notification = {
+        title,
+        body: message,
+        type: 'admin' as const,
+        read: false,
+        data: { source: 'admin_broadcast' },
+      };
+
+      // Send notifications to selected groups
+      if (sendToClients) {
+        await notificationService.sendBroadcastToClients(notification);
+      }
+      if (sendToSellers) {
+        await notificationService.sendBroadcastToSellers(notification);
+      }
+      if (sendToAdmins) {
+        await notificationService.sendBroadcastToAdmins(notification);
+      }
+
       setLoading(false);
       Alert.alert(
         'Succès',
@@ -52,7 +74,15 @@ export const AdminSendNotificationScreen: React.FC = () => {
       );
       setTitle('');
       setMessage('');
-    }, 1500);
+    } catch (e: any) {
+      setLoading(false);
+      errorHandler.handleDatabaseError(e, 'send notification');
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert('❌ Impossible d\'envoyer la notification');
+      } else {
+        Alert.alert('Erreur', 'Impossible d\'envoyer la notification');
+      }
+    }
   };
 
   return (
@@ -208,7 +238,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     backgroundColor: COLORS.card,
-    color: COLORS.bg,
+    color: '#000000',
     fontSize: FONT_SIZE.md,
   },
   messageInput: {

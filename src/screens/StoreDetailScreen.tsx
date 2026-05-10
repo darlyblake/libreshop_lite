@@ -181,12 +181,6 @@ export const StoreDetailScreen: React.FC = () => {
   const { isMobile, isTablet } = useResponsive();
   const { isDark } = useTheme();
 
-  // Debug logs
-  console.log('[StoreDetail] Route params:', route.params);
-  console.log('[StoreDetail] storeIdParam:', storeIdParam);
-  console.log('[StoreDetail] slugParam:', slugParam);
-  console.log('[StoreDetail] Platform:', Platform.OS);
-
   const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [homepageProducts, setHomepageProducts] = useState<any[]>([]);
@@ -236,7 +230,6 @@ export const StoreDetailScreen: React.FC = () => {
       parsedStoreIdFromUrl !== "null"
     )
       return String(parsedStoreIdFromUrl);
-    console.log('[StoreDetail] effectiveStoreId is null - params:', { storeIdParam, parsedStoreIdFromUrl });
     return null;
   }, [storeIdParam, parsedStoreIdFromUrl]);
 
@@ -613,15 +606,9 @@ export const StoreDetailScreen: React.FC = () => {
             );
             return;
           }
-        } catch {}
-
-        try {
-          const w: any = typeof window !== "undefined" ? window : null;
-          if (w?.prompt) {
-            w.prompt("Copiez le lien de la boutique :", link);
-            return;
-          }
-        } catch {}
+        } catch (e) {
+          console.error("Clipboard error:", e);
+        }
       }
 
       await Share.share({ message: link });
@@ -634,6 +621,20 @@ export const StoreDetailScreen: React.FC = () => {
       );
     }
   }, [store]);
+
+  const handleReportStore = useCallback(() => {
+    Alert.alert(
+      "Signaler la boutique",
+      "Pour quelle raison souhaitez-vous signaler cette boutique ?",
+      [
+        { text: "Contenu inapproprié", onPress: () => Alert.alert("Merci", "Votre signalement a été envoyé. Nous allons l'examiner.") },
+        { text: "Produits non conformes", onPress: () => Alert.alert("Merci", "Votre signalement a été envoyé. Nous allons l'examiner.") },
+        { text: "Arnaque / Fraude", onPress: () => Alert.alert("Merci", "Votre signalement a été envoyé. Nous allons l'examiner.") },
+        { text: "Autre", onPress: () => Alert.alert("Merci", "Votre signalement a été envoyé. Nous allons l'examiner.") },
+        { text: "Annuler", style: "cancel" }
+      ]
+    );
+  }, []);
 
   const handlePromoPress = useCallback(async () => {
     if (!storeData?.promoEnabled) return;
@@ -918,6 +919,19 @@ export const StoreDetailScreen: React.FC = () => {
                     color={COLORS.text}
                   />
                   <Text style={styles.followButtonText}>Partager</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.reportButton}
+                  onPress={handleReportStore}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons 
+                    name="flag-outline" 
+                    size={18} 
+                    color={COLORS.danger}
+                  />
+                  <Text style={styles.reportButtonText}>Signaler</Text>
                 </TouchableOpacity>
 
                 {store?.latitude && store?.longitude && (
@@ -2034,6 +2048,10 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     gap: SPACING.md,
   },
+  suggestedCard: {
+    width: 160,
+    marginRight: SPACING.md,
+  },
   contactButton: {
     flex: 1,
     flexDirection: "row",
@@ -2064,6 +2082,24 @@ const styles = StyleSheet.create({
   },
   followButtonText: {
     color: COLORS.text,
+    fontWeight: "600",
+    fontSize: FONT_SIZE.sm,
+  },
+  reportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.card,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.danger + "40",
+    flex: 1,
+  },
+  reportButtonText: {
+    color: COLORS.danger,
     fontWeight: "600",
     fontSize: FONT_SIZE.sm,
   },

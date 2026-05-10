@@ -518,6 +518,23 @@ export const AppNavigator: React.FC = () => {
 
   // Helper pour déterminer la route initiale
   const getInitialRouteForRole = async (role: UserRole, userId: string): Promise<keyof RootStackParamList> => {
+    // Check if user is suspended
+    if (userId && supabase) {
+      try {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('status')
+          .eq('id', userId)
+          .single();
+        
+        if (userData?.status === 'suspended') {
+          return 'AccountSuspended';
+        }
+      } catch (error) {
+        console.error('Error checking user status:', error);
+      }
+    }
+
     switch (role) {
       case 'seller':
         return 'SellerTabs';
@@ -579,6 +596,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Address" component={Screens.AddressScreen} />
         <Stack.Screen name="Security" component={Screens.SecurityScreen} />
         <Stack.Screen name="Help" component={Screens.HelpScreen} />
+        <Stack.Screen name="AccountSuspended" component={Screens.AccountSuspendedScreen} />
         
         {/* Routes vendeurs */}
         <Stack.Screen name="SellerAddStore" component={Screens.SellerAddStoreScreen} />

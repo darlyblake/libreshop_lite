@@ -39,6 +39,16 @@ interface StorePayment {
   analyticsActive: boolean;
   productsLimit: number;
   revenue: number;
+  paymentHistory: PaymentHistory[];
+}
+
+interface PaymentHistory {
+  id: string;
+  date: string;
+  amount: number;
+  status: 'paid' | 'pending' | 'overdue';
+  method: string;
+  plan: string;
 }
 
 export const AdminPaymentsScreen: React.FC = () => {
@@ -54,6 +64,16 @@ export const AdminPaymentsScreen: React.FC = () => {
 
   const [stores, setStores] = useState<StorePayment[]>([]);
 
+  const blurActiveElement = () => {
+    try {
+      if (typeof document !== 'undefined' && document.activeElement) {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+      }
+    } catch (e: any) {
+      // Expected in React Native mobile - silently ignore
+    }
+  };
+
   const loadStores = async () => {
     setLoading(true);
     try {
@@ -64,25 +84,46 @@ export const AdminPaymentsScreen: React.FC = () => {
       
       setAvailablePlans(plansRes.filter(p => p.status !== 'inactive'));
 
-      setStores(
-        (storesData || []).map((s: any) => ({
-          id: String(s.id),
-          storeName: String(s.name || ''),
-          ownerName: String(s.users?.full_name || ''),
-          currentSubscription: String(s.subscription_plan || '-'),
-          subscriptionPrice: Number(s.subscription_price || 0),
-          paymentStatus: (s.billing_status || 'pending') as any,
-          paymentDate: s.last_payment_date ? String(s.last_payment_date) : '-',
-          nextBillingDate: (s.next_billing_date || s.subscription_end) ? String(s.next_billing_date || s.subscription_end) : '-',
-          subscriptionActive: String(s.subscription_status || '').toLowerCase() === 'active' || String(s.subscription_status || '').toLowerCase() === 'trial',
-          subscriptionEnd: s.subscription_end ? String(s.subscription_end) : undefined,
-          cashierActive: Boolean(s.cashier_active ?? true),
-          onlineStoreActive: Boolean(s.online_store_active ?? true),
-          analyticsActive: Boolean(s.analytics_active ?? true),
-          productsLimit: Number(s.product_limit || 0),
-          revenue: 0,
-        }))
+      // Fetch payment history for each store
+      const storesWithHistory = await Promise.all(
+        (storesData || []).map(async (s: any) => {
+          let paymentHistory: any[] = [];
+          try {
+            paymentHistory = await adminService.getStorePaymentHistory(s.id);
+          } catch (err) {
+            console.warn(`Failed to load payment history for store ${s.id}:`, err);
+            paymentHistory = [];
+          }
+          
+          return {
+            id: String(s.id),
+            storeName: String(s.name || ''),
+            ownerName: String(s.users?.full_name || ''),
+            currentSubscription: String(s.subscription_plan || '-'),
+            subscriptionPrice: Number(s.subscription_price || 0),
+            paymentStatus: (s.billing_status || 'pending') as any,
+            paymentDate: s.last_payment_date ? String(s.last_payment_date) : '-',
+            nextBillingDate: (s.next_billing_date || s.subscription_end) ? String(s.next_billing_date || s.subscription_end) : '-',
+            subscriptionActive: String(s.subscription_status || '').toLowerCase() === 'active' || String(s.subscription_status || '').toLowerCase() === 'trial',
+            subscriptionEnd: s.subscription_end ? String(s.subscription_end) : undefined,
+            cashierActive: Boolean(s.cashier_active ?? true),
+            onlineStoreActive: Boolean(s.online_store_active ?? true),
+            analyticsActive: Boolean(s.analytics_active ?? true),
+            productsLimit: Number(s.product_limit || 0),
+            revenue: 0,
+            paymentHistory: (paymentHistory || []).map((ph: any) => ({
+              id: String(ph.id),
+              date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
+              amount: Number(ph.amount || 0),
+              status: ph.status as any,
+              method: ph.method || 'Manual',
+              plan: ph.plan || '-',
+            })),
+          };
+        })
       );
+
+      setStores(storesWithHistory);
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'load payments stores');
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -165,10 +206,6 @@ export const AdminPaymentsScreen: React.FC = () => {
       const credit = Math.floor((currentPrice / 30) * remainingDays);
       const finalPrice = Math.max(0, newPlanPrice - credit);
       
-      if (__DEV__) {
-        console.log(`[Prorata] Store: ${store.storeName}, Remaining Days: ${remainingDays}, Credit: ${credit}, Final: ${finalPrice}`);
-      }
-      
       return isNaN(finalPrice) ? newPlanPrice : finalPrice;
     } catch (e) {
       console.error('Prorata error:', e);
@@ -224,26 +261,97 @@ export const AdminPaymentsScreen: React.FC = () => {
   const upgradeSubscription = async (storeId: string, planId: string) => {
     try {
       setLoading(true);
+      const store = stores.find(s => s.id === storeId);
+      const plan = availablePlans.find(p => p.id === planId);
+      
       const updatedStore = await storeService.upgradeSubscription(storeId, planId);
 
-      setStores(prev =>
-        prev.map(s =>
-          s.id === storeId
-            ? {
-                ...s,
-                currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
-                subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
-                productsLimit: Number(updatedStore.product_limit || s.productsLimit),
-                paymentStatus: (updatedStore.billing_status || 'paid') as any,
-                paymentDate: updatedStore.last_payment_date || s.paymentDate,
-                nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
-                subscriptionActive: 
-                  String(updatedStore.subscription_status).toLowerCase() === 'active' || 
-                  String(updatedStore.subscription_status).toLowerCase() === 'trial',
-              }
-            : s
-        )
-      );
+      // Add payment history entry for the subscription upgrade/renewal (non-blocking)
+      if (store && plan) {
+        try {
+          const proratedPrice = getProratedPrice(store, plan.price);
+          const newPaymentHistory: PaymentHistory = {
+            id: String(Date.now()),
+            date: new Date().toISOString().slice(0, 10),
+            amount: proratedPrice,
+            status: 'paid',
+            method: 'Renewal',
+            plan: plan.name,
+          };
+          
+          await adminService.addPaymentHistory(storeId, newPaymentHistory);
+          
+          // Refresh payment history from database
+          const paymentHistory = await adminService.getStorePaymentHistory(storeId);
+          
+          setStores(prev =>
+            prev.map(s =>
+              s.id === storeId
+                ? {
+                    ...s,
+                    currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
+                    subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
+                    productsLimit: Number(updatedStore.product_limit || s.productsLimit),
+                    paymentStatus: (updatedStore.billing_status || 'paid') as any,
+                    paymentDate: updatedStore.last_payment_date || s.paymentDate,
+                    nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
+                    subscriptionActive: 
+                      String(updatedStore.subscription_status).toLowerCase() === 'active' || 
+                      String(updatedStore.subscription_status).toLowerCase() === 'trial',
+                    paymentHistory: (paymentHistory || []).map((ph: any) => ({
+                      id: String(ph.id),
+                      date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
+                      amount: Number(ph.amount || 0),
+                      status: ph.status as any,
+                      method: ph.method || 'Manual',
+                      plan: ph.plan || '-',
+                    })),
+                  }
+                : s
+            )
+          );
+        } catch (historyError) {
+          console.warn('Payment history save failed, but upgrade was processed:', historyError);
+          // Still update the store status even if history fails
+          setStores(prev =>
+            prev.map(s =>
+              s.id === storeId
+                ? {
+                    ...s,
+                    currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
+                    subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
+                    productsLimit: Number(updatedStore.product_limit || s.productsLimit),
+                    paymentStatus: (updatedStore.billing_status || 'paid') as any,
+                    paymentDate: updatedStore.last_payment_date || s.paymentDate,
+                    nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
+                    subscriptionActive: 
+                      String(updatedStore.subscription_status).toLowerCase() === 'active' || 
+                      String(updatedStore.subscription_status).toLowerCase() === 'trial',
+                  }
+                : s
+            )
+          );
+        }
+      } else {
+        setStores(prev =>
+          prev.map(s =>
+            s.id === storeId
+              ? {
+                  ...s,
+                  currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
+                  subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
+                  productsLimit: Number(updatedStore.product_limit || s.productsLimit),
+                  paymentStatus: (updatedStore.billing_status || 'paid') as any,
+                  paymentDate: updatedStore.last_payment_date || s.paymentDate,
+                  nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
+                  subscriptionActive: 
+                    String(updatedStore.subscription_status).toLowerCase() === 'active' || 
+                    String(updatedStore.subscription_status).toLowerCase() === 'trial',
+                }
+              : s
+          )
+        );
+      }
 
       const planName = updatedStore.subscription_plan || 'Nouveau plan';
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -272,20 +380,67 @@ export const AdminPaymentsScreen: React.FC = () => {
         last_payment_date: today,
         subscription_status: 'active' 
       });
-      setStores(prev =>
-        prev.map(s =>
-          s.id === storeId
-            ? {
-                ...s,
-                paymentStatus: ((data as any)?.billing_status || 'paid') as any,
-                paymentDate: (data as any)?.last_payment_date ? String((data as any).last_payment_date) : s.paymentDate,
-                subscriptionActive: 
-                  String((data as any)?.subscription_status).toLowerCase() === 'active' || 
-                  String((data as any)?.subscription_status).toLowerCase() === 'trial',
-              }
-            : s
-        )
-      );
+      
+      const store = stores.find(s => s.id === storeId);
+      if (store) {
+        // Save payment history to database (non-blocking)
+        try {
+          const newPaymentHistory: PaymentHistory = {
+            id: String(Date.now()),
+            date: today,
+            amount: store.subscriptionPrice,
+            status: 'paid',
+            method: 'Manual',
+            plan: store.currentSubscription,
+          };
+          
+          await adminService.addPaymentHistory(storeId, newPaymentHistory);
+          
+          // Refresh payment history from database
+          const paymentHistory = await adminService.getStorePaymentHistory(storeId);
+          
+          setStores(prev =>
+            prev.map(s =>
+              s.id === storeId
+                ? {
+                    ...s,
+                    paymentStatus: ((data as any)?.billing_status || 'paid') as any,
+                    paymentDate: (data as any)?.last_payment_date ? String((data as any).last_payment_date) : s.paymentDate,
+                    subscriptionActive: 
+                      String((data as any)?.subscription_status).toLowerCase() === 'active' || 
+                      String((data as any)?.subscription_status).toLowerCase() === 'trial',
+                    paymentHistory: (paymentHistory || []).map((ph: any) => ({
+                      id: String(ph.id),
+                      date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
+                      amount: Number(ph.amount || 0),
+                      status: ph.status as any,
+                      method: ph.method || 'Manual',
+                      plan: ph.plan || '-',
+                    })),
+                  }
+                : s
+            )
+          );
+        } catch (historyError) {
+          console.warn('Payment history save failed, but payment was processed:', historyError);
+          // Still update the store status even if history fails
+          setStores(prev =>
+            prev.map(s =>
+              s.id === storeId
+                ? {
+                    ...s,
+                    paymentStatus: ((data as any)?.billing_status || 'paid') as any,
+                    paymentDate: (data as any)?.last_payment_date ? String((data as any).last_payment_date) : s.paymentDate,
+                    subscriptionActive: 
+                      String((data as any)?.subscription_status).toLowerCase() === 'active' || 
+                      String((data as any)?.subscription_status).toLowerCase() === 'trial',
+                  }
+                : s
+            )
+          );
+        }
+      }
+      
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert('✅ Paiement marqué comme reçu');
       } else {
@@ -404,6 +559,7 @@ export const AdminPaymentsScreen: React.FC = () => {
                 style={styles.upgradeButton}
                 onPress={() => {
                   setSelectedStore(store);
+                  blurActiveElement();
                   setShowUpgradeModal(true);
                 }}
               >
@@ -499,8 +655,34 @@ export const AdminPaymentsScreen: React.FC = () => {
 
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => {
+                onPress={async () => {
                   setSelectedStore(store);
+                  blurActiveElement();
+                  
+                  // Refresh payment history before opening modal
+                  try {
+                    const paymentHistory = await adminService.getStorePaymentHistory(store.id);
+                    setStores(prev =>
+                      prev.map(s =>
+                        s.id === store.id
+                          ? {
+                              ...s,
+                              paymentHistory: (paymentHistory || []).map((ph: any) => ({
+                                id: String(ph.id),
+                                date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
+                                amount: Number(ph.amount || 0),
+                                status: ph.status as any,
+                                method: ph.method || 'Manual',
+                                plan: ph.plan || '-',
+                              })),
+                            }
+                          : s
+                      )
+                    );
+                  } catch (err) {
+                    console.warn(`Failed to refresh payment history for store ${store.id}:`, err);
+                  }
+                  
                   setShowDetailModal(true);
                 }}
               >
@@ -521,12 +703,12 @@ export const AdminPaymentsScreen: React.FC = () => {
 
       {/* Detail Modal */}
       {selectedStore && (
-        <Modal visible={showDetailModal} animationType="slide" transparent onRequestClose={() => setShowDetailModal(false)}>
+        <Modal visible={showDetailModal} animationType="slide" transparent onRequestClose={() => { blurActiveElement(); setShowDetailModal(false); }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Détails de la boutique</Text>
-                <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+                <TouchableOpacity onPress={() => { blurActiveElement(); setShowDetailModal(false); }}>
                   <Ionicons name="close" size={24} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
@@ -566,6 +748,31 @@ export const AdminPaymentsScreen: React.FC = () => {
                     Illimité / {selectedStore.productsLimit}
                   </Text>
                 </View>
+
+                <View style={styles.detailSection}>
+                  <Text style={styles.sectionTitle}>Historique des paiements</Text>
+                  {selectedStore.paymentHistory && selectedStore.paymentHistory.length > 0 ? (
+                    selectedStore.paymentHistory.map((payment, index) => (
+                      <View key={payment.id} style={styles.paymentHistoryItem}>
+                        <View style={styles.paymentHistoryLeft}>
+                          <Text style={styles.paymentHistoryDate}>{payment.date}</Text>
+                          <Text style={styles.paymentHistoryPlan}>{payment.plan}</Text>
+                        </View>
+                        <View style={styles.paymentHistoryRight}>
+                          <Text style={[styles.paymentHistoryAmount, { color: payment.status === 'paid' ? COLORS.success : COLORS.warning }]}>
+                            {payment.amount.toLocaleString()} FCFA
+                          </Text>
+                          <Text style={[styles.paymentHistoryStatus, { color: getStatusColor(payment.status) }]}>
+                            {getStatusText(payment.status)}
+                          </Text>
+                          <Text style={styles.paymentHistoryMethod}>{payment.method}</Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.noPaymentHistory}>Aucun historique de paiement</Text>
+                  )}
+                </View>
               </ScrollView>
             </View>
           </View>
@@ -574,12 +781,12 @@ export const AdminPaymentsScreen: React.FC = () => {
 
       {/* Upgrade Modal */}
       {selectedStore && (
-        <Modal visible={showUpgradeModal} animationType="slide" transparent onRequestClose={() => setShowUpgradeModal(false)}>
+        <Modal visible={showUpgradeModal} animationType="slide" transparent onRequestClose={() => { blurActiveElement(); setShowUpgradeModal(false); }}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Changer l'offre</Text>
-                <TouchableOpacity onPress={() => setShowUpgradeModal(false)}>
+                <TouchableOpacity onPress={() => { blurActiveElement(); setShowUpgradeModal(false); }}>
                   <Ionicons name="close" size={24} color={COLORS.text} />
                 </TouchableOpacity>
               </View>
@@ -905,6 +1112,57 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+    marginTop: SPACING.lg,
+  },
+  paymentHistoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  paymentHistoryLeft: {
+    flex: 1,
+  },
+  paymentHistoryDate: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  paymentHistoryPlan: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  paymentHistoryRight: {
+    alignItems: 'flex-end',
+  },
+  paymentHistoryAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+  },
+  paymentHistoryStatus: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  paymentHistoryMethod: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  noPaymentHistory: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    paddingVertical: SPACING.lg,
   },
   subscriptionOption: {
     flexDirection: 'row',

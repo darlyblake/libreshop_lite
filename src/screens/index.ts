@@ -70,3 +70,4 @@ export { PersonalInfoScreen } from './PersonalInfoScreen';
 export { AddressScreen } from './AddressScreen';
 export { SecurityScreen } from './SecurityScreen';
 export { HelpScreen } from './HelpScreen';
+export { AccountSuspendedScreen } from './AccountSuspendedScreen';

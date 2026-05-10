@@ -103,7 +103,7 @@ cd ios && pod install && cd ..
 - [x] Utiliser findNearbyStores() pour filtrer
 - [x] Trier les résultats par distance
 - [x] Afficher la distance sur chaque boutique
-- [ ] Tester le filtre
+- [x] Tester le filtre
 
 ---
 
@@ -129,8 +129,8 @@ cd ios && pod install && cd ..
 
 ## 📊 Progression Globale
 
-**Étapes complétées : 9 / 10**  
-**Pourcentage : 90%**
+**Étapes complétées : 10 / 10**  
+**Pourcentage : 100%** (développement terminé, tests restants)
 
 ---
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
@@ -13,13 +13,14 @@ import {
   FlatList,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS } from '../config/theme';
 import { adminService } from '../services/adminService';
 
 export const AdminStoresScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const scrollY = useRef(new RNAnimated.Value(0)).current;
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,6 +29,8 @@ export const AdminStoresScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState('general'); // general, subscription, products, orders, statistics
   const [loading, setLoading] = useState(false);
   const [stores, setStores] = useState<any[]>([]);
+  const [sellerFilter, setSellerFilter] = useState<string | null>(null);
+  const [sellerName, setSellerName] = useState<string | null>(null);
 
   const loadStores = async () => {
     setLoading(true);
@@ -81,17 +84,30 @@ export const AdminStoresScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Get seller filter from route params
+    if (route.params?.sellerId) {
+      setSellerFilter(route.params.sellerId);
+      setSellerName(route.params.sellerName || null);
+    }
+  }, [route.params]);
+
+  useEffect(() => {
     void loadStores();
   }, []);
 
-  // Filter stores based on search query
+  // Filter stores based on search query and seller
   const filteredStores = useMemo(() => {
-    return stores.filter(store =>
-      store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [stores, searchQuery]);
+    return stores.filter(store => {
+      const matchesSearch = 
+        store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        store.category.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesSeller = !sellerFilter || store.ownerId === sellerFilter;
+      
+      return matchesSearch && matchesSeller;
+    });
+  }, [stores, searchQuery, sellerFilter]);
 
   // Get status color
   const getStatusColor = (status: string) => {
@@ -173,11 +189,14 @@ export const AdminStoresScreen: React.FC = () => {
     header: {
       backgroundColor: COLORS.primary,
       paddingTop: getResponsiveValue(40, 50, 60),
-      paddingBottom: getResponsiveValue(20, 25, 30),
+      paddingBottom: getResponsiveValue(24, 28, 32),
       paddingHorizontal: getResponsiveValue(16, 24, 32),
+      borderBottomLeftRadius: getResponsiveValue(20, 24, 28),
+      borderBottomRightRadius: getResponsiveValue(20, 24, 28),
+      ...SHADOWS.medium,
     },
     headerTitle: {
-      fontSize: getResponsiveValue(24, 28, 32),
+      fontSize: getResponsiveValue(28, 32, 36),
       fontWeight: '700',
       color: COLORS.text,
       marginBottom: 8,
@@ -187,15 +206,31 @@ export const AdminStoresScreen: React.FC = () => {
       color: COLORS.text,
       opacity: 0.9,
     },
+    clearFilterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: COLORS.bg + '80',
+      paddingHorizontal: getResponsiveValue(12, 14, 16),
+      paddingVertical: getResponsiveValue(8, 10, 12),
+      borderRadius: getResponsiveValue(8, 10, 12),
+      marginTop: getResponsiveValue(12, 14, 16),
+      alignSelf: 'flex-start',
+      gap: 8,
+    },
+    clearFilterText: {
+      fontSize: getResponsiveValue(12, 14, 16),
+      color: COLORS.text,
+      fontWeight: '500',
+    },
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: COLORS.bg,
+      backgroundColor: COLORS.card,
       margin: getResponsiveValue(16, 20, 24),
       paddingHorizontal: getResponsiveValue(16, 20, 24),
-      paddingVertical: getResponsiveValue(12, 14, 16),
-      borderRadius: getResponsiveValue(12, 14, 16),
-      ...SHADOWS.small,
+      paddingVertical: getResponsiveValue(14, 16, 18),
+      borderRadius: getResponsiveValue(16, 18, 20),
+      ...SHADOWS.medium,
     },
     searchInput: {
       flex: 1,
@@ -206,22 +241,24 @@ export const AdminStoresScreen: React.FC = () => {
     statsContainer: {
       flexDirection: isSmallScreen ? 'column' : 'row',
       marginHorizontal: getResponsiveValue(16, 20, 24),
-      marginBottom: getResponsiveValue(16, 20, 24),
-      gap: getResponsiveValue(12, 16, 20),
+      marginBottom: getResponsiveValue(20, 24, 28),
+      gap: getResponsiveValue(14, 16, 20),
     },
     statCard: {
       flex: 1,
-      backgroundColor: COLORS.bg,
-      padding: getResponsiveValue(16, 20, 24),
-      borderRadius: getResponsiveValue(12, 14, 16),
+      backgroundColor: COLORS.card,
+      padding: getResponsiveValue(20, 24, 28),
+      borderRadius: getResponsiveValue(16, 18, 20),
       alignItems: 'center',
-      ...SHADOWS.small,
+      ...SHADOWS.medium,
+      borderWidth: 1,
+      borderColor: COLORS.border,
     },
     statValue: {
-      fontSize: getResponsiveValue(20, 24, 28),
+      fontSize: getResponsiveValue(24, 28, 32),
       fontWeight: '700',
       color: COLORS.primary,
-      marginBottom: 4,
+      marginBottom: 6,
     },
     statLabel: {
       fontSize: getResponsiveValue(12, 14, 16),
@@ -233,37 +270,40 @@ export const AdminStoresScreen: React.FC = () => {
       paddingHorizontal: getResponsiveValue(16, 20, 24),
     },
     storeCard: {
-      backgroundColor: COLORS.bg,
-      marginBottom: getResponsiveValue(12, 16, 20),
-      borderRadius: getResponsiveValue(12, 14, 16),
-      padding: getResponsiveValue(16, 20, 24),
-      ...SHADOWS.small,
+      backgroundColor: COLORS.card,
+      marginBottom: getResponsiveValue(14, 16, 20),
+      borderRadius: getResponsiveValue(16, 18, 20),
+      padding: getResponsiveValue(20, 24, 28),
+      ...SHADOWS.medium,
+      borderWidth: 1,
+      borderColor: COLORS.border,
     },
     storeHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      marginBottom: getResponsiveValue(12, 16, 20),
+      marginBottom: getResponsiveValue(14, 16, 20),
     },
     storeName: {
-      fontSize: getResponsiveValue(16, 18, 20),
-      fontWeight: '600',
+      fontSize: getResponsiveValue(18, 20, 22),
+      fontWeight: '700',
       color: COLORS.text,
       flex: 1,
     },
     storeOwner: {
-      fontSize: getResponsiveValue(12, 14, 16),
+      fontSize: getResponsiveValue(13, 14, 15),
       color: COLORS.textMuted,
-      marginTop: 4,
+      marginTop: 6,
     },
     statusBadge: {
-      paddingHorizontal: getResponsiveValue(8, 10, 12),
-      paddingVertical: getResponsiveValue(4, 6, 8),
-      borderRadius: getResponsiveValue(6, 8, 10),
+      paddingHorizontal: getResponsiveValue(10, 12, 14),
+      paddingVertical: getResponsiveValue(6, 7, 8),
+      borderRadius: getResponsiveValue(8, 10, 12),
+      ...SHADOWS.small,
     },
     statusText: {
-      fontSize: getResponsiveValue(10, 12, 14),
-      fontWeight: '500',
+      fontSize: getResponsiveValue(11, 12, 13),
+      fontWeight: '600',
       color: COLORS.text,
     },
     storeInfo: {
@@ -272,18 +312,18 @@ export const AdminStoresScreen: React.FC = () => {
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: getResponsiveValue(6, 8, 10),
+      marginBottom: getResponsiveValue(8, 10, 12),
     },
     infoText: {
-      fontSize: getResponsiveValue(12, 14, 16),
-      color: COLORS.textMuted,
-      marginLeft: 8,
+      fontSize: getResponsiveValue(13, 14, 15),
+      color: COLORS.text,
+      marginLeft: 10,
       flex: 1,
     },
     storeStats: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingTop: getResponsiveValue(12, 16, 20),
+      paddingTop: getResponsiveValue(16, 18, 20),
       borderTopWidth: 1,
       borderTopColor: COLORS.border,
     },
@@ -292,31 +332,34 @@ export const AdminStoresScreen: React.FC = () => {
       flex: 1,
     },
     storeStatValue: {
-      fontSize: getResponsiveValue(14, 16, 18),
-      fontWeight: '600',
-      color: COLORS.text,
+      fontSize: getResponsiveValue(16, 18, 20),
+      fontWeight: '700',
+      color: COLORS.primary,
     },
     storeStatLabel: {
-      fontSize: getResponsiveValue(10, 12, 14),
+      fontSize: getResponsiveValue(11, 12, 13),
       color: COLORS.textMuted,
-      marginTop: 2,
+      marginTop: 4,
+      fontWeight: '500',
     },
     actionButtons: {
       flexDirection: 'row',
-      gap: getResponsiveValue(8, 10, 12),
+      gap: getResponsiveValue(10, 12, 14),
+      marginTop: getResponsiveValue(12, 14, 16),
     },
     actionButton: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: getResponsiveValue(8, 10, 12),
-      borderRadius: getResponsiveValue(8, 10, 12),
+      paddingVertical: getResponsiveValue(10, 12, 14),
+      borderRadius: getResponsiveValue(10, 12, 14),
+      ...SHADOWS.small,
     },
     actionButtonText: {
-      fontSize: getResponsiveValue(12, 14, 16),
-      fontWeight: '500',
-      marginLeft: 6,
+      fontSize: getResponsiveValue(13, 14, 15),
+      fontWeight: '600',
+      marginLeft: 8,
     },
     editButton: {
       backgroundColor: COLORS.primary,
@@ -330,70 +373,100 @@ export const AdminStoresScreen: React.FC = () => {
     viewButton: {
       backgroundColor: COLORS.secondary,
     },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: getResponsiveValue(60, 80, 100),
+    },
+    emptyIcon: {
+      fontSize: getResponsiveValue(56, 64, 72),
+      color: COLORS.textMuted,
+      marginBottom: getResponsiveValue(20, 24, 28),
+    },
+    emptyText: {
+      fontSize: getResponsiveValue(16, 18, 20),
+      color: COLORS.textMuted,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
     modalOverlay: {
-      ...StyleSheet.absoluteFillObject,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000, // ensure on top
+      zIndex: 1000,
     },
     modalContainer: {
-      width: '90%',
-      height: '90%',
-      maxWidth: 800,
-      maxHeight: 800,
-      backgroundColor: COLORS.bg,
-      borderRadius: getResponsiveValue(16, 20, 24),
-      overflow: 'hidden',
+      width: getModalWidth(),
+      height: getModalHeight(),
+      backgroundColor: COLORS.card,
+      borderRadius: getResponsiveValue(20, 24, 28),
       ...SHADOWS.large,
+      overflow: 'hidden',
     },
     modalHeader: {
-      padding: getResponsiveValue(20, 24, 28),
-      borderBottomWidth: 1,
-      borderBottomColor: COLORS.border,
+      backgroundColor: COLORS.primary,
+      paddingTop: getResponsiveValue(24, 28, 32),
+      paddingBottom: getResponsiveValue(20, 24, 28),
+      paddingHorizontal: getResponsiveValue(24, 28, 32),
     },
     modalTitle: {
-      fontSize: getResponsiveValue(18, 20, 24),
-      fontWeight: '600',
+      fontSize: getResponsiveValue(22, 24, 26),
+      fontWeight: '700',
       color: COLORS.text,
-      marginBottom: 8,
+      marginBottom: 4,
     },
     modalSubtitle: {
       fontSize: getResponsiveValue(14, 16, 18),
-      color: COLORS.textMuted,
+      color: COLORS.text,
+      opacity: 0.9,
     },
     tabContainer: {
       flexDirection: 'row',
+      backgroundColor: COLORS.bg,
       borderBottomWidth: 1,
       borderBottomColor: COLORS.border,
     },
     tabButton: {
       flex: 1,
-      paddingVertical: getResponsiveValue(12, 14, 16),
+      paddingVertical: getResponsiveValue(14, 16, 18),
+      paddingHorizontal: getResponsiveValue(12, 14, 16),
       alignItems: 'center',
+      justifyContent: 'center',
+      borderBottomWidth: 2,
+      borderBottomColor: 'transparent',
+    },
+    activeTabButton: {
+      borderBottomColor: COLORS.primary,
+      backgroundColor: COLORS.card,
     },
     tabButtonText: {
-      fontSize: getResponsiveValue(12, 14, 16),
+      fontSize: getResponsiveValue(12, 13, 14),
       fontWeight: '500',
       color: COLORS.textMuted,
     },
-    activeTabButton: {
-      borderBottomWidth: 2,
-      borderBottomColor: COLORS.primary,
-    },
     activeTabText: {
       color: COLORS.primary,
+      fontWeight: '600',
     },
     modalContent: {
       flex: 1,
       padding: getResponsiveValue(20, 24, 28),
     },
     detailSection: {
-      marginBottom: getResponsiveValue(20, 24, 28),
+      backgroundColor: COLORS.bg,
+      borderRadius: getResponsiveValue(12, 14, 16),
+      padding: getResponsiveValue(16, 20, 24),
+      marginBottom: getResponsiveValue(16, 20, 24),
     },
     detailTitle: {
-      fontSize: getResponsiveValue(14, 16, 18),
-      fontWeight: '600',
+      fontSize: getResponsiveValue(16, 18, 20),
+      fontWeight: '700',
       color: COLORS.text,
       marginBottom: getResponsiveValue(12, 16, 20),
     },
@@ -401,46 +474,35 @@ export const AdminStoresScreen: React.FC = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: getResponsiveValue(8, 10, 12),
+      paddingVertical: getResponsiveValue(10, 12, 14),
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
     },
     detailLabel: {
-      fontSize: getResponsiveValue(12, 14, 16),
-      color: COLORS.text, // blanc
+      fontSize: getResponsiveValue(13, 14, 15),
+      fontWeight: '500',
+      color: COLORS.textMuted,
       flex: 1,
     },
     detailValue: {
-      fontSize: getResponsiveValue(12, 14, 16),
-      fontWeight: '500',
-      color: COLORS.text, // blanc
-      flex: 2,
+      fontSize: getResponsiveValue(13, 14, 15),
+      fontWeight: '600',
+      color: COLORS.text,
+      flex: 1,
       textAlign: 'right',
     },
     closeButton: {
       backgroundColor: COLORS.primary,
-      paddingVertical: getResponsiveValue(12, 14, 16),
-      borderRadius: getResponsiveValue(8, 10, 12),
+      paddingVertical: getResponsiveValue(14, 16, 18),
+      paddingHorizontal: getResponsiveValue(24, 28, 32),
+      borderRadius: getResponsiveValue(12, 14, 16),
       alignItems: 'center',
+      ...SHADOWS.medium,
     },
     closeButtonText: {
-      fontSize: getResponsiveValue(14, 16, 18),
+      fontSize: getResponsiveValue(16, 18, 20),
       fontWeight: '600',
       color: COLORS.text,
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingVertical: getResponsiveValue(40, 50, 60),
-    },
-    emptyIcon: {
-      fontSize: getResponsiveValue(48, 56, 64),
-      color: COLORS.textMuted,
-      marginBottom: getResponsiveValue(16, 20, 24),
-    },
-    emptyText: {
-      fontSize: getResponsiveValue(16, 18, 20),
-      color: COLORS.textMuted,
-      textAlign: 'center',
     },
   });
 
@@ -449,18 +511,22 @@ export const AdminStoresScreen: React.FC = () => {
     <>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Magasins</Text>
-        <Text style={styles.headerSubtitle}>Gérez tous les magasins de la plateforme</Text>
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Rechercher un magasin..."
-          placeholderTextColor={COLORS.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+        <Text style={styles.headerSubtitle}>
+          {sellerName ? `Boutiques de ${sellerName}` : 'Gérez tous les magasins de la plateforme'}
+        </Text>
+        {sellerFilter && (
+          <TouchableOpacity
+            style={styles.clearFilterButton}
+            onPress={() => {
+              setSellerFilter(null);
+              setSellerName(null);
+              navigation.setParams({ sellerId: null, sellerName: null } as never);
+            }}
+          >
+            <Ionicons name="close-circle" size={20} color={COLORS.text} />
+            <Text style={styles.clearFilterText}>Effacer le filtre</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.statsContainer}>
@@ -484,7 +550,18 @@ export const AdminStoresScreen: React.FC = () => {
 
   const renderStoreList = () => {
     return (
-      <FlatList
+      <>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search-outline" size={20} color={COLORS.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Rechercher un magasin..."
+            placeholderTextColor={COLORS.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        <FlatList
         data={filteredStores}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
@@ -584,6 +661,7 @@ export const AdminStoresScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       />
+      </>
     );
   };
 
@@ -597,11 +675,12 @@ export const AdminStoresScreen: React.FC = () => {
             <View style={styles.detailSection}>
               <Text style={styles.detailTitle}>Informations générales</Text>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Nom</Text><Text style={styles.detailValue}>{selectedStore.name}</Text></View>
-              <View style={styles.detailRow}><Text style={styles.detailLabel}>Logo</Text><Text style={styles.detailValue}>[logo]</Text></View>
-              <View style={styles.detailRow}><Text style={styles.detailLabel}>Bannière</Text><Text style={styles.detailValue}>[logo]</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Logo</Text><Text style={styles.detailValue}>{selectedStore.logo ? '✓ Défini' : 'Non défini'}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Bannière</Text><Text style={styles.detailValue}>{selectedStore.banner ? '✓ Définie' : 'Non définie'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Description</Text><Text style={styles.detailValue}>{selectedStore.description || '-'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Téléphone</Text><Text style={styles.detailValue}>{selectedStore.phone}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Localisation</Text><Text style={styles.detailValue}>{selectedStore.address}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>Ville</Text><Text style={styles.detailValue}>{selectedStore.city || '-'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Date inscription</Text><Text style={styles.detailValue}>{selectedStore.joinDate}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Statut boutique</Text><Text style={[styles.detailValue, { color: getStatusColor(selectedStore.status) }]}>{selectedStore.status}</Text></View>
             </View>
@@ -614,7 +693,12 @@ export const AdminStoresScreen: React.FC = () => {
                   <Text style={[styles.actionButtonText, {color:COLORS.text}]}>Valider</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={[styles.actionButton, styles.editButton]}>
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => {
+                    navigation.navigate('SellerAddStoreScreen', { storeId: selectedStore.id });
+                  }}
+                >
                   <Text style={[styles.actionButtonText, {color:COLORS.text}]}>Modifier</Text>
                 </TouchableOpacity>
               )}
@@ -655,14 +739,12 @@ export const AdminStoresScreen: React.FC = () => {
           <ScrollView>
             <View style={styles.detailSection}>
               <Text style={styles.detailTitle}>Abonnement</Text>
-              {/* placeholder fields */}
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Plan actuel</Text><Text style={styles.detailValue}>{selectedStore.plan||'-'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Date début</Text><Text style={styles.detailValue}>{selectedStore.subStart||'-'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Date fin</Text><Text style={styles.detailValue}>{selectedStore.subEnd||'-'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Durée (mois)</Text><Text style={styles.detailValue}>{selectedStore.subDuration||'-'}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>Statut abonnement</Text><Text style={styles.detailValue}>{selectedStore.subStatus||'-'}</Text></View>
             </View>
-            {/* ...rest of subscription actions/ history ... */}
           </ScrollView>
         );
 
@@ -670,10 +752,10 @@ export const AdminStoresScreen: React.FC = () => {
         return (
           <FlatList
             data={selectedStore.productList || []}
-            keyExtractor={p => p.id}
+            keyExtractor={(p, index) => p.id || index.toString()}
             style={{flex:1}}
-            renderItem={({item}) => (
-              <View style={styles.detailRow}>
+            renderItem={({item, index}) => (
+              <View key={item.id || index.toString()} style={styles.detailRow}>
                 <Text style={styles.detailLabel}>{item.name}</Text>
                 <Text style={styles.detailValue}>{item.status} / {item.stock} / {item.price} Fcfa</Text>
               </View>
@@ -686,11 +768,11 @@ export const AdminStoresScreen: React.FC = () => {
         return (
           <FlatList
             data={selectedStore.orderList || []}
-            keyExtractor={o => o.id}
+            keyExtractor={(o, index) => o.id || index.toString()}
             style={{flex:1}}
-            renderItem={({item}) => (
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>{item.id}</Text>
+            renderItem={({item, index}) => (
+              <View key={item.id || index.toString()} style={styles.detailRow}>
+                <Text style={styles.detailLabel}>{item.id ? item.id.slice(0, 8) : '-'}</Text>
                 <Text style={styles.detailValue}>{item.status} / {item.amount} Fcfa / {item.date}</Text>
               </View>
             )}
@@ -700,7 +782,67 @@ export const AdminStoresScreen: React.FC = () => {
 
       case 'statistics':
         return (
-          <View style={{flex:1}}><Text>Statistiques (TODO)</Text></View>
+          <ScrollView style={{flex:1}}>
+            <View style={styles.detailSection}>
+              <Text style={styles.detailTitle}>Statistiques générales</Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Revenus totaux</Text>
+                <Text style={styles.detailValue}>{formatCurrency(selectedStore.revenue)}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Nombre de commandes</Text>
+                <Text style={styles.detailValue}>{selectedStore.orders}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Nombre de produits</Text>
+                <Text style={styles.detailValue}>{selectedStore.products}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Note moyenne</Text>
+                <Text style={styles.detailValue}>{selectedStore.rating}/5</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.detailTitle}>Commandes par statut</Text>
+              {(() => {
+                const orderStats = (selectedStore.orderList || []).reduce((acc: any, order: any) => {
+                  acc[order.status] = (acc[order.status] || 0) + 1;
+                  return acc;
+                }, {});
+                return Object.keys(orderStats).length > 0 ? (
+                  Object.entries(orderStats).map(([status, count]) => (
+                    <View key={status} style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{status}</Text>
+                      <Text style={styles.detailValue}>{count as number}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.detailValue}>Aucune commande</Text>
+                );
+              })()}
+            </View>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.detailTitle}>Produits par statut</Text>
+              {(() => {
+                const productStats = (selectedStore.productList || []).reduce((acc: any, product: any) => {
+                  acc[product.status] = (acc[product.status] || 0) + 1;
+                  return acc;
+                }, {});
+                return Object.keys(productStats).length > 0 ? (
+                  Object.entries(productStats).map(([status, count]) => (
+                    <View key={status} style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>{status}</Text>
+                      <Text style={styles.detailValue}>{count as number}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.detailValue}>Aucun produit</Text>
+                );
+              })()}
+            </View>
+          </ScrollView>
         );
 
       default:

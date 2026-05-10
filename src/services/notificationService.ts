@@ -5,7 +5,7 @@ export interface Notification {
   user_id: string;
   title: string;
   body: string;
-  type: 'order' | 'payment' | 'promo' | 'system';
+  type: 'order' | 'payment' | 'promo' | 'system' | 'comment' | 'like' | 'admin';
   read: boolean;
   created_at: string;
   data?: Record<string, any>;
@@ -144,6 +144,64 @@ export const notificationService = {
             data: notification.data
         }).catch(() => {});
     });
+  },
+
+  // Send broadcast notification to all users of a specific role
+  async sendBroadcastToRole(
+    role: 'client' | 'seller' | 'admin',
+    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
+  ): Promise<void> {
+    const { data: users, error } = await supabase!
+      .from('users')
+      .select('id')
+      .eq('role', role);
+    
+    if (error) throw error;
+    
+    const userIds = users?.map((u: any) => u.id) || [];
+    if (userIds.length > 0) {
+      await this.createBulk(userIds, notification);
+    }
+  },
+
+  // Send broadcast notification to all sellers
+  async sendBroadcastToSellers(
+    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
+  ): Promise<void> {
+    await this.sendBroadcastToRole('seller', notification);
+  },
+
+  // Send broadcast notification to all clients
+  async sendBroadcastToClients(
+    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
+  ): Promise<void> {
+    await this.sendBroadcastToRole('client', notification);
+  },
+
+  // Send broadcast notification to all admins
+  async sendBroadcastToAdmins(
+    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
+  ): Promise<void> {
+    await this.sendBroadcastToRole('admin', notification);
+  },
+
+  // Register device token
+  async registerDeviceToken(
+    userId: string,
+    token: string,
+    platform: 'ios' | 'android' | 'web',
+    deviceInfo?: Record<string, any>
+  ): Promise<void> {
+    const { error } = await supabase!
+      .from('device_tokens')
+      .upsert({
+        user_id: userId,
+        token,
+        platform,
+        device_info: deviceInfo,
+        last_used_at: new Date().toISOString(),
+      });
+    if (error) throw error;
   },
 };
 

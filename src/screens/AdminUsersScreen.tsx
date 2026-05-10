@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Dimensions,
   Platform,
+  ActivityIndicator,
   
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -34,7 +35,7 @@ import { EmptyState } from '../components/EmptyState';
 import { adminService } from '../services/adminService';
 import { contactStore } from '../services/contactService';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -51,6 +52,22 @@ interface User {
   phone?: string;
   whatsapp_number?: string;
   avatar?: string;
+  is_merged?: boolean;
+  merged_ids?: string[];
+  order_details?: Array<{
+    id: string;
+    order_number: string;
+    user_name?: string;
+    total_amount: number;
+    status: string;
+    created_at: string;
+    items: Array<{
+      quantity: number;
+      price: number;
+      product_name: string;
+      store_name: string;
+    }>;
+  }>;
 }
 
 type RoleFilter = 'all' | 'client' | 'seller' | 'admin';
@@ -65,14 +82,34 @@ export const AdminUsersScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [menuUser, setMenuUser] = useState<User | null>(null);
+  const [suspendModalVisible, setSuspendModalVisible] = useState(false);
+  const [suspendReason, setSuspendReason] = useState('');
+  const [suspendUser, setSuspendUser] = useState<User | null>(null);
+  const [selectedStoreFilter, setSelectedStoreFilter] = useState<string>('all');
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: '', email: '', phone: '' });
+  const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const [statsUser, setStatsUser] = useState<User | null>(null);
+  const [statsStoreFilter, setStatsStoreFilter] = useState<string>('all');
+  const [sellerStores, setSellerStores] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'orders'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [displayedCount, setDisplayedCount] = useState(20);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const PAGE_SIZE = 20;
 
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
+    setDisplayedCount(20);
     try {
       const data = await adminService.getUsers();
 
@@ -80,15 +117,16 @@ export const AdminUsersScreen: React.FC = () => {
         (data || []).map((u: any) => ({
           id: String(u.id),
           email: String(u.email || ''),
-          full_name: String(u.full_name || ''),
+          full_name: String(u.full_name || u.email || 'Utilisateur'),
           role: (u.role || 'client') as any,
           status: (u.status || 'active') as any,
           created_at: String(u.created_at || ''),
           phone: u.phone || undefined,
           whatsapp_number: u.whatsapp_number || undefined,
           avatar: u.avatar_url || undefined,
-          total_orders: 0,
-          total_spent: 0,
+          total_orders: u.total_orders || 0,
+          total_spent: u.total_spent || 0,
+          order_details: u.order_details || [],
         }))
       );
     } catch (e: any) {
@@ -122,7 +160,7 @@ export const AdminUsersScreen: React.FC = () => {
 
   // Filtrage et tri
   const filteredUsers = useMemo(() => {
-    return users
+    const allFiltered = users
       .filter(user => {
         const matchesSearch = user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                              user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -146,7 +184,20 @@ export const AdminUsersScreen: React.FC = () => {
         }
         return sortOrder === 'asc' ? -comparison : comparison;
       });
-  }, [users, searchQuery, selectedRole, selectedStatus, sortBy, sortOrder]);
+    
+    return allFiltered.slice(0, displayedCount);
+  }, [users, searchQuery, selectedRole, selectedStatus, sortBy, sortOrder, displayedCount]);
+
+  const totalFilteredCount = useMemo(() => {
+    return users.filter(user => {
+      const matchesSearch = user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           (user.phone && user.phone.includes(searchQuery));
+      const matchesRole = selectedRole === 'all' || user.role === selectedRole;
+      const matchesStatus = selectedStatus === 'all' || user.status === selectedStatus;
+      return matchesSearch && matchesRole && matchesStatus;
+    }).length;
+  }, [users, searchQuery, selectedRole, selectedStatus]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -157,42 +208,252 @@ export const AdminUsersScreen: React.FC = () => {
     }
   }, [loadUsers]);
 
-  const handleSuspendUser = (user: User) => {
-    const nextStatus: User['status'] = user.status === 'active' ? 'suspended' : 'active';
-    const title = user.status === 'active' ? 'Suspendre l\'utilisateur' : 'Réactiver l\'utilisateur';
-    const message = `Êtes-vous sûr de vouloir ${user.status === 'active' ? 'suspendre' : 'réactiver'} ${user.full_name} ?`;
+  const loadMore = useCallback(() => {
+    if (loadingMore || displayedCount >= totalFilteredCount) return;
+    setLoadingMore(true);
+    setTimeout(() => {
+      setDisplayedCount(prev => Math.min(prev + PAGE_SIZE, totalFilteredCount));
+      setLoadingMore(false);
+    }, 300);
+  }, [loadingMore, displayedCount, totalFilteredCount]);
 
-    const run = async () => {
+  // Reset displayedCount when filters change
+  const resetDisplayedCount = useCallback(() => {
+    setDisplayedCount(20);
+  }, []);
+
+  const handleSyncRoles = async () => {
+    const ok = window.confirm('Synchroniser les rôles des vendeurs ?');
+    if (!ok) return;
+    try {
+      const result = await adminService.syncUserRolesWithStores();
+      window.alert(`✅ ${result.updated} utilisateurs synchronisés`);
+      await loadUsers();
+    } catch (e: any) {
+      window.alert('❌ Erreur');
+    }
+  };
+
+  const handleMenuPress = (user: User, event: any) => {
+    const { nativeEvent } = event;
+    setMenuUser(user);
+    setMenuPosition({ x: nativeEvent.pageX, y: nativeEvent.pageY });
+    setMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setMenuVisible(false);
+    setMenuUser(null);
+    setMenuPosition(null);
+  };
+
+  const handleViewStores = (user: User) => {
+    handleMenuClose();
+    // Navigate to AdminStores filtered by this seller
+    navigation.navigate('AdminStores' as never, { sellerId: user.id, sellerName: user.full_name } as never);
+  };
+
+  const handleViewOrders = (user: User) => {
+    handleMenuClose();
+    // Show seller's orders (not store-specific orders which are in AdminStores)
+    setSelectedUser(user);
+    setModalVisible(true);
+  };
+
+  const handleViewStats = async (user: User) => {
+    handleMenuClose();
+    setStatsUser(user);
+    
+    if (user.role === 'seller') {
       try {
-        const data = await adminService.updateUserStatus(user.id, nextStatus);
-
-        setUsers(prev => prev.map(u => (u.id === user.id ? { ...u, status: (data as any)?.status || nextStatus } : u)));
-
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.alert(`✅ Utilisateur ${nextStatus === 'suspended' ? 'suspendu' : 'réactivé'}`);
-        } else {
-          Alert.alert('Succès', `Utilisateur ${nextStatus === 'suspended' ? 'suspendu' : 'réactivé'}`);
-        }
-      } catch (e: any) {
-        errorHandler.handleDatabaseError(e, 'suspend user');
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.alert('❌ Impossible de modifier le statut utilisateur');
-        } else {
-          Alert.alert('Erreur', 'Impossible de modifier le statut utilisateur');
-        }
+        const stores = await adminService.getStoresWithDetails();
+        const userStores = stores.filter((s: any) => s.ownerId === user.id);
+        setSellerStores(userStores);
+      } catch (e) {
+        console.error('Error fetching seller stores:', e);
+        setSellerStores([]);
       }
-    };
+    } else {
+      setSellerStores([]);
+    }
+    
+    setStatsModalVisible(true);
+  };
 
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const ok = window.confirm(message);
-      if (ok) void run();
+  const handleEditUser = (user: User) => {
+    handleMenuClose();
+    setEditUser(user);
+    setEditForm({
+      full_name: user.full_name,
+      email: user.email,
+      phone: user.phone || '',
+    });
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editUser) return;
+    try {
+      await adminService.updateUserProfile(editUser.id, editForm);
+      setEditModalVisible(false);
+      setEditUser(null);
+      await loadUsers();
+      Alert.alert('Succès', 'Profil mis à jour avec succès');
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de mettre à jour le profil');
+    }
+  };
+
+  useEffect(() => {
+    if (!modalVisible) {
+      setOrderSearchQuery('');
+      setSelectedStoreFilter('all');
+    }
+  }, [modalVisible]);
+
+  useEffect(() => {
+    if (!statsModalVisible) {
+      setStatsStoreFilter('all');
+    }
+  }, [statsModalVisible]);
+
+  useEffect(() => {
+    if (selectedUser) {
+      setOrderSearchQuery('');
+    }
+  }, [selectedUser]);
+
+  // Reset displayedCount when search, role, or status changes
+  useEffect(() => {
+    resetDisplayedCount();
+  }, [searchQuery, selectedRole, selectedStatus, resetDisplayedCount]);
+
+  const handleSuspendUser = (user: User) => {
+    if (user.status === 'active') {
+      setSuspendUser(user);
+      setSuspendReason('');
+      setSuspendModalVisible(true);
+    } else {
+      // Reactivate without reason
+      const nextStatus: User['status'] = 'active';
+      const title = 'Réactiver l\'utilisateur';
+      const message = `Êtes-vous sûr de vouloir réactiver ${user.full_name} ?`;
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const ok = window.confirm(`${title}\n${message}`);
+        if (!ok) return;
+        adminService.updateUserStatus(user.id, nextStatus)
+          .then(() => loadUsers())
+          .catch(() => window.alert('Erreur'));
+      } else {
+        Alert.alert(title, message, [
+          { text: 'Annuler', style: 'cancel' },
+          {
+            text: 'Confirmer',
+            onPress: async () => {
+              try {
+                await adminService.updateUserStatus(user.id, nextStatus);
+                await loadUsers();
+              } catch (e) {
+                Alert.alert('Erreur', 'Impossible de modifier le statut');
+              }
+            }
+          }
+        ]);
+      }
+    }
+  };
+
+  const handleConfirmSuspension = async () => {
+    if (!suspendUser || !suspendReason.trim()) {
+      Alert.alert('Erreur', 'Veuillez entrer une raison de la suspension');
       return;
     }
+    try {
+      await adminService.updateUserStatus(suspendUser.id, 'suspended');
+      await adminService.updateUserSuspensionReason(suspendUser.id, suspendReason);
+      setSuspendModalVisible(false);
+      setSuspendUser(null);
+      setSuspendReason('');
+      await loadUsers();
+      Alert.alert('Succès', 'Utilisateur suspendu avec succès');
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de suspendre l\'utilisateur');
+    }
+  };
 
-    Alert.alert(title, message, [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Confirmer', style: 'destructive', onPress: () => void run() },
-    ]);
+  const groupOrdersByDate = (orders: User['order_details']) => {
+    if (!orders) return {};
+    
+    let filteredOrders = orderSearchQuery
+      ? orders.filter(order => 
+          order.order_number.toLowerCase().includes(orderSearchQuery.toLowerCase())
+        )
+      : orders;
+
+    // Filter by store if not 'all'
+    if (selectedStoreFilter !== 'all') {
+      filteredOrders = filteredOrders.filter(order =>
+        order.items.some(item => item.store_name === selectedStoreFilter)
+      );
+    }
+    
+    const grouped: Record<string, typeof orders> = {};
+    filteredOrders.forEach(order => {
+      const date = new Date(order.created_at).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      if (!grouped[date]) {
+        grouped[date] = [];
+      }
+      grouped[date].push(order);
+    });
+    
+    return grouped;
+  };
+
+  const getUniqueStores = (orders: User['order_details']) => {
+    if (!orders) return [];
+    const stores = new Set<string>();
+    
+    // Only include stores that belong to this seller
+    const sellerStoreNames = sellerStores.map((s: any) => s.name);
+    
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.store_name && sellerStoreNames.includes(item.store_name)) {
+          stores.add(item.store_name);
+        }
+      });
+    });
+    
+    return Array.from(stores).sort();
+  };
+
+  const getFilteredOrders = (orders: User['order_details'], storeFilter: string) => {
+    if (!orders) return [];
+    
+    // Filter orders to only include those from seller's stores
+    const sellerStoreNames = sellerStores.map((s: any) => s.name);
+    const sellerOrders = orders.filter(order =>
+      order.items.some(item => sellerStoreNames.includes(item.store_name))
+    );
+    
+    if (storeFilter === 'all') return sellerOrders;
+    return sellerOrders.filter(order =>
+      order.items.some(item => item.store_name === storeFilter)
+    );
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'XAF',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
   const normalizeWhatsappNumber = (raw?: string): string | null => {
@@ -339,6 +600,11 @@ export const AdminUsersScreen: React.FC = () => {
               </View>
             </View>
             <View style={styles.badges}>
+              {item.is_merged && (
+                <View style={[styles.badge, styles.mergedBadge]}>
+                  <Text style={styles.badgeText}>Fusionné</Text>
+                </View>
+              )}
               {getRoleBadge(item.role)}
               {getStatusBadge(item.status)}
             </View>
@@ -357,6 +623,43 @@ export const AdminUsersScreen: React.FC = () => {
                 </Text>
                 <Text style={styles.statLabel}>Dépensé</Text>
               </View>
+            </View>
+          )}
+
+          {item.order_details && item.order_details.length > 0 && (
+            <View style={styles.orderDetailsSection}>
+              <Text style={styles.orderDetailsTitle}>Dernières commandes</Text>
+              {item.order_details.slice(0, 3).map((order) => (
+                <View key={order.id} style={styles.orderItem}>
+                  <View style={styles.orderHeader}>
+                    <Text style={styles.orderNumber}>#{order.order_number.slice(0, 8)}</Text>
+                    <Text style={styles.orderAmount}>
+                      {order.total_amount.toLocaleString()} FCFA
+                    </Text>
+                    <Text style={[
+                      styles.orderStatus,
+                      { color: order.status === 'completed' ? COLORS.success : COLORS.warning }
+                    ]}>
+                      {order.status === 'completed' ? 'Terminée' : order.status}
+                    </Text>
+                  </View>
+                  <View style={styles.orderItems}>
+                    {order.items.slice(0, 2).map((item, idx) => (
+                      <Text key={idx} style={styles.orderItemText}>
+                        • {item.quantity}x {item.product_name} ({item.store_name})
+                      </Text>
+                    ))}
+                    {order.items.length > 2 && (
+                      <Text style={styles.orderItemText}>+ {order.items.length - 2} autres</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+              {item.order_details.length > 3 && (
+                <TouchableOpacity onPress={() => { setSelectedUser(item); setModalVisible(true); }}>
+                  <Text style={styles.viewAllOrders}>Voir toutes les commandes</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -389,7 +692,7 @@ export const AdminUsersScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconButton}
-                onPress={() => {}}
+                onPress={(e) => handleMenuPress(item, e)}
               >
                 <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textMuted} />
               </TouchableOpacity>
@@ -419,34 +722,32 @@ export const AdminUsersScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Gestion des utilisateurs</Text>
-        <TouchableOpacity style={styles.filterButton}>
-          <Ionicons name="download-outline" size={24} color={COLORS.text} />
+        <TouchableOpacity style={styles.filterButton} onPress={handleSyncRoles}>
+          <Ionicons name="sync-outline" size={24} color={COLORS.accent} />
         </TouchableOpacity>
       </Animated.View>
 
       {/* Stats Cards */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        style={styles.statsContainer}
-      >
-        <Animated.View entering={SlideInRight.delay(100)} style={styles.statCard}>
-          <Text style={styles.statCardValue}>{stats.total}</Text>
-          <Text style={styles.statCardLabel}>Total</Text>
-        </Animated.View>
-        <Animated.View entering={SlideInRight.delay(200)} style={[styles.statCard, { backgroundColor: COLORS.success + '15' }]}>
-          <Text style={[styles.statCardValue, { color: COLORS.success }]}>{stats.active}</Text>
-          <Text style={styles.statCardLabel}>Actifs</Text>
-        </Animated.View>
-        <Animated.View entering={SlideInRight.delay(300)} style={[styles.statCard, { backgroundColor: COLORS.warning + '15' }]}>
-          <Text style={[styles.statCardValue, { color: COLORS.warning }]}>{stats.pending}</Text>
-          <Text style={styles.statCardLabel}>En attente</Text>
-        </Animated.View>
-        <Animated.View entering={SlideInRight.delay(400)} style={[styles.statCard, { backgroundColor: COLORS.danger + '15' }]}>
-          <Text style={[styles.statCardValue, { color: COLORS.danger }]}>{stats.suspended}</Text>
-          <Text style={styles.statCardLabel}>Suspendus</Text>
-        </Animated.View>
-      </ScrollView>
+      <View style={styles.statsContainer}>
+        <View style={styles.statsRow}>
+          <Animated.View entering={SlideInRight.delay(100)} style={styles.statCard}>
+            <Text style={styles.statCardValue}>{stats.total}</Text>
+            <Text style={styles.statCardLabel}>Total</Text>
+          </Animated.View>
+          <Animated.View entering={SlideInRight.delay(200)} style={[styles.statCard, { backgroundColor: COLORS.success + '15' }]}>
+            <Text style={[styles.statCardValue, { color: COLORS.success }]}>{stats.active}</Text>
+            <Text style={styles.statCardLabel}>Actifs</Text>
+          </Animated.View>
+          <Animated.View entering={SlideInRight.delay(300)} style={[styles.statCard, { backgroundColor: COLORS.warning + '15' }]}>
+            <Text style={[styles.statCardValue, { color: COLORS.warning }]}>{stats.pending}</Text>
+            <Text style={styles.statCardLabel}>En attente</Text>
+          </Animated.View>
+          <Animated.View entering={SlideInRight.delay(400)} style={[styles.statCard, { backgroundColor: COLORS.danger + '15' }]}>
+            <Text style={[styles.statCardValue, { color: COLORS.danger }]}>{stats.suspended}</Text>
+            <Text style={styles.statCardLabel}>Suspendus</Text>
+          </Animated.View>
+        </View>
+      </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -547,10 +848,20 @@ export const AdminUsersScreen: React.FC = () => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         ListHeaderComponent={
           <Text style={styles.resultCount}>
-            {filteredUsers.length} utilisateur{filteredUsers.length !== 1 ? 's' : ''}
+            {filteredUsers.length} / {totalFilteredCount} utilisateur{filteredUsers.length !== 1 ? 's' : ''}
           </Text>
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={COLORS.accent} />
+              <Text style={styles.loadingMoreText}>Chargement...</Text>
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           <EmptyState
@@ -598,6 +909,14 @@ export const AdminUsersScreen: React.FC = () => {
 
                 <Card style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>Informations</Text>
+                  {selectedUser.is_merged && (
+                    <View style={styles.mergedInfo}>
+                      <Ionicons name="information-circle" size={16} color={COLORS.warning} />
+                      <Text style={styles.mergedInfoText}>
+                        Ce compte fusionne {selectedUser.merged_ids?.length || 0} comptes avec le même numéro de téléphone
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.modalInfoRow}>
                     <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} />
                     <Text style={styles.modalInfoLabel}>Email:</Text>
@@ -645,6 +964,81 @@ export const AdminUsersScreen: React.FC = () => {
                   </Card>
                 )}
 
+                {selectedUser.order_details && selectedUser.order_details.length > 0 && (
+                  <Card style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Historique des commandes</Text>
+                    
+                    {/* Store Filter */}
+                    {selectedUser.role === 'seller' && getUniqueStores(selectedUser.order_details).length > 1 && (
+                      <View style={styles.storeFilterContainer}>
+                        <Text style={styles.storeFilterLabel}>Filtrer par boutique:</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storeFilterScroll}>
+                          <TouchableOpacity
+                            style={[styles.storeFilterChip, selectedStoreFilter === 'all' && styles.storeFilterChipActive]}
+                            onPress={() => setSelectedStoreFilter('all')}
+                          >
+                            <Text style={[styles.storeFilterChipText, selectedStoreFilter === 'all' && styles.storeFilterChipTextActive]}>
+                              Toutes
+                            </Text>
+                          </TouchableOpacity>
+                          {getUniqueStores(selectedUser.order_details).map((store) => (
+                            <TouchableOpacity
+                              key={store}
+                              style={[styles.storeFilterChip, selectedStoreFilter === store && styles.storeFilterChipActive]}
+                              onPress={() => setSelectedStoreFilter(store)}
+                            >
+                              <Text style={[styles.storeFilterChipText, selectedStoreFilter === store && styles.storeFilterChipTextActive]}>
+                                {store}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
+
+                    {/* Order Search Bar */}
+                    <View style={styles.orderSearchContainer}>
+                      <Ionicons name="search" size={20} color={COLORS.textMuted} />
+                      <TextInput
+                        style={styles.orderSearchInput}
+                        placeholder="Rechercher par numéro..."
+                        placeholderTextColor={COLORS.textMuted}
+                        value={orderSearchQuery}
+                        onChangeText={setOrderSearchQuery}
+                      />
+                    </View>
+                    {Object.entries(groupOrdersByDate(selectedUser.order_details)).map(([date, orders]) => (
+                      <View key={date} style={styles.orderDateGroup}>
+                        <Text style={styles.orderDateLabel}>{date}</Text>
+                        {orders.map((order) => (
+                          <View key={order.id} style={styles.modalOrderItem}>
+                            <View style={styles.modalOrderHeader}>
+                              <Text style={styles.modalOrderNumber}>#{order.order_number.slice(0, 8)}</Text>
+                              {selectedUser.role === 'seller' && order.user_name && (
+                                <Text style={styles.modalOrderClient}>{order.user_name}</Text>
+                              )}
+                              <Text style={styles.modalOrderAmount}>{order.total_amount.toLocaleString()} FCFA</Text>
+                              <Text style={[styles.modalOrderStatus, { color: order.status === 'completed' ? COLORS.success : COLORS.warning }]}>
+                                {order.status === 'completed' ? 'Terminée' : order.status}
+                              </Text>
+                            </View>
+                            <View style={styles.modalOrderItems}>
+                              {order.items.map((item, idx) => (
+                                <View key={idx} style={styles.modalOrderProduct}>
+                                  <Text style={styles.modalOrderProductQty}>{item.quantity}x</Text>
+                                  <Text style={styles.modalOrderProductName}>{item.product_name}</Text>
+                                  <Text style={styles.modalOrderProductStore}>{item.store_name}</Text>
+                                  <Text style={styles.modalOrderProductPrice}>{item.price.toLocaleString()} FCFA</Text>
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </Card>
+                )}
+
                 <View style={styles.modalActions}>
                   <Button
                     title="Message"
@@ -666,6 +1060,305 @@ export const AdminUsersScreen: React.FC = () => {
                 </View>
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Context Menu */}
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleMenuClose}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={handleMenuClose}
+        >
+          {menuPosition && menuUser && (
+            <View
+              style={[
+                styles.menuContainer,
+                {
+                  left: Math.min(menuPosition.x, width - 200),
+                  top: menuPosition.y + 10,
+                  maxWidth: width - 32,
+                  ...(menuPosition.y > height - 250 ? { top: menuPosition.y - 250 } : {}),
+                }
+              ]}
+            >
+              {menuUser.role === 'seller' && (
+                <>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => handleViewStores(menuUser)}
+                  >
+                    <Ionicons name="storefront-outline" size={20} color={COLORS.text} />
+                    <Text style={styles.menuItemText}>Gérer ses boutiques</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => handleViewOrders(menuUser)}
+                  >
+                    <Ionicons name="cart-outline" size={20} color={COLORS.text} />
+                    <Text style={styles.menuItemText}>Historique commandes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => handleViewStats(menuUser)}
+                  >
+                    <Ionicons name="stats-chart-outline" size={20} color={COLORS.text} />
+                    <Text style={styles.menuItemText}>Stats vendeur</Text>
+                  </TouchableOpacity>
+                  <View style={styles.menuDivider} />
+                </>
+              )}
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleEditUser(menuUser)}
+              >
+                <Ionicons name="create-outline" size={20} color={COLORS.text} />
+                <Text style={styles.menuItemText}>Modifier le profil</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  handleMenuClose();
+                  handleSuspendUser(menuUser);
+                }}
+              >
+                <Ionicons
+                  name={menuUser.status === 'active' ? 'ban-outline' : 'checkmark-circle-outline'}
+                  size={20}
+                  color={menuUser.status === 'active' ? COLORS.danger : COLORS.success}
+                />
+                <Text style={[
+                  styles.menuItemText,
+                  { color: menuUser.status === 'active' ? COLORS.danger : COLORS.success }
+                ]}>
+                  {menuUser.status === 'active' ? 'Suspendre' : 'Réactiver'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Suspension Reason Modal */}
+      <Modal
+        visible={suspendModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setSuspendModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Suspendre l'utilisateur</Text>
+              <TouchableOpacity onPress={() => setSuspendModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalSectionTitle}>Raison de la suspension</Text>
+              <TextInput
+                style={styles.suspendReasonInput}
+                placeholder="Expliquez pourquoi vous suspendez cet utilisateur..."
+                placeholderTextColor={COLORS.textMuted}
+                value={suspendReason}
+                onChangeText={setSuspendReason}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+              
+              <View style={styles.modalActions}>
+                <Button
+                  title="Annuler"
+                  variant="outline"
+                  onPress={() => setSuspendModalVisible(false)}
+                  style={styles.modalActionButton}
+                />
+                <Button
+                  title="Confirmer la suspension"
+                  variant="danger"
+                  onPress={handleConfirmSuspension}
+                  style={styles.modalActionButton}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit User Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Modifier le profil</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.editFormSection}>
+                <Text style={styles.editFormLabel}>Nom complet</Text>
+                <TextInput
+                  style={styles.editFormInput}
+                  value={editForm.full_name}
+                  onChangeText={(v) => setEditForm({ ...editForm, full_name: v })}
+                  placeholder="Nom complet"
+                />
+              </View>
+
+              <View style={styles.editFormSection}>
+                <Text style={styles.editFormLabel}>Email</Text>
+                <TextInput
+                  style={styles.editFormInput}
+                  value={editForm.email}
+                  onChangeText={(v) => setEditForm({ ...editForm, email: v })}
+                  placeholder="Email"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.editFormSection}>
+                <Text style={styles.editFormLabel}>Téléphone</Text>
+                <TextInput
+                  style={styles.editFormInput}
+                  value={editForm.phone}
+                  onChangeText={(v) => setEditForm({ ...editForm, phone: v })}
+                  placeholder="Numéro de téléphone"
+                  keyboardType="phone-pad"
+                />
+              </View>
+              
+              <View style={styles.modalActions}>
+                <Button
+                  title="Annuler"
+                  variant="outline"
+                  onPress={() => setEditModalVisible(false)}
+                  style={styles.modalActionButton}
+                />
+                <Button
+                  title="Enregistrer"
+                  onPress={handleSaveEdit}
+                  style={styles.modalActionButton}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Seller Statistics Modal */}
+      <Modal
+        visible={statsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setStatsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Statistiques vendeur</Text>
+              <TouchableOpacity onPress={() => setStatsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {statsUser && (
+                <>
+                  <Text style={styles.modalSectionTitle}>{statsUser.full_name}</Text>
+                  
+                  {statsUser.role === 'seller' && sellerStores.length === 0 ? (
+                    <Card style={styles.modalSection}>
+                      <Text style={styles.emptyStateText}>
+                        Ce vendeur n'a pas encore de boutique.
+                      </Text>
+                    </Card>
+                  ) : (
+                    <>
+                      {/* Store Filter for multi-store */}
+                      {statsUser.role === 'seller' && getUniqueStores(statsUser.order_details).length > 1 && (
+                        <View style={styles.storeFilterContainer}>
+                          <Text style={styles.storeFilterLabel}>Filtrer par boutique:</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storeFilterScroll}>
+                            <TouchableOpacity
+                              style={[styles.storeFilterChip, statsStoreFilter === 'all' && styles.storeFilterChipActive]}
+                              onPress={() => setStatsStoreFilter('all')}
+                            >
+                              <Text style={[styles.storeFilterChipText, statsStoreFilter === 'all' && styles.storeFilterChipTextActive]}>
+                                Toutes
+                              </Text>
+                            </TouchableOpacity>
+                            {getUniqueStores(statsUser.order_details).map((store) => (
+                              <TouchableOpacity
+                                key={store}
+                                style={[styles.storeFilterChip, statsStoreFilter === store && styles.storeFilterChipActive]}
+                                onPress={() => setStatsStoreFilter(store)}
+                              >
+                                <Text style={[styles.storeFilterChipText, statsStoreFilter === store && styles.storeFilterChipTextActive]}>
+                                  {store}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                      
+                      <Card style={styles.statsCard}>
+                        <View style={styles.statRow}>
+                          <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{getFilteredOrders(statsUser.order_details, statsStoreFilter).length}</Text>
+                            <Text style={styles.statLabel}>Commandes</Text>
+                          </View>
+                          <View style={styles.statDivider} />
+                          <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{formatCurrency(getFilteredOrders(statsUser.order_details, statsStoreFilter).reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0))}</Text>
+                            <Text style={styles.statLabel}>Chiffre d'affaires</Text>
+                          </View>
+                        </View>
+                      </Card>
+
+                      {getFilteredOrders(statsUser.order_details, statsStoreFilter).length === 0 ? (
+                        <Card style={styles.modalSection}>
+                          <Text style={styles.emptyStateText}>
+                            Aucune commande trouvée pour les boutiques de ce vendeur.
+                          </Text>
+                        </Card>
+                      ) : (
+                        <Card style={styles.modalSection}>
+                          <Text style={styles.modalSectionTitle}>Dernières commandes</Text>
+                          {getFilteredOrders(statsUser.order_details, statsStoreFilter).slice(0, 5).map((order) => (
+                            <View key={order.id} style={styles.orderSummary}>
+                              <View>
+                                <Text style={styles.orderNumber}>#{order.order_number.slice(0, 8)}</Text>
+                                <Text style={styles.orderDate}>
+                                  {new Date(order.created_at).toLocaleDateString('fr-FR')}
+                                </Text>
+                              </View>
+                              <Text style={styles.orderAmount}>{formatCurrency(order.total_amount)}</Text>
+                            </View>
+                          ))}
+                        </Card>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -701,8 +1394,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
   },
-  filterButton: {
+  backButton: {
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterButton: {
+    padding: SPACING.sm,
     height: 40,
     borderRadius: 20,
     backgroundColor: COLORS.card,
@@ -715,19 +1418,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
   },
+  statsRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
   statCard: {
     backgroundColor: COLORS.card,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
     borderRadius: RADIUS.lg,
-    marginRight: SPACING.sm,
-    minWidth: 100,
+    flex: 1,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
   },
   statCardValue: {
-    fontSize: FONT_SIZE.xl,
+    fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     color: COLORS.text,
   },
@@ -826,6 +1532,17 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: SPACING.md,
   },
+  loadingMore: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  loadingMoreText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+  },
   userCard: {
     marginBottom: SPACING.md,
     padding: SPACING.md,
@@ -887,6 +1604,154 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     marginBottom: SPACING.sm,
   },
+  orderDetailsSection: {
+    marginTop: SPACING.sm,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  orderDetailsTitle: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
+  },
+  orderItem: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  },
+  orderNumber: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  orderAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  orderStatus: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+  },
+  orderItems: {
+    gap: 2,
+  },
+  orderItemText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  viewAllOrders: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.accent,
+    fontWeight: '500',
+    marginTop: SPACING.xs,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  menuContainer: {
+    position: 'absolute',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.md,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)',
+    elevation: 5,
+    paddingVertical: SPACING.xs,
+    zIndex: 1000,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  menuItemText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    flex: 1,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.xs,
+  },
+  suspendReasonInput: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    minHeight: 120,
+    marginBottom: SPACING.lg,
+  },
+  editFormSection: {
+    marginBottom: SPACING.md,
+  },
+  editFormLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '500',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  editFormInput: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+  },
+  statsCard: {
+    marginBottom: SPACING.md,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: COLORS.border,
+  },
+  orderSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    flexWrap: 'wrap',
+  },
+  orderNumber: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  orderDate: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  orderAmount: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  emptyStateText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    paddingVertical: SPACING.md,
+  },
   statItem: {
     flex: 1,
     alignItems: 'center',
@@ -945,11 +1810,14 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: COLORS.bg,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    paddingTop: SPACING.lg,
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
     maxHeight: '90%',
+    padding: SPACING.lg,
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1003,6 +1871,20 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
   },
+  mergedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.warning + '15',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  mergedInfoText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.text,
+    flex: 1,
+  },
   modalInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1040,6 +1922,171 @@ const styles = StyleSheet.create({
   modalStatLabel: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
+  },
+  modalOrderItem: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  modalOrderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+    paddingBottom: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalOrderAmount: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  modalOrderStatus: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+  },
+  badge: {
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: RADIUS.xs,
+  },
+  mergedBadge: {
+    backgroundColor: COLORS.warning + '30',
+    borderWidth: 1,
+    borderColor: COLORS.warning,
+  },
+  badgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+    color: COLORS.text,
+  },
+  modalOrderDate: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  modalOrderNumber: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  modalOrderClient: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+    color: COLORS.text,
+    marginLeft: SPACING.xs,
+  },
+  modalStatDivider: {
+    width: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: SPACING.lg,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.xl,
+  },
+  modalActionButton: {
+    flex: 1,
+  },
+  orderSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  orderSearchInput: {
+    flex: 1,
+    marginLeft: SPACING.sm,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+  },
+  storeFilterContainer: {
+    marginBottom: SPACING.md,
+  },
+  storeFilterLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '500',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  storeFilterScroll: {
+    flexDirection: 'row',
+  },
+  storeFilterChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: SPACING.xs,
+  },
+  storeFilterChipActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  storeFilterChipText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.text,
+  },
+  storeFilterChipTextActive: {
+    color: COLORS.textInverse,
+  },
+  orderDateGroup: {
+    marginBottom: SPACING.md,
+  },
+  orderDateLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+  },
+  modalOrderItems: {
+    gap: SPACING.xs,
+  },
+  modalOrderProduct: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  modalOrderProductQty: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.accent,
+    minWidth: 30,
+  },
+  modalOrderProductName: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    flex: 1,
+  },
+  modalOrderProductStore: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  modalOrderProductPrice: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  modalOrderNumber: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  modalOrderClient: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '500',
+    color: COLORS.text,
+    marginLeft: SPACING.xs,
   },
   modalStatDivider: {
     width: 1,

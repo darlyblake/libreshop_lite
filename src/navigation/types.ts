@@ -71,6 +71,7 @@ export type RootStackParamList = {
   Address: undefined;
   Security: undefined;
   Help: undefined;
+  AccountSuspended: undefined;
 };
 
 export type ClientTabParamList = {
