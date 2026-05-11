@@ -982,18 +982,6 @@ export const SellerDashboardScreen: React.FC = () => {
 
     const actions = [
       { 
-        label: 'Assistant IA', 
-        icon: 'sparkles', 
-        color: COLORS.info, // distinctive color
-        screen: 'AgentChat' 
-      },
-      { 
-        label: 'Ajouter produit', 
-        icon: 'add-circle', 
-        color: COLORS.accent,
-        screen: 'SellerAddProduct' 
-      },
-      { 
         label: 'Caisse (POS)', 
         icon: 'card', 
         color: COLORS.warning,
@@ -1009,12 +997,6 @@ export const SellerDashboardScreen: React.FC = () => {
         inactive: store?.online_store_active === false
       },
       { 
-        label: 'Collections', 
-        icon: 'folder', 
-        color: COLORS.info,
-        screen: 'SellerCollection' 
-      },
-      { 
         label: 'Rapports', 
         icon: 'document-text', 
         color: COLORS.primary,
@@ -1022,7 +1004,7 @@ export const SellerDashboardScreen: React.FC = () => {
       },
     ];
 
-    const visibleActions = isMobile && !isLandscape ? actions.slice(0, 6) : actions;
+    const visibleActions = actions;
 
     return (
       <View style={styles.section}>
