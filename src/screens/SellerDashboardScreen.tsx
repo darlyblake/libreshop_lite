@@ -1002,6 +1002,12 @@ export const SellerDashboardScreen: React.FC = () => {
         color: COLORS.primary,
         screen: 'SellerReports' 
       },
+      { 
+        label: 'Remboursements', 
+        icon: 'refresh', 
+        color: COLORS.danger,
+        screen: 'SellerRefunds' 
+      },
     ];
 
     const visibleActions = actions;
