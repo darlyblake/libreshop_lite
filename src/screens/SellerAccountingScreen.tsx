@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
 import { accountingService } from '../services/accountingService';
 import { errorHandler } from '../utils/errorHandler';
+import { DatePickerInput } from '../components/DatePickerInput';
 
 export const SellerAccountingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -17,8 +18,19 @@ export const SellerAccountingScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
 
-  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
-  const [endDate, setEndDate] = useState(new Date());
+  // Format dates as YYYY-MM-DD strings for DatePickerInput
+  const formatDateToString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [startDateStr, setStartDateStr] = useState(formatDateToString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
+  const [endDateStr, setEndDateStr] = useState(formatDateToString(new Date()));
+
+  const startDate = new Date(startDateStr + 'T00:00:00');
+  const endDate = new Date(endDateStr + 'T00:00:00');
 
   const handleExportSales = async () => {
     if (!storeId) return;
@@ -171,22 +183,18 @@ export const SellerAccountingScreen: React.FC = () => {
         <View style={styles.dateSection}>
           <Text style={styles.sectionTitle}>Période</Text>
           <View style={styles.dateRow}>
-            <View style={styles.dateInput}>
-              <Text style={styles.dateLabel}>Du:</Text>
-              <TextInput
-                style={styles.dateValue}
-                value={startDate.toLocaleDateString('fr-FR')}
-                editable={false}
-              />
-            </View>
-            <View style={styles.dateInput}>
-              <Text style={styles.dateLabel}>Au:</Text>
-              <TextInput
-                style={styles.dateValue}
-                value={endDate.toLocaleDateString('fr-FR')}
-                editable={false}
-              />
-            </View>
+            <DatePickerInput
+              label="Du"
+              value={startDateStr}
+              onChange={setStartDateStr}
+              placeholder="Date de début"
+            />
+            <DatePickerInput
+              label="Au"
+              value={endDateStr}
+              onChange={setEndDateStr}
+              placeholder="Date de fin"
+            />
           </View>
         </View>
 
@@ -262,9 +270,6 @@ const styles = StyleSheet.create({
   dateSection: { backgroundColor: COLORS.card, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.md },
   sectionTitle: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.sm, marginTop: SPACING.md },
   dateRow: { flexDirection: 'row', gap: SPACING.md },
-  dateInput: { flex: 1 },
-  dateLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, marginBottom: SPACING.xs },
-  dateValue: { fontSize: FONT_SIZE.md, color: COLORS.text, backgroundColor: COLORS.background, padding: SPACING.sm, borderRadius: RADIUS.sm },
   card: { backgroundColor: COLORS.card, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm },
   cardTitle: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
