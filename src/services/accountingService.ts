@@ -48,15 +48,37 @@ export interface PurchaseRecord {
 }
 
 export const accountingService = {
+  // Valider et normaliser les dates
+  validateDateRange(startDate: Date, endDate: Date): { startDate: Date; endDate: Date } {
+    const now = new Date();
+    const maxStartDate = new Date(now.getFullYear() - 5, now.getMonth(), now.getDate()); // Max 5 ans en arrière
+    
+    // S'assurer que startDate n'est pas trop loin dans le passé
+    const normalizedStartDate = startDate < maxStartDate ? maxStartDate : startDate;
+    
+    // S'assurer que endDate n'est pas dans le futur
+    const normalizedEndDate = endDate > now ? now : endDate;
+    
+    // S'assurer que startDate <= endDate
+    if (normalizedStartDate > normalizedEndDate) {
+      return { startDate: normalizedEndDate, endDate: normalizedEndDate };
+    }
+    
+    return { startDate: normalizedStartDate, endDate: normalizedEndDate };
+  },
+
   // Exporter les ventes en format comptable
   async exportSalesToCSV(storeId: string, startDate: Date, endDate: Date): Promise<string> {
     try {
+      // Valider et normaliser les dates
+      const { startDate: validStartDate, endDate: validEndDate } = this.validateDateRange(startDate, endDate);
+      
       const { data: orders, error } = await supabase
         .from('orders')
         .select('created_at, id, customer_name, customer_phone, total_amount, payment_method')
         .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
+        .gte('created_at', validStartDate.toISOString())
+        .lte('created_at', validEndDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
       if (error) throw error;
@@ -73,6 +95,7 @@ export const accountingService = {
         category: 'Ventes',
       }));
 
+      console.log(`[Accounting] Export sales: storeId=${storeId}, records=${records.length}`);
       return this.convertToCSV(records);
     } catch (error) {
       console.error('Error exporting sales to CSV:', error);
@@ -109,6 +132,9 @@ export const accountingService = {
   // Exporter les dépenses en format comptable
   async exportExpensesToCSV(storeId: string, startDate: Date, endDate: Date): Promise<string> {
     try {
+      // Valider et normaliser les dates
+      const { startDate: validStartDate, endDate: validEndDate } = this.validateDateRange(startDate, endDate);
+      
       // Pour l'instant, on simule les dépenses avec les remboursements
       // Note: La table refunds n'existe pas encore, on retourne un CSV vide
       const records = [{
@@ -120,6 +146,7 @@ export const accountingService = {
         accountCode: '-',
       }];
 
+      console.log(`[Accounting] Export expenses: storeId=${storeId}, records=${records.length}`);
       return this.convertToCSV(records);
     } catch (error) {
       console.error('Error exporting expenses to CSV:', error);
@@ -130,12 +157,15 @@ export const accountingService = {
   // Générer un rapport de TVA
   async exportTaxReport(storeId: string, startDate: Date, endDate: Date): Promise<string> {
     try {
+      // Valider et normaliser les dates
+      const { startDate: validStartDate, endDate: validEndDate } = this.validateDateRange(startDate, endDate);
+      
       const { data: orders, error } = await supabase
         .from('orders')
         .select('created_at, total_amount')
         .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
+        .gte('created_at', validStartDate.toISOString())
+        .lte('created_at', validEndDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
       if (error) throw error;
@@ -145,13 +175,14 @@ export const accountingService = {
       const netSales = totalSales - totalTax;
 
       const records = [{
-        period: `${startDate.toLocaleDateString('fr-FR')} - ${endDate.toLocaleDateString('fr-FR')}`,
+        period: `${validStartDate.toLocaleDateString('fr-FR')} - ${validEndDate.toLocaleDateString('fr-FR')}`,
         totalSales,
         totalTax,
         netSales,
         taxRate: '0%', // Pas de TVA séparée
       }];
 
+      console.log(`[Accounting] Export tax report: storeId=${storeId}, totalSales=${totalSales}`);
       return this.convertToCSV(records);
     } catch (error) {
       console.error('Error exporting tax report:', error);
@@ -162,6 +193,9 @@ export const accountingService = {
   // Générer un grand livre (General Ledger)
   async generateGeneralLedger(storeId: string, startDate: Date, endDate: Date): Promise<AccountingRecord[]> {
     try {
+      // Valider et normaliser les dates
+      const { startDate: validStartDate, endDate: validEndDate } = this.validateDateRange(startDate, endDate);
+      
       const records: AccountingRecord[] = [];
       let balance = 0;
 
@@ -170,8 +204,8 @@ export const accountingService = {
         .from('orders')
         .select('created_at, id, total_amount')
         .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
+        .gte('created_at', validStartDate.toISOString())
+        .lte('created_at', validEndDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
       (orders || []).forEach((order: any) => {
@@ -190,6 +224,7 @@ export const accountingService = {
 
       // Note: La table refunds n'existe pas encore, on ignore les remboursements
 
+      console.log(`[Accounting] Generate general ledger: storeId=${storeId}, records=${records.length}`);
       return records.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     } catch (error) {
       console.error('Error generating general ledger:', error);
@@ -241,13 +276,16 @@ export const accountingService = {
     netProfit: number;
   }> {
     try {
+      // Valider et normaliser les dates
+      const { startDate: validStartDate, endDate: validEndDate } = this.validateDateRange(startDate, endDate);
+      
       // Revenus: ventes
       const { data: orders } = await supabase
         .from('orders')
         .select('total_amount')
         .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
+        .gte('created_at', validStartDate.toISOString())
+        .lte('created_at', validEndDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
       const totalRevenue = (orders || []).reduce((sum: number, o: any) => sum + o.total_amount, 0);
@@ -267,6 +305,7 @@ export const accountingService = {
       const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
       const netProfit = netRevenue - totalExpenses;
 
+      console.log(`[Accounting] Generate income statement: storeId=${storeId}, netProfit=${netProfit}`);
       return {
         revenue: [
           { name: 'Ventes nettes', amount: netRevenue },
