@@ -53,7 +53,7 @@ export const accountingService = {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, id, customer_name, customer_phone, total_amount, payment_method, items')
+        .select('created_at, id, customer_name, customer_phone, total_amount, payment_method')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
