@@ -66,8 +66,6 @@ export interface NewCollectionData {
   icon: keyof typeof Ionicons.glyphMap;
   coverColor?: string;
   isActive?: boolean;
-  priority?: 'high' | 'medium' | 'low';
-  tags?: string[];
 }
 
 interface AddCollectionModalProps {
@@ -97,15 +95,11 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
     icon: 'folder-outline' as any,
     coverColor: theme.getColor.primary,
     isActive: true,
-    priority: 'medium',
-    tags: [],
   });
 
   const [currentStep, setCurrentStep] = useState(1);
   const [searchIcon, setSearchIcon] = useState('');
   const [selectedIconCategory, setSelectedIconCategory] = useState(0);
-  const [tagInput, setTagInput] = useState('');
-  const [showColorPicker, setShowColorPicker] = useState(false);
   
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -144,12 +138,9 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
       icon: 'folder-outline' as any,
       coverColor: theme.getColor.primary,
       isActive: true,
-      priority: 'medium',
-      tags: [],
     });
     setCurrentStep(1);
     setSearchIcon('');
-    setTagInput('');
   };
 
   const handleClose = () => {
@@ -170,20 +161,6 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
       return;
     }
 
-    if (currentStep === 2) {
-      if (!form.name.trim()) {
-        Alert.alert('Erreur', 'Le nom de la collection est requis');
-        return;
-      }
-      if (form.name.length < 3) {
-        Alert.alert('Erreur', 'Le nom doit contenir au moins 3 caractères');
-        return;
-      }
-      setCurrentStep(3);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return;
-    }
-
     // Soumission finale
     if (!form.parentCategoryId || !form.name.trim()) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
@@ -194,23 +171,6 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
     onAdd(form);
     resetForm();
     onClose();
-  };
-
-  const addTag = () => {
-    if (tagInput.trim() && !form.tags?.includes(tagInput.trim())) {
-      setForm({
-        ...form,
-        tags: [...(form.tags || []), tagInput.trim()],
-      });
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setForm({
-      ...form,
-      tags: form.tags?.filter(tag => tag !== tagToRemove),
-    });
   };
 
   const getStepIcon = (step: number) => {
@@ -234,9 +194,7 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
   // libellé de sous-titre suivant l'étape (évite plusieurs enfants Text)
   const subtitle = currentStep === 1
     ? 'Choisissez une catégorie parente'
-    : currentStep === 2
-    ? 'Informations générales'
-    : 'Personnalisation';
+    : 'Informations générales et personnalisation';
 
   return (
     <Modal
@@ -283,14 +241,14 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
               </View>
               
               <View style={styles.stepIndicator}>
-                {[1, 2, 3].map(step => (
+                {[1, 2].map(step => (
                   <View key={step} style={styles.stepItem}>
                     <Ionicons
                       name={getStepIcon(step)}
                       size={20}
                       color={getStepColor(step)}
                     />
-                    {step < 3 && (
+                    {step < 2 && (
                       <View style={[
                         styles.stepLine,
                         { backgroundColor: step < currentStep ? theme.getColor.success : theme.getColor.border }
@@ -354,7 +312,7 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                 </Animated.View>
               )}
 
-              {/* Étape 2: Informations générales */}
+              {/* Étape 2: Informations et personnalisation */}
               {currentStep === 2 && (
                 <Animated.View>
                   <View style={styles.inputGroup}>
@@ -393,84 +351,9 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                     </View>
                   </View>
 
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Priorité</Text>
-                    <View style={styles.priorityContainer}>
-                      {['low', 'medium', 'high'].map((priority) => (
-                        <TouchableOpacity
-                          key={priority}
-                          style={[
-                            styles.priorityOption,
-                            form.priority === priority && styles.priorityOptionSelected,
-                            { borderColor: priority === 'high' ? theme.getColor.error : 
-                                         priority === 'medium' ? theme.getColor.warning : theme.getColor.info }
-                          ]}
-                          onPress={() => setForm({ ...form, priority: priority as any })}
-                        >
-                          <Ionicons 
-                            name={priority === 'high' ? 'alert-circle' : 
-                                 priority === 'medium' ? 'time' : 'arrow-down'} 
-                            size={16} 
-                            color={form.priority === priority ? 'white' : 
-                                   priority === 'high' ? theme.getColor.error : 
-                                   priority === 'medium' ? theme.getColor.warning : theme.getColor.info} 
-                          />
-                          <Text style={[
-                            styles.priorityText,
-                            form.priority === priority && styles.priorityTextSelected
-                          ]}>
-                            {priority === 'high' ? 'Haute' : 
-                             priority === 'medium' ? 'Moyenne' : 'Basse'}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* Étape 3: Personnalisation */}
-              {currentStep === 3 && (
-                <Animated.View>
-                  {/* Tags */}
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Tags (optionnel)</Text>
-                    <View style={styles.tagInputContainer}>
-                      <TextInput
-                        style={styles.tagInput}
-                        placeholder="Ajouter un tag..."
-                        placeholderTextColor={theme.getColor.textTertiary}
-                        value={tagInput}
-                        onChangeText={setTagInput}
-                        onSubmitEditing={addTag}
-                      />
-                      <TouchableOpacity 
-                        style={styles.addTagButton}
-                        onPress={addTag}
-                      >
-                        <Ionicons name="add" size={20} color="white" />
-                      </TouchableOpacity>
-                    </View>
-                    
-                    {form.tags && form.tags.length > 0 && (
-                      <View style={styles.tagsContainer}>
-                        {form.tags.map((tag, index) => (
-                          <View key={index} style={styles.tag}>
-                            <Text style={styles.tagText}>{tag}</Text>
-                            <TouchableOpacity onPress={() => removeTag(tag)}>
-                              <Ionicons name="close" size={14} color={theme.getColor.textTertiary} />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Sélecteur d'icônes avec recherche */}
+                  {/* Sélecteur d'icônes */}
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel}>Icône</Text>
-                    
-                    {/* Barre de recherche d'icônes */}
                     <View style={styles.searchContainer}>
                       <Ionicons name="search" size={18} color={theme.getColor.textTertiary} />
                       <TextInput
@@ -482,55 +365,32 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                       />
                     </View>
 
-                    {/* Catégories d'icônes */}
-                    <ScrollView 
-                      horizontal 
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.iconCategories}
-                    >
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.iconCategories}>
                       {ICON_CATEGORIES.map((cat, index) => (
                         <TouchableOpacity
                           key={index}
-                          style={[
-                            styles.iconCategoryChip,
-                            selectedIconCategory === index && styles.iconCategoryChipSelected
-                          ]}
+                          style={[styles.iconCategoryChip, selectedIconCategory === index && styles.iconCategoryChipSelected]}
                           onPress={() => setSelectedIconCategory(index)}
                         >
-                          <Text style={[
-                            styles.iconCategoryText,
-                            selectedIconCategory === index && styles.iconCategoryTextSelected
-                          ]}>
+                          <Text style={[styles.iconCategoryText, selectedIconCategory === index && styles.iconCategoryTextSelected]}>
                             {cat.name}
                           </Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
 
-                    {/* Grille d'icônes */}
-                    <ScrollView 
-                      style={styles.iconSelector}
-                      nestedScrollEnabled
-                      showsVerticalScrollIndicator={true}
-                    >
+                    <ScrollView style={styles.iconSelector} nestedScrollEnabled showsVerticalScrollIndicator={true}>
                       <View style={styles.iconGrid}>
                         {(searchIcon ? filteredIcons : ICON_CATEGORIES[selectedIconCategory].icons).map((icon) => (
                           <TouchableOpacity
                             key={icon}
-                            style={[
-                              styles.iconOption,
-                              form.icon === icon && styles.iconOptionSelected,
-                            ]}
+                            style={[styles.iconOption, form.icon === icon && styles.iconOptionSelected]}
                             onPress={() => {
                               setForm({ ...form, icon: icon as any });
                               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }}
                           >
-                            <Ionicons
-                              name={icon as any}
-                              size={24}
-                              color={form.icon === icon ? theme.getColor.text : theme.getColor.text}
-                            />
+                            <Ionicons name={icon as any} size={24} color={form.icon === icon ? theme.getColor.text : theme.getColor.text} />
                           </TouchableOpacity>
                         ))}
                       </View>
@@ -544,16 +404,10 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                       {[theme.getColor.primary, theme.getColor.info, theme.getColor.accent, theme.getColor.success, theme.getColor.warning, theme.getColor.error, '#7c3aed', '#db2777'].map((color, index) => (
                         <TouchableOpacity
                           key={`${color}-${index}`}
-                          style={[
-                            styles.colorOption,
-                            { backgroundColor: color },
-                            form.coverColor === color && styles.colorOptionSelected
-                          ]}
+                          style={[styles.colorOption, { backgroundColor: color }, form.coverColor === color && styles.colorOptionSelected]}
                           onPress={() => setForm({ ...form, coverColor: color })}
                         >
-                          {form.coverColor === color && (
-                            <Ionicons name="checkmark" size={16} color="white" />
-                          )}
+                          {form.coverColor === color && <Ionicons name="checkmark" size={16} color="white" />}
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -563,20 +417,15 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                   <View style={styles.switchContainer}>
                     <Text style={styles.switchLabel}>Collection active</Text>
                     <TouchableOpacity
-                      style={[
-                        styles.switch,
-                        form.isActive ? styles.switchActive : styles.switchInactive
-                      ]}
+                      style={[styles.switch, form.isActive ? styles.switchActive : styles.switchInactive]}
                       onPress={() => setForm({ ...form, isActive: !form.isActive })}
                     >
-                      <Animated.View style={[
-                        styles.switchThumb,
-                        { transform: [{ translateX: form.isActive ? 20 : 0 }] }
-                      ]} />
+                      <Animated.View style={[styles.switchThumb, { transform: [{ translateX: form.isActive ? 20 : 0 }] }]} />
                     </TouchableOpacity>
                   </View>
                 </Animated.View>
               )}
+
             </ScrollView>
 
             {/* Actions */}
@@ -597,15 +446,15 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
               <TouchableOpacity
                 style={[
                   styles.modalButton,
-                  currentStep === 3 ? styles.confirmButton : styles.nextButton,
+                  currentStep === 2 ? styles.confirmButton : styles.nextButton,
                   currentStep === 1 && { flex: 2 }
                 ]}
                 onPress={handleSubmit}
               >
-                <Text style={currentStep === 3 ? styles.confirmButtonText : styles.nextButtonText}>
-                  {currentStep === 3 ? (editData ? 'Mettre à jour' : 'Créer') : 'Suivant'}
+                <Text style={currentStep === 2 ? styles.confirmButtonText : styles.nextButtonText}>
+                  {currentStep === 2 ? (editData ? 'Mettre à jour' : 'Créer') : 'Suivant'}
                 </Text>
-                {currentStep < 3 && (
+                {currentStep < 2 && (
                   <Ionicons name="arrow-forward" size={18} color="white" />
                 )}
               </TouchableOpacity>
@@ -772,74 +621,6 @@ const getStyles = (theme: any) => StyleSheet.create({
     minHeight: 100,
     textAlignVertical: 'top',
     paddingTop: theme.spacing.md,
-  },
-  priorityContainer: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  priorityOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    gap: theme.spacing.xs,
-    backgroundColor: theme.getColor.background,
-  },
-  priorityOptionSelected: {
-    backgroundColor: theme.getColor.primary,
-  },
-  priorityText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: '500',
-  },
-  priorityTextSelected: {
-    color: theme.getColor.text,
-  },
-  tagInputContainer: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-  },
-  tagInput: {
-    flex: 1,
-    backgroundColor: theme.getColor.background,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.sm,
-    fontSize: theme.fontSize.sm,
-    color: theme.getColor.text,
-    borderWidth: 1,
-    borderColor: theme.getColor.border,
-  },
-  addTagButton: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.getColor.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-  },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.getColor.background,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.getColor.border,
-    gap: theme.spacing.xs,
-  },
-  tagText: {
-    fontSize: theme.fontSize.xs,
-    color: theme.getColor.text,
   },
   searchContainer: {
     flexDirection: 'row',
