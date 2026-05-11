@@ -66,6 +66,7 @@ export { SellerChangePlanScreen } from './SellerChangePlanScreen';
 export { SellerAgentChatScreen } from './SellerAgentChatScreen';
 export { SellerReportsScreen } from './SellerReportsScreen';
 export { SellerRefundsScreen } from './SellerRefundsScreen';
+export { SellerAccountingScreen } from './SellerAccountingScreen';
 
 export { NotificationsScreen } from './NotificationsScreen';
 export { ResetPasswordScreen } from './ResetPasswordScreen';

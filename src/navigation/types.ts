@@ -66,6 +66,7 @@ export type RootStackParamList = {
   SellerLowStock: undefined;
   SellerReports: undefined;
   SellerRefunds: undefined;
+  SellerAccounting: undefined;
   Notifications: undefined;
   Features: undefined;
   Pricing: undefined;

@@ -1003,10 +1003,10 @@ export const SellerDashboardScreen: React.FC = () => {
         screen: 'SellerReports' 
       },
       { 
-        label: 'Remboursements', 
-        icon: 'refresh', 
-        color: COLORS.danger,
-        screen: 'SellerRefunds' 
+        label: 'Comptabilité', 
+        icon: 'calculator', 
+        color: COLORS.info,
+        screen: 'SellerAccounting' 
       },
     ];
 

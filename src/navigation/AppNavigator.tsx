@@ -613,6 +613,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerAnalytics" component={Screens.SellerAnalyticsScreen} />
         <Stack.Screen name="SellerReports" component={Screens.SellerReportsScreen} />
         <Stack.Screen name="SellerRefunds" component={Screens.SellerRefundsScreen} />
+        <Stack.Screen name="SellerAccounting" component={Screens.SellerAccountingScreen} />
         
         {/* Routes admin */}
         <Stack.Screen name="AdminSettings" component={Screens.AdminSettingsScreen} />
