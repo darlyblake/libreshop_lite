@@ -1,0 +1,48 @@
+# Snyk configuration for automated vulnerability scanning
+# https://snyk.io/docs/configuration/
+
+# Organization settings
+org: libreshop
+
+# Project settings
+project: libreshop-lite
+
+# Severity thresholds
+severity-threshold: high
+
+# Language settings
+language: javascript
+
+# Package manager
+package-manager: npm
+
+# Vulnerability database
+vulnerability-db: true
+
+# License scanning
+license-check: true
+license-policy: true
+
+# Monitor dependencies
+monitor: true
+
+# Auto-remediation
+auto-remediation: true
+auto-remediation-severity: high
+
+# Ignore specific vulnerabilities (if needed)
+# ignore:
+#   SNYK-JS-LODASH-5677:
+#     - '*':
+#         reason: 'False positive - not used in vulnerable way'
+#         expires: 2024-12-31T00:00:00Z
+
+# PR comments
+pr-comments: true
+
+# Report settings
+report:
+  - type: html
+    path: snyk-report.html
+  - type: json
+    path: snyk-report.json

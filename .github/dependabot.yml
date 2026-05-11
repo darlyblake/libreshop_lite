@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "darlyblake"
+    assignees:
+      - "darlyblake"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    allow:
+      # Allow updates for all dependencies
+      - dependency-type: "all"
+    ignore:
+      # Ignore specific dependencies if needed
+      # - dependency-name: "example-package"
+      #   versions: ["1.x"]
+    groups:
+      # Group React-related dependencies
+      react-dependencies:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      # Group Supabase dependencies
+      supabase-dependencies:
+        patterns:
+          - "@supabase*"
+      # Group Expo dependencies
+      expo-dependencies:
+        patterns:
+          - "expo*"
+          - "@expo*"
