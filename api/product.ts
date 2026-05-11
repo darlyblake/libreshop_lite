@@ -1,15 +1,41 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://gdjqzhbfibrsdiwvfhvp.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkanF6aGZpYnJzZGl3dmZodnAiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjU0NTU0NCwiZXhwIjoyMDUyMTIxNTQ0fQ.C5V0JN5tJ0F8K5X3mW5vY6N7pQ2rS8tU9vW0X1Y2Z3';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// XSS protection: escape HTML special characters
+function escapeHtml(unsafe: string): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Validate UUID format
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
 
 export default async function handler(req: any, res: any) {
   const { id } = req.query;
 
+  // Validate ID
   if (!id) {
     return res.status(400).send('Product ID is required');
+  }
+
+  if (!isValidUUID(id)) {
+    return res.status(400).send('Invalid ID format');
   }
 
   try {
@@ -31,6 +57,12 @@ export default async function handler(req: any, res: any) {
     const title = product.name || 'Produit';
     const url = `https://libreshop.shop/api/product?id=${id}`;
 
+    // Escape user content to prevent XSS
+    const safeTitle = escapeHtml(title);
+    const safeDescription = escapeHtml(description.substring(0, 200));
+    const safePrice = escapeHtml(priceFormatted);
+    const safeImageUrl = escapeHtmlAttr(imageUrl);
+
     // Generate HTML with pre-populated meta tags
     const html = `
 <!DOCTYPE html>
@@ -38,12 +70,12 @@ export default async function handler(req: any, res: any) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - ${priceFormatted} | LibreShop</title>
+  <title>${safeTitle} - ${safePrice} | LibreShop</title>
   
   <!-- Open Graph Meta Tags -->
-  <meta property="og:title" content="${title} - ${priceFormatted} | LibreShop">
-  <meta property="og:description" content="${description.substring(0, 200)}">
-  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:title" content="${safeTitle} - ${safePrice} | LibreShop">
+  <meta property="og:description" content="${safeDescription}">
+  <meta property="og:image" content="${safeImageUrl}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:type" content="image/jpeg">
@@ -53,9 +85,9 @@ export default async function handler(req: any, res: any) {
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${title} - ${priceFormatted} | LibreShop">
-  <meta name="twitter:description" content="${description.substring(0, 200)}">
-  <meta name="twitter:image" content="${imageUrl}">
+  <meta name="twitter:title" content="${safeTitle} - ${safePrice} | LibreShop">
+  <meta name="twitter:description" content="${safeDescription}">
+  <meta name="twitter:image" content="${safeImageUrl}">
   
   <!-- Product Meta Tags -->
   <meta property="product:price:amount" content="${product.price || 0}">
@@ -120,16 +152,19 @@ export default async function handler(req: any, res: any) {
 </head>
 <body>
   <div class="container">
-    <img src="${imageUrl}" alt="${title}" class="product-image">
-    <h1>${title}</h1>
-    <div class="price">${priceFormatted}</div>
-    <p class="description">${description}</p>
+    <img src="${safeImageUrl}" alt="${safeTitle}" class="product-image">
+    <h1>${safeTitle}</h1>
+    <div class="price">${safePrice}</div>
+    <p class="description">${safeDescription}</p>
     <a href="libreshop://product/${id}" class="btn">Ouvrir dans LibreShop</a>
   </div>
 </body>
 </html>`;
 
     res.setHeader('Content-Type', 'text/html');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
     res.send(html);
   } catch (error) {
     console.error('Error fetching product:', error);

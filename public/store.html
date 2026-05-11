@@ -188,8 +188,14 @@
       document.getElementById('loading').style.display = 'block';
     } else {
       // Charger les données de la boutique depuis Supabase
-      const SUPABASE_URL = 'https://gdjqzhbfibrsdiwvfhvp.supabase.co';
-      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkanF6aGZpYnJzZGl3dmZodnAiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjU0NTU0NCwiZXhwIjoyMDUyMTIxNTQ0fQ.C5V0JN5tJ0F8K5X3mW5vY6N7pQ2rS8tU9vW0X1Y2Z3';
+      // Note: En production, utiliser des variables d'environnement côté serveur
+      const SUPABASE_URL = process.env.SUPABASE_URL;
+      const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        document.getElementById('loading').textContent = 'Erreur de configuration';
+        return;
+      }
 
       try {
         // Charger la boutique

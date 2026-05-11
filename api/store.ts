@@ -1,15 +1,52 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://gdjqzhbfibrsdiwvfhvp.supabase.co';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkanF6aGZpYnJzZGl3dmZodnAiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjU0NTU0NCwiZXhwIjoyMDUyMTIxNTQ0fQ.C5V0JN5tJ0F8K5X3mW5vY6N7pQ2rS8tU9vW0X1Y2Z3';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// XSS protection: escape HTML special characters
+function escapeHtml(unsafe: string): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// Escape HTML attributes
+function escapeHtmlAttr(unsafe: string): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Validate UUID format
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
 
 export default async function handler(req: any, res: any) {
   const { id } = req.query;
 
+  // Validate ID
   if (!id) {
     return res.status(400).send('Store ID is required');
+  }
+
+  if (!isValidUUID(id)) {
+    return res.status(400).send('Invalid ID format');
   }
 
   try {
@@ -37,6 +74,14 @@ export default async function handler(req: any, res: any) {
       .eq('store_id', id)
       .eq('is_active', true);
 
+    // Escape user content to prevent XSS
+    const safeTitle = escapeHtml(title);
+    const safeDescription = escapeHtml(description.substring(0, 200));
+    const safeLogoUrl = escapeHtmlAttr(logoUrl);
+    const safeAddress = escapeHtml(store.address || '');
+    const safeCity = escapeHtml(store.city || '');
+    const safeCountry = escapeHtml(store.country || 'Gabon');
+
     // Generate HTML with pre-populated meta tags
     const html = `
 <!DOCTYPE html>
@@ -44,12 +89,12 @@ export default async function handler(req: any, res: any) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - Boutique | LibreShop</title>
+  <title>${safeTitle} - Boutique | LibreShop</title>
   
   <!-- Open Graph Meta Tags -->
-  <meta property="og:title" content="${title} - Boutique | LibreShop">
-  <meta property="og:description" content="${description.substring(0, 200)}">
-  <meta property="og:image" content="${logoUrl}">
+  <meta property="og:title" content="${safeTitle} - Boutique | LibreShop">
+  <meta property="og:description" content="${safeDescription}">
+  <meta property="og:image" content="${safeLogoUrl}">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:type" content="image/jpeg">
@@ -59,14 +104,14 @@ export default async function handler(req: any, res: any) {
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${title} - Boutique | LibreShop">
-  <meta name="twitter:description" content="${description.substring(0, 200)}">
-  <meta name="twitter:image" content="${logoUrl}">
+  <meta name="twitter:title" content="${safeTitle} - Boutique | LibreShop">
+  <meta name="twitter:description" content="${safeDescription}">
+  <meta name="twitter:image" content="${safeLogoUrl}">
   
   <!-- Local Business Meta Tags -->
-  <meta property="business:contact_data:street_address" content="${store.address || ''}">
-  <meta property="business:contact_data:locality" content="${store.city || ''}">
-  <meta property="business:contact_data:country" content="${store.country || 'Gabon'}">
+  <meta property="business:contact_data:street_address" content="${safeAddress}">
+  <meta property="business:contact_data:locality" content="${safeCity}">
+  <meta property="business:contact_data:country" content="${safeCountry}">
   
   <!-- Redirect to app after a short delay -->
   <meta http-equiv="refresh" content="0;url=libreshop://store/${id}">
@@ -139,8 +184,8 @@ export default async function handler(req: any, res: any) {
 </head>
 <body>
   <div class="container">
-    <img src="${logoUrl}" alt="${title}" class="store-logo">
-    <h1>${title}</h1>
+    <img src="${safeLogoUrl}" alt="${safeTitle}" class="store-logo">
+    <h1>${safeTitle}</h1>
     <div class="stats">
       <div class="stat">
         <div class="stat-value">${productCount || 0}</div>
@@ -151,13 +196,16 @@ export default async function handler(req: any, res: any) {
         <div class="stat-label">Note</div>
       </div>
     </div>
-    <p class="description">${description}</p>
+    <p class="description">${safeDescription}</p>
     <a href="libreshop://store/${id}" class="btn">Ouvrir dans LibreShop</a>
   </div>
 </body>
 </html>`;
 
     res.setHeader('Content-Type', 'text/html');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
     res.send(html);
   } catch (error) {
     console.error('Error fetching store:', error);
