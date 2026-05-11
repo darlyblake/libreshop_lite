@@ -53,7 +53,7 @@ export const accountingService = {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, id, customer_name, customer_phone, total, tax_amount, payment_method, items')
+        .select('created_at, id, customer_name, customer_phone, total_amount, tax_amount, payment_method, items')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -66,9 +66,9 @@ export const accountingService = {
         invoiceNumber: `FAC-${order.id.slice(0, 8)}`,
         customerName: order.customer_name || 'Client inconnu',
         customerPhone: order.customer_phone || '',
-        amount: order.total - (order.tax_amount || 0),
+        amount: order.total_amount - (order.tax_amount || 0),
         taxAmount: order.tax_amount || 0,
-        totalAmount: order.total,
+        totalAmount: order.total_amount,
         paymentMethod: order.payment_method || 'Non spécifié',
         category: 'Ventes',
       }));
@@ -85,7 +85,7 @@ export const accountingService = {
     try {
       const { data: products, error } = await supabase
         .from('products')
-        .select('name, category, stock, price, cost_price, created_at')
+        .select('name, category, stock, price, created_at')
         .eq('store_id', storeId);
 
       if (error) throw error;
@@ -95,9 +95,7 @@ export const accountingService = {
         category: product.category || 'Non catégorisé',
         quantity: product.stock,
         unitPrice: product.price,
-        costPrice: product.cost_price || 0,
         totalValue: product.stock * product.price,
-        totalCost: product.stock * (product.cost_price || 0),
         date: new Date(product.created_at).toLocaleDateString('fr-FR'),
       }));
 
@@ -112,24 +110,15 @@ export const accountingService = {
   async exportExpensesToCSV(storeId: string, startDate: Date, endDate: Date): Promise<string> {
     try {
       // Pour l'instant, on simule les dépenses avec les remboursements
-      const { data: refunds, error } = await supabase
-        .from('refunds')
-        .select('created_at, order_id, amount, reason')
-        .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .in('status', ['approved', 'processed']);
-
-      if (error) throw error;
-
-      const records = (refunds || []).map((refund: any) => ({
-        date: new Date(refund.created_at).toLocaleDateString('fr-FR'),
-        reference: `REM-${refund.order_id.slice(0, 8)}`,
-        description: refund.reason,
-        amount: refund.amount,
-        category: 'Remboursements',
-        accountCode: '708',
-      }));
+      // Note: La table refunds n'existe pas encore, on retourne un CSV vide
+      const records = [{
+        date: '-',
+        reference: '-',
+        description: 'Aucune dépense enregistrée',
+        amount: 0,
+        category: 'Dépenses',
+        accountCode: '-',
+      }];
 
       return this.convertToCSV(records);
     } catch (error) {
@@ -143,7 +132,7 @@ export const accountingService = {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total, tax_amount')
+        .select('created_at, total_amount, tax_amount')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -151,7 +140,7 @@ export const accountingService = {
 
       if (error) throw error;
 
-      const totalSales = (orders || []).reduce((sum: number, order: any) => sum + order.total, 0);
+      const totalSales = (orders || []).reduce((sum: number, order: any) => sum + order.total_amount, 0);
       const totalTax = (orders || []).reduce((sum: number, order: any) => sum + (order.tax_amount || 0), 0);
       const netSales = totalSales - totalTax;
 
@@ -179,48 +168,27 @@ export const accountingService = {
       // Ajouter les ventes
       const { data: orders } = await supabase
         .from('orders')
-        .select('created_at, id, total')
+        .select('created_at, id, total_amount')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
       (orders || []).forEach((order: any) => {
-        balance += order.total;
+        balance += order.total_amount;
         records.push({
           date: new Date(order.created_at).toLocaleDateString('fr-FR'),
           reference: `FAC-${order.id.slice(0, 8)}`,
           description: 'Vente client',
           debit: 0,
-          credit: order.total,
+          credit: order.total_amount,
           balance,
           category: 'Ventes',
           accountCode: '701',
         });
       });
 
-      // Ajouter les remboursements
-      const { data: refunds } = await supabase
-        .from('refunds')
-        .select('created_at, order_id, amount')
-        .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .in('status', ['approved', 'processed']);
-
-      (refunds || []).forEach((refund: any) => {
-        balance -= refund.amount;
-        records.push({
-          date: new Date(refund.created_at).toLocaleDateString('fr-FR'),
-          reference: `REM-${refund.order_id.slice(0, 8)}`,
-          description: 'Remboursement',
-          debit: refund.amount,
-          credit: 0,
-          balance,
-          category: 'Remboursements',
-          accountCode: '708',
-        });
-      });
+      // Note: La table refunds n'existe pas encore, on ignore les remboursements
 
       return records.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     } catch (error) {
@@ -236,22 +204,15 @@ export const accountingService = {
     equity: { name: string; amount: number }[];
   }> {
     try {
-      // Actifs: valeur du stock
+      // Actifs: valeur du stock (sans coût car la colonne n'existe pas)
       const { data: products } = await supabase
         .from('products')
-        .select('name, stock, cost_price')
+        .select('name, stock, price')
         .eq('store_id', storeId);
 
-      const inventoryValue = (products || []).reduce((sum: number, p: any) => sum + (p.stock * (p.cost_price || 0)), 0);
+      const inventoryValue = (products || []).reduce((sum: number, p: any) => sum + (p.stock * p.price), 0);
 
-      // Passifs: remboursements en attente
-      const { data: pendingRefunds } = await supabase
-        .from('refunds')
-        .select('amount')
-        .eq('store_id', storeId)
-        .eq('status', 'approved');
-
-      const pendingRefundsAmount = (pendingRefunds || []).reduce((sum: number, r: any) => sum + r.amount, 0);
+      // Note: La table refunds n'existe pas encore, pas de passifs de remboursements
 
       return {
         assets: [
@@ -261,10 +222,10 @@ export const accountingService = {
         ],
         liabilities: [
           { name: 'Dettes fournisseurs', amount: 0 }, // À implémenter
-          { name: 'Remboursements en attente', amount: pendingRefundsAmount },
+          { name: 'Remboursements en attente', amount: 0 },
         ],
         equity: [
-          { name: 'Capital', amount: inventoryValue - pendingRefundsAmount },
+          { name: 'Capital', amount: inventoryValue },
         ],
       };
     } catch (error) {
@@ -283,41 +244,23 @@ export const accountingService = {
       // Revenus: ventes
       const { data: orders } = await supabase
         .from('orders')
-        .select('total, tax_amount')
+        .select('total_amount, tax_amount')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
-      const totalRevenue = (orders || []).reduce((sum: number, o: any) => sum + o.total, 0);
+      const totalRevenue = (orders || []).reduce((sum: number, o: any) => sum + o.total_amount, 0);
       const totalTax = (orders || []).reduce((sum: number, o: any) => sum + (o.tax_amount || 0), 0);
       const netRevenue = totalRevenue - totalTax;
 
-      // Dépenses: remboursements
-      const { data: refunds } = await supabase
-        .from('refunds')
-        .select('amount')
-        .eq('store_id', storeId)
-        .gte('created_at', startDate.toISOString())
-        .lte('created_at', endDate.toISOString())
-        .in('status', ['approved', 'processed']);
-
-      const totalRefunds = (refunds || []).reduce((sum: number, r: any) => sum + r.amount, 0);
-
-      // Coût des ventes (estimation basée sur le coût des produits)
-      const { data: products } = await supabase
-        .from('products')
-        .select('cost_price, price')
-        .eq('store_id', storeId);
-
-      const averageCostRatio = products && products.length > 0
-        ? products.reduce((sum: number, p: any) => sum + (p.cost_price || 0), 0) / products.reduce((sum: number, p: any) => sum + p.price, 0)
-        : 0.5;
-
-      const costOfGoodsSold = netRevenue * averageCostRatio;
+      // Note: La table refunds n'existe pas encore, pas de remboursements
+      // Note: La colonne cost_price n'existe pas dans products, on utilise une estimation simple
+      const totalRefunds = 0;
+      const costOfGoodsSold = netRevenue * 0.5; // Estimation: 50% du revenu net
 
       const expenses = [
-        { name: 'Coût des ventes', amount: costOfGoodsSold },
+        { name: 'Coût des ventes (estimé)', amount: costOfGoodsSold },
         { name: 'Remboursements', amount: totalRefunds },
       ];
 
