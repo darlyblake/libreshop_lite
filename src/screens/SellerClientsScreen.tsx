@@ -43,8 +43,8 @@ type Client = {
   loyaltyTier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
 };
 
-// Configuration du programme de fidélité
-const LOYALTY_CONFIG = {
+// Configuration par défaut du programme de fidélité
+const DEFAULT_LOYALTY_CONFIG = {
   pointsPerXOF: 100, // 100 points pour chaque 1000 F dépensés
   tiers: {
     Bronze: { minPoints: 0, color: '#CD7F32', icon: 'medal-outline' },
@@ -55,15 +55,15 @@ const LOYALTY_CONFIG = {
 };
 
 // Calculer les points de fidélité
-const calculateLoyaltyPoints = (totalSpent: number): number => {
-  return Math.floor(totalSpent / LOYALTY_CONFIG.pointsPerXOF) * 100;
+const calculateLoyaltyPoints = (totalSpent: number, pointsPerXOF: number): number => {
+  return Math.floor(totalSpent / pointsPerXOF) * 100;
 };
 
 // Calculer le niveau de fidélité
-const calculateLoyaltyTier = (points: number): 'Bronze' | 'Silver' | 'Gold' | 'Platinum' => {
-  if (points >= LOYALTY_CONFIG.tiers.Platinum.minPoints) return 'Platinum';
-  if (points >= LOYALTY_CONFIG.tiers.Gold.minPoints) return 'Gold';
-  if (points >= LOYALTY_CONFIG.tiers.Silver.minPoints) return 'Silver';
+const calculateLoyaltyTier = (points: number, tiers: typeof DEFAULT_LOYALTY_CONFIG.tiers): 'Bronze' | 'Silver' | 'Gold' | 'Platinum' => {
+  if (points >= tiers.Platinum.minPoints) return 'Platinum';
+  if (points >= tiers.Gold.minPoints) return 'Gold';
+  if (points >= tiers.Silver.minPoints) return 'Silver';
   return 'Bronze';
 };
 
@@ -79,6 +79,8 @@ export const SellerClientsScreen: React.FC = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLoyaltySettings, setShowLoyaltySettings] = useState(false);
+  const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
+  const [editingLoyaltyConfig, setEditingLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
   const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
   // (optional) keep reference for initial values if needed later
   const [newClient, setNewClient] = useState<UserData>({
@@ -174,8 +176,8 @@ export const SellerClientsScreen: React.FC = () => {
           totalSpent: nextTotalSpent,
           lastOrder,
           isActive: true,
-          loyaltyPoints: calculateLoyaltyPoints(nextTotalSpent),
-          loyaltyTier: calculateLoyaltyTier(calculateLoyaltyPoints(nextTotalSpent)),
+          loyaltyPoints: calculateLoyaltyPoints(nextTotalSpent, loyaltyConfig.pointsPerXOF),
+          loyaltyTier: calculateLoyaltyTier(calculateLoyaltyPoints(nextTotalSpent, loyaltyConfig.pointsPerXOF), loyaltyConfig.tiers),
         });
       });
 
@@ -222,6 +224,20 @@ export const SellerClientsScreen: React.FC = () => {
     loadClients();
   }, [loadClients]);
 
+  // Load loyalty config from store or localStorage
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const savedConfig = localStorage.getItem(`loyalty_config_${user.id}`);
+      if (savedConfig) {
+        setLoyaltyConfig(JSON.parse(savedConfig));
+        setEditingLoyaltyConfig(JSON.parse(savedConfig));
+      }
+    } catch (e) {
+      console.error('Failed to load loyalty config:', e);
+    }
+  }, [user?.id]);
+
   const onRefresh = useCallback(() => {
     const run = async () => {
       setRefreshing(true);
@@ -259,6 +275,30 @@ export const SellerClientsScreen: React.FC = () => {
           }}
       ]
     );
+  };
+
+  const handleOpenLoyaltySettings = () => {
+    setEditingLoyaltyConfig(loyaltyConfig);
+    setShowLoyaltySettings(true);
+  };
+
+  const handleSaveLoyaltyConfig = () => {
+    if (!user?.id) return;
+    try {
+      localStorage.setItem(`loyalty_config_${user.id}`, JSON.stringify(editingLoyaltyConfig));
+      setLoyaltyConfig(editingLoyaltyConfig);
+      setShowLoyaltySettings(false);
+      Alert.alert('Succès', 'Configuration du programme de fidélité enregistrée');
+      loadClients(true); // Reload clients with new config
+    } catch (e) {
+      console.error('Failed to save loyalty config:', e);
+      Alert.alert('Erreur', 'Impossible d\'enregistrer la configuration');
+    }
+  };
+
+  const handleCancelLoyaltyConfig = () => {
+    setEditingLoyaltyConfig(loyaltyConfig);
+    setShowLoyaltySettings(false);
   };
 
   /* =========================
@@ -351,13 +391,13 @@ export const SellerClientsScreen: React.FC = () => {
 
           {/* LOYALTY TIER BADGE */}
           {item.loyaltyTier && (
-            <View style={[styles.loyaltyBadge, { backgroundColor: LOYALTY_CONFIG.tiers[item.loyaltyTier].color + '20' }]}>
+            <View style={[styles.loyaltyBadge, { backgroundColor: loyaltyConfig.tiers[item.loyaltyTier].color + '20' }]}>
               <Ionicons
-                name={LOYALTY_CONFIG.tiers[item.loyaltyTier].icon as any}
+                name={loyaltyConfig.tiers[item.loyaltyTier].icon as any}
                 size={16}
-                color={LOYALTY_CONFIG.tiers[item.loyaltyTier].color}
+                color={loyaltyConfig.tiers[item.loyaltyTier].color}
               />
-              <Text style={[styles.loyaltyBadgeText, { color: LOYALTY_CONFIG.tiers[item.loyaltyTier].color }]}>
+              <Text style={[styles.loyaltyBadgeText, { color: loyaltyConfig.tiers[item.loyaltyTier].color }]}>
                 {item.loyaltyTier}
               </Text>
             </View>
@@ -436,7 +476,7 @@ export const SellerClientsScreen: React.FC = () => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={[styles.headerButton, { backgroundColor: COLORS.info + '20' }]}
-            onPress={() => setShowLoyaltySettings(true)}
+            onPress={handleOpenLoyaltySettings}
           >
             <Ionicons name="trophy-outline" size={20} color={COLORS.info} />
           </TouchableOpacity>
@@ -477,52 +517,81 @@ export const SellerClientsScreen: React.FC = () => {
               <View style={styles.infoSection}>
                 <Ionicons name="information-circle" size={24} color={COLORS.info} />
                 <Text style={styles.infoText}>
-                  Les points de fidélité sont calculés automatiquement en fonction des achats de vos clients.
+                  Personnalisez votre programme de fidélité selon vos besoins.
                 </Text>
               </View>
 
+              <View style={styles.configSection}>
+                <Text style={styles.sectionTitle}>Configuration des points</Text>
+                <View style={styles.configItem}>
+                  <Text style={styles.configLabel}>Points pour chaque 1000 F dépensés</Text>
+                  <TextInput
+                    style={styles.configInput}
+                    value={String(editingLoyaltyConfig.pointsPerXOF)}
+                    onChangeText={(text) => {
+                      const value = parseInt(text) || 100;
+                      setEditingLoyaltyConfig({ ...editingLoyaltyConfig, pointsPerXOF: value });
+                    }}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
               <View style={styles.tierSection}>
-                <Text style={styles.sectionTitle}>Niveaux de fidélité</Text>
+                <Text style={styles.sectionTitle}>Seuils des niveaux de fidélité</Text>
                 
-                {Object.entries(LOYALTY_CONFIG.tiers).map(([tier, config]) => (
+                {Object.entries(editingLoyaltyConfig.tiers).map(([tier, config]) => (
                   <View key={tier} style={styles.tierCard}>
                     <View style={[styles.tierIcon, { backgroundColor: config.color + '20' }]}>
                       <Ionicons name={config.icon as any} size={24} color={config.color} />
                     </View>
                     <View style={styles.tierInfo}>
                       <Text style={styles.tierName}>{tier}</Text>
-                      <Text style={styles.tierMinPoints}>
-                        {config.minPoints === 0 ? '0' : config.minPoints.toLocaleString()}+ points
-                      </Text>
+                      <TextInput
+                        style={styles.tierInput}
+                        value={String(config.minPoints)}
+                        onChangeText={(text) => {
+                          const value = parseInt(text) || 0;
+                          setEditingLoyaltyConfig({
+                            ...editingLoyaltyConfig,
+                            tiers: {
+                              ...editingLoyaltyConfig.tiers,
+                              [tier]: { ...config, minPoints: value }
+                            }
+                          });
+                        }}
+                        keyboardType="numeric"
+                        placeholder="Points minimum"
+                      />
                     </View>
                   </View>
                 ))}
               </View>
 
-              <View style={styles.configSection}>
-                <Text style={styles.sectionTitle}>Configuration actuelle</Text>
-                <View style={styles.configItem}>
-                  <Text style={styles.configLabel}>Points par 1000 F dépensés</Text>
-                  <Text style={styles.configValue}>{LOYALTY_CONFIG.pointsPerXOF} points</Text>
-                </View>
-              </View>
-
               <View style={styles.tipSection}>
                 <Text style={styles.tipTitle}>💡 Astuces</Text>
                 <Text style={styles.tipText}>
-                  • Plus vos clients achètent, plus ils accumulent de points{'\n'}
-                  • Les clients avec un niveau élevé sont vos meilleurs clients{'\n'}
-                  • Offrez des récompenses exclusives pour vos clients fidèles
+                  • Des seuils plus bas encouragent plus rapidement la fidélité{'\n'}
+                  • Ajustez les points selon votre marge bénéficiaire{'\n'}
+                  • Les clients avec un niveau élevé sont vos meilleurs clients
                 </Text>
               </View>
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => setShowLoyaltySettings(false)}
-            >
-              <Text style={styles.modalButtonText}>Fermer</Text>
-            </TouchableOpacity>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleCancelLoyaltyConfig}
+              >
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={handleSaveLoyaltyConfig}
+              >
+                <Text style={styles.modalButtonText}>Enregistrer</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -975,11 +1044,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     margin: SPACING.lg,
     borderRadius: RADIUS.md,
+    flex: 1,
+    marginHorizontal: SPACING.xs,
+  },
+
+  cancelButton: {
+    backgroundColor: COLORS.textMuted,
+  },
+
+  cancelButtonText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
   },
 
   modalButtonText: {
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
     color: COLORS.text,
+  },
+
+  modalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+  },
+
+  configInput: {
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    minWidth: 80,
+    textAlign: 'center',
+  },
+
+  tierInput: {
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    minWidth: 100,
   },
 });
