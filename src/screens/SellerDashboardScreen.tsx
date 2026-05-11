@@ -1022,7 +1022,7 @@ export const SellerDashboardScreen: React.FC = () => {
       },
     ];
 
-    const visibleActions = isMobile && !isLandscape ? actions.slice(0, 4) : actions;
+    const visibleActions = isMobile && !isLandscape ? actions.slice(0, 6) : actions;
 
     return (
       <View style={styles.section}>
