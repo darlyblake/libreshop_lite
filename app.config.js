@@ -14,11 +14,15 @@ module.exports = ({ config }) => {
     ],
     extra: {
       ...config.extra,
+      // Only public-safe variables should be here
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
       EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
       EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
-      EXPO_PUBLIC_GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
+      EXPO_PUBLIC_WEB_BASE_URL: process.env.EXPO_PUBLIC_WEB_BASE_URL,
+      // CRITICAL: API keys must NOT be exposed in client code
+      // EXPO_PUBLIC_GEMINI_API_KEY removed - use server-side API instead
+      // EXPO_PUBLIC_GROC_API_KEY removed - use server-side API instead
     },
   };
 };

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, setSecurityHeaders, getClientIP, sanitizeError } from './auth-middleware';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -38,14 +39,22 @@ function isValidUUID(uuid: string): boolean {
 }
 
 export default async function handler(req: any, res: any) {
+  // Rate limiting
+  const clientIP = getClientIP(req);
+  if (!checkRateLimit(clientIP)) {
+    return res.status(429).send('Too many requests');
+  }
+
   const { id } = req.query;
 
   // Validate ID
   if (!id) {
+    setSecurityHeaders(res);
     return res.status(400).send('Store ID is required');
   }
 
   if (!isValidUUID(id)) {
+    setSecurityHeaders(res);
     return res.status(400).send('Invalid ID format');
   }
 
@@ -58,6 +67,7 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (error || !stores) {
+      setSecurityHeaders(res);
       return res.status(404).send('Store not found');
     }
 
@@ -202,13 +212,13 @@ export default async function handler(req: any, res: any) {
 </body>
 </html>`;
 
+    setSecurityHeaders(res);
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
     res.send(html);
   } catch (error) {
-    console.error('Error fetching store:', error);
+    console.error('Error fetching store:', sanitizeError(error));
+    setSecurityHeaders(res);
+    res.setHeader('Content-Type', 'text/html');
     res.status(500).send('Error loading store');
   }
 }

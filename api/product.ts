@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { checkRateLimit, setSecurityHeaders, getClientIP, sanitizeError } from './auth-middleware';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
@@ -20,6 +21,17 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, "&#039;");
 }
 
+// Escape HTML attributes
+function escapeHtmlAttr(unsafe: string): string {
+  if (!unsafe) return '';
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 // Validate UUID format
 function isValidUUID(uuid: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,14 +39,22 @@ function isValidUUID(uuid: string): boolean {
 }
 
 export default async function handler(req: any, res: any) {
+  // Rate limiting
+  const clientIP = getClientIP(req);
+  if (!checkRateLimit(clientIP)) {
+    return res.status(429).send('Too many requests');
+  }
+
   const { id } = req.query;
 
   // Validate ID
   if (!id) {
+    setSecurityHeaders(res);
     return res.status(400).send('Product ID is required');
   }
 
   if (!isValidUUID(id)) {
+    setSecurityHeaders(res);
     return res.status(400).send('Invalid ID format');
   }
 
@@ -47,6 +67,7 @@ export default async function handler(req: any, res: any) {
       .single();
 
     if (error || !products) {
+      setSecurityHeaders(res);
       return res.status(404).send('Product not found');
     }
 
@@ -161,13 +182,13 @@ export default async function handler(req: any, res: any) {
 </body>
 </html>`;
 
+    setSecurityHeaders(res);
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
     res.send(html);
   } catch (error) {
-    console.error('Error fetching product:', error);
+    console.error('Error fetching product:', sanitizeError(error));
+    setSecurityHeaders(res);
+    res.setHeader('Content-Type', 'text/html');
     res.status(500).send('Error loading product');
   }
 }
