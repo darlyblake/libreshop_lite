@@ -109,11 +109,11 @@ export const ProductDetailScreen: React.FC = () => {
           setStore(s);
         }
 
-        // Update SEO meta tags
+        // Update SEO meta tags automatically from product data
         setProductPageMeta({
           productId: p.id,
-          name: p.seo_title || p.name,
-          description: p.seo_description || p.description || '',
+          name: p.name,
+          description: p.description || '',
           price: p.price,
           rating: (p as any).rating || 0,
           ratingCount: (p as any).review_count || (p as any).view_count || 0,

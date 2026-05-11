@@ -398,6 +398,19 @@ const SellerAddStoreScreen: React.FC = () => {
       </View>
 
       <Text style={styles.sectionTitle}>Informations</Text>
+      
+      <View style={styles.seoTipCard}>
+        <Ionicons name="information-circle-outline" size={20} color={COLORS.accent} />
+        <View style={styles.seoTipContent}>
+          <Text style={styles.seoTipTitle}>💡 Conseils pour être visible sur Google</Text>
+          <Text style={styles.seoTipText}>
+            • Nom de boutique: Choisissez un nom clair et descriptif (ex: "Mode Urbaine Dakar"){"\n"}
+            • Description: Décrivez vos produits et votre activité en 2-3 phrases (utilisez des mots-clés pertinents){"\n"}
+            • Catégorie: Choisissez la catégorie la plus précise pour votre activité
+          </Text>
+        </View>
+      </View>
+      
       <Input
         icon="storefront-outline"
         placeholder="Nom de la boutique"
@@ -819,6 +832,30 @@ const getStyles = (themeContext: any) => {
     zIndex: 2,
     height: 24,
     justifyContent: 'center',
+  },
+  seoTipCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.accent + '10',
+    borderWidth: 1,
+    borderColor: COLORS.accent + '30',
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  seoTipContent: {
+    flex: 1,
+  },
+  seoTipTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  seoTipText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    lineHeight: 18,
   },
   categorySelector: {
     flexDirection: 'row',
