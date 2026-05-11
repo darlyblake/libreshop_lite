@@ -1142,7 +1142,12 @@ export const SellerCollectionScreen: React.FC = () => {
               <Text style={styles.emptyStateText}>
                 {searchQuery 
                   ? "Aucune collection ne correspond à votre recherche"
-                  : "Commencez par créer votre première collection"}
+                  : "Les collections organisent vos produits et les rendent visibles sur LibreShop.\n\n" +
+                    "💡 Pourquoi créer une collection ?\n" +
+                    "• Organisez vos produits par thème (ex: Vêtements d'été, Nouveautés)\n" +
+                    "• Liez votre collection à une catégorie pour être trouvé par les clients\n" +
+                    "• Vos produits s'affichent quand les clients recherchent cette catégorie\n\n" +
+                    "Commencez par créer votre première collection"}
               </Text>
               <TouchableOpacity 
                 style={styles.emptyStateButton}
