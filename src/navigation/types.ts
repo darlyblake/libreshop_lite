@@ -64,6 +64,7 @@ export type RootStackParamList = {
   SellerSale: { productId: string };
   SellerRestock: { productId: string };
   SellerLowStock: undefined;
+  SellerReports: undefined;
   Notifications: undefined;
   Features: undefined;
   Pricing: undefined;
@@ -90,7 +91,6 @@ export type SellerTabParamList = {
   SellerCollection: undefined;
   SellerClients: undefined;
   SellerStore: undefined;
-  SellerReports: undefined;
 };
 
 // Declare global types for useNavigation

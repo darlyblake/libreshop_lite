@@ -1014,6 +1014,12 @@ export const SellerDashboardScreen: React.FC = () => {
         color: COLORS.info,
         screen: 'SellerCollection' 
       },
+      { 
+        label: 'Rapports', 
+        icon: 'document-text', 
+        color: COLORS.primary,
+        screen: 'SellerReports' 
+      },
     ];
 
     const visibleActions = isMobile && !isLandscape ? actions.slice(0, 4) : actions;
