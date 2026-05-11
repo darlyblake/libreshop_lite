@@ -411,7 +411,7 @@ export const refundService = {
   },
 
   // Helper: Mapper les données de la base vers le type Refund
-  private mapToRefund(data: any): Refund {
+  mapToRefund(data: any): Refund {
     return {
       id: data.id,
       orderId: data.order_id,
