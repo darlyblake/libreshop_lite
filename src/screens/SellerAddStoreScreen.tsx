@@ -406,7 +406,8 @@ const SellerAddStoreScreen: React.FC = () => {
           <Text style={styles.seoTipText}>
             • Nom de boutique: Choisissez un nom clair et descriptif (ex: "Mode Urbaine Dakar"){"\n"}
             • Description: Décrivez vos produits et votre activité en 2-3 phrases (utilisez des mots-clés pertinents){"\n"}
-            • Catégorie: Choisissez la catégorie la plus précise pour votre activité
+            • Catégorie: Choisissez la catégorie la plus précise pour votre activité{"\n"}
+            • Google Business Profile: Créez votre profil Google Business gratuit pour améliorer votre référencement local et apparaître sur Google Maps (https://business.google.com)
           </Text>
         </View>
       </View>
