@@ -9,7 +9,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 async function testStoreCreation() {
   try {
     const email = 'test_store_creator_' + Date.now() + '@example.com';
-    const password = 'Password123!';
+    const password = process.env.TEST_PASSWORD || 'TestPassword123!';
     
     // 1. Sign up user
     console.log('Signing up user:', email);

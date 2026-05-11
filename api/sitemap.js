@@ -1,4 +1,9 @@
+import { setSecurityHeaders } from './auth-middleware';
+
 export default function handler(req, res) {
+  // Set security headers
+  setSecurityHeaders(res);
+  
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
