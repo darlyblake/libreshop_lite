@@ -53,7 +53,7 @@ export const accountingService = {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, id, customer_name, customer_phone, total_amount, tax_amount, payment_method, items')
+        .select('created_at, id, customer_name, customer_phone, total_amount, payment_method, items')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -66,8 +66,8 @@ export const accountingService = {
         invoiceNumber: `FAC-${order.id.slice(0, 8)}`,
         customerName: order.customer_name || 'Client inconnu',
         customerPhone: order.customer_phone || '',
-        amount: order.total_amount - (order.tax_amount || 0),
-        taxAmount: order.tax_amount || 0,
+        amount: order.total_amount,
+        taxAmount: 0,
         totalAmount: order.total_amount,
         paymentMethod: order.payment_method || 'Non spécifié',
         category: 'Ventes',
@@ -132,7 +132,7 @@ export const accountingService = {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total_amount, tax_amount')
+        .select('created_at, total_amount')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -141,7 +141,7 @@ export const accountingService = {
       if (error) throw error;
 
       const totalSales = (orders || []).reduce((sum: number, order: any) => sum + order.total_amount, 0);
-      const totalTax = (orders || []).reduce((sum: number, order: any) => sum + (order.tax_amount || 0), 0);
+      const totalTax = 0; // Pas de colonne tax_amount dans la base
       const netSales = totalSales - totalTax;
 
       const records = [{
@@ -149,7 +149,7 @@ export const accountingService = {
         totalSales,
         totalTax,
         netSales,
-        taxRate: totalSales > 0 ? ((totalTax / totalSales) * 100).toFixed(2) + '%' : '0%',
+        taxRate: '0%', // Pas de TVA séparée
       }];
 
       return this.convertToCSV(records);
@@ -244,14 +244,14 @@ export const accountingService = {
       // Revenus: ventes
       const { data: orders } = await supabase
         .from('orders')
-        .select('total_amount, tax_amount')
+        .select('total_amount')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
         .in('status', ['paid', 'delivered']);
 
       const totalRevenue = (orders || []).reduce((sum: number, o: any) => sum + o.total_amount, 0);
-      const totalTax = (orders || []).reduce((sum: number, o: any) => sum + (o.tax_amount || 0), 0);
+      const totalTax = 0; // Pas de colonne tax_amount dans la base
       const netRevenue = totalRevenue - totalTax;
 
       // Note: La table refunds n'existe pas encore, pas de remboursements
