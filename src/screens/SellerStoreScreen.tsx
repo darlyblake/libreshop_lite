@@ -269,20 +269,21 @@ export const SellerStoreScreen: React.FC = () => {
   };
 
   const handleShareStore = async () => {
-    if (!storePublicUrl) {
+    if (!store?.id) {
       Alert.alert('Partager', 'Lien boutique indisponible.');
       return;
     }
     try {
+      const shareUrl = `https://libreshop.shop/store.html?id=${store.id}`;
       await shareContent({
         title: store?.name || 'Boutique',
         description: store?.description || '',
-        url: storePublicUrl,
+        url: shareUrl,
         imageUrl: (store as any)?.logo_url || (store as any)?.banner_url || undefined,
         type: 'store',
       });
     } catch (e: any) {
-      Alert.alert('Partager', storePublicUrl);
+      Alert.alert('Partager', `https://libreshop.shop/store.html?id=${store.id}`);
     }
   };
 

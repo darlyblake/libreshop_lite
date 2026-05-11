@@ -63,6 +63,7 @@ export type RootStackParamList = {
   SellerProductActions: { productId: string };
   SellerSale: { productId: string };
   SellerRestock: { productId: string };
+  SellerLowStock: undefined;
   Notifications: undefined;
   Features: undefined;
   Pricing: undefined;

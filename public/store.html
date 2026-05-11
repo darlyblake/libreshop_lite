@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Boutique - LibreShop</title>
+  
+  <!-- Open Graph Meta Tags (dynamiques via JavaScript) -->
+  <meta property="og:title" content="Boutique - LibreShop">
+  <meta property="og:description" content="Découvrez cette boutique sur LibreShop">
+  <meta property="og:image" content="https://libreshop.shop/icon-512.png">
+  <meta property="og:url" content="">
+  <meta property="og:type" content="business.business">
+  <meta property="og:site_name" content="LibreShop">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Boutique - LibreShop">
+  <meta name="twitter:description" content="Découvrez cette boutique sur LibreShop">
+  <meta name="twitter:image" content="https://libreshop.shop/icon-512.png">
+  
+  <!-- Local Business Meta Tags -->
+  <meta property="business:contact_data:street_address" content="">
+  <meta property="business:contact_data:locality" content="">
+  <meta property="business:contact_data:country" content="">
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .logo {
+      width: 48px;
+      height: 48px;
+      background: #8b5cf6;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+    }
+    .store-banner {
+      width: 100%;
+      height: 200px;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+      border-radius: 8px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 48px;
+    }
+    .store-logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin: -60px auto 16px;
+      border: 4px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      color: #1a1a1a;
+      text-align: center;
+    }
+    .store-info {
+      text-align: center;
+      color: #666;
+      margin-bottom: 24px;
+    }
+    .description {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      text-align: center;
+      padding: 16px;
+      background: #f8f8f8;
+      border-radius: 8px;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #8b5cf6;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+    }
+    .btn {
+      display: inline-block;
+      background: #8b5cf6;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      text-align: center;
+      width: 100%;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="loading" class="loading">Chargement de la boutique...</div>
+    <div id="content" style="display: none;">
+      <div class="header">
+        <div class="logo">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        </div>
+        <div>
+          <strong>LibreShop</strong>
+          <div style="font-size: 14px; color: #666;">Marketplace Africaine</div>
+        </div>
+      </div>
+      <div class="store-banner">
+        🏪
+      </div>
+      <img id="storeLogo" class="store-logo" src="" alt="" style="display: none;">
+      <h1 id="storeName"></h1>
+      <div class="store-info">
+        <div id="storeLocation"></div>
+        <div id="storeCategory"></div>
+      </div>
+      <p id="storeDescription" class="description"></p>
+      <div class="stats">
+        <div class="stat">
+          <div id="productCount" class="stat-value">0</div>
+          <div class="stat-label">Produits</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">⭐</div>
+          <div class="stat-label">Note</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value">🚀</div>
+          <div class="stat-label">Livraison</div>
+        </div>
+      </div>
+      <a id="storeLink" class="btn" href="#">Visiter la boutique</a>
+    </div>
+  </div>
+
+  <script type="module">
+    // Récupérer l'ID de la boutique depuis l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const storeId = urlParams.get('id');
+
+    if (!storeId) {
+      document.getElementById('loading').textContent = 'Boutique non trouvée';
+      document.getElementById('loading').style.display = 'block';
+    } else {
+      // Charger les données de la boutique depuis Supabase
+      const SUPABASE_URL = 'https://gdjqzhbfibrsdiwvfhvp.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkanF6aGZpYnJzZGl3dmZodnAiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjU0NTU0NCwiZXhwIjoyMDUyMTIxNTQ0fQ.C5V0JN5tJ0F8K5X3mW5vY6N7pQ2rS8tU9vW0X1Y2Z3';
+
+      try {
+        // Charger la boutique
+        const storeResponse = await fetch(`${SUPABASE_URL}/rest/v1/stores?id=eq.${storeId}&select=*`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+
+        const storeData = await storeResponse.json();
+        
+        if (storeData && storeData.length > 0) {
+          const store = storeData[0];
+          
+          // Charger le nombre de produits
+          const productsResponse = await fetch(`${SUPABASE_URL}/rest/v1/products?store_id=eq.${storeId}&select=id`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            }
+          });
+
+          const productsData = await productsResponse.json();
+          const productCount = productsData?.length || 0;
+          
+          // Mettre à jour les meta tags Open Graph
+          document.title = `${store.name} - Boutique | LibreShop`;
+          document.querySelector('meta[property="og:title"]').setAttribute('content', `${store.name} - Boutique | LibreShop`);
+          document.querySelector('meta[property="og:description"]').setAttribute('content', store.description?.substring(0, 200) || 'Découvrez cette boutique sur LibreShop');
+          document.querySelector('meta[property="og:image"]').setAttribute('content', store.logo_url || 'https://libreshop.shop/icon-512.png');
+          document.querySelector('meta[property="og:url"]').setAttribute('content', window.location.href);
+          document.querySelector('meta[name="twitter:title"]').setAttribute('content', `${store.name} - Boutique | LibreShop`);
+          document.querySelector('meta[name="twitter:description"]').setAttribute('content', store.description?.substring(0, 200) || 'Découvrez cette boutique sur LibreShop');
+          document.querySelector('meta[name="twitter:image"]').setAttribute('content', store.logo_url || 'https://libreshop.shop/icon-512.png');
+          
+          // Afficher le contenu
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('content').style.display = 'block';
+          
+          document.getElementById('storeName').textContent = store.name;
+          document.getElementById('storeLocation').textContent = store.location || '';
+          document.getElementById('storeCategory').textContent = store.category || '';
+          document.getElementById('storeDescription').textContent = store.description || '';
+          document.getElementById('productCount').textContent = productCount;
+          document.getElementById('storeLink').href = window.location.href;
+          
+          const logo = document.getElementById('storeLogo');
+          if (store.logo_url) {
+            logo.src = store.logo_url;
+            logo.alt = store.name;
+            logo.style.display = 'block';
+          }
+        } else {
+          document.getElementById('loading').textContent = 'Boutique non trouvée';
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement de la boutique:', error);
+        document.getElementById('loading').textContent = 'Erreur lors du chargement de la boutique';
+      }
+    }
+  </script>
+</body>
+</html>

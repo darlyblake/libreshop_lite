@@ -83,8 +83,7 @@ export const SellerProductsScreen: React.FC = () => {
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
 
   const getProductPublicUrl = useCallback((productId: string) => {
-    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-    return webBaseUrl ? `${webBaseUrl}/product/${productId}` : Linking.createURL(`/product/${productId}`);
+    return `https://libreshop.shop/product.html?id=${productId}`;
   }, []);
 
   const shareOrCopyProductUrl = useCallback(async (productId: string) => {

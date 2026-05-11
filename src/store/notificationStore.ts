@@ -4,7 +4,7 @@ export interface Notification {
   id: string;
   title: string;
   body: string;
-  type: 'order' | 'payment' | 'promo' | 'system';
+  type: 'order' | 'payment' | 'promo' | 'system' | 'comment' | 'like' | 'admin';
   read: boolean;
   created_at: string;
   data?: Record<string, any>;

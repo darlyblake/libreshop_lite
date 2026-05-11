@@ -38,6 +38,7 @@ export { SellerCollectionProductsScreen } from './SellerCollectionProductsScreen
 export { SellerProductActionsScreen } from './SellerProductActionsScreen';
 export { SellerSaleScreen } from './SellerSaleScreen';
 export { SellerRestockScreen } from './SellerRestockScreen';
+export { SellerLowStockScreen } from './SellerLowStockScreen';
 export { AdminDashboardScreen } from './AdminDashboardScreen';
 export { AdminSettingsScreen } from './AdminSettingsScreen';
 export { AdminUsersScreen } from './AdminUsersScreen';

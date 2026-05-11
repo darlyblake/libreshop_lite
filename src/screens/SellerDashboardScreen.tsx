@@ -31,6 +31,7 @@ import { authService } from '../services/authService';
 import { productLikesService } from '../services/productLikesService';
 import { notificationService } from '../services/notificationService';
 import { analyticsService, TimelineDataPoint, TopProductData } from '../services/analyticsService';
+import { lowStockAlertService } from '../services/lowStockAlertService';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { cacheService } from '../services/cacheService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
@@ -150,7 +151,7 @@ export const SellerDashboardScreen: React.FC = () => {
     return () => clearInterval(id);
   }, []);
 
-  const [summary, setSummary] = useState({ totalRevenue: 0, pendingOrders: 0, deliveredOrders: 0 });
+  const [summary, setSummary] = useState({ totalRevenue: 0, pendingOrders: 0, deliveredOrders: 0, lowStockCount: 0 });
 
   const sellerName = React.useMemo(() => {
     const fullName = String(user?.full_name || '').trim();
@@ -326,11 +327,12 @@ export const SellerDashboardScreen: React.FC = () => {
 
       const { start, prevStart, prevEnd } = getRangeBounds(timeRange);
 
-      const [ordersResponse, products, totalLikes, storeStats] = await Promise.all([
+      const [ordersResponse, products, totalLikes, storeStats, lowStockProducts] = await Promise.all([
         orderService.getByStore(store.id),
         productService.getByStoreAll(store.id),
         productLikesService.getStoreLikesCount(store.id).catch(() => 0),
         storeStatsService.getByStore(store.id).catch(() => null),
+        lowStockAlertService.getLowStockProducts(store.id).catch(() => []),
       ]);
       
       const orders = ordersResponse.orders || [];
@@ -481,7 +483,7 @@ export const SellerDashboardScreen: React.FC = () => {
       setRecentOrders(mappedOrders);
       setActivities(finalActivities);
       
-      const dashboardSummary = { totalRevenue, pendingOrders, deliveredOrders };
+      const dashboardSummary = { totalRevenue, pendingOrders, deliveredOrders, lowStockCount: lowStockProducts.length };
       setSummary(dashboardSummary);
 
       // Save to cache (10 minutes)
@@ -725,50 +727,6 @@ export const SellerDashboardScreen: React.FC = () => {
     );
   };
 
-  const renderAlerts = () => {
-    if (alerts.length === 0) return null;
-
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <Ionicons name="alert" size={fontSize.lg} color={COLORS.warning} />
-            <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>Attention requise</Text>
-          </View>
-        </View>
-
-        <View style={{ gap: spacing.sm }}>
-          {alerts.slice(0, 4).map((a) => (
-            <View
-              key={a.id}
-              style={[
-                styles.alertRow,
-                {
-                  padding: spacing.lg,
-                  backgroundColor: COLORS.card,
-                  borderRadius: component.cardBorderRadius,
-                },
-              ]}
-            >
-              <View style={[styles.alertIcon, { backgroundColor: a.color + '20' }]}>
-                <Ionicons name={a.icon} size={fontSize.lg} color={a.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.alertTitle, { fontSize: fontSize.md }]} numberOfLines={1}>
-                  {a.title}
-                </Text>
-                <Text style={[styles.alertSubtitle, { fontSize: fontSize.xs }]} numberOfLines={2}>
-                  {a.subtitle}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={fontSize.lg} color={COLORS.textMuted} />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  };
-
   const getStatCardMinWidth = () => {
     if (isDesktop) return 260;
     if (isTablet) return 240;
@@ -957,6 +915,44 @@ export const SellerDashboardScreen: React.FC = () => {
           </View>
         )}
       </View>
+    );
+  };
+
+  // Rendu des alertes (stock faible)
+  const renderAlerts = () => {
+    if (summary.lowStockCount === 0) return null;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.alertCard,
+          {
+            padding: spacing.lg,
+            backgroundColor: COLORS.warning + '15',
+            borderRadius: component.cardBorderRadius,
+            marginBottom: spacing.lg,
+            borderWidth: 1,
+            borderColor: COLORS.warning + '40',
+          }
+        ]}
+        onPress={() => navigation.navigate('SellerLowStock')}
+        activeOpacity={0.7}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={[styles.alertIcon, { backgroundColor: COLORS.warning + '20' }]}>
+            <Ionicons name="warning" size={fontSize.lg} color={COLORS.warning} />
+          </View>
+          <View style={{ flex: 1, marginLeft: spacing.md }}>
+            <Text style={[styles.alertTitle, { fontSize: fontSize.md, color: COLORS.text }]}>
+              Stock faible
+            </Text>
+            <Text style={[styles.alertText, { fontSize: fontSize.sm, color: COLORS.textMuted }]}>
+              {summary.lowStockCount} produit{summary.lowStockCount > 1 ? 's' : ''} avec stock faible
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={fontSize.md} color={COLORS.warning} />
+        </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1704,6 +1700,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  alertCard: {
+    borderWidth: 1,
+    borderColor: COLORS.warning + '40',
+  },
   alertIcon: {
     width: 40,
     height: 40,
@@ -1715,6 +1715,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
     marginBottom: 2,
+  },
+  alertText: {
+    color: COLORS.textMuted,
   },
   alertSubtitle: {
     color: COLORS.textMuted,

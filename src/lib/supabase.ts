@@ -191,6 +191,8 @@ export interface Product {
   price: number;
   compare_price?: number;
   stock: number;
+  low_stock_threshold?: number;
+  low_stock_alert_sent?: boolean;
   reference?: string;
   images: string[];
   is_active: boolean;

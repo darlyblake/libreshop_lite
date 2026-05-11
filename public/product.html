@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Produit - LibreShop</title>
+  
+  <!-- Open Graph Meta Tags (dynamiques via JavaScript) -->
+  <meta property="og:title" content="Produit - LibreShop">
+  <meta property="og:description" content="Découvrez ce produit sur LibreShop">
+  <meta property="og:image" content="https://libreshop.shop/icon-512.png">
+  <meta property="og:url" content="">
+  <meta property="og:type" content="product">
+  <meta property="og:site_name" content="LibreShop">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Produit - LibreShop">
+  <meta name="twitter:description" content="Découvrez ce produit sur LibreShop">
+  <meta name="twitter:image" content="https://libreshop.shop/icon-512.png">
+  
+  <!-- Product Meta Tags -->
+  <meta property="product:price:amount" content="">
+  <meta property="product:price:currency" content="XOF">
+  <meta property="product:availability" content="InStock">
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .logo {
+      width: 48px;
+      height: 48px;
+      background: #8b5cf6;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
+    }
+    .product-image {
+      width: 100%;
+      max-width: 400px;
+      height: auto;
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      color: #1a1a1a;
+    }
+    .price {
+      font-size: 24px;
+      font-weight: bold;
+      color: #8b5cf6;
+      margin-bottom: 16px;
+    }
+    .description {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: inline-block;
+      background: #8b5cf6;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="loading" class="loading">Chargement du produit...</div>
+    <div id="content" style="display: none;">
+      <div class="header">
+        <div class="logo">
+          <svg viewBox="0 0 24 24">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+          </svg>
+        </div>
+        <div>
+          <strong>LibreShop</strong>
+          <div style="font-size: 14px; color: #666;">Marketplace Africaine</div>
+        </div>
+      </div>
+      <img id="productImage" class="product-image" src="" alt="" style="display: none;">
+      <h1 id="productName"></h1>
+      <div id="productPrice" class="price"></div>
+      <p id="productDescription" class="description"></p>
+      <a id="productLink" class="btn" href="#">Voir sur LibreShop</a>
+    </div>
+  </div>
+
+  <script type="module">
+    // Récupérer l'ID du produit depuis l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const productId = urlParams.get('id');
+
+    if (!productId) {
+      document.getElementById('loading').textContent = 'Produit non trouvé';
+      document.getElementById('loading').style.display = 'block';
+    } else {
+      // Charger les données du produit depuis Supabase
+      const SUPABASE_URL = 'https://gdjqzhbfibrsdiwvfhvp.supabase.co';
+      const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkanF6aGZpYnJzZGl3dmZodnAiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjU0NTU0NCwiZXhwIjoyMDUyMTIxNTQ0fQ.C5V0JN5tJ0F8K5X3mW5vY6N7pQ2rS8tU9vW0X1Y2Z3';
+
+      try {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.${productId}&select=*`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+          const product = data[0];
+          
+          // Mettre à jour les meta tags Open Graph
+          document.title = `${product.name} - ${product.price.toLocaleString()} FCFA | LibreShop`;
+          document.querySelector('meta[property="og:title"]').setAttribute('content', `${product.name} - ${product.price.toLocaleString()} FCFA | LibreShop`);
+          document.querySelector('meta[property="og:description"]').setAttribute('content', product.description?.substring(0, 200) || 'Découvrez ce produit sur LibreShop');
+          document.querySelector('meta[property="og:image"]').setAttribute('content', product.images?.[0] || 'https://libreshop.shop/icon-512.png');
+          document.querySelector('meta[property="og:url"]').setAttribute('content', window.location.href);
+          document.querySelector('meta[name="twitter:title"]').setAttribute('content', `${product.name} - ${product.price.toLocaleString()} FCFA | LibreShop`);
+          document.querySelector('meta[name="twitter:description"]').setAttribute('content', product.description?.substring(0, 200) || 'Découvrez ce produit sur LibreShop');
+          document.querySelector('meta[name="twitter:image"]').setAttribute('content', product.images?.[0] || 'https://libreshop.shop/icon-512.png');
+          document.querySelector('meta[property="product:price:amount"]').setAttribute('content', product.price);
+          
+          // Afficher le contenu
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('content').style.display = 'block';
+          
+          document.getElementById('productName').textContent = product.name;
+          document.getElementById('productPrice').textContent = `${product.price.toLocaleString()} FCFA`;
+          document.getElementById('productDescription').textContent = product.description || '';
+          document.getElementById('productLink').href = window.location.href;
+          
+          const img = document.getElementById('productImage');
+          if (product.images && product.images.length > 0) {
+            img.src = product.images[0];
+            img.alt = product.name;
+            img.style.display = 'block';
+          }
+        } else {
+          document.getElementById('loading').textContent = 'Produit non trouvé';
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement du produit:', error);
+        document.getElementById('loading').textContent = 'Erreur lors du chargement du produit';
+      }
+    }
+  </script>
+</body>
+</html>

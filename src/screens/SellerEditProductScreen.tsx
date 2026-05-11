@@ -29,6 +29,7 @@ interface FormData {
   price: string;
   comparePrice: string;
   stock: string;
+  lowStockThreshold: string;
   reference: string;
   category: string;
   isActive: boolean;
@@ -55,6 +56,7 @@ export const SellerEditProductScreen: React.FC = () => {
     price: '',
     comparePrice: '',
     stock: '',
+    lowStockThreshold: '5',
     reference: '',
     category: '',
     isActive: true,
@@ -76,6 +78,7 @@ export const SellerEditProductScreen: React.FC = () => {
         price: product.price.toString(),
         comparePrice: product.compare_price?.toString() || '',
         stock: product.stock.toString(),
+        lowStockThreshold: product.low_stock_threshold?.toString() || '5',
         reference: product.reference || '',
         category: product.category || '',
         isActive: product.is_active,
@@ -194,6 +197,7 @@ export const SellerEditProductScreen: React.FC = () => {
         price: parseFloat(formData.price),
         compare_price: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
         stock: formData.stock ? parseInt(formData.stock) : 0,
+        low_stock_threshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : 5,
         reference: formData.reference,
         category: formData.category,
         is_active: formData.isActive,
@@ -329,13 +333,20 @@ export const SellerEditProductScreen: React.FC = () => {
           </View>
           <View style={styles.halfInput}>
             <Input
-              label="Référence"
-              value={formData.reference}
-              onChangeText={(value) => updateField('reference', value)}
-              placeholder="SKU-001"
+              label="Seuil d'alerte stock"
+              value={formData.lowStockThreshold}
+              onChangeText={(value) => updateField('lowStockThreshold', value)}
+              placeholder="5"
+              keyboardType="numeric"
             />
           </View>
         </View>
+        <Input
+          label="Référence"
+          value={formData.reference}
+          onChangeText={(value) => updateField('reference', value)}
+          placeholder="SKU-001"
+        />
         <Input
           label="Catégorie"
           value={formData.category}

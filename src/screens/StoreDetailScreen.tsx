@@ -897,11 +897,11 @@ export const StoreDetailScreen: React.FC = () => {
               </View>
 
               <View style={styles.actionButtonsRow}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.followButton}
                   onPress={() => {
                     if (store) {
-                      const shareUrl = `https://libreshop.shop/store/${store.id}`;
+                      const shareUrl = `https://libreshop.shop/store.html?id=${store.id}`;
                       shareContent({
                         title: store.name,
                         description: store.description || '',

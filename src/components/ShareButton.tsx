@@ -28,23 +28,28 @@ export const shareContent = async (options: ShareOptions) => {
   const { title, description, url, price, type = 'product' } = options;
   
   try {
+    // Générer l'URL web pour le partage (pour les aperçus riches sur WhatsApp/Facebook)
+    const webUrl = type === 'product' 
+      ? `https://libreshop.shop/product.html?id=${url.split('/').pop()}`
+      : `https://libreshop.shop/store.html?id=${url.split('/').pop()}`;
+
     // Créer le message de partage selon le type
     let shareMessage = '';
     
     if (type === 'product') {
       shareMessage = `🛍️ ${title}\n`;
       if (price) shareMessage += `💰 ${price}\n`;
-      shareMessage += `📝 ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n`;
-      shareMessage += `🔗 ${url}\n\n`;
+      shareMessage += `📝 ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n\n`;
+      shareMessage += `🔗 ${webUrl}\n\n`;
       shareMessage += `Découvrez sur LibreShop 🛒`;
     } else {
       shareMessage = `🏪 ${title}\n`;
-      shareMessage += `📝 ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n`;
-      shareMessage += `🔗 ${url}\n\n`;
+      shareMessage += `📝 ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n\n`;
+      shareMessage += `🔗 ${webUrl}\n\n`;
       shareMessage += `Découvrez cette boutique sur LibreShop 🛒`;
     }
 
-    console.log('[shareContent] platform=', Platform.OS, 'navigator.share=', typeof navigator !== 'undefined' && !!(navigator as any).share, 'imageUrl=', options.imageUrl);
+    console.log('[shareContent] platform=', Platform.OS, 'navigator.share=', typeof navigator !== 'undefined' && !!(navigator as any).share, 'imageUrl=', options.imageUrl, 'webUrl=', webUrl);
     if (Platform.OS === 'web') {
       // Sur web: ouvrir le native share sheet via Web Share API quand elle est supportée.
       // Important: ne pas faire de copier-coller au lieu du share sheet.
@@ -62,12 +67,12 @@ export const shareContent = async (options: ShareOptions) => {
         await navigator.share({
           title,
           text: shareMessage,
-          url,
+          url: webUrl,
         });
       } else {
         // Fallback: copier dans le presse-papiers (si Web Share indisponible)
         try {
-          await navigator.clipboard.writeText(url);
+          await navigator.clipboard.writeText(webUrl);
           Alert.alert('Lien copié !', 'Le lien a été copié dans votre presse-papiers.');
         } catch {
           // dernier recours: copier le texte complet
@@ -113,7 +118,7 @@ export const shareContent = async (options: ShareOptions) => {
 
         // For URL/text sharing prefer React Native Share which reliably opens the native share sheet
         console.log('[shareContent] no image - using Share.share');
-        await Share.share({ message: shareMessage, title: title, url: url });
+        await Share.share({ message: shareMessage, title: title, url: webUrl });
       } catch (err) {
         throw err;
       }

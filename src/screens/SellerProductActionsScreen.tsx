@@ -131,9 +131,7 @@ export const SellerProductActionsScreen: React.FC = () => {
     if (!product) return;
     triggerHaptic();
     const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-    const url = webBaseUrl 
-      ? `${webBaseUrl}/product/${product.id}` 
-      : Linking.createURL(`/product/${product.id}`);
+    const url = `https://libreshop.shop/product.html?id=${product.id}`;
 
     try {
       await shareContent({

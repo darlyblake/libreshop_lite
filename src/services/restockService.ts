@@ -1,4 +1,5 @@
 import { useSupabase } from '../lib/supabase';
+import { lowStockAlertService } from './lowStockAlertService';
 
 export interface RestockHistory {
   id: string;
@@ -22,6 +23,15 @@ export const restockService = {
       .select('*')
       .single();
     if (error) throw error;
+    
+    // Reset low stock alert flag when product is restocked
+    try {
+      await lowStockAlertService.resetAlertFlag(restock.product_id);
+    } catch (e) {
+      // Don't block restock if alert reset fails
+      console.warn('Failed to reset low stock alert flag:', e);
+    }
+    
     return data as RestockHistory;
   },
 
