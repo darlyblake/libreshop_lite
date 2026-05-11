@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput, Modal, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
 import { accountingService } from '../services/accountingService';
 import { errorHandler } from '../utils/errorHandler';
-import { DatePickerInput } from '../components/DatePickerInput';
 
 export const SellerAccountingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -18,19 +18,10 @@ export const SellerAccountingScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
 
-  // Format dates as YYYY-MM-DD strings for DatePickerInput
-  const formatDateToString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const [startDateStr, setStartDateStr] = useState(formatDateToString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
-  const [endDateStr, setEndDateStr] = useState(formatDateToString(new Date()));
-
-  const startDate = new Date(startDateStr + 'T00:00:00');
-  const endDate = new Date(endDateStr + 'T00:00:00');
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const [endDate, setEndDate] = useState(new Date());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   const handleExportSales = async () => {
     if (!storeId) return;
@@ -113,7 +104,11 @@ export const SellerAccountingScreen: React.FC = () => {
     try {
       setLoading(true);
       const balanceSheet = await accountingService.generateBalanceSheet(storeId, endDate);
-      const csv = accountingService.convertToCSV(balanceSheet);
+      const csv = accountingService.convertToCSV([
+        ...balanceSheet.assets.map(a => ({ ...a, category: 'Actifs' })),
+        ...balanceSheet.liabilities.map(l => ({ ...l, category: 'Passifs' })),
+        ...balanceSheet.equity.map(e => ({ ...e, category: 'Capitaux' })),
+      ]);
       accountingService.downloadCSV(csv, `bilan_${endDate.toISOString().split('T')[0]}.csv`);
       Alert.alert('Succès', 'Export du bilan réussi');
     } catch (e) {
@@ -129,7 +124,11 @@ export const SellerAccountingScreen: React.FC = () => {
     try {
       setLoading(true);
       const incomeStatement = await accountingService.generateIncomeStatement(storeId, startDate, endDate);
-      const csv = accountingService.convertToCSV(incomeStatement);
+      const csv = accountingService.convertToCSV([
+        ...incomeStatement.revenue.map(r => ({ ...r, category: 'Revenus' })),
+        ...incomeStatement.expenses.map(e => ({ ...e, category: 'Dépenses' })),
+        { name: 'Bénéfice net', amount: incomeStatement.netProfit, category: 'Résultat' },
+      ]);
       accountingService.downloadCSV(csv, `compte_resultat_${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}.csv`);
       Alert.alert('Succès', 'Export du compte de résultat réussi');
     } catch (e) {
@@ -183,20 +182,44 @@ export const SellerAccountingScreen: React.FC = () => {
         <View style={styles.dateSection}>
           <Text style={styles.sectionTitle}>Période</Text>
           <View style={styles.dateRow}>
-            <DatePickerInput
-              label="Du"
-              value={startDateStr}
-              onChange={setStartDateStr}
-              placeholder="Date de début"
-            />
-            <DatePickerInput
-              label="Au"
-              value={endDateStr}
-              onChange={setEndDateStr}
-              placeholder="Date de fin"
-            />
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setShowStartPicker(true)}
+            >
+              <Text style={styles.dateLabel}>Du:</Text>
+              <Text style={styles.dateValue}>{startDate.toLocaleDateString('fr-FR')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dateInput}
+              onPress={() => setShowEndPicker(true)}
+            >
+              <Text style={styles.dateLabel}>Au:</Text>
+              <Text style={styles.dateValue}>{endDate.toLocaleDateString('fr-FR')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
+
+        {showStartPicker && (
+          <DateTimePicker
+            value={startDate}
+            mode="date"
+            onChange={(event, date) => {
+              setShowStartPicker(false);
+              if (date) setStartDate(date);
+            }}
+          />
+        )}
+
+        {showEndPicker && (
+          <DateTimePicker
+            value={endDate}
+            mode="date"
+            onChange={(event, date) => {
+              setShowEndPicker(false);
+              if (date) setEndDate(date);
+            }}
+          />
+        )}
 
         <Text style={styles.sectionTitle}>Exports Comptables</Text>
 
@@ -263,13 +286,16 @@ export const SellerAccountingScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SPACING.md, backgroundColor: COLORS.card },
   headerTitle: { fontSize: FONT_SIZE.lg, fontWeight: '600', color: COLORS.text },
   content: { flex: 1, padding: SPACING.md },
   dateSection: { backgroundColor: COLORS.card, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.md },
   sectionTitle: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text, marginBottom: SPACING.sm, marginTop: SPACING.md },
   dateRow: { flexDirection: 'row', gap: SPACING.md },
+  dateInput: { flex: 1, backgroundColor: COLORS.bg, padding: SPACING.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border },
+  dateLabel: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted, marginBottom: SPACING.xs },
+  dateValue: { fontSize: FONT_SIZE.md, color: COLORS.text },
   card: { backgroundColor: COLORS.card, padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.sm },
   cardTitle: { fontSize: FONT_SIZE.md, fontWeight: '600', color: COLORS.text },
