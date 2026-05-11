@@ -306,6 +306,7 @@ const SellerTabs: React.FC = React.memo(() => {
       <SellerTab.Screen name="SellerCollection" component={Screens.SellerCollectionScreen} options={{ title: 'Collections' }} />
       <SellerTab.Screen name="SellerClients" component={Screens.SellerClientsScreen} options={{ title: 'Clients' }} />
       <SellerTab.Screen name="SellerStore" component={Screens.SellerStoreScreen} options={{ title: 'Boutique' }} />
+      <SellerTab.Screen name="SellerReports" component={Screens.SellerReportsScreen} options={{ title: 'Rapports' }} />
     </SellerTab.Navigator>
   );
 });
