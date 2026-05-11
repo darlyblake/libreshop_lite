@@ -5,12 +5,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-
+  Modal,
   Alert,
   FlatList,
   ListRenderItem,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -38,6 +39,32 @@ type Client = {
   totalSpent?: number;
   lastOrder?: string;
   isActive: boolean;
+  loyaltyPoints?: number;
+  loyaltyTier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum';
+};
+
+// Configuration du programme de fidélité
+const LOYALTY_CONFIG = {
+  pointsPerXOF: 100, // 100 points pour chaque 1000 F dépensés
+  tiers: {
+    Bronze: { minPoints: 0, color: '#CD7F32', icon: 'medal-outline' },
+    Silver: { minPoints: 1000, color: '#C0C0C0', icon: 'medal-outline' },
+    Gold: { minPoints: 5000, color: '#FFD700', icon: 'trophy-outline' },
+    Platinum: { minPoints: 10000, color: '#E5E4E2', icon: 'ribbon-outline' },
+  },
+};
+
+// Calculer les points de fidélité
+const calculateLoyaltyPoints = (totalSpent: number): number => {
+  return Math.floor(totalSpent / LOYALTY_CONFIG.pointsPerXOF) * 100;
+};
+
+// Calculer le niveau de fidélité
+const calculateLoyaltyTier = (points: number): 'Bronze' | 'Silver' | 'Gold' | 'Platinum' => {
+  if (points >= LOYALTY_CONFIG.tiers.Platinum.minPoints) return 'Platinum';
+  if (points >= LOYALTY_CONFIG.tiers.Gold.minPoints) return 'Gold';
+  if (points >= LOYALTY_CONFIG.tiers.Silver.minPoints) return 'Silver';
+  return 'Bronze';
 };
 
 /* =========================
@@ -51,6 +78,7 @@ export const SellerClientsScreen: React.FC = () => {
   const { user } = useAuthStore();
 
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showLoyaltySettings, setShowLoyaltySettings] = useState(false);
   const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
   // (optional) keep reference for initial values if needed later
   const [newClient, setNewClient] = useState<UserData>({
@@ -146,6 +174,8 @@ export const SellerClientsScreen: React.FC = () => {
           totalSpent: nextTotalSpent,
           lastOrder,
           isActive: true,
+          loyaltyPoints: calculateLoyaltyPoints(nextTotalSpent),
+          loyaltyTier: calculateLoyaltyTier(calculateLoyaltyPoints(nextTotalSpent)),
         });
       });
 
@@ -313,6 +343,29 @@ export const SellerClientsScreen: React.FC = () => {
 
             <View style={styles.statItem}>
               <Text style={styles.statValue}>
+                {item.loyaltyPoints ?? 0}
+              </Text>
+              <Text style={styles.statLabel}>Points fidélité</Text>
+            </View>
+          </View>
+
+          {/* LOYALTY TIER BADGE */}
+          {item.loyaltyTier && (
+            <View style={[styles.loyaltyBadge, { backgroundColor: LOYALTY_CONFIG.tiers[item.loyaltyTier].color + '20' }]}>
+              <Ionicons
+                name={LOYALTY_CONFIG.tiers[item.loyaltyTier].icon as any}
+                size={16}
+                color={LOYALTY_CONFIG.tiers[item.loyaltyTier].color}
+              />
+              <Text style={[styles.loyaltyBadgeText, { color: LOYALTY_CONFIG.tiers[item.loyaltyTier].color }]}>
+                {item.loyaltyTier}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.clientStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
                 {item.lastOrder
                   ? new Date(item.lastOrder).toLocaleDateString('fr-FR')
                   : '—'}
@@ -380,12 +433,20 @@ export const SellerClientsScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Clients</Text>
 
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowAddModal(true)}
-        >
-          <Ionicons name="add" size={24} color={COLORS.text} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: COLORS.info + '20' }]}
+            onPress={() => setShowLoyaltySettings(true)}
+          >
+            <Ionicons name="trophy-outline" size={20} color={COLORS.info} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Ionicons name="add" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* add-client modal */}
@@ -395,6 +456,76 @@ export const SellerClientsScreen: React.FC = () => {
         onSubmit={handleAddClient}
         initialData={newClient}
       />
+
+      {/* loyalty settings modal */}
+      <Modal
+        visible={showLoyaltySettings}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLoyaltySettings(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Programme de fidélité</Text>
+              <TouchableOpacity onPress={() => setShowLoyaltySettings(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.infoSection}>
+                <Ionicons name="information-circle" size={24} color={COLORS.info} />
+                <Text style={styles.infoText}>
+                  Les points de fidélité sont calculés automatiquement en fonction des achats de vos clients.
+                </Text>
+              </View>
+
+              <View style={styles.tierSection}>
+                <Text style={styles.sectionTitle}>Niveaux de fidélité</Text>
+                
+                {Object.entries(LOYALTY_CONFIG.tiers).map(([tier, config]) => (
+                  <View key={tier} style={styles.tierCard}>
+                    <View style={[styles.tierIcon, { backgroundColor: config.color + '20' }]}>
+                      <Ionicons name={config.icon as any} size={24} color={config.color} />
+                    </View>
+                    <View style={styles.tierInfo}>
+                      <Text style={styles.tierName}>{tier}</Text>
+                      <Text style={styles.tierMinPoints}>
+                        {config.minPoints === 0 ? '0' : config.minPoints.toLocaleString()}+ points
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.configSection}>
+                <Text style={styles.sectionTitle}>Configuration actuelle</Text>
+                <View style={styles.configItem}>
+                  <Text style={styles.configLabel}>Points par 1000 F dépensés</Text>
+                  <Text style={styles.configValue}>{LOYALTY_CONFIG.pointsPerXOF} points</Text>
+                </View>
+              </View>
+
+              <View style={styles.tipSection}>
+                <Text style={styles.tipTitle}>💡 Astuces</Text>
+                <Text style={styles.tipText}>
+                  • Plus vos clients achètent, plus ils accumulent de points{'\n'}
+                  • Les clients avec un niveau élevé sont vos meilleurs clients{'\n'}
+                  • Offrez des récompenses exclusives pour vos clients fidèles
+                </Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => setShowLoyaltySettings(false)}
+            >
+              <Text style={styles.modalButtonText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
 
       {/* SEARCH */}
@@ -482,6 +613,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.xl,
     paddingBottom: SPACING.lg,
+  },
+
+  headerActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   headerTitle: {
@@ -668,5 +812,174 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.accent,
     fontWeight: '500',
+  },
+
+  loyaltyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    marginBottom: SPACING.md,
+    gap: SPACING.xs,
+  },
+
+  loyaltyBadgeText: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+
+  modalContent: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.xl,
+    width: '100%',
+    maxHeight: '80%',
+    overflow: 'hidden',
+  },
+
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  modalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+
+  modalBody: {
+    padding: SPACING.lg,
+  },
+
+  infoSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.info + '10',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.lg,
+  },
+
+  infoText: {
+    flex: 1,
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    flexShrink: 1,
+  },
+
+  sectionTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+
+  tierSection: {
+    marginBottom: SPACING.lg,
+  },
+
+  tierCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+
+  tierIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+
+  tierInfo: {
+    flex: 1,
+  },
+
+  tierName: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+
+  tierMinPoints: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+  },
+
+  configSection: {
+    marginBottom: SPACING.lg,
+  },
+
+  configItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+
+  configLabel: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+  },
+
+  configValue: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+
+  tipSection: {
+    backgroundColor: COLORS.accent + '10',
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+  },
+
+  tipTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+
+  tipText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    lineHeight: 20,
+  },
+
+  modalButton: {
+    backgroundColor: COLORS.accent,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    alignItems: 'center',
+    margin: SPACING.lg,
+    borderRadius: RADIUS.md,
+  },
+
+  modalButtonText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
   },
 });
