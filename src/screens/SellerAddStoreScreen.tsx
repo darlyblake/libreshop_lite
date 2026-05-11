@@ -436,13 +436,30 @@ const SellerAddStoreScreen: React.FC = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.categorySelector} onPress={() => setPickerVisible(true)}>
-        <Ionicons name="pricetag-outline" size={20} color={COLORS.textMuted} />
+      <TouchableOpacity 
+        style={[
+          styles.categorySelector,
+          touched.category && errors.category && styles.categorySelectorError
+        ]} 
+        onPress={() => setPickerVisible(true)}
+      >
+        <Ionicons 
+          name="pricetag-outline" 
+          size={20} 
+          color={touched.category && errors.category ? COLORS.danger : COLORS.textMuted} 
+        />
         <Text style={[styles.categorySelectorText, !values.category && styles.placeholderText]}>
           {values.category ? categories.find(c => c.slug === values.category)?.name : 'Sélectionnez une catégorie'}
         </Text>
         <Ionicons name="chevron-down" size={20} color={COLORS.textMuted} />
+        {touched.category && errors.category && (
+          <Ionicons name="alert-circle" size={20} color={COLORS.danger} style={{ marginLeft: SPACING.sm }} />
+        )}
       </TouchableOpacity>
+      
+      {touched.category && errors.category && (
+        <Text style={styles.errorText}>{errors.category}</Text>
+      )}
       
       <Input
         placeholder="Description courte (optionnel)"
@@ -870,10 +887,18 @@ const getStyles = (themeContext: any) => {
     gap: SPACING.sm,
     marginBottom: SPACING.md,
   },
+  categorySelectorError: {
+    borderColor: COLORS.danger,
+  },
   categorySelectorText: {
     flex: 1,
     fontSize: FONT_SIZE.md,
     color: COLORS.text,
+  },
+  errorText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.danger,
+    marginBottom: SPACING.md,
   },
   placeholderText: {
     color: COLORS.textMuted,
