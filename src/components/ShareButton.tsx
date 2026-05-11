@@ -30,8 +30,8 @@ export const shareContent = async (options: ShareOptions) => {
   try {
     // Générer l'URL web pour le partage (pour les aperçus riches sur WhatsApp/Facebook)
     const webUrl = type === 'product' 
-      ? `https://libreshop.shop/product.html?id=${url.split('/').pop()}`
-      : `https://libreshop.shop/store.html?id=${url.split('/').pop()}`;
+      ? `https://libreshop.shop/api/product?id=${url.split('/').pop()}`
+      : `https://libreshop.shop/api/store?id=${url.split('/').pop()}`;
 
     // Créer le message de partage selon le type
     let shareMessage = '';

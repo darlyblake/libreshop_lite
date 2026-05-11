@@ -130,8 +130,7 @@ export const SellerProductActionsScreen: React.FC = () => {
   const handleShare = async () => {
     if (!product) return;
     triggerHaptic();
-    const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-    const url = `https://libreshop.shop/product.html?id=${product.id}`;
+    const url = `https://libreshop.shop/api/product?id=${product.id}`;
 
     try {
       await shareContent({

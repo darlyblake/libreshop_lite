@@ -1011,7 +1011,7 @@ export const ProductDetailScreen: React.FC = () => {
             style={styles.headerButton}
             onPress={() => {
               if (product) {
-                const shareUrl = `https://libreshop.shop/product.html?id=${product.id}`;
+                const shareUrl = `https://libreshop.shop/api/product?id=${product.id}`;
                 shareContent({
                   title: product.name,
                   description: product.description || '',

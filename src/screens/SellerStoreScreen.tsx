@@ -274,7 +274,7 @@ export const SellerStoreScreen: React.FC = () => {
       return;
     }
     try {
-      const shareUrl = `https://libreshop.shop/store.html?id=${store.id}`;
+      const shareUrl = `https://libreshop.shop/api/store?id=${store.id}`;
       await shareContent({
         title: store?.name || 'Boutique',
         description: store?.description || '',
@@ -283,7 +283,7 @@ export const SellerStoreScreen: React.FC = () => {
         type: 'store',
       });
     } catch (e: any) {
-      Alert.alert('Partager', `https://libreshop.shop/store.html?id=${store.id}`);
+      Alert.alert('Partager', `https://libreshop.shop/api/store?id=${store.id}`);
     }
   };
 

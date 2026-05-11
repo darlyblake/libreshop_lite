@@ -901,7 +901,7 @@ export const StoreDetailScreen: React.FC = () => {
                   style={styles.followButton}
                   onPress={() => {
                     if (store) {
-                      const shareUrl = `https://libreshop.shop/store.html?id=${store.id}`;
+                      const shareUrl = `https://libreshop.shop/api/store?id=${store.id}`;
                       shareContent({
                         title: store.name,
                         description: store.description || '',
