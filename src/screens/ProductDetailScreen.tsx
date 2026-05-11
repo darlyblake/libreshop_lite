@@ -112,8 +112,8 @@ export const ProductDetailScreen: React.FC = () => {
         // Update SEO meta tags
         setProductPageMeta({
           productId: p.id,
-          name: p.name,
-          description: p.description || '',
+          name: p.seo_title || p.name,
+          description: p.seo_description || p.description || '',
           price: p.price,
           rating: (p as any).rating || 0,
           ratingCount: (p as any).review_count || (p as any).view_count || 0,

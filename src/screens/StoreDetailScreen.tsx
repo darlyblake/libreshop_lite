@@ -255,11 +255,12 @@ export const StoreDetailScreen: React.FC = () => {
       setStore(s);
 
       // Update SEO meta tags
+      // Apply SEO meta tags using custom settings if available, otherwise defaults
       setStorePageMeta({
         storeId: s.id,
-        storeName: s.name,
-        description: s.description || '',
-        imageUrl: s.logo_url || '',
+        storeName: s.seo_title || s.name,
+        description: s.seo_description || s.description || '',
+        imageUrl: s.seo_og_image || s.logo_url || '',
         rating: s.rating || 0,
         ratingCount: s.review_count || 0,
         location: s.city || '',
