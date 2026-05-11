@@ -492,13 +492,30 @@ const SellerAddStoreScreen: React.FC = () => {
         error={touched.phone ? errors.phone : undefined}
       />
       
-      <TouchableOpacity style={styles.categorySelector} onPress={() => setCountryPickerVisible(true)}>
-        <Ionicons name="flag-outline" size={20} color={COLORS.textMuted} />
+      <TouchableOpacity 
+        style={[
+          styles.categorySelector,
+          touched.country_id && errors.country_id && styles.categorySelectorError
+        ]} 
+        onPress={() => setCountryPickerVisible(true)}
+      >
+        <Ionicons 
+          name="flag-outline" 
+          size={20} 
+          color={touched.country_id && errors.country_id ? COLORS.danger : COLORS.textMuted} 
+        />
         <Text style={[styles.categorySelectorText, !values.country_id && styles.placeholderText]}>
           {values.country_id ? countries.find(c => c.id === values.country_id)?.name : 'Sélectionnez un pays'}
         </Text>
         <Ionicons name="chevron-down" size={20} color={COLORS.textMuted} />
+        {touched.country_id && errors.country_id && (
+          <Ionicons name="alert-circle" size={20} color={COLORS.danger} style={{ marginLeft: SPACING.sm }} />
+        )}
       </TouchableOpacity>
+      
+      {touched.country_id && errors.country_id && (
+        <Text style={styles.errorText}>{errors.country_id}</Text>
+      )}
 
       <Input
         icon="business-outline"
@@ -514,6 +531,7 @@ const SellerAddStoreScreen: React.FC = () => {
           }
         }}
         editable={!!values.country_id}
+        error={touched.city_id ? errors.city_id : undefined}
       />
       
       {cityResults.length > 0 && !values.city_id && (
