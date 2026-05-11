@@ -177,6 +177,11 @@ export interface Store {
   city?: string;
   country?: string;
   location_set_at?: string;
+  // SEO fields
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string;
+  seo_og_image?: string;
   created_at: string;
   store_stats?: any;
 }
@@ -207,6 +212,10 @@ export interface Product {
   view_count?: number;
   total_sales?: number;
   featured?: boolean;
+  // SEO fields
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string;
   created_at: string;
   stores?: {
     name: string;

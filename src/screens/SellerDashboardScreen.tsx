@@ -1008,6 +1008,12 @@ export const SellerDashboardScreen: React.FC = () => {
         color: COLORS.info,
         screen: 'SellerAccounting' 
       },
+      { 
+        label: 'SEO', 
+        icon: 'search', 
+        color: COLORS.accent,
+        screen: 'SellerSeoSettings' 
+      },
     ];
 
     const visibleActions = actions;
