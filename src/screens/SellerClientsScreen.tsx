@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
