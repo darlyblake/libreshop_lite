@@ -13,16 +13,15 @@ import {
   RefreshControl,
   ScrollView,
   TextInput,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/responsive';
 import AddUserModal, { UserData } from '../components/AddUserModal';
 import { SearchBar } from '../components/SearchBar';
+import { DatePickerInput } from '../components/DatePickerInput';
 import { useSearch } from '../hooks/useSearch';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
@@ -87,8 +86,6 @@ export const SellerClientsScreen: React.FC = () => {
   const [showLoyaltySettings, setShowLoyaltySettings] = useState(false);
   const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
   const [editingLoyaltyConfig, setEditingLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
   // (optional) keep reference for initial values if needed later
   const [newClient, setNewClient] = useState<UserData>({
@@ -578,55 +575,18 @@ export const SellerClientsScreen: React.FC = () => {
               {editingLoyaltyConfig.isActive && (
                 <View style={styles.configSection}>
                   <Text style={styles.sectionTitle}>Période du programme</Text>
-                  {Platform.OS === 'web' ? (
-                    <>
-                      <View style={styles.configItem}>
-                        <Text style={styles.configLabel}>Date de début</Text>
-                        <TextInput
-                          style={styles.configInput}
-                          value={editingLoyaltyConfig.startDate || ''}
-                          onChangeText={(text) => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, startDate: text })}
-                          placeholder="YYYY-MM-DD"
-                        />
-                      </View>
-                      <View style={styles.configItem}>
-                        <Text style={styles.configLabel}>Date de fin</Text>
-                        <TextInput
-                          style={styles.configInput}
-                          value={editingLoyaltyConfig.endDate || ''}
-                          onChangeText={(text) => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, endDate: text })}
-                          placeholder="YYYY-MM-DD"
-                        />
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <View style={styles.configItem}>
-                        <Text style={styles.configLabel}>Date de début</Text>
-                        <TouchableOpacity
-                          style={styles.dateInput}
-                          onPress={() => setShowStartDatePicker(true)}
-                        >
-                          <Text style={styles.dateInputText}>
-                            {editingLoyaltyConfig.startDate || 'Sélectionner une date'}
-                          </Text>
-                          <Ionicons name="calendar-outline" size={20} color={COLORS.accent} />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.configItem}>
-                        <Text style={styles.configLabel}>Date de fin</Text>
-                        <TouchableOpacity
-                          style={styles.dateInput}
-                          onPress={() => setShowEndDatePicker(true)}
-                        >
-                          <Text style={styles.dateInputText}>
-                            {editingLoyaltyConfig.endDate || 'Sélectionner une date'}
-                          </Text>
-                          <Ionicons name="calendar-outline" size={20} color={COLORS.accent} />
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )}
+                  <DatePickerInput
+                    label="Date de début"
+                    value={editingLoyaltyConfig.startDate || ''}
+                    onChange={(date) => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, startDate: date })}
+                    placeholder="Sélectionner la date de début"
+                  />
+                  <DatePickerInput
+                    label="Date de fin"
+                    value={editingLoyaltyConfig.endDate || ''}
+                    onChange={(date) => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, endDate: date })}
+                    placeholder="Sélectionner la date de fin"
+                  />
                 </View>
               )}
 
@@ -701,37 +661,6 @@ export const SellerClientsScreen: React.FC = () => {
                 <Text style={styles.modalButtonText}>Enregistrer</Text>
               </TouchableOpacity>
             </View>
-
-            {/* DateTimePickers - only for mobile */}
-            {Platform.OS !== 'web' && showStartDatePicker && (
-              <DateTimePicker
-                value={editingLoyaltyConfig.startDate ? new Date(editingLoyaltyConfig.startDate) : new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  setShowStartDatePicker(false);
-                  if (date) {
-                    const formatted = date.toISOString().split('T')[0];
-                    setEditingLoyaltyConfig({ ...editingLoyaltyConfig, startDate: formatted });
-                  }
-                }}
-              />
-            )}
-
-            {Platform.OS !== 'web' && showEndDatePicker && (
-              <DateTimePicker
-                value={editingLoyaltyConfig.endDate ? new Date(editingLoyaltyConfig.endDate) : new Date()}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={(event, date) => {
-                  setShowEndDatePicker(false);
-                  if (date) {
-                    const formatted = date.toISOString().split('T')[0];
-                    setEditingLoyaltyConfig({ ...editingLoyaltyConfig, endDate: formatted });
-                  }
-                }}
-              />
-            )}
           </View>
         </View>
       </Modal>
@@ -1220,22 +1149,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     minWidth: 80,
     textAlign: 'center',
-  },
-
-  dateInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.bg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-  },
-
-  dateInputText: {
-    fontSize: FONT_SIZE.md,
-    color: COLORS.text,
   },
 
   tierInput: {

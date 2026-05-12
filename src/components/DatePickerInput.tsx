@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import ReactDatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { useTheme } from '../hooks/useTheme';
 
 interface DatePickerInputProps {
@@ -84,20 +86,38 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
     }
   };
 
-  // For web, show styled text input
+  // For web, use ReactDatePicker
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
         {label ? <Text style={styles.label}>{label}</Text> : null}
         <View style={[styles.inputContainer, error ? styles.inputError : undefined]}>
           <Ionicons name="calendar-outline" size={20} color={COLORS.accent} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder={placeholder}
-            placeholderTextColor={COLORS.textMuted}
-            value={value}
-            onChangeText={handleManualInput}
-          />
+          <View style={styles.webDatePickerContainer}>
+            <ReactDatePicker
+              selected={value ? new Date(value + 'T00:00:00') : null}
+              onChange={(date: Date | null) => {
+                if (date) {
+                  const formatted = formatDateForInput(date);
+                  onChange(formatted);
+                } else {
+                  onChange('');
+                }
+              }}
+              dateFormat="yyyy-MM-dd"
+              placeholderText={placeholder}
+              className="react-datepicker-wrapper"
+              customInput={
+                <TextInput
+                  style={styles.input}
+                  placeholder={placeholder}
+                  placeholderTextColor={COLORS.textMuted}
+                  value={value}
+                  editable={false}
+                />
+              }
+            />
+          </View>
           {value ? (
             <TouchableOpacity onPress={() => onChange('')}>
               <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
@@ -258,6 +278,9 @@ const getStyles = (theme: any) => {
     fontSize: FONT_SIZE.md,
     color: COLORS.text,
     paddingVertical: SPACING.sm,
+  },
+  webDatePickerContainer: {
+    flex: 1,
   },
   inputText: {
     flex: 1,
