@@ -39,6 +39,7 @@ type Client = {
   email?: string;
   ordersCount?: number;
   totalSpent?: number;
+  totalSpentInPeriod?: number; // Total spent within current loyalty period
   lastOrder?: string;
   isActive: boolean;
   loyaltyPoints?: number;
@@ -151,16 +152,6 @@ export const SellerClientsScreen: React.FC = () => {
 
       // Extraire les clients des commandes
       (ordersData as any[]).forEach((o: any) => {
-        // Filtrer les commandes par période du programme de fidélité
-        if (loyaltyConfig.isActive && loyaltyConfig.startDate && loyaltyConfig.endDate) {
-          const orderDate = new Date(o?.created_at);
-          const startDate = new Date(loyaltyConfig.startDate);
-          const endDate = new Date(loyaltyConfig.endDate);
-          if (orderDate < startDate || orderDate > endDate) {
-            return; // Ignorer les commandes hors période
-          }
-        }
-
         const customerPhone = String(o?.customer_phone || '').trim();
         const customerName = String(o?.customer_name || '').trim();
         const userId = String(o?.user_id || '').trim();
@@ -182,6 +173,17 @@ export const SellerClientsScreen: React.FC = () => {
           return new Date(createdAt) > new Date(existing.lastOrder) ? createdAt : existing.lastOrder;
         })();
 
+        // Filtrer les commandes par période du programme de fidélité pour les points
+        let totalSpentInPeriod = existing?.totalSpentInPeriod || 0;
+        if (loyaltyConfig.isActive && loyaltyConfig.startDate && loyaltyConfig.endDate) {
+          const orderDate = new Date(o?.created_at);
+          const startDate = new Date(loyaltyConfig.startDate);
+          const endDate = new Date(loyaltyConfig.endDate);
+          if (orderDate >= startDate && orderDate <= endDate) {
+            totalSpentInPeriod += total; // Compter uniquement les commandes dans la période
+          }
+        }
+
         map.set(id, {
           id,
           name,
@@ -189,10 +191,11 @@ export const SellerClientsScreen: React.FC = () => {
           email,
           ordersCount: nextOrdersCount,
           totalSpent: nextTotalSpent,
+          totalSpentInPeriod,
           lastOrder,
           isActive: true,
-          loyaltyPoints: calculateLoyaltyPoints(nextTotalSpent, loyaltyConfig.pointsPerXOF),
-          loyaltyTier: calculateLoyaltyTier(calculateLoyaltyPoints(nextTotalSpent, loyaltyConfig.pointsPerXOF), loyaltyConfig.tiers),
+          loyaltyPoints: loyaltyConfig.isActive ? calculateLoyaltyPoints(totalSpentInPeriod, loyaltyConfig.pointsPerXOF) : 0,
+          loyaltyTier: loyaltyConfig.isActive ? calculateLoyaltyTier(calculateLoyaltyPoints(totalSpentInPeriod, loyaltyConfig.pointsPerXOF), loyaltyConfig.tiers) : undefined,
         });
       });
 
@@ -304,7 +307,8 @@ export const SellerClientsScreen: React.FC = () => {
       setLoyaltyConfig(editingLoyaltyConfig);
       setShowLoyaltySettings(false);
       Alert.alert('Succès', 'Configuration du programme de fidélité enregistrée');
-      loadClients(true); // Reload clients with new config
+      // Reload clients with reset=true to recalculate points based on new period
+      loadClients(true);
       checkTierAchievements();
     } catch (e) {
       console.error('Failed to save loyalty config:', e);
