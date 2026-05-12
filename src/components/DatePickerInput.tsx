@@ -107,6 +107,11 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
               dateFormat="yyyy-MM-dd"
               placeholderText={placeholder}
               className="react-datepicker-wrapper"
+              popperPlacement="bottom-start"
+              popperProps={{
+                strategy: 'fixed',
+              }}
+              calendarClassName="react-datepicker-calendar"
               customInput={
                 <TextInput
                   style={styles.input}
@@ -125,6 +130,39 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
           ) : null}
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <style>{`
+          .react-datepicker-popper {
+            z-index: 9999 !important;
+            position: fixed !important;
+          }
+          .react-datepicker-calendar {
+            background-color: ${COLORS.card} !important;
+            border: 1px solid ${COLORS.border} !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+          }
+          .react-datepicker__header {
+            background-color: ${COLORS.accent} !important;
+            border-bottom: 1px solid ${COLORS.border} !important;
+          }
+          .react-datepicker__current-month,
+          .react-datepicker__day-name {
+            color: ${COLORS.text} !important;
+          }
+          .react-datepicker__day {
+            color: ${COLORS.text} !important;
+          }
+          .react-datepicker__day:hover {
+            background-color: ${COLORS.accent}20 !important;
+          }
+          .react-datepicker__day--selected {
+            background-color: ${COLORS.accent} !important;
+            color: ${COLORS.text} !important;
+          }
+          .react-datepicker__day--keyboard-selected {
+            background-color: ${COLORS.accent}30 !important;
+          }
+        `}</style>
       </View>
     );
   }
@@ -281,6 +319,7 @@ const getStyles = (theme: any) => {
   },
   webDatePickerContainer: {
     flex: 1,
+    zIndex: 1000,
   },
   inputText: {
     flex: 1,
