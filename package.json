@@ -26,6 +26,7 @@
     "@shopify/react-native-skia": "2.6.1",
     "@supabase/supabase-js": "^2.95.3",
     "canvaskit-wasm": "0.41.0",
+    "date-fns-tz": "^3.2.0",
     "expo": "~54.0.33",
     "expo-audio": "~1.1.1",
     "expo-av": "~16.0.8",

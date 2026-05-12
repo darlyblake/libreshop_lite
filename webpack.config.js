@@ -32,6 +32,7 @@ module.exports = async function (env, argv) {
       : []),
     /react-native-worklets[\s\S]*require\.getModules\(\)/,
     /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
+    /Critical dependency: the request of a dependency is an expression.*react-datepicker/,
   ];
 
   // Fix: Victory Native and Skia for web
