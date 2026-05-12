@@ -13,10 +13,12 @@ import {
   RefreshControl,
   ScrollView,
   TextInput,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/responsive';
 import AddUserModal, { UserData } from '../components/AddUserModal';
@@ -46,6 +48,9 @@ type Client = {
 
 // Configuration par défaut du programme de fidélité
 const DEFAULT_LOYALTY_CONFIG = {
+  isActive: false,
+  startDate: null as string | null,
+  endDate: null as string | null,
   pointsPerXOF: 100, // 100 points pour chaque 1000 F dépensés
   tiers: {
     Bronze: { minPoints: 0, color: '#CD7F32', icon: 'medal-outline' },
@@ -82,6 +87,8 @@ export const SellerClientsScreen: React.FC = () => {
   const [showLoyaltySettings, setShowLoyaltySettings] = useState(false);
   const [loyaltyConfig, setLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
   const [editingLoyaltyConfig, setEditingLoyaltyConfig] = useState(DEFAULT_LOYALTY_CONFIG);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
   // (optional) keep reference for initial values if needed later
   const [newClient, setNewClient] = useState<UserData>({
@@ -147,6 +154,16 @@ export const SellerClientsScreen: React.FC = () => {
 
       // Extraire les clients des commandes
       (ordersData as any[]).forEach((o: any) => {
+        // Filtrer les commandes par période du programme de fidélité
+        if (loyaltyConfig.isActive && loyaltyConfig.startDate && loyaltyConfig.endDate) {
+          const orderDate = new Date(o?.created_at);
+          const startDate = new Date(loyaltyConfig.startDate);
+          const endDate = new Date(loyaltyConfig.endDate);
+          if (orderDate < startDate || orderDate > endDate) {
+            return; // Ignorer les commandes hors période
+          }
+        }
+
         const customerPhone = String(o?.customer_phone || '').trim();
         const customerName = String(o?.customer_name || '').trim();
         const userId = String(o?.user_id || '').trim();
@@ -291,9 +308,32 @@ export const SellerClientsScreen: React.FC = () => {
       setShowLoyaltySettings(false);
       Alert.alert('Succès', 'Configuration du programme de fidélité enregistrée');
       loadClients(true); // Reload clients with new config
+      checkTierAchievements();
     } catch (e) {
       console.error('Failed to save loyalty config:', e);
       Alert.alert('Erreur', 'Impossible d\'enregistrer la configuration');
+    }
+  };
+
+  const checkTierAchievements = () => {
+    if (!loyaltyConfig.isActive) return;
+    
+    const notifications: string[] = [];
+    clients.forEach(client => {
+      if (client.loyaltyPoints && client.loyaltyTier) {
+        const tierConfig = loyaltyConfig.tiers[client.loyaltyTier];
+        if (client.loyaltyPoints >= tierConfig.minPoints) {
+          notifications.push(`${client.name} a atteint le niveau ${client.loyaltyTier}!`);
+        }
+      }
+    });
+
+    if (notifications.length > 0) {
+      Alert.alert(
+        'Niveaux atteints',
+        notifications.slice(0, 5).join('\n') + (notifications.length > 5 ? `\n...et ${notifications.length - 5} autres` : ''),
+        [{ text: 'OK' }]
+      );
     }
   };
 
@@ -523,6 +563,74 @@ export const SellerClientsScreen: React.FC = () => {
               </View>
 
               <View style={styles.configSection}>
+                <Text style={styles.sectionTitle}>Statut du programme</Text>
+                <View style={styles.switchContainer}>
+                  <Text style={styles.switchLabel}>Programme actif</Text>
+                  <TouchableOpacity
+                    style={[styles.switch, editingLoyaltyConfig.isActive ? styles.switchActive : styles.switchInactive]}
+                    onPress={() => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, isActive: !editingLoyaltyConfig.isActive })}
+                  >
+                    <View style={[styles.switchThumb, { transform: [{ translateX: editingLoyaltyConfig.isActive ? 20 : 0 }] }]} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {editingLoyaltyConfig.isActive && (
+                <View style={styles.configSection}>
+                  <Text style={styles.sectionTitle}>Période du programme</Text>
+                  {Platform.OS === 'web' ? (
+                    <>
+                      <View style={styles.configItem}>
+                        <Text style={styles.configLabel}>Date de début</Text>
+                        <TextInput
+                          style={styles.configInput}
+                          value={editingLoyaltyConfig.startDate || ''}
+                          onChangeText={(text) => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, startDate: text })}
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </View>
+                      <View style={styles.configItem}>
+                        <Text style={styles.configLabel}>Date de fin</Text>
+                        <TextInput
+                          style={styles.configInput}
+                          value={editingLoyaltyConfig.endDate || ''}
+                          onChangeText={(text) => setEditingLoyaltyConfig({ ...editingLoyaltyConfig, endDate: text })}
+                          placeholder="YYYY-MM-DD"
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.configItem}>
+                        <Text style={styles.configLabel}>Date de début</Text>
+                        <TouchableOpacity
+                          style={styles.dateInput}
+                          onPress={() => setShowStartDatePicker(true)}
+                        >
+                          <Text style={styles.dateInputText}>
+                            {editingLoyaltyConfig.startDate || 'Sélectionner une date'}
+                          </Text>
+                          <Ionicons name="calendar-outline" size={20} color={COLORS.accent} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.configItem}>
+                        <Text style={styles.configLabel}>Date de fin</Text>
+                        <TouchableOpacity
+                          style={styles.dateInput}
+                          onPress={() => setShowEndDatePicker(true)}
+                        >
+                          <Text style={styles.dateInputText}>
+                            {editingLoyaltyConfig.endDate || 'Sélectionner une date'}
+                          </Text>
+                          <Ionicons name="calendar-outline" size={20} color={COLORS.accent} />
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </View>
+              )}
+
+              <View style={styles.configSection}>
                 <Text style={styles.sectionTitle}>Configuration des points</Text>
                 <View style={styles.configItem}>
                   <Text style={styles.configLabel}>Points pour chaque 1000 F dépensés</Text>
@@ -593,6 +701,37 @@ export const SellerClientsScreen: React.FC = () => {
                 <Text style={styles.modalButtonText}>Enregistrer</Text>
               </TouchableOpacity>
             </View>
+
+            {/* DateTimePickers - only for mobile */}
+            {Platform.OS !== 'web' && showStartDatePicker && (
+              <DateTimePicker
+                value={editingLoyaltyConfig.startDate ? new Date(editingLoyaltyConfig.startDate) : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  setShowStartDatePicker(false);
+                  if (date) {
+                    const formatted = date.toISOString().split('T')[0];
+                    setEditingLoyaltyConfig({ ...editingLoyaltyConfig, startDate: formatted });
+                  }
+                }}
+              />
+            )}
+
+            {Platform.OS !== 'web' && showEndDatePicker && (
+              <DateTimePicker
+                value={editingLoyaltyConfig.endDate ? new Date(editingLoyaltyConfig.endDate) : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  setShowEndDatePicker(false);
+                  if (date) {
+                    const formatted = date.toISOString().split('T')[0];
+                    setEditingLoyaltyConfig({ ...editingLoyaltyConfig, endDate: formatted });
+                  }
+                }}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -1083,6 +1222,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+  },
+
+  dateInputText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+  },
+
   tierInput: {
     backgroundColor: COLORS.bg,
     borderWidth: 1,
@@ -1092,5 +1247,44 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     color: COLORS.text,
     minWidth: 100,
+  },
+
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+  },
+
+  switchLabel: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+  },
+
+  switch: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+  },
+
+  switchActive: {
+    backgroundColor: COLORS.success,
+  },
+
+  switchInactive: {
+    backgroundColor: COLORS.textMuted,
+  },
+
+  switchThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
