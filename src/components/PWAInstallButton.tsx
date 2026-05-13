@@ -32,7 +32,18 @@ export const PWAInstallButton: React.FC = () => {
 
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(true); // FORCE VISIBLE POUR TEST
+  const [showFallbackModal, setShowFallbackModal] = useState(false);
+
+  // LOG DIAGNOSTIC
+  console.log('🧩 PWA Button mounted:', {
+    isWeb: Platform.OS === 'web',
+    userAgent: navigator.userAgent,
+    protocol: location.protocol,
+    hostname: location.hostname,
+    standalone: window.matchMedia('(display-mode: standalone)').matches,
+    navigatorStandalone: ('standalone' in window.navigator) ? (window.navigator as any).standalone : false
+  });
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -63,12 +74,14 @@ export const PWAInstallButton: React.FC = () => {
 
     // Listen for Chrome/Android native install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
+      console.log('🚀 beforeinstallprompt FIRED!', e);
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowInstallPrompt(true);
     };
 
     const handleAppInstalled = () => {
+      console.log('✅ PWA appinstalled!');
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
