@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
@@ -79,6 +81,21 @@ export const CheckoutScreen: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Address & Onboarding states
+  const [addresses, setAddresses] = useState<any[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
+  const [isOnboardingVisible, setIsOnboardingVisible] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardingPhone, setOnboardingPhone] = useState('');
+  const [onboardingAddress, setOnboardingAddress] = useState({
+    label: 'Maison',
+    city: '',
+    address: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
+    note: '',
+  });
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -258,21 +275,160 @@ export const CheckoutScreen: React.FC = () => {
   // Check if we need strict location (city or km delivery mode)
   const requiresLocation = storesData.some(s => s.delivery_mode === 'km' || s.delivery_mode === 'city');
 
+  const handleSelectAddress = (addr: any) => {
+    setSelectedAddressId(addr.id);
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        city: addr.city || '',
+        address: addr.address || '',
+        notes: addr.note || prev.notes || '',
+      };
+      genericStorage.setItem('@libreshop_client_profile', next);
+      return next;
+    });
+    if (addr.latitude && addr.longitude) {
+      setUserLocation({ latitude: addr.latitude, longitude: addr.longitude });
+    } else {
+      setUserLocation(null);
+    }
+  };
+
+  const loadAddresses = async () => {
+    if (!user) return;
+    try {
+      const key = `@libreshop_addresses_${user.id}`;
+      const stored = await AsyncStorage.getItem(key);
+      let list: any[] = [];
+      if (stored) {
+        list = JSON.parse(stored);
+        setAddresses(list);
+      } else if (user.address) {
+        // Migration of legacy main address
+        const migrationAddr = {
+          id: '1',
+          label: 'Adresse principale',
+          city: '',
+          address: user.address,
+          is_default: true,
+        };
+        list = [migrationAddr];
+        setAddresses(list);
+        await AsyncStorage.setItem(key, JSON.stringify(list));
+      } else {
+        setAddresses([]);
+      }
+
+      // Check if onboarding is needed
+      const hasPhone = !!(user.whatsapp_number || user.phone);
+      const hasAddress = list.length > 0;
+
+      if (!hasPhone || !hasAddress) {
+        // Pre-fill fields from user profile if they exist
+        setOnboardingPhone(user.whatsapp_number || user.phone || '');
+        setOnboardingAddress(prev => ({
+          ...prev,
+          city: '',
+          address: user.address || '',
+          label: 'Maison',
+        }));
+        setOnboardingStep(1);
+        setIsOnboardingVisible(true);
+      } else {
+        // If they already have a default address, select it
+        const def = list.find(a => a.is_default) || list[0];
+        if (def) {
+          handleSelectAddress(def);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading addresses in Checkout:', error);
+    }
+  };
+
+  const handleCompleteOnboarding = async () => {
+    if (!user) return;
+    if (!onboardingAddress.label.trim() || !onboardingAddress.city.trim() || !onboardingAddress.address.trim()) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires (*)');
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      // 1. Update user profile on Supabase with the WhatsApp phone number
+      const updatedUser = await userService.upsertProfile(user.id, {
+        whatsapp_number: onboardingPhone,
+        phone: onboardingPhone,
+      });
+      useAuthStore.getState().setUser(updatedUser);
+
+      // 2. Create the first address object
+      const firstAddr = {
+        id: Date.now().toString(),
+        label: onboardingAddress.label,
+        city: onboardingAddress.city,
+        address: onboardingAddress.address,
+        latitude: onboardingAddress.latitude,
+        longitude: onboardingAddress.longitude,
+        note: onboardingAddress.note,
+        is_default: true,
+      };
+
+      // 3. Save to AsyncStorage
+      const key = `@libreshop_addresses_${user.id}`;
+      await AsyncStorage.setItem(key, JSON.stringify([firstAddr]));
+      
+      // 4. Update local states
+      setAddresses([firstAddr]);
+      setSelectedAddressId(firstAddr.id);
+      setFormData(prev => ({
+        ...prev,
+        phone: onboardingPhone,
+        city: onboardingAddress.city,
+        address: onboardingAddress.address,
+        notes: onboardingAddress.note || '',
+      }));
+      if (onboardingAddress.latitude && onboardingAddress.longitude) {
+        setUserLocation({ latitude: onboardingAddress.latitude, longitude: onboardingAddress.longitude });
+      }
+
+      setIsOnboardingVisible(false);
+      Alert.alert('Succès', 'Votre profil de livraison a été créé avec succès !');
+    } catch (e) {
+      errorHandler.handle(e, 'Complete onboarding failed');
+      Alert.alert('Erreur', 'Impossible de terminer la configuration de votre profil.');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAddresses();
+    }, [user])
+  );
+
   useEffect(() => {
     const restore = async () => {
       const saved = await genericStorage.getItem<any>('@libreshop_client_profile');
       if (saved) {
         setFormData((prev) => ({
           ...prev,
-          name: String(saved?.name || prev.name || ''),
-          phone: String(saved?.phone || prev.phone || ''),
+          name: String(saved?.name || prev.name || user?.full_name || ''),
+          phone: String(saved?.phone || prev.phone || user?.whatsapp_number || user?.phone || ''),
           address: String(saved?.address || prev.address || ''),
           notes: String(saved?.notes || prev.notes || ''),
+        }));
+      } else if (user) {
+        setFormData((prev) => ({
+          ...prev,
+          name: user.full_name || '',
+          phone: user.whatsapp_number || user.phone || '',
         }));
       }
     };
     restore();
-  }, []);
+  }, [user]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => {
@@ -310,6 +466,48 @@ export const CheckoutScreen: React.FC = () => {
             <Ionicons name="location-outline" size={20} color={COLORS.accent} />
             <Text style={styles.sectionTitle}>Adresse de livraison</Text>
           </View>
+
+          {user && addresses.length > 0 ? (
+            <View style={styles.addressSelectorContainer}>
+              <Text style={styles.addressSelectorLabel}>Sélectionnez une adresse enregistrée :</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addressSelectorScroll}>
+                {addresses.map((addr) => {
+                  const isSelected = selectedAddressId === addr.id;
+                  return (
+                    <TouchableOpacity
+                      key={addr.id}
+                      style={[styles.addressChip, isSelected && styles.addressChipActive]}
+                      onPress={() => handleSelectAddress(addr)}
+                    >
+                      <Ionicons 
+                        name={isSelected ? "checkmark-circle" : "location"} 
+                        size={16} 
+                        color={isSelected ? "#fff" : COLORS.accent} 
+                      />
+                      <Text style={[styles.addressChipText, isSelected && styles.addressChipTextActive]}>
+                        {addr.label} {addr.is_default && " ★"}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={styles.addressChipAdd}
+                  onPress={() => navigation.navigate('Address')}
+                >
+                  <Ionicons name="settings-outline" size={16} color={COLORS.textMuted} />
+                  <Text style={styles.addressChipAddText}>Gérer</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          ) : user ? (
+            <TouchableOpacity 
+              style={styles.noAddressButton}
+              onPress={() => navigation.navigate('Address')}
+            >
+              <Ionicons name="add-circle-outline" size={20} color={COLORS.accent} />
+              <Text style={styles.noAddressButtonText}>Gérer mes adresses de livraison</Text>
+            </TouchableOpacity>
+          ) : null}
           
           <View style={styles.formGroup}>
             <Text style={styles.label}>Nom complet</Text>
@@ -844,6 +1042,170 @@ export const CheckoutScreen: React.FC = () => {
           <Text style={styles.orderButtonText}>{processing || completed ? '...' : 'Commander'}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Onboarding Modal for First Order (WhatsApp + First Address) */}
+      <Modal
+        visible={isOnboardingVisible}
+        transparent
+        animationType="slide"
+      >
+        <View style={styles.onboardingOverlay}>
+          <View style={styles.onboardingContainer}>
+            <Text style={styles.onboardingTitle}>Bienvenue sur LibreShop !</Text>
+            <Text style={styles.onboardingSubtitle}>
+              Configurez vos informations de contact et de livraison pour votre première commande.
+            </Text>
+
+            {/* Progress Indicator */}
+            <View style={styles.progressRow}>
+              <View style={[styles.progressStep, onboardingStep >= 1 && styles.progressStepActive]} />
+              <View style={[styles.progressStep, onboardingStep >= 2 && styles.progressStepActive]} />
+            </View>
+            <Text style={styles.stepIndicatorText}>Étape {onboardingStep} sur 2</Text>
+
+            {onboardingStep === 1 ? (
+              <View style={styles.stepContent}>
+                <View style={styles.onboardingBadge}>
+                  <Ionicons name="logo-whatsapp" size={32} color="#fff" />
+                </View>
+                <Text style={styles.stepTitle}>Numéro de téléphone WhatsApp</Text>
+                <Text style={styles.stepDesc}>
+                  Ce numéro permettra au vendeur ou au livreur de vous contacter pour la livraison ou pour discuter de votre commande.
+                </Text>
+                <TextInput
+                  style={styles.onboardingInput}
+                  placeholder="Ex: +225 07 00 00 00 00"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="phone-pad"
+                  value={onboardingPhone}
+                  onChangeText={setOnboardingPhone}
+                />
+                <TouchableOpacity 
+                  style={styles.onboardingNextBtn}
+                  onPress={() => {
+                    if (onboardingPhone.trim().length < 6) {
+                      Alert.alert('Erreur', 'Veuillez saisir un numéro de téléphone WhatsApp valide.');
+                      return;
+                    }
+                    setOnboardingStep(2);
+                  }}
+                >
+                  <Text style={styles.onboardingNextText}>Suivant</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView style={styles.stepContentScroll} showsVerticalScrollIndicator={false}>
+                <View style={{ alignItems: 'center' }}>
+                  <View style={[styles.onboardingBadge, { backgroundColor: COLORS.accent }]}>
+                    <Ionicons name="location" size={32} color="#fff" />
+                  </View>
+                  <Text style={styles.stepTitle}>Adresse de livraison</Text>
+                  <Text style={styles.stepDesc}>
+                    Ajoutez votre première adresse pour recevoir vos commandes.
+                  </Text>
+                </View>
+
+                <View style={styles.onboardingFormGroup}>
+                  <Text style={styles.onboardingLabel}>Nom de l'adresse (Ex: Maison, Bureau)*</Text>
+                  <TextInput
+                    style={styles.onboardingInput}
+                    placeholder="Ex: Maison, Bureau..."
+                    placeholderTextColor={COLORS.textMuted}
+                    value={onboardingAddress.label}
+                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, label: v }))}
+                  />
+                </View>
+
+                <View style={styles.onboardingFormGroup}>
+                  <Text style={styles.onboardingLabel}>Ville *</Text>
+                  <TextInput
+                    style={styles.onboardingInput}
+                    placeholder="Ex: Abidjan, Yamoussoukro..."
+                    placeholderTextColor={COLORS.textMuted}
+                    value={onboardingAddress.city}
+                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, city: v }))}
+                  />
+                </View>
+
+                <View style={styles.onboardingFormGroup}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={styles.onboardingLabel}>Adresse complète (Quartier, détails) *</Text>
+                    <TouchableOpacity 
+                      style={styles.onboardingLocateBtn}
+                      onPress={async () => {
+                        setProcessing(true);
+                        try {
+                          const pos = await locationService.getCurrentPosition();
+                          if (pos) {
+                            setOnboardingAddress(prev => ({
+                              ...prev,
+                              latitude: pos.latitude,
+                              longitude: pos.longitude,
+                            }));
+                            const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
+                            if (addr) {
+                              setOnboardingAddress(prev => ({
+                                ...prev,
+                                address: addr.street || prev.address || '',
+                                city: addr.city || prev.city || '',
+                              }));
+                            }
+                            Alert.alert('Succès', 'Votre position GPS a été enregistrée !');
+                          } else {
+                            Alert.alert('Erreur', 'Impossible de récupérer votre position GPS.');
+                          }
+                        } catch (e) {
+                          Alert.alert('Erreur', 'Impossible de récupérer votre position GPS.');
+                        } finally {
+                          setProcessing(false);
+                        }
+                      }}
+                    >
+                      <Ionicons name="locate" size={14} color={COLORS.accent} />
+                      <Text style={{ fontSize: 12, color: COLORS.accent, fontWeight: '600' }}>Me localiser</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={[styles.onboardingInput, { height: 60, textAlignVertical: 'top' }]}
+                    placeholder="Quartier, rue, portail, couleur..."
+                    placeholderTextColor={COLORS.textMuted}
+                    multiline
+                    value={onboardingAddress.address}
+                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, address: v }))}
+                  />
+                </View>
+
+                <View style={styles.onboardingFormGroup}>
+                  <Text style={styles.onboardingLabel}>Note / Instructions spéciales (optionnel)</Text>
+                  <TextInput
+                    style={styles.onboardingInput}
+                    placeholder="Ex: Portail bleu, à côté du supermarché..."
+                    placeholderTextColor={COLORS.textMuted}
+                    value={onboardingAddress.note}
+                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, note: v }))}
+                  />
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md, marginBottom: SPACING.xl }}>
+                  <TouchableOpacity 
+                    style={styles.onboardingBackBtn}
+                    onPress={() => setOnboardingStep(1)}
+                  >
+                    <Text style={styles.onboardingBackText}>Retour</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.onboardingFinishBtn}
+                    onPress={handleCompleteOnboarding}
+                  >
+                    <Text style={styles.onboardingFinishText}>Terminer</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1051,6 +1413,229 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
+  },
+  addressSelectorContainer: {
+    marginBottom: SPACING.md,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  addressSelectorLabel: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+    marginBottom: SPACING.xs,
+  },
+  addressSelectorScroll: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  addressChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.bg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: SPACING.xs,
+  },
+  addressChipActive: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  addressChipText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSoft,
+  },
+  addressChipTextActive: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  addressChipAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+    backgroundColor: COLORS.bg,
+  },
+  addressChipAddText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+  },
+  noAddressButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.card,
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+    marginBottom: SPACING.md,
+    justifyContent: 'center',
+  },
+  noAddressButtonText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  onboardingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-end',
+  },
+  onboardingContainer: {
+    backgroundColor: COLORS.bg,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
+    maxHeight: '90%',
+    padding: SPACING.xl,
+    paddingTop: SPACING.xxl,
+  },
+  onboardingTitle: {
+    fontSize: FONT_SIZE.xl,
+    fontWeight: '800',
+    color: COLORS.text,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  onboardingSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSoft,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: SPACING.lg,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  progressStep: {
+    width: 24,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.border,
+  },
+  progressStepActive: {
+    backgroundColor: COLORS.accent,
+  },
+  stepIndicatorText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  stepContent: {
+    alignItems: 'center',
+    paddingBottom: SPACING.xl,
+  },
+  stepContentScroll: {
+    maxHeight: 500,
+  },
+  onboardingBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#25D366',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  stepTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  stepDesc: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSoft,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: SPACING.xl,
+    paddingHorizontal: SPACING.md,
+  },
+  onboardingInput: {
+    width: '100%',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    marginBottom: SPACING.xl,
+  },
+  onboardingNextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    width: '100%',
+    backgroundColor: COLORS.accent,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.full,
+  },
+  onboardingNextText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  onboardingFormGroup: {
+    width: '100%',
+    marginBottom: SPACING.md,
+  },
+  onboardingLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.textSoft,
+    marginBottom: SPACING.xs,
+  },
+  onboardingLocateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  onboardingBackBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  onboardingBackText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.textSoft,
+  },
+  onboardingFinishBtn: {
+    flex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.full,
+    backgroundColor: '#4CAF50',
+  },
+  onboardingFinishText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: '#fff',
   },
   errorText: {
     color: COLORS.danger,

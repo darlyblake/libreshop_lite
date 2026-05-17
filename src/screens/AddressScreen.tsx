@@ -12,16 +12,21 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
 import { locationService } from '../services/locationService';
 
-interface Address {
+export interface Address {
   id: string;
   label: string;
+  city: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
+  note?: string;
   is_default: boolean;
 }
 
@@ -35,7 +40,11 @@ export const AddressScreen: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     label: '',
+    city: '',
     address: '',
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
+    note: '',
     is_default: false,
   });
   const [locating, setLocating] = useState(false);
@@ -50,15 +59,20 @@ export const AddressScreen: React.FC = () => {
       }
       
       const addr = await locationService.reverseGeocode(position.latitude, position.longitude);
-      if (addr && addr.street) {
+      if (addr) {
         setFormData(prev => ({
           ...prev,
-          address: addr.street || ''
+          city: addr.city || prev.city || '',
+          address: addr.street || '',
+          latitude: position.latitude,
+          longitude: position.longitude,
         }));
       } else {
         setFormData(prev => ({
           ...prev,
-          address: `Lat: ${position.latitude.toFixed(5)}, Lon: ${position.longitude.toFixed(5)}`
+          address: `Lat: ${position.latitude.toFixed(5)}, Lon: ${position.longitude.toFixed(5)}`,
+          latitude: position.latitude,
+          longitude: position.longitude,
         }));
       }
     } catch (e) {
@@ -73,18 +87,28 @@ export const AddressScreen: React.FC = () => {
     loadAddresses();
   }, []);
 
+  const getStorageKey = () => user ? `@libreshop_addresses_${user.id}` : null;
+
   const loadAddresses = async () => {
+    if (!user) return;
     try {
-      // Simuler le chargement des adresses depuis l'API
-      if (user?.address) {
-        setAddresses([
-          {
-            id: '1',
-            label: 'Adresse principale',
-            address: user.address,
-            is_default: true,
-          }
-        ]);
+      const key = getStorageKey();
+      if (!key) return;
+      
+      const stored = await AsyncStorage.getItem(key);
+      if (stored) {
+        setAddresses(JSON.parse(stored));
+      } else if (user.address) {
+        // Migration of main user address
+        const migrationAddr: Address = {
+          id: '1',
+          label: 'Adresse principale',
+          city: '',
+          address: user.address,
+          is_default: true,
+        };
+        setAddresses([migrationAddr]);
+        await AsyncStorage.setItem(key, JSON.stringify([migrationAddr]));
       }
     } catch (error) {
       errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error loading addresses:');
@@ -92,8 +116,9 @@ export const AddressScreen: React.FC = () => {
   };
 
   const handleAddAddress = async () => {
+    if (!user) return;
     if (!formData.label.trim() || !formData.address.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
       return;
     }
 
@@ -102,24 +127,42 @@ export const AddressScreen: React.FC = () => {
       const newAddress: Address = {
         id: Date.now().toString(),
         label: formData.label,
+        city: formData.city,
         address: formData.address,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        note: formData.note,
         is_default: formData.is_default || addresses.length === 0,
       };
 
+      let updatedList = [...addresses];
       if (newAddress.is_default) {
-        setAddresses(prev => prev.map(addr => ({ ...addr, is_default: false })));
+        updatedList = updatedList.map(addr => ({ ...addr, is_default: false }));
       }
-
-      setAddresses(prev => [...prev, newAddress]);
+      updatedList.push(newAddress);
       
-      // Mettre à jour l'adresse principale de l'utilisateur
-      if (newAddress.is_default && user) {
+      setAddresses(updatedList);
+      const key = getStorageKey();
+      if (key) {
+        await AsyncStorage.setItem(key, JSON.stringify(updatedList));
+      }
+      
+      // Update main profile address if default
+      if (newAddress.is_default) {
         await authService.updateProfile(user.id, { address: newAddress.address });
         const { setUser } = useAuthStore.getState();
         setUser({ ...user, address: newAddress.address });
       }
 
-      setFormData({ label: '', address: '', is_default: false });
+      setFormData({
+        label: '',
+        city: '',
+        address: '',
+        latitude: undefined,
+        longitude: undefined,
+        note: '',
+        is_default: false,
+      });
       setShowAddForm(false);
       Alert.alert('Succès', 'Adresse ajoutée avec succès');
     } catch (error) {
@@ -131,20 +174,25 @@ export const AddressScreen: React.FC = () => {
   };
 
   const handleSetDefault = async (addressId: string) => {
+    if (!user) return;
     try {
       const address = addresses.find(addr => addr.id === addressId);
       if (!address) return;
 
-      setAddresses(prev => prev.map(addr => ({
+      const updatedList = addresses.map(addr => ({
         ...addr,
         is_default: addr.id === addressId
-      })));
+      }));
 
-      if (user) {
-        await authService.updateProfile(user.id, { address: address.address });
-        const { setUser } = useAuthStore.getState();
-        setUser({ ...user, address: address.address });
+      setAddresses(updatedList);
+      const key = getStorageKey();
+      if (key) {
+        await AsyncStorage.setItem(key, JSON.stringify(updatedList));
       }
+
+      await authService.updateProfile(user.id, { address: address.address });
+      const { setUser } = useAuthStore.getState();
+      setUser({ ...user, address: address.address });
 
       Alert.alert('Succès', 'Adresse principale mise à jour');
     } catch (error) {
@@ -162,8 +210,13 @@ export const AddressScreen: React.FC = () => {
         {
           text: 'Supprimer',
           style: 'destructive',
-          onPress: () => {
-            setAddresses(prev => prev.filter(addr => addr.id !== addressId));
+          onPress: async () => {
+            const updatedList = addresses.filter(addr => addr.id !== addressId);
+            setAddresses(updatedList);
+            const key = getStorageKey();
+            if (key) {
+              await AsyncStorage.setItem(key, JSON.stringify(updatedList));
+            }
             Alert.alert('Succès', 'Adresse supprimée');
           }
         }
@@ -181,7 +234,10 @@ export const AddressScreen: React.FC = () => {
           </View>
         )}
       </View>
-      <Text style={styles.addressText}>{item.address}</Text>
+      <Text style={styles.addressText}>
+        {item.city ? `${item.city}, ` : ''}{item.address}
+        {item.note ? `\nNote : ${item.note}` : ''}
+      </Text>
       <View style={styles.addressActions}>
         {!item.is_default && (
           <TouchableOpacity
@@ -454,6 +510,17 @@ export const AddressScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputGroup}>
+              <Text style={styles.label}>Ville *</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.city}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, city: text }))}
+                placeholder="Ex: Abidjan, Yamoussoukro..."
+                placeholderTextColor={getColor.textMuted}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                 <Text style={styles.label}>Adresse complète *</Text>
                 <TouchableOpacity 
@@ -475,10 +542,21 @@ export const AddressScreen: React.FC = () => {
                 style={[styles.input, styles.textArea]}
                 value={formData.address}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, address: text }))}
-                placeholder="Entrez l'adresse complète"
+                placeholder="Entrez l'adresse complète (quartier, rue, détails...)"
                 placeholderTextColor={getColor.textMuted}
                 multiline
                 numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Note / Instructions pour la livraison</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.note}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, note: text }))}
+                placeholder="Ex: Portail bleu, à côté du supermarché..."
+                placeholderTextColor={getColor.textMuted}
               />
             </View>
 
@@ -499,7 +577,15 @@ export const AddressScreen: React.FC = () => {
                 style={styles.cancelButton}
                 onPress={() => {
                   setShowAddForm(false);
-                  setFormData({ label: '', address: '', is_default: false });
+                  setFormData({
+                    label: '',
+                    city: '',
+                    address: '',
+                    latitude: undefined,
+                    longitude: undefined,
+                    note: '',
+                    is_default: false,
+                  });
                 }}
               >
                 <Text style={styles.cancelButtonText}>Annuler</Text>
