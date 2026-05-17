@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
+import { sessionStorage } from '../lib/storage';
 import { orderService } from '../services/orderService';
 import { wishlistService } from '../services/wishlistService';
 import { useTheme } from '../hooks/useTheme';
@@ -218,6 +219,20 @@ export const ClientProfileScreen: React.FC = () => {
   };
 
   const handleMenuPress = (item: (typeof MENU_ITEMS)[number]) => {
+    if (item.label === 'Ouvrir ma boutique') {
+      if (user) {
+        // Switch to seller role in sessionStorage and navigate
+        sessionStorage.saveUserRole('seller').then(() => {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'SellerTabs' }],
+          });
+        });
+      } else {
+        navigation.navigate('SellerAuth');
+      }
+      return;
+    }
     if (item.action === 'restore') {
       setShowRestoreModal(true);
       return;

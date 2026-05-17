@@ -7,6 +7,8 @@ import {
   Alert,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { 
   useAnimatedStyle, 
@@ -96,7 +98,8 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
   style,
   testID,
 }) => {
-  const { user } = useAuthStore();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { user, showAuthModal } = useAuthStore();
   const effectiveUserId = propUserId || user?.id;
 
   const themeContext = useTheme();
@@ -206,15 +209,8 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
 
   const handleFollow = useCallback(async (): Promise<void> => {
     if (!effectiveUserId) {
-      try {
-        const { data: { session } } = await authService.signInAnonymously();
-        if (!session?.user) throw new Error('Auth failed');
-        Alert.alert('Presque fini', `Identité créée. Réessayez de suivre ${storeName} !`);
-        return;
-      } catch (err) {
-        Alert.alert('Action impossible', 'Veuillez vérifier votre connexion internet.');
-        return;
-      }
+      showAuthModal({ type: 'FOLLOW_STORE', payload: { storeId } });
+      return;
     }
 
     if (!storeId || storeId === '' || storeId === 'undefined') {

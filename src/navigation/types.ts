@@ -6,6 +6,7 @@ export type RootStackParamList = {
   ClientOnboarding: undefined;
   About: undefined;
   SellerAuth: undefined;
+  ClientAuth: { pendingAction?: any };
   SellerEmailConfirm: { token?: string; type?: string; email?: string };
   SubscriptionExpired: undefined;
   AdminDashboard: undefined;

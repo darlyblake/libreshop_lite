@@ -59,7 +59,7 @@ export const ProductDetailScreen: React.FC = () => {
   const isDarkTheme = Boolean((theme as any)?.isDark ?? false);
   const STAR_COLOR = (COLORS as any)?.star ?? '#f1c40f';
   const { addItem, items } = useCartStore();
-  const { user } = useAuthStore();
+  const { user, showAuthModal } = useAuthStore();
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList<string>>(null);
@@ -410,12 +410,11 @@ export const ProductDetailScreen: React.FC = () => {
 
     const handleAddToCartWeb = () => {
       if (!product) return;
+      if (!user?.id) {
+        showAuthModal({ type: 'ADD_TO_CART', payload: { product, quantity } });
+        return;
+      }
       try {
-        // DEBUG: log product shape to help debugging when button is clicked
-        // useCartStore expects a full Product object and optional quantity
-        // eslint-disable-next-line no-console
-
-        // Ensure product has a numeric stock field so store.addItem doesn't silently ignore it
         const productToAdd = { ...product, stock: typeof (product as any)?.stock === 'number' ? (product as any).stock : 9999 } as any;
 
         addItem(productToAdd, quantity);
@@ -432,6 +431,11 @@ export const ProductDetailScreen: React.FC = () => {
     const handleBuyNowWeb = async () => {
       try {
         if (!product) return;
+ 
+        if (!user?.id) {
+          showAuthModal({ type: 'BUY_NOW', payload: { product, quantity } });
+          return;
+        }
 
         // Re-check latest product state (stock/price) before checkout
         let latest = product;
@@ -1505,6 +1509,10 @@ export const ProductDetailScreen: React.FC = () => {
                 Alert.alert("Erreur", "Produit indisponible");
                 return;
               }
+              if (!user?.id) {
+                showAuthModal({ type: 'BUY_NOW', payload: { product, quantity } });
+                return;
+              }
               addItem(product, quantity);
               void Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success,
@@ -1527,6 +1535,10 @@ export const ProductDetailScreen: React.FC = () => {
               if (!productData.inStock || !storeStatus.isOpen) return;
               if (!product) {
                 Alert.alert("Erreur", "Produit indisponible");
+                return;
+              }
+              if (!user?.id) {
+                showAuthModal({ type: 'ADD_TO_CART', payload: { product, quantity } });
                 return;
               }
               addItem(product, quantity);

@@ -372,6 +372,7 @@ export const SellerAuthScreen: React.FC = () => {
     setError('');
 
     try {
+      await AsyncStorage.setItem('@libreshop_auth_intent', 'seller');
       // Get the redirect URL for deep linking
       const redirectUrl = Linking.createURL('auth/callback');
       

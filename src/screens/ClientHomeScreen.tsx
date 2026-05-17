@@ -586,7 +586,11 @@ export const ClientHomeScreen: React.FC = () => {
           <View style={styles.headerContent}>
             <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoAnim }] }]}> 
               <Animated.Text style={[styles.logoText, { transform: [{ scale: pulseAnim }] }]} numberOfLines={1} adjustsFontSizeToFit>Libreshop</Animated.Text>
-              <Text style={styles.logoSlogan} numberOfLines={1}>Achetez local, vivez mieux</Text>
+              <Text style={styles.logoSlogan} numberOfLines={1}>
+                {user 
+                  ? `Bonjour, ${user.full_name?.split(' ')[0] || 'Acheteur'} ! 👋` 
+                  : 'Connectez-vous pour commander'}
+              </Text>
             </Animated.View>
             <TouchableOpacity
               style={styles.openShopButton}

@@ -27,7 +27,7 @@ import { getStoreStatus } from '../utils/storeStatus';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const user = useAuthStore((s) => s.user);
+  const { user, showAuthModal } = useAuthStore();
   const { items: globalItems, getTotal, storeId: storeIdFromStore, clearCart } = useCartStore();
   const route = useRoute<any>();
 
@@ -746,24 +746,15 @@ export const CheckoutScreen: React.FC = () => {
             try {
               // ensure user exists
               let userId = user?.id;
-              if (!userId) {
-                try {
-                  await authService.signInAnonymously();
-                  const u = await authService.getCurrentUser();
-                  userId = u?.id;
-                } catch (e) {
-                  // ignore - will require login
-                }
-              }
 
               if (!userId) {
                 setProcessing(false);
                 if (Platform.OS === 'web' && typeof window !== 'undefined') {
                   const ok = window.confirm('Connexion requise: veuillez vous connecter pour passer commande. Voulez-vous vous connecter maintenant ?');
-                  if (ok) navigation.navigate('SellerAuth');
+                  if (ok) showAuthModal({ type: 'CHECKOUT' });
                 } else {
                   Alert.alert('Connexion requise', 'Veuillez vous connecter pour passer commande', [
-                    { text: 'Se connecter', onPress: () => navigation.navigate('SellerAuth') },
+                    { text: 'Se connecter', onPress: () => showAuthModal({ type: 'CHECKOUT' }) },
                     { text: 'Annuler', style: 'cancel' },
                   ]);
                 }

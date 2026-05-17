@@ -14,6 +14,10 @@ interface AuthState {
   setSession: (session: any) => void;
   setLoading: (loading: boolean) => void;
   signOut: () => Promise<void>;
+  isAuthModalVisible: boolean;
+  pendingAction: any;
+  showAuthModal: (pendingAction?: any) => void;
+  hideAuthModal: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -22,6 +26,10 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       session: null,
       isLoading: true,
+      isAuthModalVisible: false,
+      pendingAction: null,
+      showAuthModal: (pendingAction = null) => set({ isAuthModalVisible: true, pendingAction }),
+      hideAuthModal: () => set({ isAuthModalVisible: false, pendingAction: null }),
       setUser: (user) => set({ user }),
       setSession: (session) => set({ session }),
       setLoading: (isLoading) => set({ isLoading }),

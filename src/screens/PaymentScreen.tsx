@@ -48,7 +48,7 @@ export const PaymentScreen: React.FC = () => {
 
   const orderId = routeOrderId || `ORD-${Date.now()}`;
 
-  const user = useAuthStore((s) => s.user);
+  const { user, showAuthModal } = useAuthStore();
   const { clearCart, removeItem } = useCartStore();
 
   const parseJsonParam = <T,>(value: any, fallback: T): T => {
@@ -136,17 +136,7 @@ export const PaymentScreen: React.FC = () => {
           // ignore, will try anonymous sign-in below
         }
 
-        if (!userId) {
-          // Anonymous sign-ins may be disabled on the Supabase project.
-          // In that case we must require an explicit login.
-          try {
-            await authService.signInAnonymously();
-            const userObj = await authService.getCurrentUser();
-            userId = userObj?.id || undefined;
-          } catch (e: any) {
-            errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'failed to create guest session at payment time', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-          }
-        }
+
       }
 
       if (!userId) {
@@ -155,7 +145,7 @@ export const PaymentScreen: React.FC = () => {
         Alert.alert('Connexion requise', 'Veuillez vous connecter pour passer commande', [
           {
             text: 'Se connecter',
-            onPress: () => navigation.navigate('SellerAuth'),
+            onPress: () => showAuthModal({ type: 'CHECKOUT' }),
           },
           { text: 'Annuler', style: 'cancel' },
         ]);

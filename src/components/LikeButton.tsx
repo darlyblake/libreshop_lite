@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { 
   useAnimatedStyle, 
@@ -79,7 +81,8 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
   hapticFeedback = true,
   testID,
 }) => {
-  const { user } = useAuthStore();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  const { user, showAuthModal } = useAuthStore();
   const effectiveUserId = propUserId || user?.id;
 
   const themeContext = useTheme();
@@ -186,17 +189,8 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
 
   const handleLike = useCallback(async (): Promise<void> => {
     if (!effectiveUserId) {
-      try {
-        const { data: { session } } = await authService.signInAnonymously();
-        if (!session?.user) throw new Error('Auth failed');
-        // Let the next render cycle handle the like with the new ID
-        // or we could execute it directly here, but simple is better.
-        Alert.alert('Presque fini', 'Votre identité anonyme a été créée. Réessayez d\'aimer ce produit !');
-        return;
-      } catch (err) {
-        Alert.alert('Action impossible', 'Veuillez vérifier votre connexion internet.');
-        return;
-      }
+      showAuthModal({ type: 'LIKE_PRODUCT', payload: { productId } });
+      return;
     }
 
     if (isProcessingRef.current || disabled) return;

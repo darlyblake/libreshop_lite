@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, useWindowDimensions, Platform, StatusBar, AppSt
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
@@ -13,6 +14,8 @@ import { LandingScreen } from '../screens/LandingScreen';
 import { ClientOnboardingScreen } from '../screens/ClientOnboardingScreen';
 import { AboutStaticScreen } from '../screens/AboutStaticScreen';
 import { SellerAuthScreen } from '../screens/SellerAuthScreen';
+import { ClientAuthScreen } from '../screens/ClientAuthScreen';
+import { ClientAuthModal } from '../components/ClientAuthModal';
 import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
 import { SellerEmailConfirmScreen } from '../screens/SellerEmailConfirmScreen';
 import { SubscriptionExpiredScreen } from '../screens/SubscriptionExpiredScreen';
@@ -581,20 +584,9 @@ export const AppNavigator: React.FC = () => {
           }
         }
 
-        // Pas de session active -> Sign in anonymously for "ghost" users
-        try {
-          const { data: { session: anonSession } } = await authService.signInAnonymously();
-          if (anonSession?.user) {
-            setUser(anonSession.user);
-            setSession(anonSession);
-          }
-          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-        } catch (anonError) {
-          // If anonymous sign in fails, just continue as guest
-          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-        }
+        // Pas de session active -> Continue as guest
+        const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+        setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
       } catch (error) {
         errorHandler.handleAuthError(error as Error, 'SessionRestoration');
         const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
@@ -658,6 +650,20 @@ export const AppNavigator: React.FC = () => {
       }
     }
 
+    // Check auth intent
+    try {
+      const intent = await AsyncStorage.getItem('@libreshop_auth_intent');
+      if (intent === 'client') {
+        await AsyncStorage.removeItem('@libreshop_auth_intent');
+        return 'ClientTabs';
+      } else if (intent === 'seller') {
+        await AsyncStorage.removeItem('@libreshop_auth_intent');
+        return 'SellerTabs';
+      }
+    } catch (e) {
+      console.error('Error checking auth intent:', e);
+    }
+
     switch (role) {
       case 'seller':
         return 'SellerTabs';
@@ -680,6 +686,7 @@ export const AppNavigator: React.FC = () => {
         backgroundColor={initialRoute === 'Landing' ? 'transparent' : '#ffffff'}
         translucent={Platform.OS === 'android' || initialRoute === 'Landing'}
       />
+      <ClientAuthModal />
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
@@ -693,6 +700,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="ClientOnboarding" component={ClientOnboardingScreen} />
         <Stack.Screen name="About" component={AboutStaticScreen} options={{ title: 'À propos' }} />
         <Stack.Screen name="SellerAuth" component={SellerAuthScreen} />
+        <Stack.Screen name="ClientAuth" component={ClientAuthScreen} />
         <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         <Stack.Screen name="SellerEmailConfirm" component={SellerEmailConfirmScreen} />
         <Stack.Screen name="SubscriptionExpired" component={SubscriptionExpiredScreen} />

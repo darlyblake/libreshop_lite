@@ -44,7 +44,7 @@ export const ProductDetailScreen: React.FC = () => {
   const { width, isDesktop } = useResponsive();
   const { theme, getColor: COLORS, spacing: SPACING, radius: RADIUS } = useTheme();
   const { addItem, items } = useCartStore();
-  const { user } = useAuthStore();
+  const { user, showAuthModal } = useAuthStore();
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const { productId } = route.params || {};
@@ -813,6 +813,10 @@ export const ProductDetailScreen: React.FC = () => {
               Alert.alert("Erreur", "Produit indisponible");
               return;
             }
+            if (!user?.id) {
+              showAuthModal({ type: 'BUY_NOW', payload: { product, quantity } });
+              return;
+            }
             addItem(product, quantity);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             navigation.navigate('Cart');
@@ -833,6 +837,10 @@ export const ProductDetailScreen: React.FC = () => {
             if (!productData?.inStock) return;
             if (!product) {
               Alert.alert("Erreur", "Produit indisponible");
+              return;
+            }
+            if (!user?.id) {
+              showAuthModal({ type: 'ADD_TO_CART', payload: { product, quantity } });
               return;
             }
             addItem(product, quantity);

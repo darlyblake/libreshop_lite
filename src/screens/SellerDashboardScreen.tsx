@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store';
+import { sessionStorage } from '../lib/storage';
 import { useNotificationStore } from '../store/notificationStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -1234,6 +1235,24 @@ export const SellerDashboardScreen: React.FC = () => {
             </View>
             
             <View style={styles.headerRight}>
+              <TouchableOpacity 
+                style={[styles.headerButton, { 
+                  width: component.buttonHeight,
+                  height: component.buttonHeight,
+                  borderRadius: component.buttonBorderRadius,
+                  marginRight: spacing.sm,
+                }]}
+                onPress={async () => {
+                  await sessionStorage.saveUserRole('client');
+                  navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'ClientTabs' }],
+                  });
+                }}
+              >
+                <Ionicons name="people-outline" size={fontSize.lg} color={COLORS.text} />
+              </TouchableOpacity>
+
               <TouchableOpacity 
                 style={[styles.headerButton, { 
                   width: component.buttonHeight,
