@@ -28,21 +28,17 @@ export const ClientAuthModal: React.FC = () => {
   const { addItem } = useCartStore();
   const [loading, setLoading] = useState(false);
 
-  // Save intent when pending action is set
-  useEffect(() => {
-    if (isAuthModalVisible) {
-      AsyncStorage.setItem('@libreshop_auth_intent', 'client');
-      if (pendingAction) {
-        AsyncStorage.setItem('@libreshop_pending_action', JSON.stringify(pendingAction));
-      }
-    }
-  }, [isAuthModalVisible, pendingAction]);
-
   const handleGoogleSignIn = async () => {
     if (loading) return;
     setLoading(true);
 
     try {
+      // Save intent and pending action securely before browser redirection to avoid race conditions
+      await AsyncStorage.setItem('@libreshop_auth_intent', 'client');
+      if (pendingAction) {
+        await AsyncStorage.setItem('@libreshop_pending_action', JSON.stringify(pendingAction));
+      }
+
       const redirectUrl = Linking.createURL('auth/callback');
       
       await authService.signInWithOAuth({
