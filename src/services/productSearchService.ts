@@ -1,18 +1,26 @@
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
-const OPENAI_KEY = process.env.OPENAI_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || 
+                     process.env.NEXT_PUBLIC_SUPABASE_URL || 
+                     process.env.EXPO_PUBLIC_SUPABASE_URL;
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in env for productSearchService');
-}
-if (!OPENAI_KEY) {
-  console.warn('OPENAI_KEY not set — semantic search will be unavailable');
-}
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || 
+                     process.env.SUPABASE_KEY || 
+                     process.env.SUPABASE_ANON_KEY || 
+                     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
+                     process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+const OPENAI_KEY = process.env.OPENAI_KEY || 
+                   process.env.EXPO_PUBLIC_OPENAI_KEY;
+
+let supabase: any = null;
+
+if (SUPABASE_URL && SUPABASE_KEY) {
+  supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
+} else {
+  console.error('⚠️ Supabase credentials not found in environment for productSearchService');
+}
 
 async function getQueryEmbedding(text: string): Promise<number[] | null> {
   if (!OPENAI_KEY || !text) return null;
@@ -41,6 +49,11 @@ export type SearchResult = {
 
 export async function searchProductsHybrid(q: string, page = 1, perPage = 20): Promise<{ data: SearchResult[]; total: number | null }> {
   if (!q || q.trim().length === 0) return { data: [], total: 0 };
+
+  if (!supabase) {
+    console.error('searchProductsHybrid error: Supabase client is not initialized (missing environment credentials)');
+    return { data: [], total: 0 };
+  }
 
   const offset = (page - 1) * perPage;
   let emb: number[] | null = null;
