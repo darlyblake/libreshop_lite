@@ -534,102 +534,76 @@ export const CheckoutScreen: React.FC = () => {
             {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
           </View>
           
-          {requiresLocation && (
-            <View style={{ marginBottom: SPACING.md }}>
-              <TouchableOpacity 
-                style={{ 
-                  backgroundColor: COLORS.card, 
-                  borderWidth: 2, 
-                  borderColor: userLocation ? COLORS.success : COLORS.primary,
-                  padding: SPACING.md, 
-                  borderRadius: RADIUS.lg, 
-                  flexDirection: 'row', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  gap: SPACING.sm
-                }}
-                onPress={async () => {
-                  setProcessing(true);
-                  try {
-                    const pos = await locationService.getCurrentPosition();
-                    if (pos) {
-                      setUserLocation(pos);
-                      const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
-                      if (addr) {
-                        handleInputChange('address', addr.street || '');
-                        if (addr.city) handleInputChange('city', addr.city);
-                      }
-                    } else {
-                      Alert.alert('Erreur', 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.');
+          <View style={{ marginBottom: SPACING.md }}>
+            <TouchableOpacity 
+              style={{ 
+                backgroundColor: COLORS.card, 
+                borderWidth: 2, 
+                borderColor: userLocation ? COLORS.success : COLORS.primary,
+                padding: SPACING.md, 
+                borderRadius: RADIUS.lg, 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: SPACING.sm
+              }}
+              onPress={async () => {
+                setProcessing(true);
+                try {
+                  const pos = await locationService.getCurrentPosition();
+                  if (pos) {
+                    setUserLocation(pos);
+                    const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
+                    if (addr) {
+                      handleInputChange('address', addr.street || '');
+                      if (addr.city) handleInputChange('city', addr.city);
                     }
-                  } catch(e) {
-                    Alert.alert('Erreur', 'Impossible de récupérer votre position.');
-                  } finally {
-                    setProcessing(false);
+                  } else {
+                    Alert.alert('Erreur', 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.');
                   }
-                }}
-              >
-                <Ionicons name={userLocation ? "checkmark-circle" : "locate"} size={24} color={userLocation ? COLORS.success : COLORS.primary} />
-                <Text style={{ fontSize: 16, color: userLocation ? COLORS.success : COLORS.primary, fontWeight: '700' }}>
-                  {userLocation ? 'Position validée' : 'Obtenir ma position de livraison'}
-                </Text>
-              </TouchableOpacity>
-              {!userLocation && (
-                <Text style={{ fontSize: 12, color: COLORS.danger, marginTop: 8, textAlign: 'center' }}>
-                  Ce vendeur nécessite votre position exacte pour calculer les frais de livraison.
-                </Text>
-              )}
-            </View>
-          )}
+                } catch(e) {
+                  Alert.alert('Erreur', 'Impossible de récupérer votre position.');
+                } finally {
+                  setProcessing(false);
+                }
+              }}
+            >
+              <Ionicons name={userLocation ? "checkmark-circle" : "locate"} size={24} color={userLocation ? COLORS.success : COLORS.primary} />
+              <Text style={{ fontSize: 16, color: userLocation ? COLORS.success : COLORS.primary, fontWeight: '700' }}>
+                {userLocation ? 'Position validée' : 'Obtenir ma position de livraison'}
+              </Text>
+            </TouchableOpacity>
+            {!userLocation && requiresLocation && (
+              <Text style={{ fontSize: 12, color: COLORS.danger, marginTop: 8, textAlign: 'center' }}>
+                Ce vendeur nécessite votre position exacte pour calculer les frais de livraison.
+              </Text>
+            )}
+          </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Ville {requiresLocation && '(Détectée via GPS)'}</Text>
+            <Text style={styles.label}>Ville</Text>
             <TextInput
-              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null, requiresLocation && { backgroundColor: COLORS.bg, opacity: 0.7 }]}
-              placeholder={requiresLocation ? "Utilisez le bouton de localisation" : "Ex: Douala, Yaoundé..."}
+              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null, { backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
+              placeholder="Cliquez sur 'Obtenir ma position' ci-dessus"
               placeholderTextColor={COLORS.textMuted}
               value={formData.city}
-              editable={!requiresLocation}
-              onChangeText={(v) => handleInputChange('city', v)}
+              editable={false}
             />
             {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
           </View>
 
           <View style={styles.formGroup}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
-              <Text style={styles.label}>Adresse précise {requiresLocation && '(Détectée via GPS)'}</Text>
-              {!requiresLocation && (
-                <TouchableOpacity 
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                  onPress={async () => {
-                    const pos = await locationService.getCurrentPosition();
-                    if (pos) {
-                      setUserLocation(pos);
-                      const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
-                      if (addr) {
-                        handleInputChange('address', addr.street || '');
-                        if (addr.city) handleInputChange('city', addr.city);
-                      }
-                      Alert.alert('Localisation', 'Position récupérée avec succès !');
-                    } else {
-                      Alert.alert('Erreur', 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.');
-                    }
-                  }}
-                >
-                  <Ionicons name="locate" size={16} color={COLORS.accent} />
-                  <Text style={{ fontSize: 12, color: COLORS.accent, fontWeight: '600' }}>Me localiser</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={styles.label}>Adresse précise</Text>
             </View>
             <TextInput
-              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null, requiresLocation && { backgroundColor: COLORS.bg, opacity: 0.7 }]}
-              placeholder={requiresLocation ? "Utilisez le bouton de localisation" : "Quartier, Carrefour, description..."}
+              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null, { backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
+              placeholder="Cliquez sur 'Obtenir ma position' ci-dessus"
               placeholderTextColor={COLORS.textMuted}
               multiline
               numberOfLines={3}
               value={formData.address}
-              editable={!requiresLocation}
-              onChangeText={(v) => handleInputChange('address', v)}
+              editable={false}
             />
             {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
           </View>
@@ -1120,11 +1094,11 @@ export const CheckoutScreen: React.FC = () => {
                 <View style={styles.onboardingFormGroup}>
                   <Text style={styles.onboardingLabel}>Ville *</Text>
                   <TextInput
-                    style={styles.onboardingInput}
-                    placeholder="Ex: Abidjan, Yamoussoukro..."
+                    style={[styles.onboardingInput, { backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
+                    placeholder="Rempli via 'Me localiser' ci-dessous"
                     placeholderTextColor={COLORS.textMuted}
                     value={onboardingAddress.city}
-                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, city: v }))}
+                    editable={false}
                   />
                 </View>
 
@@ -1167,12 +1141,12 @@ export const CheckoutScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                   <TextInput
-                    style={[styles.onboardingInput, { height: 60, textAlignVertical: 'top' }]}
-                    placeholder="Quartier, rue, portail, couleur..."
+                    style={[styles.onboardingInput, { height: 60, textAlignVertical: 'top', backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
+                    placeholder="Rempli via 'Me localiser' ci-dessus"
                     placeholderTextColor={COLORS.textMuted}
                     multiline
                     value={onboardingAddress.address}
-                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, address: v }))}
+                    editable={false}
                   />
                 </View>
 

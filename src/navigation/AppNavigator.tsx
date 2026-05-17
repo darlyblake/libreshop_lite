@@ -557,8 +557,26 @@ export const AppNavigator: React.FC = () => {
           return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        let session = null;
+        const hasHashToken = typeof window !== 'undefined' && 
+                             (window.location.hash.includes('access_token=') || 
+                              window.location.search.includes('access_token='));
+
+        if (hasHashToken) {
+          // Poll every 100ms for up to 15 times (1.5 seconds) to let Supabase process URL token
+          for (let i = 0; i < 15; i++) {
+            const { data } = await supabase.auth.getSession();
+            if (data?.session) {
+              session = data.session;
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } else {
+          const { data } = await supabase.auth.getSession();
+          session = data?.session;
+        }
+
         if (session?.user) {
           const userData = await authService.getCurrentUser();
           if (userData) {
@@ -648,6 +666,19 @@ export const AppNavigator: React.FC = () => {
       } catch (error) {
         console.error('Error checking user status:', error);
       }
+    }
+
+    // Check pending action first to route directly to Checkout
+    try {
+      const pendingActionStr = await AsyncStorage.getItem('@libreshop_pending_action');
+      if (pendingActionStr) {
+        const action = JSON.parse(pendingActionStr);
+        if (action.type === 'CHECKOUT' || action.type === 'BUY_NOW') {
+          return 'Checkout';
+        }
+      }
+    } catch (e) {
+      console.error('Error checking pending action for initial route:', e);
     }
 
     // Check auth intent

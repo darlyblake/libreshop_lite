@@ -512,11 +512,11 @@ export const AddressScreen: React.FC = () => {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Ville *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: '#f0f0f0', color: getColor.textSoft }]}
                 value={formData.city}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, city: text }))}
-                placeholder="Ex: Abidjan, Yamoussoukro..."
+                placeholder="Rempli via 'Ma position' ci-dessous"
                 placeholderTextColor={getColor.textMuted}
+                editable={false}
               />
             </View>
 
@@ -539,13 +539,13 @@ export const AddressScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { backgroundColor: '#f0f0f0', color: getColor.textSoft }]}
                 value={formData.address}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, address: text }))}
-                placeholder="Entrez l'adresse complète (quartier, rue, détails...)"
+                placeholder="Rempli via 'Ma position' ci-dessus"
                 placeholderTextColor={getColor.textMuted}
                 multiline
                 numberOfLines={3}
+                editable={false}
               />
             </View>
 

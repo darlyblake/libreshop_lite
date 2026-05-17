@@ -135,17 +135,17 @@ export const ClientAuthModal: React.FC = () => {
             Alert.alert('Succès', 'Produit ajouté au panier !');
           } else if (action.type === 'BUY_NOW') {
             addItem(action.payload.product, action.payload.quantity);
-            // Navigate to checkout with a short delay to let navigation tree mount
+            // Navigate to checkout instantly
             setTimeout(() => {
               navigation.navigate('Checkout', { 
                 items: [{ product: action.payload.product, quantity: action.payload.quantity }], 
                 storeId: action.payload.product.store_id 
               });
-            }, 500);
+            }, 0);
           } else if (action.type === 'CHECKOUT') {
             setTimeout(() => {
               navigation.navigate('Checkout');
-            }, 500);
+            }, 0);
           } else if (action.type === 'LIKE_PRODUCT') {
             await productLikesService.toggleLike(user.id, action.payload.productId);
             Alert.alert('Succès', 'Produit ajouté à vos favoris !');
