@@ -24,7 +24,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const ClientAuthModal: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { isAuthModalVisible, pendingAction, hideAuthModal, setUser, setSession } = useAuthStore();
+  const { isAuthModalVisible, pendingAction, hideAuthModal, setUser, setSession, user } = useAuthStore();
   const { addItem } = useCartStore();
   const [loading, setLoading] = useState(false);
 
@@ -119,6 +119,52 @@ export const ClientAuthModal: React.FC = () => {
 
     return () => subscription.remove();
   }, [isAuthModalVisible]);
+
+  // Check for pending action on startup when user becomes authenticated (especially on Web reload)
+  useEffect(() => {
+    const checkPendingActionOnStartup = async () => {
+      if (!user) return;
+      try {
+        const savedActionStr = await AsyncStorage.getItem('@libreshop_pending_action');
+        if (savedActionStr) {
+          // Clear immediately to prevent double processing
+          await AsyncStorage.removeItem('@libreshop_pending_action');
+          await AsyncStorage.removeItem('@libreshop_auth_intent');
+          
+          const action = JSON.parse(savedActionStr);
+          
+          // Execute the pending action
+          if (action.type === 'ADD_TO_CART') {
+            addItem(action.payload.product, action.payload.quantity);
+            Alert.alert('Succès', 'Produit ajouté au panier !');
+          } else if (action.type === 'BUY_NOW') {
+            addItem(action.payload.product, action.payload.quantity);
+            // Navigate to checkout with a short delay to let navigation tree mount
+            setTimeout(() => {
+              navigation.navigate('Checkout', { 
+                items: [{ product: action.payload.product, quantity: action.payload.quantity }], 
+                storeId: action.payload.product.store_id 
+              });
+            }, 500);
+          } else if (action.type === 'CHECKOUT') {
+            setTimeout(() => {
+              navigation.navigate('Checkout');
+            }, 500);
+          } else if (action.type === 'LIKE_PRODUCT') {
+            await productLikesService.toggleLike(user.id, action.payload.productId);
+            Alert.alert('Succès', 'Produit ajouté à vos favoris !');
+          } else if (action.type === 'FOLLOW_STORE') {
+            await storeService.toggleFollow(user.id, action.payload.storeId);
+            Alert.alert('Succès', 'Vous suivez maintenant cette boutique !');
+          }
+        }
+      } catch (error) {
+        console.error('Error resuming pending action on startup:', error);
+      }
+    };
+
+    checkPendingActionOnStartup();
+  }, [user]);
 
   return (
     <Modal
