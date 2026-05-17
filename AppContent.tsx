@@ -5,7 +5,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { ThemeProvider } from './src/components/ThemeProvider';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { AppNavigator } from './src/navigation';
+import AppNavigator from './src/navigation/AppNavigator';
 
 export default function AppContent() {
   return (

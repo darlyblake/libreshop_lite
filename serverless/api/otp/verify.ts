@@ -4,19 +4,19 @@ import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
 // Environment variables required:
-// SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// SUPABASE_URL, SUPABASE_ANON_KEY
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const ANON_KEY = process.env.SUPABASE_ANON_KEY!;
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
+const supabase = createClient(SUPABASE_URL, ANON_KEY, {
   auth: { persistSession: false }
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
+  if (req.method !== 'POST') return res.status(405).send('Méthode non autorisée');
   const { email, code, newPassword } = req.body || {};
-  if (!email || !code) return res.status(400).json({ error: 'email and code required' });
+  if (!email || !code) return res.status(400).json({ error: 'Email et code requis' });
 
   try {
     const hash = crypto.createHash('sha256').update(String(code)).digest('hex');
@@ -31,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (qerr) throw qerr;
     if (!rows || rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid or expired code' });
+      return res.status(400).json({ error: 'Code invalide ou expiré' });
     }
 
     const otp = rows[0];
@@ -48,25 +48,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const usersRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE}`,
-        apikey: SERVICE_ROLE
+        Authorization: `Bearer ${ANON_KEY}`,
+        apikey: ANON_KEY
       }
     });
     if (!usersRes.ok) {
       const text = await usersRes.text();
       console.error('admin users fetch failed', text);
-      return res.status(502).json({ error: 'Failed to fetch user' });
+      return res.status(502).json({ error: 'Erreur lors de la récupération des données' });
     }
     const users = await usersRes.json();
     const user = Array.isArray(users) ? users[0] : users;
-    if (!user || !user.id) return res.status(404).json({ error: 'User not found' });
+    if (!user || !user.id) return res.status(404).json({ error: 'Utilisateur non trouvé' });
 
     // Update password
     const updateRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${user.id}`, {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${SERVICE_ROLE}`,
-        apikey: SERVICE_ROLE,
+        Authorization: `Bearer ${ANON_KEY}`,
+        apikey: ANON_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ password: newPassword })
@@ -75,12 +75,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!updateRes.ok) {
       const text = await updateRes.text();
       console.error('admin update failed', text);
-      return res.status(502).json({ error: 'Failed to update password' });
+      return res.status(502).json({ error: 'Erreur lors de la mise à jour du mot de passe' });
     }
 
     return res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('verify OTP error', err);
-    return res.status(500).json({ error: String(err.message || err) });
+    return res.status(500).json({ error: 'Erreur serveur' });
   }
 }

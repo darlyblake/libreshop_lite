@@ -194,25 +194,39 @@ export const productService = {
     const client = useSupabase();
     const from = page * pageSize;
     const to = from + pageSize - 1;
+
+    // For simple sorts (newest, popular), let Supabase do the sorting server-side
+    // — no need to over-fetch. For composite ranking sorts, fetch 3× for quality.
+    const needsClientRanking = ['trending', 'ranked', 'sales', 'top'].includes(sort);
     
-    // Fetch more data for ranking to ensure quality results after sorting
-    const fetchSize = Math.max(200, pageSize * 10);
-    
+    if (!needsClientRanking) {
+      const orderCol = sort === 'popular' ? 'view_count' : 'created_at';
+      const { data, error } = await client
+        .from('products')
+        .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
+        .eq('is_active', true)
+        .gt('stock', 0)
+        .order(orderCol, { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return data || [];
+    }
+
+    // Composite sorts: fetch 3× pageSize for ranking quality (down from 10-200×)
+    const fetchSize = Math.min(pageSize * 3, 60);
     const { data, error } = await client
       .from('products')
       .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
       .eq('is_active', true)
       .gt('stock', 0)
       .order('created_at', { ascending: false })
-      .range(0, fetchSize - 1);
-    
+      .range(from, from + fetchSize - 1);
+
     if (error) throw error;
 
-    // Apply unified ranking system
+    // Apply unified ranking system on the smaller fetch
     const ranked = rankProducts(data || [], sort);
-    
-    // Return paginated results from ranked data
-    return ranked.slice(from, to + 1);
+    return ranked.slice(0, pageSize);
   },
 
   /**
@@ -437,8 +451,6 @@ export const productService = {
   async getStorePromotionProducts(storeId: string) {
     const client = useSupabase();
     
-    console.log('[ProductService] Loading promotion products for store:', storeId);
-    
     // Get all active products for the store
     const { data: allProducts, error } = await client
       .from('products')
@@ -448,32 +460,21 @@ export const productService = {
     
     if (error) throw error;
     
-    console.log('[ProductService] Total active products:', allProducts?.length);
-    
     // Filter products with promotions on client side
     const promotionProducts = (allProducts || []).filter(product => {
       // Product has active sale
-      if (product.sale_active === true) {
-        console.log('[ProductService] Product with sale_active:', product.name, product.sale_active);
-        return true;
-      }
+      if (product.sale_active === true) return true;
       
       // Product has compare_price greater than price (indicates discount)
-      if (product.compare_price && product.compare_price > product.price) {
-        console.log('[ProductService] Product with compare_price > price:', product.name, { price: product.price, compare_price: product.compare_price });
-        return true;
-      }
+      if (product.compare_price && product.compare_price > product.price) return true;
       
       return false;
     });
-    
-    console.log('[ProductService] Products after filtering:', promotionProducts.length);
     
     // Calculate discount percent for products with compare_price but no discount_percent
     const productsWithDiscount = promotionProducts.map(product => {
       if (!product.discount_percent && product.compare_price && product.compare_price > product.price) {
         const discountPercent = Math.round(((product.compare_price - product.price) / product.compare_price) * 100);
-        console.log('[ProductService] Calculated discount for', product.name, ':', discountPercent + '%');
         return { ...product, discount_percent: discountPercent };
       }
       return product;
@@ -485,8 +486,6 @@ export const productService = {
       const discountB = b.discount_percent || 0;
       return discountB - discountA;
     });
-    
-    console.log('[ProductService] Final promotion products:', productsWithDiscount.length);
     
     return productsWithDiscount;
   },
@@ -536,22 +535,20 @@ export const productService = {
   async incrementViews(productId: string) {
     const client = useSupabase();
     try {
-      // Fetch current views
-      const { data: current } = await client
-        .from('products')
-        .select('view_count')
-        .eq('id', productId)
-        .maybeSingle();
-      
-      const newCount = (Number(current?.view_count) || 0) + 1;
-      
-      // Update with new count
-      await client
-        .from('products')
-        .update({ view_count: newCount })
-        .eq('id', productId);
-    } catch (e) {
-      console.warn('Failed to increment views:', e);
+      // Try atomic RPC first (single DB round-trip, no SELECT needed)
+      const { error } = await client.rpc('increment_product_views', { p_product_id: productId });
+      if (error && (error.code === 'PGRST202' || String(error.message).includes('could not find'))) {
+        // RPC not available — fallback: fetch then update (2 queries, legacy behaviour)
+        const { data: current } = await client
+          .from('products').select('view_count').eq('id', productId).maybeSingle();
+        await client
+          .from('products')
+          .update({ view_count: (Number(current?.view_count) || 0) + 1 })
+          .eq('id', productId);
+      }
+      // All other errors are silently ignored — view count is non-critical
+    } catch {
+      // Non-critical: silently ignore
     }
   },
 
@@ -594,6 +591,29 @@ export const productService = {
     } catch (e) {
       // Silently fail - product sales stats are now handled by RPC functions
     }
+  },
+
+  async updateStock(productId: string, quantityToAdd: number) {
+    const client = useSupabase();
+    const { data: product, error: fetchError } = await client
+      .from('products')
+      .select('stock')
+      .eq('id', productId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    const newStock = (product.stock || 0) + quantityToAdd;
+    
+    const { data, error } = await client
+      .from('products')
+      .update({ stock: newStock })
+      .eq('id', productId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
   },
 
   async getProductOptions(productId: string) {

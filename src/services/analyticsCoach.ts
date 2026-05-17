@@ -8,6 +8,8 @@ export interface SellerStats {
   averageBasket: number;          // Panier moyen (FCFA)
   revenueLast30Days: number;
   revenuePrevious30Days: number;
+  totalExpenses: number;          // Total des charges (Cogs + Dépenses)
+  netProfit: number;              // Bénéfice net
   deliveryRate: number;           // Taux de livraison (%)
   topProducts: Array<{
     name: string;
@@ -61,6 +63,8 @@ export const getGeminiStrategicAdvice = async (stats: SellerStats, storeId?: str
   const statsPrompt = `
 Voici les statistiques de performance d'un vendeur LibreShop :
 - Revenu 30j: ${stats.revenueLast30Days.toLocaleString()} FCFA (Croissance: ${growth.toFixed(1)}%)
+- Dépenses totales: ${stats.totalExpenses.toLocaleString()} FCFA
+- Bénéfice Net: ${stats.netProfit.toLocaleString()} FCFA
 - Panier moyen: ${stats.averageBasket.toLocaleString()} FCFA (Marché: ${stats.marketAvgBasket?.toLocaleString() || 'N/A'})
 - Taux de livraison: ${stats.deliveryRate}%
 - Fidélité clients: ${stats.loyaltyRate}%
@@ -137,6 +141,8 @@ export const answerSellerQuestion = async (question: string, stats: SellerStats)
   const context = `
 Statistiques Vendeur :
 - Revenu 30j: ${stats.revenueLast30Days.toLocaleString()} FCFA
+- Dépenses: ${stats.totalExpenses.toLocaleString()} FCFA
+- Bénéfice: ${stats.netProfit.toLocaleString()} FCFA
 - Croissance: ${growth.toFixed(1)}%
 - Panier moyen: ${stats.averageBasket.toLocaleString()} FCFA
 - Taux livraison: ${stats.deliveryRate}%

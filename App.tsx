@@ -77,7 +77,10 @@ if (Platform.OS === 'web') {
       msg.includes('translate.google.com') ||
       msg.includes('translate.googleapis.com') ||
       msg.includes('gen204') ||
-      msg.includes('ERR_BLOCKED_BY_CLIENT')
+      msg.includes('ERR_BLOCKED_BY_CLIENT') ||
+      msg.includes('AuthApiError') ||
+      msg.includes('Refresh Token') ||
+      msg.includes('message channel closed')
     ) {
       return;
     }
@@ -177,7 +180,18 @@ export default function App() {
     };
   }, []);
 
-  if (!skiaReady) {
+  const [AppContent, setAppContent] = React.useState<React.ComponentType | null>(null);
+
+  useEffect(() => {
+    if (skiaReady) {
+      // Require AppContent only AFTER Skia is ready ensures that all 
+      // Skia-dependent modules are evaluated with CanvasKit already on global scope.
+      const content = require("./AppContent").default;
+      setAppContent(() => content);
+    }
+  }, [skiaReady]);
+
+  if (!skiaReady || !AppContent) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0a0c12', justifyContent: 'center', alignItems: 'center' }}>
         <View style={{ 
@@ -192,10 +206,6 @@ export default function App() {
       </View>
     );
   }
-
-  // Requiring AppContent only AFTER Skia is ready ensures that all 
-  // Skia-dependent modules are evaluated with CanvasKit already on global scope.
-  const AppContent = require("./AppContent").default;
 
   return (
     <AppContent />

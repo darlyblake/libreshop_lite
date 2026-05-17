@@ -22,6 +22,7 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { cloudinaryService } from '../services/cloudinaryService';
+import { locationService } from '../services/locationService';
 
 type RouteProps = RouteProp<RootStackParamList, 'SellerOrderDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -46,6 +47,23 @@ export const SellerOrderDetailScreen: React.FC = () => {
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  // 📦 Pick & Pack — checklist des articles
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [packMode, setPackMode] = useState(false);
+
+  const toggleItem = (id: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allChecked = order ? checkedItems.size === order.order_items.length : false;
+  const progress = order && order.order_items.length > 0
+    ? checkedItems.size / order.order_items.length
+    : 0;
 
   useEffect(() => {
     void loadOrder();
@@ -203,6 +221,21 @@ Merci.`;
             <Text style={styles.infoText}>{order.shipping_address}</Text>
           </View>
         )}
+        {order.city && (
+          <View style={styles.infoRow}>
+            <Ionicons name="business-outline" size={18} color={COLORS.textMuted} />
+            <Text style={styles.infoText}>Ville: {order.city}</Text>
+          </View>
+        )}
+        {(order as any).latitude && (order as any).longitude && (
+          <TouchableOpacity 
+            style={[styles.infoRow, { marginTop: SPACING.xs }]}
+            onPress={() => locationService.openInMaps((order as any).latitude, (order as any).longitude, order.customer_name || 'Client')}
+          >
+            <Ionicons name="map-outline" size={18} color={COLORS.accent} />
+            <Text style={[styles.infoText, { color: COLORS.accent, fontWeight: '600' }]}>Voir sur la carte</Text>
+          </TouchableOpacity>
+        )}
         {order.notes && (
           <View style={styles.infoRow}>
             <Ionicons name="document-text-outline" size={18} color={COLORS.textMuted} />
@@ -219,26 +252,131 @@ Merci.`;
         </TouchableOpacity>
       </Card>
 
-      {/* Order Items */}
+      {/* Order Items + Pick & Pack */}
       <Card style={styles.section}>
-        <Text style={styles.sectionTitle}>Produits ({order.order_items.length})</Text>
-        {order.order_items.map((item) => (
-          <View key={item.id} style={styles.itemContainer}>
-            <Image 
-              source={{ uri: cloudinaryService.getOptimizedUrl(item.product?.images && item.product.images.length > 0 ? item.product.images[0] : 'https://picsum.photos/200', 800) }} 
-              style={styles.itemImage}
-            />
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemName}>{item.product?.name || 'Produit'}</Text>
-              <Text style={styles.itemPrice}>
-                {item.price.toLocaleString()} FCFAs × {item.quantity}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md }}>
+          <Text style={styles.sectionTitle}>Produits ({order.order_items.length})</Text>
+          {['paid', 'accepted'].includes(order.status) && (
+            <TouchableOpacity
+              onPress={() => { setPackMode(p => !p); setCheckedItems(new Set()); }}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                backgroundColor: packMode ? COLORS.accent + '20' : COLORS.card,
+                borderWidth: 1, borderColor: packMode ? COLORS.accent : COLORS.border,
+                paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
+              }}
+            >
+              <Ionicons name={packMode ? 'checkmark-done' : 'cube-outline'} size={14} color={packMode ? COLORS.accent : COLORS.textMuted} />
+              <Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '700', color: packMode ? COLORS.accent : COLORS.textMuted }}>
+                {packMode ? 'Mode actif' : 'Pick & Pack'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Barre de progression */}
+        {packMode && (
+          <View style={{ marginBottom: SPACING.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ fontSize: FONT_SIZE.xs, color: COLORS.textMuted }}>
+                {checkedItems.size}/{order.order_items.length} article{order.order_items.length > 1 ? 's' : ''} vérifiés
+              </Text>
+              <Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '700', color: allChecked ? COLORS.success : COLORS.warning }}>
+                {allChecked ? '✅ Prêt !' : `${Math.round(progress * 100)}%`}
               </Text>
             </View>
-            <Text style={styles.itemTotal}>
-              {(item.price * item.quantity).toLocaleString()} FCFAs
-            </Text>
+            <View style={{ height: 6, backgroundColor: COLORS.border, borderRadius: 3, overflow: 'hidden' }}>
+              <View style={{
+                height: 6, borderRadius: 3,
+                width: `${Math.round(progress * 100)}%` as any,
+                backgroundColor: allChecked ? COLORS.success : COLORS.warning,
+              }} />
+            </View>
           </View>
-        ))}
+        )}
+
+        {order.order_items.map((item) => {
+          const isChecked = checkedItems.has(item.id);
+          return (
+            <TouchableOpacity
+              key={item.id}
+              onPress={() => packMode && toggleItem(item.id)}
+              activeOpacity={packMode ? 0.7 : 1}
+              style={[
+                styles.itemContainer,
+                packMode && {
+                  borderRadius: 10,
+                  borderWidth: 1.5,
+                  borderColor: isChecked ? COLORS.success : COLORS.border,
+                  backgroundColor: isChecked ? COLORS.success + '10' : COLORS.bg,
+                  marginBottom: SPACING.sm,
+                  paddingHorizontal: SPACING.sm,
+                }
+              ]}
+            >
+              {packMode ? (
+                <View style={{
+                  width: 28, height: 28, borderRadius: 14, marginRight: SPACING.sm,
+                  backgroundColor: isChecked ? COLORS.success : COLORS.card,
+                  borderWidth: 2, borderColor: isChecked ? COLORS.success : COLORS.border,
+                  alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                  {isChecked && <Ionicons name="checkmark" size={16} color="#fff" />}
+                </View>
+              ) : (
+                <Image 
+                  source={{ uri: cloudinaryService.getOptimizedUrl(item.product?.images && item.product.images.length > 0 ? item.product.images[0] : 'https://picsum.photos/200', 300) }} 
+                  style={styles.itemImage}
+                />
+              )}
+              <View style={styles.itemInfo}>
+                <Text style={[styles.itemName, packMode && isChecked && { textDecorationLine: 'line-through', color: COLORS.textMuted }]}>
+                  {item.product?.name || 'Produit'}
+                </Text>
+                <Text style={styles.itemPrice}>
+                  {item.price.toLocaleString()} FCFAs × {item.quantity}
+                </Text>
+                {packMode && !isChecked && (
+                  <Text style={{ fontSize: FONT_SIZE.xs, color: COLORS.warning, marginTop: 2 }}>⚠️ À vérifier</Text>
+                )}
+              </View>
+              <Text style={[styles.itemTotal, packMode && isChecked && { color: COLORS.success }]}>
+                {(item.price * item.quantity).toLocaleString()} FCFAs
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Bouton Prêt à expédier */}
+        {packMode && (
+          <TouchableOpacity
+            onPress={() => {
+              if (!allChecked) {
+                Alert.alert('Articles manquants', `Cochez tous les articles avant de continuer.\n\nRestant : ${order.order_items.length - checkedItems.size} article(s) non vérifié(s).`);
+                return;
+              }
+              Alert.alert(
+                '📦 Prêt à expédier',
+                'Tous les articles ont été vérifiés. Marquer cette commande comme expédiée ?',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Confirmer', onPress: () => handleUpdateStatus('shipped') },
+                ]
+              );
+            }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+              marginTop: SPACING.md, paddingVertical: SPACING.md, borderRadius: RADIUS.md,
+              backgroundColor: allChecked ? COLORS.success : COLORS.border,
+              opacity: allChecked ? 1 : 0.6,
+            }}
+          >
+            <Ionicons name={allChecked ? 'checkmark-circle' : 'lock-closed-outline'} size={20} color={allChecked ? '#fff' : COLORS.textMuted} />
+            <Text style={{ fontWeight: '800', fontSize: FONT_SIZE.md, color: allChecked ? '#fff' : COLORS.textMuted }}>
+              {allChecked ? 'Prêt à expédier ✓' : `Cochez tous les articles (${order.order_items.length - checkedItems.size} restant)`}
+            </Text>
+          </TouchableOpacity>
+        )}
       </Card>
 
       {/* Payment Info */}

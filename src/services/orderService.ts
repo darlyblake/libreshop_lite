@@ -228,7 +228,6 @@ export const orderService = {
     if (!order) throw new Error("Commande non trouvée");
 
     const client = useSupabase();
-    console.log('🔄 Accepting order...', orderId);
     try {
       const { data, error } = await client.rpc('accept_order', {
         p_order_id: orderId,
@@ -271,7 +270,6 @@ export const orderService = {
     if (!order) throw new Error("Commande non trouvée");
 
     const client = useSupabase();
-    console.log('💰 Confirming payment...', orderId);
     
     const { data, error } = await client.rpc('confirm_order_payment', {
       p_order_id: orderId
@@ -287,7 +285,6 @@ export const orderService = {
 
   async cancelOrderRobust(orderId: string) {
     const client = useSupabase();
-    console.log('❌ Cancelling order robustly...', orderId);
     try {
       const { data, error } = await client.rpc('cancel_order_robust', {
         p_order_id: orderId
@@ -401,10 +398,24 @@ export const orderService = {
 
       if (type === 'new') {
         title = 'Nouvelle commande ! 🛒';
-        body = `Vous avez reçu une nouvelle commande (#${orderShortId}).`;
+        body = `Vous avez reçu une nouvelle commande (#${orderShortId})`;
+
+        // 📍 Détails de livraison dynamique
+        if (order.city) {
+          body += ` — Livraison à ${order.city}`;
+        }
+        if (order.delivery_mode === 'km' && (order.latitude || order.longitude)) {
+          body += ` 📍 Position GPS disponible`;
+        } else if (order.delivery_mode === 'km') {
+          body += ` 🗺️ Livraison au KM`;
+        } else if (order.delivery_mode === 'city' && order.city) {
+          body += ` 🏙️ Tarif ville`;
+        }
+        body += '.';
       } else if (type === 'cancelled') {
         title = 'Commande annulée ❌';
         body = `La commande #${orderShortId} a été annulée par le client.`;
+        if (order.city) body += ` (Livraison prévue à ${order.city})`;
       }
 
       if (title && body) {
@@ -413,7 +424,14 @@ export const orderService = {
           title,
           body,
           type: 'order',
-          data: { orderId: order.id, type }
+          data: {
+            orderId: order.id,
+            type,
+            city: order.city || null,
+            deliveryMode: order.delivery_mode || 'fixed',
+            latitude: order.latitude || null,
+            longitude: order.longitude || null,
+          }
         });
       }
     } catch (e) {

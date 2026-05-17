@@ -117,9 +117,16 @@ export const cacheService = {
   async hashData(data: any): Promise<string> {
     try {
       const str = JSON.stringify(data);
+      // Sample the string instead of iterating all chars — prevents blocking JS thread
+      // for large payloads (e.g. 200 products = 400K+ chars)
+      const len = str.length;
+      const sample =
+        str.substring(0, 800) +          // first 800 chars
+        str.substring(Math.max(0, len - 200)) + // last 200 chars
+        len.toString();                   // total length as discriminator
       let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
+      for (let i = 0; i < sample.length; i++) {
+        const char = sample.charCodeAt(i);
         hash = (hash << 5) - hash + char;
         hash = hash & hash;
       }

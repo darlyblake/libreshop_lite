@@ -1,4 +1,5 @@
 export { LandingScreen } from './LandingScreen';
+export { ClientOnboardingScreen } from './ClientOnboardingScreen';
 export { AboutStaticScreen } from './AboutStaticScreen';
 export { SellerAuthScreen } from './SellerAuthScreen';
 export { SellerEmailConfirmScreen } from './SellerEmailConfirmScreen';
@@ -37,7 +38,6 @@ export { SellerEditCollectionScreen } from './SellerEditCollectionScreen';
 export { SellerCollectionProductsScreen } from './SellerCollectionProductsScreen';
 export { SellerProductActionsScreen } from './SellerProductActionsScreen';
 export { SellerSaleScreen } from './SellerSaleScreen';
-export { SellerRestockScreen } from './SellerRestockScreen';
 export { SellerLowStockScreen } from './SellerLowStockScreen';
 export { AdminDashboardScreen } from './AdminDashboardScreen';
 export { AdminSettingsScreen } from './AdminSettingsScreen';
@@ -67,6 +67,7 @@ export { SellerAgentChatScreen } from './SellerAgentChatScreen';
 export { SellerReportsScreen } from './SellerReportsScreen';
 export { SellerRefundsScreen } from './SellerRefundsScreen';
 export { SellerAccountingScreen } from './SellerAccountingScreen';
+export { default as SellerReturnsScreen } from './SellerReturnsScreen';
 
 export { NotificationsScreen } from './NotificationsScreen';
 export { ResetPasswordScreen } from './ResetPasswordScreen';
@@ -75,3 +76,6 @@ export { AddressScreen } from './AddressScreen';
 export { SecurityScreen } from './SecurityScreen';
 export { HelpScreen } from './HelpScreen';
 export { AccountSuspendedScreen } from './AccountSuspendedScreen';
+export * from './SellerCouponsScreen';
+export { SellerStockHistoryScreen } from './SellerStockHistoryScreen';
+

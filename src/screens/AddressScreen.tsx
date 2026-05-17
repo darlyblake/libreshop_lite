@@ -16,6 +16,7 @@ import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
+import { locationService } from '../services/locationService';
 
 interface Address {
   id: string;
@@ -37,6 +38,36 @@ export const AddressScreen: React.FC = () => {
     address: '',
     is_default: false,
   });
+  const [locating, setLocating] = useState(false);
+
+  const handleGetCurrentLocation = async () => {
+    setLocating(true);
+    try {
+      const position = await locationService.getCurrentPosition();
+      if (!position) {
+        Alert.alert('Erreur', 'Impossible de récupérer votre position actuelle. Assurez-vous d’activer le GPS.');
+        return;
+      }
+      
+      const addr = await locationService.reverseGeocode(position.latitude, position.longitude);
+      if (addr && addr.street) {
+        setFormData(prev => ({
+          ...prev,
+          address: addr.street || ''
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          address: `Lat: ${position.latitude.toFixed(5)}, Lon: ${position.longitude.toFixed(5)}`
+        }));
+      }
+    } catch (e) {
+      errorHandler.handle(e, 'Location address error');
+      Alert.alert('Erreur', 'Une erreur s’est produite lors de la détection de l’adresse.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   useEffect(() => {
     loadAddresses();
@@ -371,6 +402,20 @@ export const AddressScreen: React.FC = () => {
       fontSize: fontSize.md,
       fontWeight: '600',
     },
+    locationButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+      backgroundColor: getColor.accent + '15',
+    },
+    locationButtonText: {
+      fontSize: fontSize.xs,
+      fontWeight: '600',
+      color: getColor.accent,
+    },
   });
 
   return (
@@ -409,7 +454,23 @@ export const AddressScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Adresse complète *</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+                <Text style={styles.label}>Adresse complète *</Text>
+                <TouchableOpacity 
+                  style={styles.locationButton} 
+                  onPress={handleGetCurrentLocation}
+                  disabled={locating}
+                >
+                  {locating ? (
+                    <ActivityIndicator size="small" color={getColor.accent} />
+                  ) : (
+                    <>
+                      <Ionicons name="location" size={14} color={getColor.accent} />
+                      <Text style={styles.locationButtonText}>Ma position</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={formData.address}

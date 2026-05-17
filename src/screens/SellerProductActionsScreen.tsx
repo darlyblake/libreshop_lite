@@ -200,7 +200,7 @@ export const SellerProductActionsScreen: React.FC = () => {
 
   const handleRestock = () => {
     triggerHaptic();
-    navigation.navigate('SellerRestock', { productId: product?.id });
+    navigation.navigate('SellerStockHistory', { productId: product?.id, openRestockModal: true });
   };
 
   if (loading) {

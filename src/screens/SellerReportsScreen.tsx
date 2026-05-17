@@ -10,6 +10,8 @@ import {
   FlatList,
   Alert,
   Platform,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,22 +21,35 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
-import { reportsService, DailySalesReport, MonthlySalesReport, CategorySalesReport, MarginReport, ReturnReport, InventoryReport, ClientReport } from '../services/reportsService';
+import { productService } from '../services/productService';
+import { reportsService, DailySalesReport, MonthlySalesReport, CollectionSalesReport, MarginReport, ReturnReport, InventoryReport, ClientReport } from '../services/reportsService';
+import { accountingService } from '../services/accountingService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 
-type ReportType = 'daily' | 'monthly' | 'category' | 'margin' | 'return' | 'inventory' | 'client';
+type ReportType = 'ledger' | 'daily' | 'monthly' | 'collection' | 'margin' | 'return' | 'inventory' | 'client';
 
 const REPORTS = [
+  { id: 'ledger', title: 'Mouvements', icon: 'list-outline', description: 'Journal détaillé des entrées et sorties' },
   { id: 'daily', title: 'Ventes par Jour', icon: 'calendar-outline', description: 'Ventes quotidiennes détaillées' },
   { id: 'monthly', title: 'Ventes par Mois', icon: 'calendar-number-outline', description: 'Ventes mensuelles agrégées' },
-  { id: 'category', title: 'Ventes par Catégorie', icon: 'pricetag-outline', description: 'Performance par catégorie' },
+  { id: 'collection', title: 'Ventes par Collection', icon: 'pricetag-outline', description: 'Performance par collection' },
   { id: 'margin', title: 'Marges', icon: 'trending-up-outline', description: 'Analyse des marges bénéficiaires' },
   { id: 'return', title: 'Retours', icon: 'refresh-outline', description: 'Rapport des retours' },
   { id: 'inventory', title: 'Inventaire', icon: 'cube-outline', description: 'État du stock' },
-  { id: 'client', title: 'Clients', icon: 'people-outline', description: 'Analyse de la clientèle' },
+  { id: 'client', title: 'Clients', icon: 'people-outline', description: 'Top clients et fidélité' },
 ];
+
+const webInputStyle = {
+  padding: 8,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#e2e8f0',
+  fontSize: 14,
+  width: '100%',
+  marginTop: 4,
+};
 
 export const SellerReportsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -42,18 +57,23 @@ export const SellerReportsScreen: React.FC = () => {
   const { user } = useAuthStore();
   const { spacing, fontSize, isMobile, isTablet, isDesktop } = useResponsive();
 
-  const [selectedReport, setSelectedReport] = useState<ReportType>('daily');
+  const [selectedReport, setSelectedReport] = useState<ReportType>('ledger');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
 
+  const [ledger, setLedger] = useState<any[]>([]);
   const [dailySales, setDailySales] = useState<DailySalesReport[]>([]);
   const [monthlySales, setMonthlySales] = useState<MonthlySalesReport[]>([]);
-  const [categorySales, setCategorySales] = useState<CategorySalesReport[]>([]);
+  const [collectionSales, setCollectionSales] = useState<CollectionSalesReport[]>([]);
   const [margins, setMargins] = useState<MarginReport[]>([]);
   const [returns, setReturns] = useState<ReturnReport[]>([]);
   const [inventory, setInventory] = useState<InventoryReport[]>([]);
   const [clients, setClients] = useState<ClientReport[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [productSearch, setProductSearch] = useState('');
+  const [productModalVisible, setProductModalVisible] = useState(false);
 
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
   const [endDate, setEndDate] = useState(new Date());
@@ -66,7 +86,7 @@ export const SellerReportsScreen: React.FC = () => {
     if (storeId) {
       loadReports();
     }
-  }, [storeId, selectedReport, startDate, endDate]);
+  }, [storeId, selectedReport, startDate, endDate, selectedProductId]);
 
   const loadStore = async () => {
     if (!user?.id) return;
@@ -74,6 +94,8 @@ export const SellerReportsScreen: React.FC = () => {
       const store = await storeService.getByUser(user.id);
       if (store?.id) {
         setStoreId(store.id);
+        const pList = await productService.getByStoreAll(store.id);
+        setProducts(pList || []);
       }
     } catch (e) {
       errorHandler.handleDatabaseError(e as Error, 'Error loading store');
@@ -86,6 +108,10 @@ export const SellerReportsScreen: React.FC = () => {
       setLoading(true);
       
       switch (selectedReport) {
+        case 'ledger':
+          const lData = await accountingService.generateGeneralLedger(storeId, startDate, endDate, selectedProductId || undefined);
+          setLedger(lData);
+          break;
         case 'daily':
           const daily = await reportsService.getDailySalesReport(storeId, startDate, endDate);
           setDailySales(daily);
@@ -94,9 +120,9 @@ export const SellerReportsScreen: React.FC = () => {
           const monthly = await reportsService.getMonthlySalesReport(storeId, startDate.getFullYear());
           setMonthlySales(monthly);
           break;
-        case 'category':
-          const category = await reportsService.getCategorySalesReport(storeId, startDate, endDate);
-          setCategorySales(category);
+        case 'collection':
+          const collection = await reportsService.getCollectionSalesReport(storeId, startDate, endDate);
+          setCollectionSales(collection);
           break;
         case 'margin':
           const margin = await reportsService.getMarginReport(storeId, startDate, endDate);
@@ -135,6 +161,10 @@ export const SellerReportsScreen: React.FC = () => {
       let filename = 'rapport';
 
       switch (selectedReport) {
+        case 'ledger':
+          data = ledger;
+          filename = 'journal_mouvements';
+          break;
         case 'daily':
           data = dailySales;
           filename = 'ventes_journalieres';
@@ -143,9 +173,9 @@ export const SellerReportsScreen: React.FC = () => {
           data = monthlySales;
           filename = 'ventes_mensuelles';
           break;
-        case 'category':
-          data = categorySales;
-          filename = 'ventes_par_categorie';
+        case 'collection':
+          data = collectionSales;
+          filename = 'ventes_par_collection';
           break;
         case 'margin':
           data = margins;
@@ -202,6 +232,126 @@ export const SellerReportsScreen: React.FC = () => {
 
   const formatAmount = (amount: number) => amount.toLocaleString('fr-FR') + ' FCFA';
 
+  const renderLedger = () => {
+    const selectedProduct = products.find(p => p.id === selectedProductId);
+    const filteredProducts = products.filter(p => 
+      p.name.toLowerCase().includes(productSearch.toLowerCase())
+    );
+
+    return (
+      <View style={{ flex: 1 }}>
+        {/* Real Product Selector for Ledger */}
+        <View style={styles.filterSection}>
+          <Text style={styles.filterLabel}>Filtrer par produit:</Text>
+          <TouchableOpacity 
+            style={styles.selectorButton}
+            onPress={() => setProductModalVisible(true)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="cube-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.selectorButtonText}>
+                {selectedProduct ? selectedProduct.name : 'Tous les produits'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={20} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Product Selection Modal */}
+        <Modal
+          visible={productModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setProductModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.searchModal}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Choisir un produit</Text>
+                <TouchableOpacity onPress={() => setProductModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.text} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.searchInputContainer}>
+                <Ionicons name="search" size={20} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Rechercher un produit..."
+                  value={productSearch}
+                  onChangeText={setProductSearch}
+                  autoFocus={Platform.OS !== 'web'}
+                />
+              </View>
+
+              <ScrollView style={styles.productList}>
+                <TouchableOpacity 
+                  style={[styles.productItem, selectedProductId === '' && styles.productItemActive]}
+                  onPress={() => {
+                    setSelectedProductId('');
+                    setProductModalVisible(false);
+                    setProductSearch('');
+                  }}
+                >
+                  <Text style={[styles.productItemText, selectedProductId === '' && styles.productItemTextActive]}>
+                    Tous les produits
+                  </Text>
+                  {selectedProductId === '' && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
+                </TouchableOpacity>
+
+                {filteredProducts.map(p => (
+                  <TouchableOpacity 
+                    key={p.id}
+                    style={[styles.productItem, selectedProductId === p.id && styles.productItemActive]}
+                    onPress={() => {
+                      setSelectedProductId(p.id);
+                      setProductModalVisible(false);
+                      setProductSearch('');
+                    }}
+                  >
+                    <Text style={[styles.productItemText, selectedProductId === p.id && styles.productItemTextActive]}>
+                      {p.name}
+                    </Text>
+                    {selectedProductId === p.id && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <FlatList
+          data={ledger}
+          keyExtractor={(item, index) => `${item.reference}-${index}`}
+          renderItem={({ item }) => (
+            <View style={styles.reportItem}>
+              <View style={styles.reportItemHeader}>
+                <View>
+                  <Text style={styles.reportItemTitle}>{item.description}</Text>
+                  <Text style={styles.reportItemDetail}>{item.date} • {item.reference}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.reportItemValue, { color: item.credit > 0 ? COLORS.success : COLORS.danger }]}>
+                    {item.credit > 0 ? `+${formatAmount(item.credit)}` : item.debit > 0 ? `-${formatAmount(item.debit)}` : '---'}
+                  </Text>
+                  <Text style={{ fontSize: 10, color: COLORS.textMuted }}>Solde: {formatAmount(item.balance)}</Text>
+                  {item.stockQty !== 0 && (
+                    <View style={[styles.stockBadge, { backgroundColor: item.stockQty > 0 ? `${COLORS.success}20` : `${COLORS.danger}20` }]}>
+                      <Text style={[styles.stockBadgeText, { color: item.stockQty > 0 ? COLORS.success : COLORS.danger }]}>
+                        {item.stockQty > 0 ? `+${item.stockQty}` : item.stockQty} articles
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+          ListEmptyComponent={<Text style={styles.emptyText}>Aucun mouvement sur cette période</Text>}
+        />
+      </View>
+    );
+  };
+
   const renderDailySales = () => (
     <FlatList
       data={dailySales}
@@ -244,18 +394,18 @@ export const SellerReportsScreen: React.FC = () => {
     />
   );
 
-  const renderCategorySales = () => (
+  const renderCollectionSales = () => (
     <FlatList
-      data={categorySales}
-      keyExtractor={(item) => item.categoryId}
+      data={collectionSales}
+      keyExtractor={(item) => item.collectionId}
       renderItem={({ item }) => (
         <View style={styles.reportItem}>
           <View style={styles.reportItemHeader}>
-            <Text style={styles.reportItemTitle}>{item.categoryName}</Text>
+            <Text style={styles.reportItemTitle}>{item.collectionName}</Text>
             <Text style={styles.reportItemValue}>{formatAmount(item.totalRevenue)}</Text>
           </View>
           <View style={styles.reportItemDetails}>
-            <Text style={styles.reportItemDetail}>{item.percentage.toFixed(1)}% du total</Text>
+            <Text style={styles.reportItemDetail}>{item.percentage.toFixed(2)}% du total</Text>
             <Text style={styles.reportItemDetail}>{item.totalOrders} commandes</Text>
             <Text style={styles.reportItemDetail}>{item.totalItemsSold} articles</Text>
           </View>
@@ -324,7 +474,7 @@ export const SellerReportsScreen: React.FC = () => {
             </Text>
           </View>
           <View style={styles.reportItemDetails}>
-            <Text style={styles.reportItemDetail}>Catégorie: {item.category}</Text>
+            <Text style={styles.reportItemDetail}>Collection: {item.category}</Text>
             <Text style={styles.reportItemDetail}>Seuil: {item.lowStockThreshold}</Text>
             <Text style={styles.reportItemDetail}>Valeur: {formatAmount(item.value)}</Text>
             <Text style={styles.reportItemDetail}>Statut: {item.status === 'out' ? 'Rupture' : item.status === 'low' ? 'Faible' : 'OK'}</Text>
@@ -361,12 +511,14 @@ export const SellerReportsScreen: React.FC = () => {
 
   const renderReportContent = () => {
     switch (selectedReport) {
+      case 'ledger':
+        return renderLedger();
       case 'daily':
         return renderDailySales();
       case 'monthly':
         return renderMonthlySales();
-      case 'category':
-        return renderCategorySales();
+      case 'collection':
+        return renderCollectionSales();
       case 'margin':
         return renderMargins();
       case 'return':
@@ -426,18 +578,41 @@ export const SellerReportsScreen: React.FC = () => {
 
         {/* Date Range Selector */}
         <View style={styles.dateRangeContainer}>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => {
-              // TODO: Implement date picker
-              Alert.alert('Information', 'Sélecteur de date à implémenter');
-            }}
-          >
-            <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.dateButtonText}>
-              {startDate.toLocaleDateString('fr-FR')} - {endDate.toLocaleDateString('fr-FR')}
-            </Text>
-          </TouchableOpacity>
+          {Platform.OS === 'web' ? (
+            <View style={styles.dateRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateLabel}>Du:</Text>
+                <input
+                  type="date"
+                  value={startDate.toISOString().split('T')[0]}
+                  style={webInputStyle}
+                  onChange={(e) => setStartDate(new Date(e.target.value))}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.dateLabel}>Au:</Text>
+                <input
+                  type="date"
+                  value={endDate.toISOString().split('T')[0]}
+                  style={webInputStyle}
+                  onChange={(e) => setEndDate(new Date(e.target.value))}
+                />
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => {
+                // TODO: Implement native date picker
+                Alert.alert('Information', 'Sélecteur de date à implémenter');
+              }}
+            >
+              <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.dateButtonText}>
+                {startDate.toLocaleDateString('fr-FR')} - {endDate.toLocaleDateString('fr-FR')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Report Content */}
@@ -448,7 +623,29 @@ export const SellerReportsScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.reportContent}>
-            {renderReportContent()}
+            {/* Lien vers la gestion active */}
+      {selectedReport === 'return' && (
+        <TouchableOpacity 
+          style={styles.manageButton}
+          onPress={() => navigation.navigate('SellerReturns')}
+        >
+          <Ionicons name="settings-outline" size={20} color={COLORS.white} />
+          <Text style={styles.manageButtonText}>Gérer les retours en cours</Text>
+        </TouchableOpacity>
+      )}
+
+      {selectedReport === 'inventory' && (
+        <TouchableOpacity 
+          style={styles.manageButton}
+          onPress={() => navigation.navigate('SellerStockHistory')}
+        >
+          <Ionicons name="journal-outline" size={20} color={COLORS.white} />
+          <Text style={styles.manageButtonText}>Voir l'Audit & Historique des Mouvements</Text>
+        </TouchableOpacity>
+      )}
+
+
+      {renderReportContent()}
           </View>
         )}
       </ScrollView>
@@ -547,6 +744,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
   },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.md,
+    gap: 8,
+  },
+  manageButtonText: {
+    color: COLORS.white,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   reportItem: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.md,
@@ -592,5 +804,119 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     paddingVertical: SPACING.xxl,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginBottom: 2,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  stockBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  stockBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  filterSection: {
+    marginBottom: SPACING.md,
+    backgroundColor: COLORS.card,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+  },
+  selectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.bg,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  selectorButtonText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  searchModal: {
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: Platform.OS === 'web' ? 12 : 10,
+    paddingHorizontal: SPACING.sm,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+  },
+  productList: {
+    maxHeight: 400,
+  },
+  productItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  productItemActive: {
+    backgroundColor: `${COLORS.primary}05`,
+  },
+  productItemText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+  },
+  productItemTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });

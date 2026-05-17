@@ -638,29 +638,18 @@ export const storeService = {
     
     if (error) throw error;
     
-    // Filtrer par distance côté client
-    const nearbyStores = (data || []).filter(store => {
-      const distance = locationService.calculateDistance(
-        lat, lon,
-        store.latitude || 0,
-        store.longitude || 0
-      );
-      return distance <= radiusKm;
-    });
+    const userCoords = { latitude: lat, longitude: lon };
     
-    // Trier par distance et ajouter la distance calculée
-    const storesWithDistance = nearbyStores.map(store => {
-      const distance = locationService.calculateDistance(
-        lat, lon,
-        store.latitude || 0,
-        store.longitude || 0
-      );
-      return { ...store, distance };
-    });
+    // Filtrer par distance côté client et trier
+    const storesWithDistance = (data || [])
+      .map(store => ({
+        ...store,
+        distance: locationService.calculateDistanceToStore(userCoords, store)
+      }))
+      .filter(store => store.distance !== null && store.distance <= radiusKm)
+      .sort((a, b) => (a.distance || 0) - (b.distance || 0));
     
-    storesWithDistance.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-    
-    return storesWithDistance as Store[];
+    return storesWithDistance as any as Store[];
   },
 };
 

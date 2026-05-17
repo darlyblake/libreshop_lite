@@ -29,6 +29,7 @@ interface CollectionOption {
 interface Product {
   name: string;
   price: string;
+  costPrice: string;
   comparePrice: string;
   stock: string;
   barcode?: string; // code barre facultatif
@@ -446,6 +447,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [newProduct, setNewProduct] = useState<Product>({
     name: '',
     price: '',
+    costPrice: '',
     comparePrice: '',
     stock: '',
     barcode: undefined,
@@ -504,6 +506,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       errors.stock = 'Stock invalide (≥ 0)';
     }
 
+    if (newProduct.costPrice && newProduct.costPrice.trim()) {
+      if (isNaN(Number(newProduct.costPrice)) || Number(newProduct.costPrice) < 0) {
+        errors.costPrice = 'Prix invalide (≥ 0)';
+      }
+    }
+
     if (!newProduct.collectionId) {
       errors.collection = 'Collection requise';
     }
@@ -547,6 +555,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     setNewProduct({
       name: '',
       price: '',
+      costPrice: '',
       comparePrice: '',
       stock: '',
       barcode: undefined,
@@ -716,6 +725,23 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 keyboardType="numeric"
               />
               {fieldErrors.price && <Text style={styles.errorText}>{fieldErrors.price}</Text>}
+            </View>
+
+            <View style={styles.modalInput}>
+              <Text style={styles.inputLabel}>
+                Prix d'achat (pour calcul des bénéfices)
+              </Text>
+              <TextInput
+                style={[styles.input, fieldErrors.costPrice && styles.inputError]}
+                placeholder="Ex: 500000"
+                placeholderTextColor={COLORS.textMuted}
+                value={newProduct.costPrice}
+                onChangeText={(text) =>
+                  setNewProduct({ ...newProduct, costPrice: text })
+                }
+                keyboardType="numeric"
+              />
+              {fieldErrors.costPrice && <Text style={styles.errorText}>{fieldErrors.costPrice}</Text>}
             </View>
 
             <View style={styles.modalInput}>

@@ -21,6 +21,9 @@ import { storeService } from '../services/storeService';
 import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
+import { locationService, LocationCoords } from '../services/locationService';
+import { couponService } from '../services/couponService';
+import { getStoreStatus } from '../utils/storeStatus';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -69,43 +72,104 @@ export const CheckoutScreen: React.FC = () => {
     name: user?.full_name || '',
     phone: user?.whatsapp_number || user?.phone || '',
     address: '',
+    city: '',
     notes: '',
   });
+  const [userLocation, setUserLocation] = useState<LocationCoords | null>(null);
   const [processing, setProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Load store data for tax and shipping. Supports single-store or mixed carts.
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [deliveryError, setDeliveryError] = useState('');
+
+  // Calculate shipping dynamically
+  useEffect(() => {
+    let mounted = true;
+    const computeShipping = async () => {
+      if (storesData.length === 0) return;
+      
+      let totalShipping = 0;
+      let hasError = false;
+      let errorMsg = '';
+
+      for (const s of storesData) {
+        if (!s) continue;
+        
+        let fee = s.shipping_price || 0;
+        
+        if (s.delivery_mode === 'km') {
+          const dist = locationService.calculateDistanceToStore(userLocation, s);
+          if (dist !== null) {
+            fee = Math.round(dist * (s.delivery_price_km || 0));
+          } else {
+            fee = 0;
+          }
+        } else if (s.delivery_mode === 'city') {
+          if (formData.city) {
+            if (s.delivery_city_fees && Object.keys(s.delivery_city_fees).length > 0) {
+              const normalizeStr = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+              const userCityNormal = normalizeStr(formData.city);
+              const cityKey = Object.keys(s.delivery_city_fees).find(k => normalizeStr(k) === userCityNormal);
+              if (cityKey) {
+                fee = s.delivery_city_fees[cityKey];
+              } else {
+                hasError = true;
+                errorMsg = `Le vendeur ne livre pas à ${formData.city}.`;
+                fee = 0;
+              }
+            } else {
+              fee = s.shipping_price || 0;
+            }
+          } else {
+            fee = 0;
+          }
+        }
+        
+        totalShipping += fee;
+      }
+      
+      if (mounted) {
+        setAggregatedShipping(totalShipping);
+        setDeliveryError(hasError ? errorMsg : '');
+      }
+    };
+    
+    computeShipping();
+    return () => { mounted = false; };
+  }, [storesData, userLocation, formData.city]);
+
+  // Load store data for tax and base settings.
   useEffect(() => {
     let mounted = true;
     const loadStores = async () => {
       try {
         setLoadingStore(true);
 
-            // If a single storeId is locked, load that store only
             if (activeStoreId) {
               const storeData = await storeService.getById(activeStoreId);
           if (!mounted) return;
               setStore(storeData);
               setStoresData(storeData ? [storeData] : []);
-              // compute aggregated values for single store -- use passed items when available
+              
               const subtotalSingle = (paramItems && Array.isArray(paramItems))
                 ? paramItems.reduce((s: number, it: any) => s + (it.product.price || 0) * (it.quantity || 0), 0)
                 : getTotal();
-          const taxAmt = storeData?.tax_rate ? subtotalSingle * (storeData.tax_rate / 100) : 0;
-          const ship = storeData?.shipping_price || 0;
-          setAggregatedTaxAmount(Math.round(taxAmt));
-          setAggregatedShipping(ship);
-          return;
-        }
+              const taxAmt = storeData?.tax_rate ? subtotalSingle * (storeData.tax_rate / 100) : 0;
+              setAggregatedTaxAmount(Math.round(taxAmt));
+              return;
+            }
 
-        // Mixed cart: gather unique store ids from items and fetch each store
         const ids = Array.from(new Set((paramItems ?? items).map((i: any) => (i.product as any)?.store_id).filter(Boolean)));
         if (ids.length === 0) {
           setStore(null);
           setStoresData([]);
           setAggregatedTaxAmount(0);
-          setAggregatedShipping(0);
           return;
         }
 
@@ -114,7 +178,6 @@ export const CheckoutScreen: React.FC = () => {
         setStore(null);
         setStoresData(stores.filter(Boolean));
 
-        // compute subtotal per store
         const subtotalByStore: Record<string, number> = {};
         (paramItems ?? items).forEach((it: any) => {
           const sid = (it.product as any)?.store_id || (it as any).store_id;
@@ -123,17 +186,12 @@ export const CheckoutScreen: React.FC = () => {
         });
 
         let taxSum = 0;
-        let shippingSum = 0;
         for (const s of stores) {
           if (!s) continue;
-          const sid = s.id;
-          const storeSubtotal = subtotalByStore[sid] || 0;
-          const t = s.tax_rate ? storeSubtotal * (s.tax_rate / 100) : 0;
-          taxSum += t;
-          shippingSum += s.shipping_price || 0;
+          const storeSubtotal = subtotalByStore[s.id] || 0;
+          taxSum += s.tax_rate ? storeSubtotal * (s.tax_rate / 100) : 0;
         }
         setAggregatedTaxAmount(Math.round(taxSum));
-        setAggregatedShipping(shippingSum);
       } catch (e) {
         errorHandler.handle(e, 'load store for checkout', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       } finally {
@@ -148,10 +206,57 @@ export const CheckoutScreen: React.FC = () => {
     ? paramItems.reduce((s: number, it: any) => s + (it.product.price || 0) * (it.quantity || 0), 0)
     : getTotal();
   const taxRate = store?.tax_rate || 0; // legacy single-store rate for label
-  const shippingPrice = store?.shipping_price || 0; // legacy single-store shipping
   const taxAmount = store ? Math.round(subtotal * (taxRate / 100)) : aggregatedTaxAmount;
-  const total = subtotal + taxAmount + (store ? shippingPrice : aggregatedShipping);
+  const deliveryFeeCalculated = aggregatedShipping;
+  // Make sure total doesn't go below 0
+  const total = Math.max(0, subtotal + taxAmount + deliveryFeeCalculated - discountAmount);
   const cartEmpty = (paramItems ? paramItems.length === 0 : items.length === 0);
+
+
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    const validationStoreId = activeStoreId || (storesData.length > 0 ? storesData[0].id : null);
+    if (!validationStoreId) {
+      setCouponMessage('Impossible de vérifier le code pour ce panier.');
+      return;
+    }
+
+    setValidatingCoupon(true);
+    setCouponMessage('');
+    try {
+      const orderAmountBeforeDiscount = subtotal + taxAmount + deliveryFeeCalculated;
+      const result = await couponService.validateCoupon(couponCode, validationStoreId, orderAmountBeforeDiscount);
+      
+      if (result.isValid) {
+        if (result.discountType === 'free_shipping') {
+          setDiscountAmount(deliveryFeeCalculated);
+        } else {
+          setDiscountAmount(result.discountAmount);
+        }
+        setCouponApplied(true);
+        setCouponMessage(result.message || 'Code appliqué !');
+      } else {
+        setDiscountAmount(0);
+        setCouponApplied(false);
+        setCouponMessage(result.message || 'Code invalide.');
+      }
+    } catch (e) {
+      setCouponMessage('Erreur lors de la vérification.');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode('');
+    setDiscountAmount(0);
+    setCouponApplied(false);
+    setCouponMessage('');
+  };
+
+  // Check if we need strict location (city or km delivery mode)
+  const requiresLocation = storesData.some(s => s.delivery_mode === 'km' || s.delivery_mode === 'city');
 
   useEffect(() => {
     const restore = async () => {
@@ -231,15 +336,101 @@ export const CheckoutScreen: React.FC = () => {
             {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
           </View>
           
+          {requiresLocation && (
+            <View style={{ marginBottom: SPACING.md }}>
+              <TouchableOpacity 
+                style={{ 
+                  backgroundColor: COLORS.card, 
+                  borderWidth: 2, 
+                  borderColor: userLocation ? COLORS.success : COLORS.primary,
+                  padding: SPACING.md, 
+                  borderRadius: RADIUS.lg, 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  gap: SPACING.sm
+                }}
+                onPress={async () => {
+                  setProcessing(true);
+                  try {
+                    const pos = await locationService.getCurrentPosition();
+                    if (pos) {
+                      setUserLocation(pos);
+                      const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
+                      if (addr) {
+                        handleInputChange('address', addr.street || '');
+                        if (addr.city) handleInputChange('city', addr.city);
+                      }
+                    } else {
+                      Alert.alert('Erreur', 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.');
+                    }
+                  } catch(e) {
+                    Alert.alert('Erreur', 'Impossible de récupérer votre position.');
+                  } finally {
+                    setProcessing(false);
+                  }
+                }}
+              >
+                <Ionicons name={userLocation ? "checkmark-circle" : "locate"} size={24} color={userLocation ? COLORS.success : COLORS.primary} />
+                <Text style={{ fontSize: 16, color: userLocation ? COLORS.success : COLORS.primary, fontWeight: '700' }}>
+                  {userLocation ? 'Position validée' : 'Obtenir ma position de livraison'}
+                </Text>
+              </TouchableOpacity>
+              {!userLocation && (
+                <Text style={{ fontSize: 12, color: COLORS.danger, marginTop: 8, textAlign: 'center' }}>
+                  Ce vendeur nécessite votre position exacte pour calculer les frais de livraison.
+                </Text>
+              )}
+            </View>
+          )}
+
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Adresse de livraison</Text>
+            <Text style={styles.label}>Ville {requiresLocation && '(Détectée via GPS)'}</Text>
             <TextInput
-              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null]}
-              placeholder="Ville, quartier, rue..."
+              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null, requiresLocation && { backgroundColor: COLORS.bg, opacity: 0.7 }]}
+              placeholder={requiresLocation ? "Utilisez le bouton de localisation" : "Ex: Douala, Yaoundé..."}
+              placeholderTextColor={COLORS.textMuted}
+              value={formData.city}
+              editable={!requiresLocation}
+              onChangeText={(v) => handleInputChange('city', v)}
+            />
+            {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
+          </View>
+
+          <View style={styles.formGroup}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm }}>
+              <Text style={styles.label}>Adresse précise {requiresLocation && '(Détectée via GPS)'}</Text>
+              {!requiresLocation && (
+                <TouchableOpacity 
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  onPress={async () => {
+                    const pos = await locationService.getCurrentPosition();
+                    if (pos) {
+                      setUserLocation(pos);
+                      const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
+                      if (addr) {
+                        handleInputChange('address', addr.street || '');
+                        if (addr.city) handleInputChange('city', addr.city);
+                      }
+                      Alert.alert('Localisation', 'Position récupérée avec succès !');
+                    } else {
+                      Alert.alert('Erreur', 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.');
+                    }
+                  }}
+                >
+                  <Ionicons name="locate" size={16} color={COLORS.accent} />
+                  <Text style={{ fontSize: 12, color: COLORS.accent, fontWeight: '600' }}>Me localiser</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <TextInput
+              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null, requiresLocation && { backgroundColor: COLORS.bg, opacity: 0.7 }]}
+              placeholder={requiresLocation ? "Utilisez le bouton de localisation" : "Quartier, Carrefour, description..."}
               placeholderTextColor={COLORS.textMuted}
               multiline
               numberOfLines={3}
               value={formData.address}
+              editable={!requiresLocation}
               onChangeText={(v) => handleInputChange('address', v)}
             />
             {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
@@ -309,6 +500,54 @@ export const CheckoutScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Code Promo */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="ticket-outline" size={20} color={COLORS.accent} />
+            <Text style={styles.sectionTitle}>Code Promo</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+            <TextInput 
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="Entrez votre code"
+              placeholderTextColor={COLORS.textMuted}
+              value={couponCode}
+              onChangeText={(v) => {
+                setCouponCode(v);
+                if (couponApplied) handleRemoveCoupon();
+              }}
+              autoCapitalize="characters"
+              editable={!couponApplied}
+            />
+            <TouchableOpacity 
+              style={[{
+                backgroundColor: couponApplied ? COLORS.danger : COLORS.primary,
+                paddingHorizontal: SPACING.lg,
+                borderRadius: RADIUS.md,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }]}
+              onPress={couponApplied ? handleRemoveCoupon : handleApplyCoupon}
+              disabled={validatingCoupon}
+            >
+              {validatingCoupon ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
+                  {couponApplied ? 'Retirer' : 'Appliquer'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          {couponMessage ? (
+            <Text style={{ 
+              color: couponApplied ? COLORS.success : COLORS.danger, 
+              fontSize: 13, 
+              marginTop: SPACING.sm 
+            }}>{couponMessage}</Text>
+          ) : null}
+        </View>
+
         {/* Order Summary */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -361,9 +600,20 @@ export const CheckoutScreen: React.FC = () => {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Livraison</Text>
               <Text style={styles.summaryValue}>
-                {loadingStore ? '...' : (store ? (shippingPrice > 0 ? `${shippingPrice.toLocaleString()} FCA` : 'Gratuite') : `${aggregatedShipping.toLocaleString()} FCA`)}
+                {loadingStore ? '...' : (requiresLocation && !userLocation ? 'À calculer' : (aggregatedShipping > 0 ? `${aggregatedShipping.toLocaleString()} FCA` : 'Gratuite'))}
               </Text>
             </View>
+
+            {/* Discount */}
+            {discountAmount > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: COLORS.success }]}>Réduction (Code Promo)</Text>
+                <Text style={[styles.summaryValue, { color: COLORS.success }]}>
+                  -{discountAmount.toLocaleString()} FCA
+                </Text>
+              </View>
+            )}
+
             <View style={styles.divider} />
             <View style={styles.summaryRow}>
               <Text style={styles.totalLabel}>Total TTC</Text>
@@ -394,10 +644,24 @@ export const CheckoutScreen: React.FC = () => {
           <Text style={styles.bottomTotalLabel}>Total TTC</Text>
           <Text style={styles.bottomTotalValue}>{total.toLocaleString()} FCA</Text>
         </View>
-          <TouchableOpacity 
+        <TouchableOpacity 
           style={[styles.orderButton, (cartEmpty || processing || completed) && { opacity: 0.6 }]}
           disabled={cartEmpty || processing || completed}
           onPress={async () => {
+            // Check store status
+            for (const s of storesData) {
+              if (s) {
+                const status = getStoreStatus(s);
+                if (!status.isOpen) {
+                  Alert.alert(
+                    "Boutique fermée",
+                    `La boutique "${s.name}" est actuellement fermée${status.reason === 'paused' ? ' (en pause)' : ''}. Impossible de passer commande pour le moment.`
+                  );
+                  return;
+                }
+              }
+            }
+
             // Validate items exist and are parseable
             if (!Array.isArray(paramItems) && !Array.isArray(items)) {
               // Attempt to recover from URL query if possible
@@ -444,8 +708,27 @@ export const CheckoutScreen: React.FC = () => {
             if (!formData.phone || formData.phone.trim().length < 6) {
               newErrors.phone = 'Veuillez entrer un numéro de téléphone valide.';
             }
+            if (!formData.city || formData.city.trim().length < 2) {
+              newErrors.city = 'Veuillez entrer votre ville.';
+            }
             if (!formData.address || formData.address.trim().length < 5) {
               newErrors.address = 'Veuillez entrer votre adresse de livraison.';
+            }
+            if (deliveryError) {
+              newErrors.city = deliveryError;
+            }
+
+            // Specific check for location delivery (KM or City)
+            if (requiresLocation && !userLocation) {
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                const ok = window.confirm('Attention: La position est nécessaire pour calculer les frais de livraison. Voulez-vous continuer avec les frais par défaut (0 FCA) ?');
+                if (!ok) return;
+              } else {
+                Alert.alert('Position requise', 'Le vendeur nécessite votre position pour calculer la livraison. Souhaitez-vous continuer sans position ?', [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Continuer', style: 'default' }
+                ]);
+              }
             }
 
             if (Object.keys(newErrors).length > 0) {
@@ -501,10 +784,17 @@ export const CheckoutScreen: React.FC = () => {
                 user_id: userId,
                 store_id: String(activeStoreId),
                 total_amount: Number(total),
+                tax_amount: Number(taxAmount),
+                delivery_fee: Number(deliveryFeeCalculated),
+                discount_amount: Number(discountAmount),
+                coupon_code: couponApplied ? couponCode : null,
                 status: 'pending',
                 payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod,
                 payment_status: 'paid',
                 shipping_address: formData.address,
+                city: formData.city,
+                latitude: userLocation?.latitude,
+                longitude: userLocation?.longitude,
                 customer_phone: formData.phone,
                 notes: formData.notes,
                 customer_name: formData.name,
@@ -519,6 +809,7 @@ export const CheckoutScreen: React.FC = () => {
                   product_id: it.product.id,
                   quantity: it.quantity,
                   price: it.product.price,
+                  cost_price: it.product.cost_price,
                 }));
                 await orderService.createItems(rows);
                 // Envoi best-effort d'une notification vendeur côté client

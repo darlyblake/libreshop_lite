@@ -577,11 +577,7 @@ export const AdminDashboardScreen: React.FC = () => {
                 data={chartData} 
                 loading={loading} 
                 timeRange="30d" 
-                color={COLORS.accent} 
-                textColor={COLORS.textMuted} 
-                borderColor={COLORS.border} 
-                cardColor={COLORS.card} 
-                useGradient={true}
+                primaryColor={COLORS.accent} 
               />
             </View>
           ) : (

@@ -4,14 +4,14 @@ import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
 
 // Environment variables required:
-// SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SENDGRID_API_KEY, EMAIL_FROM
+// SUPABASE_URL, SUPABASE_ANON_KEY, SENDGRID_API_KEY, EMAIL_FROM
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const ANON_KEY = process.env.SUPABASE_ANON_KEY!;
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY!;
 const EMAIL_FROM = process.env.EMAIL_FROM || 'noreply@example.com';
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
+const supabase = createClient(SUPABASE_URL, ANON_KEY, {
   auth: { persistSession: false }
 });
 
@@ -65,12 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!sgRes.ok) {
       const text = await sgRes.text();
       console.error('SendGrid error:', text);
-      return res.status(502).json({ error: 'Failed to send email' });
+      return res.status(502).json({ error: 'Erreur lors de l\'envoi de l\'email' });
     }
 
     return res.status(200).json({ ok: true });
   } catch (err: any) {
     console.error('generate OTP error', err);
-    return res.status(500).json({ error: String(err.message || err) });
+    return res.status(500).json({ error: 'Erreur serveur' });
   }
 }

@@ -172,7 +172,7 @@ interface CardProps {
   onPress?: () => void;
 }
 
-export const Card: React.FC<CardProps> = ({ children, style, onPress }) => {
+export const Card: React.FC<CardProps> = React.memo(({ children, style, onPress }) => {
   const themeContext = useTheme();
   const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
 
@@ -186,7 +186,7 @@ export const Card: React.FC<CardProps> = ({ children, style, onPress }) => {
       {children}
     </Wrapper>
   );
-};
+});
 
 // Store Card Component
 interface StoreCardProps {
@@ -200,7 +200,7 @@ interface StoreCardProps {
   onPress: () => void;
 }
 
-export const StoreCard: React.FC<StoreCardProps> = ({
+export const StoreCard: React.FC<StoreCardProps> = React.memo(({
   name,
   category,
   description,
@@ -249,7 +249,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
 
 // Product Card Component
 interface ProductCardProps {
@@ -260,7 +260,7 @@ interface ProductCardProps {
   onPress: () => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+export const ProductCard: React.FC<ProductCardProps> = React.memo(({
   name,
   price,
   comparePrice,
@@ -302,5 +302,5 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
 

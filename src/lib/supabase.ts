@@ -167,6 +167,9 @@ export interface Store {
   visible?: boolean;
   tax_rate?: number;
   shipping_price?: number;
+  delivery_mode?: 'fixed' | 'km' | 'city';
+  delivery_price_km?: number;
+  delivery_city_fees?: Record<string, number>;
   total_orders?: number;
   rating_avg?: number;
   rating_count?: number;
@@ -177,6 +180,12 @@ export interface Store {
   city?: string;
   country?: string;
   location_set_at?: string;
+  business_hours?: Record<string, { isOpen: boolean; open: string; close: string }>;
+  is_paused?: boolean;
+  announcement_banner?: string;
+  announcement_banner_enabled?: boolean;
+  announcement_popup?: string;
+  announcement_popup_enabled?: boolean;
   created_at: string;
   store_stats?: any;
 }
@@ -190,6 +199,7 @@ export interface Product {
   description?: string;
   price: number;
   compare_price?: number;
+  cost_price?: number;
   stock: number;
   low_stock_threshold?: number;
   low_stock_alert_sent?: boolean;
@@ -258,6 +268,9 @@ export interface Order {
   shipping_address?: string;
   customer_phone?: string;
   notes?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
   created_at: string;
 }
 
@@ -267,6 +280,7 @@ export interface OrderItem {
   product_id: string;
   quantity: number;
   price: number;
+  cost_price?: number;
   product?: Product;
 }
 

@@ -7,6 +7,9 @@ import {
   StyleSheet,
   Alert,
   Image,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,9 +20,9 @@ import { orderService } from '../services/orderService';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
-import { Card } from '../components/Card';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import { Card, LoadingSpinner, OrderTimeline } from '../components';
 import { cloudinaryService } from '../services/cloudinaryService';
+import { refundService } from '../services/refundService';
 
 type RouteProps = RouteProp<RootStackParamList, 'ClientOrderDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -37,6 +40,10 @@ export const ClientOrderDetailScreen: React.FC = () => {
   
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refunds, setRefunds] = useState<any[]>([]);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -63,11 +70,54 @@ export const ClientOrderDetailScreen: React.FC = () => {
       };
       
       setOrder(normalized as OrderWithDetails);
+
+      // Charger les remboursements de cette commande
+      try {
+        const refundList = await refundService.getRefundsByOrder(orderId);
+        setRefunds(refundList || []);
+      } catch (err) {
+        console.warn('Error loading refunds:', err);
+      }
     } catch (error) {
       errorHandler.handleDatabaseError(error, 'Error loading order:');
       Alert.alert('Erreur', 'Impossible de charger la commande');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleInitiateReturn = async () => {
+    if (!returnReason.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir un motif pour votre retour');
+      return;
+    }
+
+    setSubmittingReturn(true);
+    try {
+      await refundService.createRefund({
+        orderId: order!.id,
+        amount: order!.total_amount,
+        reason: returnReason,
+        type: 'full',
+        status: 'pending',
+        items: order!.order_items.map(item => ({
+          productId: item.product_id,
+          productName: item.product?.name || 'Produit',
+          quantity: item.quantity,
+          price: item.price,
+          refundAmount: item.price * item.quantity,
+        }))
+      });
+
+      Alert.alert('Succès ✓', 'Votre demande de retour a été soumise avec succès.');
+      setShowReturnModal(false);
+      setReturnReason('');
+      loadOrder();
+    } catch (err) {
+      errorHandler.handle(err, 'Create refund error', ErrorCategory.USER_INPUT, ErrorSeverity.MEDIUM);
+      Alert.alert('Erreur', 'Impossible d’initier le retour de commande.');
+    } finally {
+      setSubmittingReturn(false);
     }
   };
 
@@ -145,21 +195,8 @@ export const ClientOrderDetailScreen: React.FC = () => {
         <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
       </View>
 
-      {/* Status Badge */}
-      <View style={styles.statusContainer}>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
-          <Ionicons 
-            name={order.status === 'delivered' ? 'checkmark-circle' : 
-                 order.status === 'cancelled' ? 'close-circle' :
-                 order.status === 'shipped' ? 'airplane' : 'time-outline'} 
-            size={16} 
-            color={getStatusColor(order.status)} 
-          />
-          <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
-            {getStatusLabel(order.status)}
-          </Text>
-        </View>
-      </View>
+      {/* Order Timeline */}
+      <OrderTimeline status={order.status} />
 
       {/* Store Info */}
       {order.store && (
@@ -235,7 +272,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
               <View style={styles.itemImage}>
                 {productImage ? (
                   <Image
-                    source={{ uri: cloudinaryService.getOptimizedUrl(productImage, 800) }}
+                    source={{ uri: cloudinaryService.getOptimizedUrl(productImage, 300) }}
                     style={{ width: '100%', height: '100%', borderRadius: 8 }}
                   />
                 ) : (
@@ -290,25 +327,116 @@ export const ClientOrderDetailScreen: React.FC = () => {
         </View>
       </Card>
 
-      {/* Actions */}
-      {order.users && (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.helpButton}
-            onPress={() => {
-              const phone = order.users?.phone || order.customer_phone;
-              if (!phone) {
-                Alert.alert('Erreur', 'Numéro de téléphone non disponible');
-                return;
-              }
-              contactStore({ rawPhone: phone, message: `Bonjour, je vous contacte concernant la commande #${orderId.slice(0, 8)}` });
-            }}
-          >
-            <Ionicons name="chatbubble-outline" size={20} color={COLORS.accent} />
-            <Text style={styles.helpText}>Contacter le client</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Return Requests Status */}
+      {refunds.length > 0 && (
+        <Card style={[styles.section, { borderColor: COLORS.accent, borderWidth: 1 }]}>
+          <Text style={[styles.sectionTitle, { color: COLORS.accent }]}>Demande de retour active</Text>
+          {refunds.map((ref) => (
+            <View key={ref.id} style={{ marginTop: SPACING.sm }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontWeight: '600', color: COLORS.text, flex: 1, marginRight: SPACING.sm }}>Motif: {ref.reason}</Text>
+                <View style={{
+                  backgroundColor: ref.status === 'approved' || ref.status === 'processed' ? COLORS.success + '20' : ref.status === 'rejected' ? COLORS.danger + '20' : COLORS.warning + '20',
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 4
+                }}>
+                  <Text style={{
+                    color: ref.status === 'approved' || ref.status === 'processed' ? COLORS.success : ref.status === 'rejected' ? COLORS.danger : COLORS.warning,
+                    fontSize: FONT_SIZE.xs,
+                    fontWeight: '600'
+                  }}>
+                    {ref.status === 'pending' ? 'En attente' : ref.status === 'approved' || ref.status === 'processed' ? 'Accepté' : 'Refusé'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.textMuted, marginTop: 4 }}>
+                Créé le {new Date(ref.orderDate).toLocaleDateString('fr-FR')} — Montant: {ref.amount.toLocaleString()} FCFAs
+              </Text>
+            </View>
+          ))}
+        </Card>
       )}
+
+      <View style={[styles.actions, { flexDirection: 'column', gap: SPACING.md }]}>
+        <TouchableOpacity
+          style={styles.helpButton}
+          onPress={() => {
+            const phone = order.store?.whatsapp_number || order.store?.phone || order.customer_phone;
+            if (!phone) {
+              Alert.alert('Erreur', 'Numéro de téléphone de la boutique non disponible');
+              return;
+            }
+            contactStore({ rawPhone: phone, message: `Bonjour, je vous contacte concernant ma commande #${orderId.slice(0, 8)}` });
+          }}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={COLORS.accent} />
+          <Text style={styles.helpText}>Contacter la boutique</Text>
+        </TouchableOpacity>
+
+        {order.status === 'delivered' && refunds.length === 0 && (
+          <TouchableOpacity
+            style={[styles.helpButton, { borderColor: COLORS.danger, backgroundColor: COLORS.danger + '10' }]}
+            onPress={() => setShowReturnModal(true)}
+          >
+            <Ionicons name="return-up-back" size={20} color={COLORS.danger} />
+            <Text style={[styles.helpText, { color: COLORS.danger }]}>Demander un retour / remboursement</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Return Request Modal */}
+      <Modal
+        visible={showReturnModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowReturnModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: COLORS.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: COLORS.text }]}>Demander un retour</Text>
+              <TouchableOpacity onPress={() => setShowReturnModal(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalSubtitle, { color: COLORS.textMuted }]}>
+              Veuillez expliquer en détail la raison de votre retour. Notre équipe et le vendeur l'analyseront dans les plus brefs délais.
+            </Text>
+
+            <TextInput
+              style={[styles.modalInput, { height: 100, textAlignVertical: 'top' }]}
+              value={returnReason}
+              onChangeText={setReturnReason}
+              placeholder="Raison du retour (ex: Produit défectueux, mauvaise taille...)"
+              placeholderTextColor={COLORS.textMuted}
+              multiline
+              numberOfLines={4}
+            />
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowReturnModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalConfirmButton}
+                onPress={handleInitiateReturn}
+                disabled={submittingReturn}
+              >
+                {submittingReturn ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Soumettre</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <View style={{ height: SPACING.xxl }} />
     </ScrollView>
@@ -490,6 +618,67 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     textAlign: 'center',
     marginTop: SPACING.xxl,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: SPACING.xl,
+  },
+  modalContent: {
+    borderRadius: RADIUS.lg,
+    padding: SPACING.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    fontSize: FONT_SIZE.sm,
+    lineHeight: 20,
+    marginBottom: SPACING.lg,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    color: COLORS.text,
+    backgroundColor: COLORS.bg,
+    marginBottom: SPACING.lg,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalConfirmButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.danger,
+  },
+  modalCancelText: {
+    color: COLORS.text,
+    fontWeight: '600',
+  },
+  modalConfirmText: {
+    color: '#FFF',
+    fontWeight: '600',
   },
 });
 

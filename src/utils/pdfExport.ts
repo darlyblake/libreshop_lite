@@ -461,6 +461,140 @@ export const exportOrdersToPDF = async (
   }
 };
 
+// ==========================================
+// BATCH PRINT: individual slips side by side
+// Generates one PDF with full invoice per order, separated by page breaks
+// ==========================================
+export const exportBatchOrdersToPDF = async (
+  orders: OrderData[],
+  storeName: string = 'Ma Boutique'
+): Promise<void> => {
+  try {
+    if (orders.length === 0) {
+      Alert.alert('Info', 'Aucune commande sélectionnée');
+      return;
+    }
+
+    const allSlipsHTML = orders.map((order, index) => `
+      <div class="slip-page" style="${index < orders.length - 1 ? 'page-break-after: always;' : ''}">
+        <div class="slip-header">
+          <div class="slip-store">${storeName}</div>
+          <div class="slip-badge">BORDEREAU D'EXPÉDITION</div>
+          <div class="slip-ref">#${order.id.slice(0, 8).toUpperCase()}</div>
+        </div>
+
+        <div class="slip-body">
+          <div class="slip-section">
+            <div class="slip-section-title">📦 Commande</div>
+            <div class="slip-row"><span>Date</span><strong>${formatDate(order.createdAt)}</strong></div>
+            <div class="slip-row"><span>Statut</span><strong class="status-badge status-${order.status}">${getStatusLabel(order.status)}</strong></div>
+            <div class="slip-row"><span>Paiement</span><strong>${getPaymentMethodLabel(order.paymentMethod)}</strong></div>
+          </div>
+
+          <div class="slip-section">
+            <div class="slip-section-title">👤 Client</div>
+            <div class="slip-row"><span>Nom</span><strong>${order.customerName || 'Client'}</strong></div>
+            <div class="slip-row"><span>Téléphone</span><strong>${order.customerPhone || 'N/A'}</strong></div>
+            ${order.shippingAddress ? `<div class="slip-row"><span>Adresse</span><strong>${order.shippingAddress}</strong></div>` : ''}
+          </div>
+
+          <div class="slip-section">
+            <div class="slip-section-title">🛒 Articles</div>
+            ${order.items.map(item => `
+              <div class="slip-item">
+                <span>${item.name}</span>
+                <span>x${item.quantity} &nbsp; ${formatCurrency(item.price * item.quantity)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="slip-footer">
+          <div class="slip-total">TOTAL : ${formatCurrency(order.totalAmount)}</div>
+          <div class="slip-note">Généré par LibreShop • ${new Date().toLocaleDateString('fr-FR')}</div>
+        </div>
+      </div>
+    `).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Impression en masse — ${storeName}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f0f0; color: #222; }
+          .slip-page {
+            max-width: 680px;
+            margin: 30px auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+          }
+          @media print {
+            body { background: white; }
+            .slip-page { box-shadow: none; border-radius: 0; margin: 0; max-width: 100%; border: 1px solid #ddd; }
+          }
+          .slip-header {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 24px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .slip-store { font-size: 18px; font-weight: 800; }
+          .slip-badge { font-size: 11px; font-weight: 700; letter-spacing: 1px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; }
+          .slip-ref { font-size: 20px; font-weight: 900; font-family: monospace; }
+          .slip-body { padding: 20px 28px; }
+          .slip-section { margin-bottom: 18px; }
+          .slip-section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #4f46e5; margin-bottom: 8px; border-bottom: 2px solid #ede9fe; padding-bottom: 4px; }
+          .slip-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 13px; color: #444; border-bottom: 1px dashed #f0f0f0; }
+          .slip-row span:first-child { color: #888; }
+          .slip-item { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed #f0f0f0; }
+          .slip-footer { background: #f8f7ff; padding: 16px 28px; display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #ede9fe; }
+          .slip-total { font-size: 22px; font-weight: 900; color: #4f46e5; }
+          .slip-note { font-size: 10px; color: #aaa; }
+          .status-badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+          .status-pending { background: #fef3c7; color: #92400e; }
+          .status-accepted { background: #ede9fe; color: #5b21b6; }
+          .status-paid { background: #d1fae5; color: #065f46; }
+          .status-shipped { background: #dbeafe; color: #1e40af; }
+          .status-delivered { background: #d1fae5; color: #065f46; }
+          .status-cancelled { background: #fee2e2; color: #991b1b; }
+        </style>
+      </head>
+      <body>
+        ${allSlipsHTML}
+      </body>
+      </html>
+    `;
+
+    if (Platform.OS === 'web') {
+      printHTMLOnWeb(html);
+      return;
+    }
+
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    const isShareAvailable = await Sharing.isAvailableAsync();
+    if (isShareAvailable) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Bordereaux — ${orders.length} commande(s)`,
+        UTI: 'com.adobe.pdf',
+      });
+    } else {
+      Alert.alert('Succès', `PDF sauvegardé: ${uri}`);
+    }
+  } catch (error) {
+    errorHandler.handleDatabaseError(error, 'Error batch printing:');
+    Alert.alert('Erreur', 'Impossible de générer les bordereaux');
+  }
+};
+
+
 export default {
   exportOrderToPDF,
   exportOrdersToPDF,

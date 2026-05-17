@@ -16,28 +16,37 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  session: null,
-  isLoading: true,
-  setUser: (user) => set({ user }),
-  setSession: (session) => set({ session }),
-  setLoading: (isLoading) => set({ isLoading }),
-  signOut: async () => {
-    try {
-      // Clear Supabase session
-      await authService.signOut();
-    } catch (error) {
-      errorHandler.handle(error, 'Error signing out from Supabase:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      session: null,
+      isLoading: true,
+      setUser: (user) => set({ user }),
+      setSession: (session) => set({ session }),
+      setLoading: (isLoading) => set({ isLoading }),
+      signOut: async () => {
+        try {
+          // Clear Supabase session
+          await authService.signOut();
+        } catch (error) {
+          errorHandler.handle(error, 'Error signing out from Supabase:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+        }
+        
+        // Clear store state
+        set({ user: null, session: null, isLoading: false });
+        
+        // Note: Other stores will be cleared by their own logic or on app reload
+        // This avoids circular import issues
+      },
+    }),
+    {
+      name: '@libreshop_auth',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ user: state.user, session: state.session }),
     }
-    
-    // Clear store state
-    set({ user: null, session: null, isLoading: false });
-    
-    // Note: Other stores will be cleared by their own logic or on app reload
-    // This avoids circular import issues
-  },
-}));
+  )
+);
 
 // Store Store
 interface StoreState {

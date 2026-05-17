@@ -3,6 +3,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 // Stack Navigator param lists
 export type RootStackParamList = {
   Landing: undefined;
+  ClientOnboarding: undefined;
   About: undefined;
   SellerAuth: undefined;
   SellerEmailConfirm: { token?: string; type?: string; email?: string };
@@ -62,11 +63,14 @@ export type RootStackParamList = {
   SellerOrderDetail: { orderId: string };
   SellerProductActions: { productId: string };
   SellerSale: { productId: string };
-  SellerRestock: { productId: string };
   SellerLowStock: undefined;
   SellerReports: undefined;
+  SellerStockHistory?: { productId?: string; openRestockModal?: boolean };
   SellerRefunds: undefined;
+
   SellerAccounting: undefined;
+  SellerReturns: undefined;
+  SellerCoupons: undefined;
   Notifications: undefined;
   Features: undefined;
   Pricing: undefined;
@@ -76,6 +80,7 @@ export type RootStackParamList = {
   Security: undefined;
   Help: undefined;
   AccountSuspended: undefined;
+  ResetPassword: undefined;
 };
 
 export type ClientTabParamList = {

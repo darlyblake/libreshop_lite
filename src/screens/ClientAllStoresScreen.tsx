@@ -102,20 +102,14 @@ export const ClientAllStoresScreen: React.FC = () => {
   useEffect(() => {
     if (nearbyEnabled && userLocation) {
       const storesWithDistance = stores
-        .filter(store => store.latitude && store.longitude)
         .map(store => ({
           ...store,
-          distance: locationService.calculateDistance(
-            userLocation.latitude, 
-            userLocation.longitude, 
-            store.latitude, 
-            store.longitude
-          )
+          distance: locationService.calculateDistanceToStore(userLocation, store)
         }))
-        .filter(store => store.distance <= nearbyRadius)
-        .sort((a, b) => (a as any).distance - (b as any).distance);
+        .filter(store => store.distance !== null && store.distance <= nearbyRadius)
+        .sort((a, b) => (a as any).distance! - (b as any).distance!);
       
-      setNearbyStores(storesWithDistance);
+      setNearbyStores(storesWithDistance as any);
     }
   }, [stores, nearbyEnabled, userLocation, nearbyRadius]);
 
@@ -195,24 +189,22 @@ export const ClientAllStoresScreen: React.FC = () => {
       setLoadingNearby(true);
       try {
         const location = await locationService.getCurrentPosition();
+        if (!location) {
+          Alert.alert('Erreur', 'Impossible d\'accéder à votre position');
+          return;
+        }
         setUserLocation(location);
         
         // Filter existing stores by distance
         const storesWithDistance = stores
-          .filter(store => store.latitude && store.longitude)
           .map(store => ({
             ...store,
-            distance: locationService.calculateDistance(
-              location.latitude, 
-              location.longitude, 
-              store.latitude, 
-              store.longitude
-            )
+            distance: locationService.calculateDistanceToStore(location, store)
           }))
-          .filter(store => store.distance <= nearbyRadius)
-          .sort((a, b) => (a as any).distance - (b as any).distance);
+          .filter(store => store.distance !== null && store.distance <= nearbyRadius)
+          .sort((a, b) => (a as any).distance! - (b as any).distance!);
         
-        setNearbyStores(storesWithDistance);
+        setNearbyStores(storesWithDistance as any);
         setNearbyEnabled(true);
       } catch (error) {
         console.error('Error getting nearby stores:', error);
@@ -236,20 +228,14 @@ export const ClientAllStoresScreen: React.FC = () => {
       try {
         // Filter existing stores by distance with new radius
         const storesWithDistance = stores
-          .filter(store => store.latitude && store.longitude)
           .map(store => ({
             ...store,
-            distance: locationService.calculateDistance(
-              userLocation.latitude, 
-              userLocation.longitude, 
-              store.latitude, 
-              store.longitude
-            )
+            distance: locationService.calculateDistanceToStore(userLocation, store)
           }))
-          .filter(store => store.distance <= radius)
-          .sort((a, b) => (a as any).distance - (b as any).distance);
+          .filter(store => store.distance !== null && store.distance <= radius)
+          .sort((a, b) => (a as any).distance! - (b as any).distance!);
         
-        setNearbyStores(storesWithDistance);
+        setNearbyStores(storesWithDistance as any);
       } catch (error) {
         console.error('Error updating nearby stores:', error);
       } finally {
@@ -352,7 +338,7 @@ export const ClientAllStoresScreen: React.FC = () => {
           >
             <View style={styles.storeMedia}>
               {bannerUrl ? (
-                <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 800) }} style={styles.storeBanner} resizeMode="cover" />
+                <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={styles.storeBanner} resizeMode="cover" />
               ) : (
                 <LinearGradient
                   colors={[COLORS.accent + '40', COLORS.accent + '10']}
@@ -362,7 +348,7 @@ export const ClientAllStoresScreen: React.FC = () => {
 
               <View style={styles.storeLogoWrap}>
                 {logoUrl ? (
-                  <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 800) }} style={styles.storeLogo} />
+                  <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={styles.storeLogo} />
                 ) : (
                   <View style={styles.storeLogoPlaceholder}>
                     <Ionicons name="storefront" size={20} color={COLORS.accent} />
@@ -378,14 +364,18 @@ export const ClientAllStoresScreen: React.FC = () => {
               )}
 
               {/* Distance badge */}
-              {nearbyEnabled && userLocation && item.latitude && item.longitude && (
-                <View style={styles.distanceBadge}>
-                  <Ionicons name="location-outline" size={12} color={COLORS.accent} />
-                  <Text style={styles.distanceBadgeText}>
-                    {locationService.calculateDistance(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude).toFixed(1)} km
-                  </Text>
-                </View>
-              )}
+              {(() => {
+                const distance = nearbyEnabled ? locationService.calculateDistanceToStore(userLocation, item) : null;
+                if (distance === null) return null;
+                return (
+                  <View style={styles.distanceBadge}>
+                    <Ionicons name="location-outline" size={12} color={COLORS.accent} />
+                    <Text style={styles.distanceBadgeText}>
+                      {distance.toFixed(1)} km
+                    </Text>
+                  </View>
+                );
+              })()}
             </View>
 
             <View style={styles.storeBody}>

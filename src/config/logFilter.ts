@@ -6,6 +6,10 @@ const IGNORED_PATTERNS: RegExp[] = [
   /net::ERR_BLOCKED_BY_CLIENT/, // adblock-type errors
   /cacheMonitor/, // our cache monitor verbose logs
   /WebSocket connection to 'ws:\/\/localhost:\d+\/(hot|message)' failed/, // HMR websocket noise
+  /AuthApiError/, // supabase refresh token expiry
+  /Invalid Refresh Token/,
+  /message channel closed/, // extension unhandled rejections
+  /translate\.googleapis\.com/, // blocked translation API
 ];
 
 function shouldIgnore(args: any[]): boolean {

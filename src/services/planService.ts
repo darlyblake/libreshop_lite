@@ -1,5 +1,28 @@
 import { useSupabase } from '../lib/supabase';
 
+// Helper function to check if current user is admin
+async function isAdmin(): Promise<boolean> {
+  try {
+    const client = useSupabase();
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) return false;
+
+    const role = user.user_metadata?.role || user.app_metadata?.role;
+    return role === 'admin';
+  } catch (error) {
+    console.error('Error checking admin role:', error);
+    return false;
+  }
+}
+
+// Helper function to enforce admin access
+async function requireAdmin(): Promise<void> {
+  const adminCheck = await isAdmin();
+  if (!adminCheck) {
+    throw new Error('Accès non autorisé');
+  }
+}
+
 // plan management types and service (moved out of storeService)
 export interface Plan {
   id: string;
@@ -35,6 +58,7 @@ export const planService = {
   },
 
   async create(plan: Partial<Plan>) {
+    await requireAdmin();
     const client = useSupabase();
     const { data, error } = await client.from('plans').insert(plan).select('*').single();
     if (error) throw error;
@@ -42,6 +66,7 @@ export const planService = {
   },
 
   async update(id: string, plan: Partial<Plan>) {
+    await requireAdmin();
     const client = useSupabase();
     const { data, error } = await client.from('plans').update(plan).eq('id', id).select('*').single();
     if (error) throw error;
@@ -49,6 +74,7 @@ export const planService = {
   },
 
   async delete(id: string) {
+    await requireAdmin();
     const client = useSupabase();
     const { error } = await client.from('plans').delete().eq('id', id);
     if (error) throw error;

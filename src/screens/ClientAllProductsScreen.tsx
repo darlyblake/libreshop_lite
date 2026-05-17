@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,14 @@ import {
   ScrollView,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { errorHandler } from '../utils/errorHandler';
-import { ProductCard } from '../components';
+import { ProductCard, ProductCardSkeleton } from '../components';
 import { SortTabs } from '../components/SortTabs';
 import { productService } from '../services/productService';
 import { categoryService } from '../services/categoryService';
@@ -157,6 +158,19 @@ export const ClientAllProductsScreen: React.FC = () => {
     return filtered;
   }, [products, searchQuery]);
 
+  const renderProductItem = useCallback(({ item }: { item: any }) => (
+    <View style={[styles.productCardWrapper, { width: itemWidth }]}> 
+      <ProductCard
+        name={item.name}
+        price={item.price}
+        comparePrice={item.compare_price}
+        imageUrl={item.images?.[0]}
+        onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+      />
+      <Text style={styles.storeName} numberOfLines={1}>{item.stores?.name || 'Boutique'}</Text>
+    </View>
+  ), [itemWidth, styles.productCardWrapper, styles.storeName, navigation]);
+
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}> 
@@ -167,8 +181,12 @@ export const ClientAllProductsScreen: React.FC = () => {
           <Text style={styles.title}>Produits</Text>
           <View style={styles.placeholder} />
         </View>
-        <View style={styles.loadingContainer}>
-          <LoadingSpinner />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, padding: SPACING.lg }}>
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <View key={`product-sk-${idx}`} style={{ width: itemWidth, marginBottom: SPACING.md }}>
+              <ProductCardSkeleton />
+            </View>
+          ))}
         </View>
       </View>
     );
@@ -257,18 +275,7 @@ export const ClientAllProductsScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
-          renderItem={({ item }) => (
-            <View style={[styles.productCardWrapper, { width: itemWidth }]}> 
-              <ProductCard
-                name={item.name}
-                price={item.price}
-                comparePrice={item.compare_price}
-                imageUrl={item.images?.[0]}
-                onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-              />
-              <Text style={styles.storeName} numberOfLines={1}>{item.stores?.name || 'Boutique'}</Text>
-            </View>
-          )}
+          renderItem={renderProductItem}
           ListFooterComponent={loadingMore ? (
             <View style={styles.footerLoader}>
               <ActivityIndicator color={COLORS.accent} />
@@ -280,6 +287,13 @@ export const ClientAllProductsScreen: React.FC = () => {
               <Text style={styles.emptyText}>Essayez un autre filtre ou mot-clé.</Text>
             </View>
           )}
+          
+          // Performance Tuning Options:
+          initialNumToRender={8}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS !== 'web'}
+          updateCellsBatchingPeriod={50}
         />
 
       </View>

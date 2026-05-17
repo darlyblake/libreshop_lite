@@ -40,6 +40,7 @@ import { useResponsive } from "../utils/responsive";
 import { useTheme } from "../hooks/useTheme";
 import { StoreMap } from "../components/StoreMap";
 import { locationService } from "../services/locationService";
+import { getStoreStatus } from "../utils/storeStatus";
 
 const { width } = Dimensions.get("window");
 
@@ -200,6 +201,13 @@ export const StoreDetailScreen: React.FC = () => {
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
+
+  useEffect(() => {
+    if (store?.announcement_popup_enabled && store?.announcement_popup) {
+      setShowAnnouncementPopup(true);
+    }
+  }, [store]);
 
   const parsedStoreIdFromUrl = useMemo(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -424,6 +432,11 @@ export const StoreDetailScreen: React.FC = () => {
           : null,
       }
     : STORE_DATA;
+
+  const storeStatus = useMemo(() => {
+    if (!store) return { isOpen: true };
+    return getStoreStatus(store);
+  }, [store]);
 
   // Product count per collection
   const productCountByCollection = useMemo(() => {
@@ -808,6 +821,16 @@ export const StoreDetailScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Bandeau d'annonce (déroulant / moderne) */}
+      {store?.announcement_banner_enabled && store?.announcement_banner ? (
+        <View style={{ backgroundColor: COLORS.accent, paddingVertical: 10, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="megaphone-outline" size={18} color="white" style={{ marginRight: 8 }} />
+          <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13, textAlign: 'center' }} numberOfLines={1}>
+            {store.announcement_banner}
+          </Text>
+        </View>
+      ) : null}
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Loading */}
         {loading && <StoreSkeleton />}
@@ -1176,29 +1199,31 @@ export const StoreDetailScreen: React.FC = () => {
                   </View>
                 )}
 
-              <View style={styles.productsGrid}>
-                {paginatedProducts.map((p) => {
-                  const product = mapProductToCard(p);
-                  return (
-                    <View
-                      key={product.id}
-                      style={[styles.productCardWrapper, { width: cardWidth }]}
-                    >
-                      <ProductCard
-                        name={product.name}
-                        price={product.price}
-                        comparePrice={product.comparePrice}
-                        imageUrl={product.imageUrl}
-                        onPress={() =>
-                          navigation.navigate("ProductDetail", {
-                            productId: product.id,
-                          })
-                        }
-                      />
-                    </View>
-                  );
-                })}
-              </View>
+              {useMemo(() => (
+                <View style={styles.productsGrid}>
+                  {paginatedProducts.map((p) => {
+                    const product = mapProductToCard(p);
+                    return (
+                      <View
+                        key={product.id}
+                        style={[styles.productCardWrapper, { width: cardWidth }]}
+                      >
+                        <ProductCard
+                          name={product.name}
+                          price={product.price}
+                          comparePrice={product.comparePrice}
+                          imageUrl={product.imageUrl}
+                          onPress={() =>
+                            navigation.navigate("ProductDetail", {
+                              productId: product.id,
+                            })
+                          }
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              ), [paginatedProducts, cardWidth, navigation])}
             </View>
 
             {/* Load More */}
@@ -1394,7 +1419,27 @@ export const StoreDetailScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
 
-                  {store?.opening_hours && (
+                  {(store as any)?.business_hours ? (
+                    <View style={styles.aboutCard}>
+                      <Text style={styles.aboutTitle}>Horaires d'ouverture</Text>
+                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                        const config = (store as any).business_hours[day];
+                        if (!config) return null;
+                        const dayNames: Record<string, string> = {
+                          monday: 'Lundi', tuesday: 'Mardi', wednesday: 'Mercredi', 
+                          thursday: 'Jeudi', friday: 'Vendredi', saturday: 'Samedi', sunday: 'Dimanche'
+                        };
+                        return (
+                          <View key={day} style={styles.hoursRow}>
+                            <Text style={styles.dayText}>{dayNames[day] || day}</Text>
+                            <Text style={[styles.timeText, !config.isOpen && styles.closedText]}>
+                              {config.isOpen ? `${config.open} — ${config.close}` : 'Fermé'}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ) : store?.opening_hours ? (
                     <View style={styles.contactItem}>
                       <Ionicons
                         name="time"
@@ -1407,7 +1452,7 @@ export const StoreDetailScreen: React.FC = () => {
                         <Text style={styles.contactValue}>{store.opening_hours}</Text>
                       </View>
                     </View>
-                  )}
+                  ) : null}
                 </View>
 
                 {/* Stats */}
@@ -1633,6 +1678,45 @@ export const StoreDetailScreen: React.FC = () => {
               height={Dimensions.get('window').height - 60}
             />
           )}
+        </View>
+      </Modal>
+
+      {/* MODAL POPUP ANNONCE BOUTIQUE */}
+      <Modal
+        visible={showAnnouncementPopup}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAnnouncementPopup(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: isDark ? '#1e293b' : 'white', borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, position: 'relative', elevation: 10 }}>
+            {/* Bouton fermer */}
+            <TouchableOpacity 
+              style={{ position: 'absolute', top: 16, right: 16, padding: 4 }}
+              onPress={() => setShowAnnouncementPopup(false)}
+            >
+              <Ionicons name="close" size={24} color={COLORS.textMuted} />
+            </TouchableOpacity>
+
+            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.accent + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <Ionicons name="notifications" size={28} color={COLORS.accent} />
+            </View>
+
+            <Text style={{ color: COLORS.text, fontSize: 18, fontWeight: '700', marginBottom: 12, textAlign: 'center' }}>
+              Annonce de la Boutique
+            </Text>
+
+            <Text style={{ color: COLORS.text, fontSize: 14, lineHeight: 20, textAlign: 'center', marginBottom: 24 }}>
+              {store?.announcement_popup}
+            </Text>
+
+            <TouchableOpacity 
+              style={{ width: '100%', paddingVertical: 14, borderRadius: 16, backgroundColor: COLORS.accent, alignItems: 'center' }}
+              onPress={() => setShowAnnouncementPopup(false)}
+            >
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -2411,5 +2495,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
   },
+  closedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    gap: SPACING.sm,
+  },
+  closedBannerText: {
+    color: 'white',
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    flex: 1,
+  },
+  hoursRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border + '30',
+  },
+  dayText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  timeText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSoft,
+    fontWeight: '600',
+  },
+  closedText: {
+    color: COLORS.danger,
+  },
 });
-

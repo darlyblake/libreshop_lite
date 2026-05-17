@@ -64,6 +64,15 @@ type StoreData = {
   orders?: number;
   taxRate?: number;
   shippingPrice?: number;
+  deliveryMode?: 'fixed' | 'km' | 'city';
+  deliveryPriceKm?: number;
+  deliveryCityFees?: Record<string, number>;
+  businessHours?: Record<string, { isOpen: boolean; open: string; close: string }>;
+  isPaused?: boolean;
+  announcementBanner?: string;
+  announcementBannerEnabled?: boolean;
+  announcementPopup?: string;
+  announcementPopupEnabled?: boolean;
 };
 
 const STORE_DATA: StoreData = {};
@@ -88,7 +97,9 @@ export const SellerStoreScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showHoursModal, setShowHoursModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -176,6 +187,23 @@ export const SellerStoreScreen: React.FC = () => {
         address: (s as any).address,
         taxRate: Number((s as any).tax_rate) || 0,
         shippingPrice: Number((s as any).shipping_price) || 0,
+        deliveryMode: (s as any).delivery_mode || 'fixed',
+        deliveryPriceKm: Number((s as any).delivery_price_km) || 0,
+        deliveryCityFees: (s as any).delivery_city_fees || {},
+        businessHours: (s as any).business_hours || {
+          monday: { isOpen: true, open: "08:00", close: "18:00" },
+          tuesday: { isOpen: true, open: "08:00", close: "18:00" },
+          wednesday: { isOpen: true, open: "08:00", close: "18:00" },
+          thursday: { isOpen: true, open: "08:00", close: "18:00" },
+          friday: { isOpen: true, open: "08:00", close: "18:00" },
+          saturday: { isOpen: true, open: "09:00", close: "15:00" },
+          sunday: { isOpen: false, open: "00:00", close: "00:00" },
+        },
+        isPaused: Boolean((s as any).is_paused),
+        announcementBanner: (s as any).announcement_banner || '',
+        announcementBannerEnabled: Boolean((s as any).announcement_banner_enabled),
+        announcementPopup: (s as any).announcement_popup || '',
+        announcementPopupEnabled: Boolean((s as any).announcement_popup_enabled),
       });
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'LoadStore');
@@ -214,6 +242,11 @@ export const SellerStoreScreen: React.FC = () => {
         promo_enabled: Boolean(next.promoEnabled),
         tax_rate: next.taxRate ? Number(next.taxRate) : 0,
         shipping_price: next.shippingPrice ? Number(next.shippingPrice) : 0,
+        delivery_mode: next.deliveryMode || 'fixed',
+        delivery_price_km: next.deliveryPriceKm ? Number(next.deliveryPriceKm) : 0,
+        delivery_city_fees: next.deliveryCityFees || {},
+        business_hours: next.businessHours,
+        is_paused: Boolean(next.isPaused),
       };
 
       // Ajouter les champs image seulement s'ils ont changé
@@ -243,8 +276,13 @@ export const SellerStoreScreen: React.FC = () => {
       await storeService.update(store.id, updatePayload);
 
       setShowEditModal(false);
+      setShowHoursModal(false);
       await loadStore();
-      Alert.alert('Succès', 'Boutique mise à jour');
+      if (Platform.OS === 'web') {
+        window.alert('Boutique mise à jour');
+      } else {
+        Alert.alert('Succès', 'Boutique mise à jour');
+      }
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'SaveStore');
       Alert.alert('Erreur', e?.message || 'Impossible de sauvegarder');
@@ -253,20 +291,32 @@ export const SellerStoreScreen: React.FC = () => {
     }
   };
 
-  const handleTogglePause = async () => {
+  const handleSaveAnnouncements = async (banner: string, bannerEnabled: boolean, popup: string, popupEnabled: boolean) => {
     if (!store?.id) return;
     try {
       setSaving(true);
-      const nextVisible = !Boolean((store as any).visible);
-      await storeService.update(store.id, { visible: nextVisible });
+      await storeService.update(store.id, {
+        announcement_banner: banner.trim(),
+        announcement_banner_enabled: bannerEnabled,
+        announcement_popup: popup.trim(),
+        announcement_popup_enabled: popupEnabled,
+      });
+      setShowAnnouncementsModal(false);
       await loadStore();
-      Alert.alert('Succès', nextVisible ? 'Boutique réactivée' : 'Boutique mise en pause');
+      if (Platform.OS === 'web') {
+        window.alert('Annonces mises à jour');
+      } else {
+        Alert.alert('Succès', 'Annonces mises à jour');
+      }
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message || 'Impossible de changer le statut');
+      errorHandler.handleDatabaseError(e, 'SaveAnnouncements');
+      Alert.alert('Erreur', e?.message || 'Impossible de sauvegarder les annonces');
     } finally {
       setSaving(false);
     }
   };
+
+
 
   const handleShareStore = async () => {
     if (!store?.id) {
@@ -409,6 +459,55 @@ export const SellerStoreScreen: React.FC = () => {
     }
   };
 
+  const handleTogglePause = async () => {
+    if (!store?.id) return;
+    const newPausedState = !storeData.isPaused;
+    
+    const title = newPausedState ? "Mettre en pause" : "Réactiver la boutique";
+    const message = newPausedState 
+      ? "En mettant votre boutique en pause, les clients ne pourront plus passer de commande. Voulez-vous continuer ?"
+      : "Votre boutique sera à nouveau ouverte aux commandes. Continuer ?";
+
+    const performToggle = async () => {
+      try {
+        setLoading(true);
+        await storeService.update(store.id, { is_paused: newPausedState });
+        setStoreData(prev => ({ ...prev, isPaused: newPausedState }));
+        if (Platform.OS === 'web') {
+          window.alert(newPausedState ? 'Boutique en pause.' : 'Boutique réactivée.');
+        } else {
+          Alert.alert('Succès', newPausedState ? 'Boutique en pause.' : 'Boutique réactivée.');
+        }
+      } catch (e: any) {
+        if (Platform.OS === 'web') {
+          window.alert('Erreur: Impossible de modifier le statut.');
+        } else {
+          Alert.alert('Erreur', 'Impossible de modifier le statut.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const ok = window.confirm(`${title}\n\n${message}`);
+      if (ok) performToggle();
+    } else {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: "Annuler", style: "cancel" },
+          { 
+            text: "Confirmer", 
+            style: newPausedState ? "destructive" : "default",
+            onPress: performToggle
+          }
+        ]
+      );
+    }
+  };
+
   const handleUpdatePassword = async () => {
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs');
@@ -540,6 +639,8 @@ export const SellerStoreScreen: React.FC = () => {
   // Edit Modal Component (Internal)
   const EditStoreModal: React.FC<{ visible: boolean; data: StoreData; onSave: (d: StoreData) => void; onClose: () => void; }> = ({ visible, data, onSave, onClose }) => {
     const [form, setForm] = useState<StoreData>({ ...data });
+    const [newCityName, setNewCityName] = useState('');
+    const [showAddCity, setShowAddCity] = useState(false);
     const { categories, loadCategories, isLoading: categoriesLoading } = useCategoryStore();
 
     useEffect(() => {
@@ -588,38 +689,400 @@ export const SellerStoreScreen: React.FC = () => {
                 }
               </ScrollView>
 
-              <Text style={styles.modalLabel}>Logo</Text>
-              {form.logoUrl && <Image source={{ uri: cloudinaryService.getOptimizedUrl(form.logoUrl, 800) }} style={styles.modalPreview} />}
-              <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('logoUrl')}><Text style={styles.modalImageButtonText}>Changer le logo</Text></TouchableOpacity>
+              <View style={{ marginTop: spacing.xl }}>
+                <Text style={[styles.modalTitle, { fontSize: fontSize.md, marginBottom: spacing.md }]}>Frais de livraison</Text>
+                
+                <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+                  {[
+                    { id: 'fixed', label: 'Prix Fixe', icon: 'pin' },
+                    { id: 'km', label: 'Au KM', icon: 'map' },
+                    { id: 'city', label: 'Par Ville', icon: 'business' }
+                  ].map(mode => (
+                    <TouchableOpacity 
+                      key={mode.id}
+                      style={[
+                        styles.categoryChip, 
+                        { flex: 1, alignItems: 'center' },
+                        form.deliveryMode === mode.id && styles.categoryChipActive
+                      ]}
+                      onPress={() => handleChange('deliveryMode', mode.id)}
+                    >
+                      <Ionicons name={mode.icon as any} size={16} color={form.deliveryMode === mode.id ? getColor.accent : getColor.textMuted} />
+                      <Text style={[styles.categoryChipText, form.deliveryMode === mode.id && styles.categoryChipTextActive, { fontSize: 11, marginTop: 4 }]}>
+                        {mode.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-              <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('bannerUrl')}><Text style={styles.modalImageButtonText}>Changer la bannière</Text></TouchableOpacity>
-              
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.modalLabel}>TVA (%)</Text>
-                  <TextInput 
-                    style={styles.modalInput} 
-                    value={form.taxRate?.toString() || ''} 
-                    onChangeText={t => handleChange('taxRate', parseFloat(t) || 0)} 
-                    keyboardType="numeric"
-                    placeholder="Ex: 18"
+                {form.deliveryMode === 'fixed' && (
+                  <View>
+                    <Text style={styles.modalLabel}>Frais de livraison par défaut (FCFA)</Text>
+                    <TextInput 
+                      style={styles.modalInput} 
+                      value={form.shippingPrice?.toString() || ''} 
+                      onChangeText={t => handleChange('shippingPrice', parseFloat(t) || 0)} 
+                      keyboardType="numeric"
+                      placeholder="Ex: 1000"
+                    />
+                  </View>
+                )}
+
+                {form.deliveryMode === 'km' && (
+                  <View>
+                    <Text style={styles.modalLabel}>Prix par Kilomètre (FCFA / KM)</Text>
+                    <TextInput 
+                      style={styles.modalInput} 
+                      value={form.deliveryPriceKm?.toString() || ''} 
+                      onChangeText={t => handleChange('deliveryPriceKm', parseFloat(t) || 0)} 
+                      keyboardType="numeric"
+                      placeholder="Ex: 250"
+                    />
+                    <Text style={{ fontSize: 12, color: getColor.textMuted, marginTop: 6 }}>
+                      Le client sera facturé selon sa distance réelle par rapport à votre boutique.
+                    </Text>
+                  </View>
+                )}
+
+                {form.deliveryMode === 'city' && (
+                  <View>
+                    <Text style={styles.modalLabel}>Tarifs par Ville</Text>
+                    {Object.entries(form.deliveryCityFees || {}).map(([city, fee], idx) => (
+                      <View key={idx} style={{ marginBottom: spacing.md, backgroundColor: getColor.bg, borderRadius: 8, padding: spacing.sm }}>
+                        {/* Nom de la ville */}
+                        <Text style={{ fontSize: 13, color: getColor.textMuted, marginBottom: 4 }}>Ville</Text>
+                        <TextInput 
+                          style={[styles.modalInput, { marginBottom: spacing.sm }]} 
+                          value={city} 
+                          editable={false}
+                        />
+                        {/* Tarif + Supprimer */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, color: getColor.textMuted, marginBottom: 4 }}>Tarif (FCFA)</Text>
+                            <TextInput 
+                              style={styles.modalInput}
+                              value={fee.toString()} 
+                              onChangeText={t => {
+                                const next = { ...form.deliveryCityFees };
+                                next[city] = parseFloat(t) || 0;
+                                handleChange('deliveryCityFees', next);
+                              }}
+                              keyboardType="numeric"
+                              placeholder="0"
+                            />
+                          </View>
+                          <TouchableOpacity 
+                            style={{ padding: spacing.sm, marginTop: 20 }}
+                            onPress={() => {
+                              const next = { ...form.deliveryCityFees };
+                              delete next[city];
+                              handleChange('deliveryCityFees', next);
+                            }}
+                          >
+                            <Ionicons name="trash-outline" size={22} color={getColor.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+
+                    
+                    {showAddCity ? (
+                      <View style={{ marginTop: spacing.sm }}>
+                        <TextInput
+                          style={[styles.modalInput, { width: '100%' }]}
+                          placeholder="Nom de la ville"
+                          value={newCityName}
+                          onChangeText={setNewCityName}
+                          autoFocus
+                        />
+                        <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                          <TouchableOpacity
+                            style={[styles.button, styles.submitButton, { flex: 1 }]}
+                            onPress={() => {
+                              if (newCityName.trim()) {
+                                const next = { ...form.deliveryCityFees };
+                                next[newCityName.trim()] = 1000;
+                                handleChange('deliveryCityFees', next);
+                                setNewCityName('');
+                                setShowAddCity(false);
+                              }
+                            }}
+                          >
+                            <Text style={styles.submitText}>Confirmer</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.button, styles.cancelButton, { flex: 1 }]}
+                            onPress={() => { setNewCityName(''); setShowAddCity(false); }}
+                          >
+                            <Text style={styles.cancelText}>Annuler</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={[styles.modalImageButton, { marginTop: spacing.sm, borderStyle: 'dashed' }]}
+                        onPress={() => setShowAddCity(true)}
+                      >
+                        <Text style={styles.modalImageButtonText}>+ Ajouter une ville</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              <View style={{ marginTop: spacing.xl }}>
+                <Text style={styles.modalLabel}>TVA sur les produits (%)</Text>
+                <TextInput 
+                  style={styles.modalInput} 
+                  value={form.taxRate?.toString() || ''} 
+                  onChangeText={t => handleChange('taxRate', parseFloat(t) || 0)} 
+                  keyboardType="numeric"
+                  placeholder="Ex: 18"
+                />
+              </View>
+
+              <View style={{ marginTop: spacing.xl }}>
+                <Text style={styles.modalLabel}>Logo</Text>
+                {form.logoUrl && (
+                  <Image 
+                    source={{ uri: cloudinaryService.getOptimizedUrl(form.logoUrl, 800) }} 
+                    style={styles.modalPreview} 
                   />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.modalLabel}>Frais livraison (FCFA)</Text>
-                  <TextInput 
-                    style={styles.modalInput} 
-                    value={form.shippingPrice?.toString() || ''} 
-                    onChangeText={t => handleChange('shippingPrice', parseFloat(t) || 0)} 
-                    keyboardType="numeric"
-                    placeholder="Ex: 1500"
-                  />
-                </View>
+                )}
+                <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('logoUrl')}>
+                  <Text style={styles.modalImageButtonText}>Changer le logo</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalImageButton} onPress={() => pickImage('bannerUrl')}>
+                  <Text style={styles.modalImageButtonText}>Changer la bannière</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.modalButtonRow}>
-                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}><Text style={styles.cancelText}>Annuler</Text></TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.submitButton]} onPress={() => onSave(form)}><Text style={styles.submitText}>Enregistrer</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+                  <Text style={styles.cancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.submitButton]} onPress={() => onSave(form)}>
+                  <Text style={styles.submitText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // Announcements Modal Component (Internal)
+  const AnnouncementsModalInner: React.FC<{
+    visible: boolean;
+    data: StoreData;
+    onSave: (banner: string, bannerEnabled: boolean, popup: string, popupEnabled: boolean) => void;
+    onClose: () => void;
+  }> = ({ visible, data, onSave, onClose }) => {
+    const [banner, setBanner] = useState(data.announcementBanner || '');
+    const [bannerEnabled, setBannerEnabled] = useState(Boolean(data.announcementBannerEnabled));
+    const [popup, setPopup] = useState(data.announcementPopup || '');
+    const [popupEnabled, setPopupEnabled] = useState(Boolean(data.announcementPopupEnabled));
+
+    useEffect(() => {
+      if (visible) {
+        setBanner(data.announcementBanner || '');
+        setBannerEnabled(Boolean(data.announcementBannerEnabled));
+        setPopup(data.announcementPopup || '');
+        setPopupEnabled(Boolean(data.announcementPopupEnabled));
+      }
+    }, [visible, data]);
+
+    return (
+      <Modal visible={visible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Bannières & Annonces</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={getColor.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              
+              {/* Section Bandeau Déroulant */}
+              <View style={{ marginBottom: spacing.xl, borderBottomWidth: 1, borderBottomColor: getColor.border, paddingBottom: spacing.lg }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                  <Text style={[styles.modalTitle, { fontSize: fontSize.md }]}>Bandeau d'annonce boutique</Text>
+                  <TouchableOpacity 
+                    onPress={() => setBannerEnabled(!bannerEnabled)}
+                    style={{
+                      width: 48,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: bannerEnabled ? getColor.accent : getColor.border,
+                      padding: 2,
+                      justifyContent: 'center',
+                      alignItems: bannerEnabled ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'white', elevation: 2 }} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 13, color: getColor.textMuted, marginBottom: spacing.md }}>
+                  Affiche un bandeau déroulant coloré tout en haut de votre page boutique (ex: promotions, horaires exceptionnels).
+                </Text>
+                {bannerEnabled && (
+                  <TextInput 
+                    style={styles.modalInput} 
+                    value={banner} 
+                    onChangeText={setBanner} 
+                    placeholder="Ex: -20% sur toute la collection avec le code PRINTEMPS !" 
+                    placeholderTextColor={getColor.textMuted}
+                  />
+                )}
+              </View>
+
+              {/* Section Pop-up d'Annonce */}
+              <View style={{ marginBottom: spacing.xl }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                  <Text style={[styles.modalTitle, { fontSize: fontSize.md }]}>Pop-up d'annonce boutique</Text>
+                  <TouchableOpacity 
+                    onPress={() => setPopupEnabled(!popupEnabled)}
+                    style={{
+                      width: 48,
+                      height: 28,
+                      borderRadius: 14,
+                      backgroundColor: popupEnabled ? getColor.accent : getColor.border,
+                      padding: 2,
+                      justifyContent: 'center',
+                      alignItems: popupEnabled ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: 'white', elevation: 2 }} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={{ fontSize: 13, color: getColor.textMuted, marginBottom: spacing.md }}>
+                  Affiche une boîte de dialogue d'annonce au client dès qu'il ouvre la page de votre boutique (idéal pour les annonces importantes).
+                </Text>
+                {popupEnabled && (
+                  <TextInput 
+                    style={[styles.modalInput, { height: 100, textAlignVertical: 'top' }]} 
+                    value={popup} 
+                    onChangeText={setPopup} 
+                    multiline
+                    placeholder="Ex: Chers clients, nous sommes fermés exceptionnellement ce vendredi pour inventaire. Réouverture samedi !" 
+                    placeholderTextColor={getColor.textMuted}
+                  />
+                )}
+              </View>
+
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+                  <Text style={styles.cancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.submitButton]} onPress={() => onSave(banner, bannerEnabled, popup, popupEnabled)}>
+                  <Text style={styles.submitText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+  // Edit Hours Modal Component
+  const EditHoursModal: React.FC<{ visible: boolean; data: StoreData; onSave: (d: StoreData) => void; onClose: () => void; }> = ({ visible, data, onSave, onClose }) => {
+    const [formHours, setFormHours] = useState<any>(data.businessHours || {});
+
+    useEffect(() => {
+      if (visible) setFormHours(data.businessHours || {});
+    }, [visible, data]);
+
+    const days = [
+      { key: 'monday', label: 'Lundi' },
+      { key: 'tuesday', label: 'Mardi' },
+      { key: 'wednesday', label: 'Mercredi' },
+      { key: 'thursday', label: 'Jeudi' },
+      { key: 'friday', label: 'Vendredi' },
+      { key: 'saturday', label: 'Samedi' },
+      { key: 'sunday', label: 'Dimanche' },
+    ];
+
+    const updateDay = (day: string, field: 'isOpen' | 'open' | 'close', value: any) => {
+      setFormHours((prev: any) => ({
+        ...prev,
+        [day]: { ...(prev[day] || { isOpen: true, open: '08:00', close: '18:00' }), [field]: value }
+      }));
+    };
+
+    return (
+      <Modal visible={visible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Horaires d'ouverture</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={getColor.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: spacing.md }}>
+              {days.map(d => {
+                const dayData = formHours[d.key] || { isOpen: true, open: '08:00', close: '18:00' };
+                return (
+                  <View key={d.key} style={{ marginBottom: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: getColor.border + '20' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                      <Text style={{ fontWeight: '700', color: getColor.text, fontSize: fontSize.md }}>{d.label}</Text>
+                      <TouchableOpacity
+                        onPress={() => updateDay(d.key, 'isOpen', !dayData.isOpen)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                      >
+                        <Text style={{ color: dayData.isOpen ? getColor.accent : getColor.textSoft, fontSize: fontSize.xs, fontWeight: '600' }}>
+                          {dayData.isOpen ? 'OUVERT' : 'FERMÉ'}
+                        </Text>
+                        <Ionicons 
+                          name={dayData.isOpen ? "checkmark-circle" : "ellipse-outline"} 
+                          size={24} 
+                          color={dayData.isOpen ? getColor.accent : getColor.border} 
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {dayData.isOpen ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: getColor.textSoft, marginBottom: 4, textTransform: 'uppercase' }}>Ouverture</Text>
+                          <TextInput
+                            style={[styles.modalInput, { paddingVertical: 8, textAlign: 'center' }]}
+                            value={dayData.open}
+                            onChangeText={(t) => updateDay(d.key, 'open', t)}
+                            placeholder="08:00"
+                            keyboardType="numbers-and-punctuation"
+                          />
+                        </View>
+                        <Ionicons name="arrow-forward" size={16} color={getColor.border} style={{ marginTop: 20 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: getColor.textSoft, marginBottom: 4, textTransform: 'uppercase' }}>Fermeture</Text>
+                          <TextInput
+                            style={[styles.modalInput, { paddingVertical: 8, textAlign: 'center' }]}
+                            value={dayData.close}
+                            onChangeText={(t) => updateDay(d.key, 'close', t)}
+                            placeholder="18:00"
+                            keyboardType="numbers-and-punctuation"
+                          />
+                        </View>
+                      </View>
+                    ) : (
+                      <View style={{ paddingVertical: 4 }}>
+                        <Text style={{ color: getColor.textSoft, fontStyle: 'italic', fontSize: fontSize.sm }}>La boutique est fermée toute la journée.</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+              <View style={styles.modalButtonRow}>
+                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
+                  <Text style={styles.cancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.submitButton]} onPress={() => onSave({ ...data, businessHours: formHours })}>
+                  <Text style={styles.submitText}>Enregistrer</Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
           </View>
@@ -643,6 +1106,7 @@ export const SellerStoreScreen: React.FC = () => {
       </View>
 
       <EditStoreModal visible={showEditModal} data={storeData} onClose={() => setShowEditModal(false)} onSave={handleSaveStore} />
+      <EditHoursModal visible={showHoursModal} data={storeData} onClose={() => setShowHoursModal(false)} onSave={handleSaveStore} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
         {loading ? (
@@ -707,6 +1171,9 @@ export const SellerStoreScreen: React.FC = () => {
                 <View style={styles.card}>
                   {renderSettingItem('qr-code-outline', 'QR Code boutique', false, handleShowQrLink)}
                   {renderSettingItem('share-social-outline', 'Partager la boutique', false, handleShareStore)}
+                  {renderSettingItem('time-outline', 'Horaires d\'ouverture', false, () => setShowHoursModal(true))}
+                  {renderSettingItem('megaphone-outline', 'Bannières & Annonces Boutique', false, () => setShowAnnouncementsModal(true))}
+                  {renderSettingItem(storeData.isPaused ? 'play-circle-outline' : 'pause-circle-outline', storeData.isPaused ? 'Réactiver la boutique' : 'Mettre en pause (Fermeture)', storeData.isPaused === false, handleTogglePause)}
                   {renderSettingItem('location-outline', 'Localisation de la boutique', false, () => setShowLocationPicker(true))}
                   
                   <View style={styles.settingItem}>
@@ -718,7 +1185,13 @@ export const SellerStoreScreen: React.FC = () => {
                   </View>
 
                   {renderSettingItem('cash-outline', `TVA: ${storeData.taxRate || 0}%`, false, () => setShowEditModal(true))}
-                  {renderSettingItem('car-outline', `Livraison: ${storeData.shippingPrice || 0} FCFA`, false, () => setShowEditModal(true))}
+                  {storeData.deliveryMode === 'km' ? (
+                    renderSettingItem('map-outline', `Livraison: ${storeData.deliveryPriceKm || 0} FCFA/KM`, false, () => setShowEditModal(true))
+                  ) : storeData.deliveryMode === 'city' ? (
+                    renderSettingItem('business-outline', `Livraison: Par Ville (${Object.keys(storeData.deliveryCityFees || {}).length})`, false, () => setShowEditModal(true))
+                  ) : (
+                    renderSettingItem('pin-outline', `Livraison: ${storeData.shippingPrice || 0} FCFA`, false, () => setShowEditModal(true))
+                  )}
 
                   {renderSettingItem('key-outline', 'Changer le mot de passe', false, () => setShowPasswordModal(true))}
                   {renderSettingItem('log-out-outline', 'Se déconnecter', true, () => setShowSignOutModal(true))}
@@ -833,6 +1306,14 @@ export const SellerStoreScreen: React.FC = () => {
           )}
         </View>
       </Modal>
+
+      {/* Announcements Modal */}
+      <AnnouncementsModalInner 
+        visible={showAnnouncementsModal}
+        data={storeData}
+        onSave={handleSaveAnnouncements}
+        onClose={() => setShowAnnouncementsModal(false)}
+      />
     </View>
   );
 };

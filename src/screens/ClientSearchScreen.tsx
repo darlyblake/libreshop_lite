@@ -10,6 +10,9 @@ import {
   StatusBar,
   Platform,
   ScrollView,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,16 +22,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInDown, FadeOut, Layout, SlideInRight, SlideInLeft, useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
 import { SortTabs } from '../components/SortTabs';
 import { SearchBar } from '../components/SearchBar';
-import { ProductCard, StoreCard, EmptyState, LoadingSpinner } from '../components';
+import { ProductCard, StoreCard, EmptyState, LoadingSpinner, ProductCardSkeleton } from '../components';
 import { categoryService } from '../services/categoryService';
 import { grocService } from '../services/grocService';
 import { productService } from '../services/productService';
 import { errorHandler } from '../utils/errorHandler';
-import { useLegacyPalette } from '../hooks/useLegacyPalette';
+import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
 import { useSearchStore } from '../store/searchStore';
 import { SHADOWS } from '../config/theme';
 import { locationService } from '../services/locationService';
+import { cacheService } from '../services/cacheService';
 
 const { width, height } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -60,6 +64,8 @@ type Store = {
   description?: string;
   logo_url?: string;
   product_count?: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 // Constantes optimisées
@@ -148,15 +154,48 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
 
   useEffect(() => {
     const fetchData = async () => {
+      const cacheKey = `SEARCH_POPULAR_SUGGESTIONS:${sort}`;
+      const cacheKeyCategories = `SEARCH_POPULAR_CATEGORIES`;
+
       try {
+        // 1. Lire depuis le cache local pour éviter les surcharges de requêtes Supabase
+        const cachedNames = await cacheService.get<string[]>(cacheKey);
+        const cachedCats = await cacheService.get<Category[]>(cacheKeyCategories);
+
+        if (cachedNames) {
+          setPopularSuggestions(cachedNames);
+        }
+        if (cachedCats) {
+          setPopularCategories(cachedCats);
+        }
+
+        // Si les données sont déjà en cache, on évite la requête réseau
+        if (cachedNames && cachedCats) {
+          return;
+        }
+
+        // 2. Récupérer uniquement les données manquantes
         const [popularProducts, categoriesData] = await Promise.all([
-          productService.getAll(0, 8, sort as any),
-          categoryService.getByParent(null)
+          !cachedNames ? productService.getAll(0, 8, sort as any) : Promise.resolve(null),
+          !cachedCats ? categoryService.getByParent(null) : Promise.resolve(null)
         ]);
 
         if (popularProducts) {
-          const names = Array.from(new Set(popularProducts.map(p => p.name))).slice(0, 6);
+          const names = Array.from(
+            new Set(
+              popularProducts.map(p => {
+                // Nettoyage intelligent : Prendre les 2 premiers mots et mettre la 1ère lettre en majuscule pour éviter la surcharge visuelle
+                const words = p.name.trim().split(/\s+/);
+                return words
+                  .slice(0, 2)
+                  .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                  .join(' ');
+              })
+            )
+          ).slice(0, 6);
+          
           setPopularSuggestions(names);
+          await cacheService.set(cacheKey, names, 60); // 60 minutes de cache
         }
 
         if (categoriesData) {
@@ -166,7 +205,9 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
             icon: getCategoryIcon(cat.name),
             color: getCategoryColor(index)
           }));
+          
           setPopularCategories(formattedCategories);
+          await cacheService.set(cacheKeyCategories, formattedCategories, 60); // 60 minutes de cache
         }
       } catch (err) {
         console.warn('Failed to fetch trending data:', err);
@@ -374,6 +415,16 @@ export const ClientSearchScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [sort, setSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('popular');
 
+  // Nouveaux filtres
+  const [showFilters, setShowFilters] = useState(false);
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [minRating, setMinRating] = useState<number>(0);
+  
+  const [tempMinPrice, setTempMinPrice] = useState<string>('');
+  const [tempMaxPrice, setTempMaxPrice] = useState<string>('');
+  const [tempMinRating, setTempMinRating] = useState<number>(0);
+
   // Nearby filter state
   const [nearbyEnabled, setNearbyEnabled] = useState(false);
   const [nearbyRadius, setNearbyRadius] = useState(10);
@@ -404,20 +455,14 @@ export const ClientSearchScreen: React.FC = () => {
   useEffect(() => {
     if (nearbyEnabled && userLocation) {
       const storesWithDistance = stores
-        .filter(store => store.latitude && store.longitude)
         .map(store => ({
           ...store,
-          distance: locationService.calculateDistance(
-            userLocation.latitude, 
-            userLocation.longitude, 
-            store.latitude, 
-            store.longitude
-          )
+          distance: locationService.calculateDistanceToStore(userLocation, store)
         }))
-        .filter(store => store.distance <= nearbyRadius)
-        .sort((a, b) => (a as any).distance - (b as any).distance);
+        .filter(store => store.distance !== null && store.distance <= nearbyRadius)
+        .sort((a, b) => (a as any).distance! - (b as any).distance!);
       
-      setNearbyStores(storesWithDistance);
+      setNearbyStores(storesWithDistance as any);
     }
   }, [stores, nearbyEnabled, userLocation, nearbyRadius]);
 
@@ -481,9 +526,19 @@ export const ClientSearchScreen: React.FC = () => {
     return (contentWidth - SPACING.xl * 2 - SPACING.sm * (numColumns - 1)) / numColumns;
   }, [numColumns, SPACING]);
 
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const price = Number(p.price) || 0;
+      if (minPrice && Number(minPrice) > 0 && price < Number(minPrice)) return false;
+      if (maxPrice && Number(maxPrice) > 0 && price > Number(maxPrice)) return false;
+      if (minRating > 0 && (p.average_rating || 0) < minRating) return false;
+      return true;
+    });
+  }, [products, minPrice, maxPrice, minRating]);
+
   const hasResults = useMemo(() => 
-    products.length > 0 || stores.length > 0,
-    [products.length, stores.length]
+    filteredProducts.length > 0 || stores.length > 0,
+    [filteredProducts.length, stores.length]
   );
 
   // Animations du header
@@ -550,31 +605,28 @@ export const ClientSearchScreen: React.FC = () => {
     Keyboard.dismiss();
   }, []);
 
-  // Handle nearby filter toggle
   const handleToggleNearby = useCallback(async () => {
     if (!nearbyEnabled) {
       // Enable nearby filter
       setLoadingNearby(true);
       try {
         const location = await locationService.getCurrentPosition();
+        if (!location) {
+          Alert.alert('Erreur', 'Impossible d\'accéder à votre position');
+          return;
+        }
         setUserLocation(location);
         
         // Filter existing stores by distance
         const storesWithDistance = stores
-          .filter(store => store.latitude && store.longitude)
           .map(store => ({
             ...store,
-            distance: locationService.calculateDistance(
-              location.latitude, 
-              location.longitude, 
-              store.latitude, 
-              store.longitude
-            )
+            distance: locationService.calculateDistanceToStore(location, store)
           }))
-          .filter(store => store.distance <= nearbyRadius)
+          .filter(store => store.distance !== null && store.distance <= nearbyRadius)
           .sort((a, b) => (a as any).distance - (b as any).distance);
         
-        setNearbyStores(storesWithDistance);
+        setNearbyStores(storesWithDistance as any);
         setNearbyEnabled(true);
       } catch (error) {
         console.error('Error getting nearby stores:', error);
@@ -590,7 +642,6 @@ export const ClientSearchScreen: React.FC = () => {
     }
   }, [nearbyEnabled, nearbyRadius, stores]);
 
-  // Handle radius change
   const handleRadiusChange = useCallback(async (radius: number) => {
     setNearbyRadius(radius);
     if (nearbyEnabled && userLocation) {
@@ -598,20 +649,14 @@ export const ClientSearchScreen: React.FC = () => {
       try {
         // Filter existing stores by distance with new radius
         const storesWithDistance = stores
-          .filter(store => store.latitude && store.longitude)
           .map(store => ({
             ...store,
-            distance: locationService.calculateDistance(
-              userLocation.latitude, 
-              userLocation.longitude, 
-              store.latitude, 
-              store.longitude
-            )
+            distance: locationService.calculateDistanceToStore(userLocation, store)
           }))
-          .filter(store => store.distance <= radius)
+          .filter(store => store.distance !== null && store.distance <= radius)
           .sort((a, b) => (a as any).distance - (b as any).distance);
         
-        setNearbyStores(storesWithDistance);
+        setNearbyStores(storesWithDistance as any);
       } catch (error) {
         console.error('Error updating nearby stores:', error);
       } finally {
@@ -650,11 +695,7 @@ export const ClientSearchScreen: React.FC = () => {
   ), [productItemWidth, handleProductPress]);
 
   const renderStoreItem = useCallback(({ item, index }: { item: Store; index: number }) => {
-    let distance: number | null = null;
-    
-    if (nearbyEnabled && userLocation && item.latitude && item.longitude) {
-      distance = locationService.calculateDistance(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude);
-    }
+    const distance = nearbyEnabled ? locationService.calculateDistanceToStore(userLocation, item) : null;
 
     return (
       <Animated.View
@@ -795,22 +836,40 @@ export const ClientSearchScreen: React.FC = () => {
     <Animated.View style={[styles.headerContainer, headerAnimatedStyle]}>
       <BlurView intensity={80} tint="light" style={styles.headerBlur}>
         <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={handleSearchChange}
-            onSubmitEditing={handleSearchSubmit}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            onClear={handleClearSearch}
-            placeholder="Rechercher des produits ou boutiques..."
-            style={styles.searchBar}
-            autoFocus={false}
-            showCancelButton={isFocused}
-            onCancel={() => {
-              setIsFocused(false);
-              Keyboard.dismiss();
-            }}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
+            <View style={{ flex: 1 }}>
+              <SearchBar
+                value={searchQuery}
+                onChangeText={handleSearchChange}
+                onSubmitEditing={handleSearchSubmit}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                onClear={handleClearSearch}
+                placeholder="Rechercher des produits ou boutiques..."
+                style={styles.searchBar}
+                autoFocus={false}
+                showCancelButton={isFocused}
+                onCancel={() => {
+                  setIsFocused(false);
+                  Keyboard.dismiss();
+                }}
+              />
+            </View>
+            <TouchableOpacity 
+              style={{ width: 44, height: 44, borderRadius: RADIUS.lg, backgroundColor: (minPrice || maxPrice || minRating > 0) ? palette.accent : palette.card, alignItems: 'center', justifyContent: 'center', marginTop: SPACING.sm, borderWidth: 1, borderColor: palette.border }}
+              onPress={() => {
+                setTempMinPrice(minPrice);
+                setTempMaxPrice(maxPrice);
+                setTempMinRating(minRating);
+                setShowFilters(true);
+              }}
+            >
+              <Ionicons name="options-outline" size={22} color={(minPrice || maxPrice || minRating > 0) ? 'white' : palette.text} />
+              {(minPrice || maxPrice || minRating > 0) ? (
+                <View style={{ position: 'absolute', top: -4, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: palette.danger, borderWidth: 2, borderColor: palette.card }} />
+              ) : null}
+            </TouchableOpacity>
+          </View>
         </View>
       </BlurView>
     </Animated.View>
@@ -819,9 +878,22 @@ export const ClientSearchScreen: React.FC = () => {
   const renderResults = () => {
     if (loading) {
       return (
-        <View style={styles.loadingContainer}>
-          <LoadingSpinner size="large" />
-          <Text style={styles.loadingText}>Recherche en cours...</Text>
+        <View style={styles.resultsContent}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <Ionicons name="cube-outline" size={22} color={palette.accent} />
+                <Text style={styles.sectionTitle}>Recherche en cours...</Text>
+              </View>
+            </View>
+            <View style={[styles.productsGrid, { flexDirection: 'row', flexWrap: 'wrap' }]}>
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <View key={`product-sk-${idx}`} style={[styles.productItemContainer, { width: productItemWidth, marginBottom: 16 }]}>
+                  <ProductCardSkeleton />
+                </View>
+              ))}
+            </View>
+          </View>
         </View>
       );
     }
@@ -834,7 +906,7 @@ export const ClientSearchScreen: React.FC = () => {
           icon="alert-circle-outline"
           actionLabel="Réessayer"
           onAction={() => debouncedSearch(searchQuery)}
-          imageStyle={styles.emptyStateImage}
+          style={styles.emptyStateImage}
         />
       );
     }
@@ -871,9 +943,9 @@ export const ClientSearchScreen: React.FC = () => {
           title="Aucun résultat trouvé"
           description={`Désolé, nous n'avons rien trouvé pour "${searchQuery}". Essayez avec d'autres mots-clés.`}
           icon="search-outline"
-          secondaryActionLabel="Voir les catégories"
-          onSecondaryAction={() => setSelectedCategory(null)}
-          imageStyle={styles.emptyStateImage}
+          actionLabel="Voir les catégories"
+          onAction={() => setSelectedCategory(null)}
+          style={styles.emptyStateImage}
         />
       );
     }
@@ -890,7 +962,7 @@ export const ClientSearchScreen: React.FC = () => {
         entering={FadeIn.duration(ANIMATION_DURATION)}
       >
         {intentKeywords.length > 0 && renderIntentSuggestions()}
-        {products.length > 0 && (
+        {filteredProducts.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
@@ -898,7 +970,7 @@ export const ClientSearchScreen: React.FC = () => {
                 <Text style={styles.sectionTitle}>Produits</Text>
               </View>
               <View style={styles.sectionBadge}>
-                <Text style={styles.sectionCount}>{products.length}</Text>
+                <Text style={styles.sectionCount}>{filteredProducts.length}</Text>
               </View>
             </View>
             {/* Sort tabs for search results */}
@@ -914,7 +986,7 @@ export const ClientSearchScreen: React.FC = () => {
             />
             
             <FlatList
-              data={products}
+              data={filteredProducts}
               renderItem={renderProductItem}
               keyExtractor={(item) => `product-${item.id}`}
               numColumns={numColumns}
@@ -1085,6 +1157,93 @@ export const ClientSearchScreen: React.FC = () => {
           {hasSearched ? renderResults() : renderInitialState()}
 
           {renderSuggestionsDropdown()}
+
+          {/* Modal de filtres avancés */}
+          <Modal visible={showFilters} transparent animationType="slide" onRequestClose={() => setShowFilters(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+              <View style={{ backgroundColor: palette.bg, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.xl, paddingBottom: insets.bottom + SPACING.xl, maxHeight: '90%' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl }}>
+                  <Text style={{ fontSize: FONT_SIZE.xl, fontWeight: '700', color: palette.text }}>Filtres avancés</Text>
+                  <TouchableOpacity onPress={() => setShowFilters(false)} style={{ padding: SPACING.xs, backgroundColor: palette.card, borderRadius: RADIUS.full }}>
+                    <Ionicons name="close" size={20} color={palette.text} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Prix */}
+                <View style={{ marginBottom: SPACING.xl }}>
+                  <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '600', color: palette.text, marginBottom: SPACING.md }}>Fourchette de prix (FCA)</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
+                    <View style={{ flex: 1, backgroundColor: palette.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, paddingHorizontal: SPACING.md, paddingVertical: Platform.OS === 'ios' ? SPACING.md : 0 }}>
+                      <TextInput 
+                        placeholder="Min (ex: 5000)" 
+                        placeholderTextColor={palette.textMuted} 
+                        style={{ color: palette.text, fontSize: FONT_SIZE.md, height: 44 }} 
+                        keyboardType="numeric" 
+                        value={tempMinPrice} 
+                        onChangeText={setTempMinPrice} 
+                      />
+                    </View>
+                    <Text style={{ color: palette.textMuted, fontSize: FONT_SIZE.lg }}>-</Text>
+                    <View style={{ flex: 1, backgroundColor: palette.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, paddingHorizontal: SPACING.md, paddingVertical: Platform.OS === 'ios' ? SPACING.md : 0 }}>
+                      <TextInput 
+                        placeholder="Max (ex: 50000)" 
+                        placeholderTextColor={palette.textMuted} 
+                        style={{ color: palette.text, fontSize: FONT_SIZE.md, height: 44 }} 
+                        keyboardType="numeric" 
+                        value={tempMaxPrice} 
+                        onChangeText={setTempMaxPrice} 
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Notes */}
+                <View style={{ marginBottom: SPACING.xl }}>
+                  <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '600', color: palette.text, marginBottom: SPACING.md }}>Note minimale</Text>
+                  <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <TouchableOpacity 
+                        key={star} 
+                        onPress={() => setTempMinRating(star === tempMinRating ? 0 : star)}
+                        style={{ flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: tempMinRating >= star ? palette.accent + '15' : palette.card, borderWidth: 1, borderColor: tempMinRating >= star ? palette.accent : palette.border, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Ionicons name={tempMinRating >= star ? "star" : "star-outline"} size={20} color={tempMinRating >= star ? palette.accent : palette.textMuted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Actions */}
+                <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md }}>
+                  <TouchableOpacity 
+                    style={{ flex: 1, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, alignItems: 'center' }}
+                    onPress={() => {
+                      setTempMinPrice('');
+                      setTempMaxPrice('');
+                      setTempMinRating(0);
+                      setMinPrice('');
+                      setMaxPrice('');
+                      setMinRating(0);
+                      setShowFilters(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '600', color: palette.text }}>Réinitialiser</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={{ flex: 2, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: palette.accent, alignItems: 'center' }}
+                    onPress={() => {
+                      setMinPrice(tempMinPrice);
+                      setMaxPrice(tempMaxPrice);
+                      setMinRating(tempMinRating);
+                      setShowFilters(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: 'white' }}>Appliquer les filtres</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </View>
     </View>
@@ -1185,7 +1344,7 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     backgroundColor: palette.accent + '20',
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.round,
+    borderRadius: RADIUS.full,
   },
   sectionCount: {
     fontSize: FONT_SIZE.sm,
@@ -1316,7 +1475,7 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     backgroundColor: palette.card,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderRadius: RADIUS.round,
+    borderRadius: RADIUS.full,
     gap: SPACING.sm,
     borderWidth: 1,
     borderColor: palette.border,
@@ -1454,7 +1613,7 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
     backgroundColor: palette.accent + '15',
-    borderRadius: RADIUS.round,
+    borderRadius: RADIUS.full,
   },
   intentSuggestionText: {
     color: palette.accent,

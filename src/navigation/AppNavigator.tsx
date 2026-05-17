@@ -8,11 +8,124 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 
-// Imports optimisés
-import * as Screens from '../screens';
+// Imports optimisés en direct pour les écrans clients
+import { LandingScreen } from '../screens/LandingScreen';
+import { ClientOnboardingScreen } from '../screens/ClientOnboardingScreen';
+import { AboutStaticScreen } from '../screens/AboutStaticScreen';
+import { SellerAuthScreen } from '../screens/SellerAuthScreen';
+import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
+import { SellerEmailConfirmScreen } from '../screens/SellerEmailConfirmScreen';
+import { SubscriptionExpiredScreen } from '../screens/SubscriptionExpiredScreen';
+import { ClientHomeScreen } from '../screens/ClientHomeScreen';
+import { ClientOrdersScreen } from '../screens/ClientOrdersScreen';
+import { ClientSearchScreen } from '../screens/ClientSearchScreen';
+import { WishlistScreen } from '../screens/WishlistScreen';
+import { ClientProfileScreen } from '../screens/ClientProfileScreen';
+import { ClientDetailScreen } from '../screens/ClientDetailScreen';
+import { ClientOrderDetailScreen } from '../screens/ClientOrderDetailScreen';
+import { ClientEditScreen } from '../screens/ClientEditScreen';
+import { ClientAllStoresScreen } from '../screens/ClientAllStoresScreen';
+import { ClientAllProductsScreen } from '../screens/ClientAllProductsScreen';
+import { StoreDetailScreen } from '../screens/StoreDetailScreen';
+import { ProductDetailScreen } from '../screens/ProductDetailScreen';
+import { CartScreen } from '../screens/CartScreen';
+import { CheckoutScreen } from '../screens/CheckoutScreen';
+import { PaymentScreen } from '../screens/PaymentScreen';
+import { BulkPaymentScreen } from '../screens/BulkPaymentScreen';
+import { ConfirmationScreen } from '../screens/ConfirmationScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { PersonalInfoScreen } from '../screens/PersonalInfoScreen';
+import { AddressScreen } from '../screens/AddressScreen';
+import { SecurityScreen } from '../screens/SecurityScreen';
+import { HelpScreen } from '../screens/HelpScreen';
+import { AccountSuspendedScreen } from '../screens/AccountSuspendedScreen';
+
+// HOC pour le lazy loading des écrans lourds (vendeurs / admin)
+const lazyLoad = (importFn: () => Promise<any>, exportName: string) => {
+  const LazyComponent = (props: any) => {
+    const [Component, setComponent] = useState<React.ComponentType<any> | null>(null);
+
+    useEffect(() => {
+      let active = true;
+      importFn().then((module) => {
+        if (active) {
+          setComponent(() => module[exportName] || module.default);
+        }
+      }).catch(err => {
+        console.error(`Failed to lazy load ${exportName}:`, err);
+      });
+      return () => { active = false; };
+    }, []);
+
+    if (!Component) {
+      return <LoadingScreen />;
+    }
+
+    return <Component {...props} />;
+  };
+  
+  LazyComponent.displayName = `Lazy(${exportName})`;
+  return LazyComponent;
+};
+
+// Lazy loaded Seller screens
+const SellerDashboardScreen = lazyLoad(() => import('../screens/SellerDashboardScreen'), 'SellerDashboardScreen');
+const SellerProductsScreen = lazyLoad(() => import('../screens/SellerProductsScreen'), 'SellerProductsScreen');
+const SellerOrdersScreen = lazyLoad(() => import('../screens/SellerOrdersScreen'), 'SellerOrdersScreen');
+const SellerCollectionScreen = lazyLoad(() => import('../screens/SellerCollectionScreen'), 'SellerCollectionScreen');
+const SellerClientsScreen = lazyLoad(() => import('../screens/SellerClientsScreen'), 'SellerClientsScreen');
+const SellerStoreScreen = lazyLoad(() => import('../screens/SellerStoreScreen'), 'SellerStoreScreen');
+const SellerAddStoreScreen = lazyLoad(() => import('../screens/SellerAddStoreScreen'), 'SellerAddStoreScreen');
+const SellerCaisseScreen = lazyLoad(() => import('../screens/SellerCaisseScreen'), 'SellerCaisseScreen');
+const SellerAddProductScreen = lazyLoad(() => import('../screens/SellerAddProductScreen'), 'SellerAddProductScreen');
+const SellerEditProductScreen = lazyLoad(() => import('../screens/SellerEditProductScreen'), 'SellerEditProductScreen');
+const SellerEditCollectionScreen = lazyLoad(() => import('../screens/SellerEditCollectionScreen'), 'SellerEditCollectionScreen');
+const SellerCollectionProductsScreen = lazyLoad(() => import('../screens/SellerCollectionProductsScreen'), 'SellerCollectionProductsScreen');
+const SellerOrderDetailScreen = lazyLoad(() => import('../screens/SellerOrderDetailScreen'), 'SellerOrderDetailScreen');
+const SellerProductActionsScreen = lazyLoad(() => import('../screens/SellerProductActionsScreen'), 'SellerProductActionsScreen');
+const SellerSaleScreen = lazyLoad(() => import('../screens/SellerSaleScreen'), 'SellerSaleScreen');
+const SellerLowStockScreen = lazyLoad(() => import('../screens/SellerLowStockScreen'), 'SellerLowStockScreen');
+const SellerAnalyticsScreen = lazyLoad(() => import('../screens/SellerAnalyticsScreen'), 'SellerAnalyticsScreen');
+const SellerReportsScreen = lazyLoad(() => import('../screens/SellerReportsScreen'), 'SellerReportsScreen');
+const SellerStockHistoryScreen = lazyLoad(() => import('../screens/SellerStockHistoryScreen'), 'SellerStockHistoryScreen');
+const SellerRefundsScreen = lazyLoad(() => import('../screens/SellerRefundsScreen'), 'SellerRefundsScreen');
+const SellerAccountingScreen = lazyLoad(() => import('../screens/SellerAccountingScreen'), 'SellerAccountingScreen');
+const SellerReturnsScreen = lazyLoad(() => import('../screens/SellerReturnsScreen'), 'SellerReturnsScreen');
+const SellerCouponsScreen = lazyLoad(() => import('../screens/SellerCouponsScreen'), 'SellerCouponsScreen');
+
+// Lazy loaded Admin screens
+const AdminDashboardScreen = lazyLoad(() => import('../screens/AdminDashboardScreen'), 'AdminDashboardScreen');
+const AdminSettingsScreen = lazyLoad(() => import('../screens/AdminSettingsScreen'), 'AdminSettingsScreen');
+const AdminUsersScreen = lazyLoad(() => import('../screens/AdminUsersScreen'), 'AdminUsersScreen');
+const AdminStoresScreen = lazyLoad(() => import('../screens/AdminStoresScreen'), 'AdminStoresScreen');
+const AdminCategoriesScreen = lazyLoad(() => import('../screens/AdminCategoriesScreen'), 'AdminCategoriesScreen');
+const AdminSubscriptionsScreen = lazyLoad(() => import('../screens/AdminSubscriptionsScreen'), 'AdminSubscriptionsScreen');
+const AdminPaymentsScreen = lazyLoad(() => import('../screens/AdminPaymentsScreen'), 'AdminPaymentsScreen');
+const AdminAdministratorsScreen = lazyLoad(() => import('../screens/AdminAdministratorsScreen'), 'AdminAdministratorsScreen');
+const AdminFeaturedScreen = lazyLoad(() => import('../screens/AdminFeaturedScreen'), 'AdminFeaturedScreen');
+const AdminReportsScreen = lazyLoad(() => import('../screens/AdminReportsScreen'), 'AdminReportsScreen');
+const AdminAnalyticsScreen = lazyLoad(() => import('../screens/AdminAnalyticsScreen'), 'AdminAnalyticsScreen');
+const AdminProfileScreen = lazyLoad(() => import('../screens/AdminProfileScreen'), 'AdminProfileScreen');
+const AdminActivityScreen = lazyLoad(() => import('../screens/AdminActivityScreen'), 'AdminActivityScreen');
+const AdminRevenueDetailsScreen = lazyLoad(() => import('../screens/AdminRevenueDetailsScreen'), 'AdminRevenueDetailsScreen');
+const AdminNotificationsScreen = lazyLoad(() => import('../screens/AdminNotificationsScreen'), 'AdminNotificationsScreen');
+const AdminSendNotificationScreen = lazyLoad(() => import('../screens/AdminSendNotificationScreen'), 'AdminSendNotificationScreen');
+const AdminAPKUpdatesScreen = lazyLoad(() => import('../screens/AdminAPKUpdatesScreen'), 'AdminAPKUpdatesScreen');
+const AdminCountriesScreen = lazyLoad(() => import('../screens/AdminCountriesScreen'), 'AdminCountriesScreen');
+const AdminCitiesScreen = lazyLoad(() => import('../screens/AdminCitiesScreen'), 'AdminCitiesScreen');
+const AdminBannersScreen = lazyLoad(() => import('../screens/AdminBannersScreen'), 'AdminBannersScreen');
+const AdminBannerFormScreen = lazyLoad(() => import('../screens/AdminBannerFormScreen'), 'AdminBannerFormScreen');
+const AdminAgentScreen = lazyLoad(() => import('../screens/AdminAgentScreen'), 'AdminAgentScreen');
+
+// Other Lazy loaded screens
+const FeaturesScreen = lazyLoad(() => import('../screens/FeaturesScreen'), 'FeaturesScreen');
+const PricingScreen = lazyLoad(() => import('../screens/PricingScreen'), 'PricingScreen');
+const SellerChangePlanScreen = lazyLoad(() => import('../screens/SellerChangePlanScreen'), 'SellerChangePlanScreen');
+const SellerAgentChatScreen = lazyLoad(() => import('../screens/SellerAgentChatScreen'), 'SellerAgentChatScreen');
+
 import { RootStackParamList, ClientTabParamList, SellerTabParamList, UserRole, NotificationPayload } from './types';
 import { useAuthStore } from '../store';
-import { sessionStorage } from '../lib/storage';
+import { sessionStorage, onboardingStorage } from '../lib/storage';
 import { supabase } from '../lib/supabase';
 import { authService } from '../services/authService';
 import { storeService } from '../services/storeService';
@@ -183,8 +296,8 @@ const ClientTabs: React.FC = React.memo(() => {
 
   return (
     <ClientTab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color }) => (
+      screenOptions={({ route }: { route: { name: string } }) => ({
+        tabBarIcon: ({ focused, color }: { focused: boolean; color: string }) => (
           <Ionicons 
             name={getIconName(route.name, focused)} 
             size={iconSize} 
@@ -218,19 +331,19 @@ const ClientTabs: React.FC = React.memo(() => {
         headerShown: false,
       })}
     >
-      <ClientTab.Screen name="ClientHome" component={Screens.ClientHomeScreen} options={{ title: 'Accueil' }} />
+      <ClientTab.Screen name="ClientHome" component={ClientHomeScreen} options={{ title: 'Accueil' }} />
       <ClientTab.Screen 
         name="ClientOrders" 
-        component={Screens.ClientOrdersScreen} 
+        component={ClientOrdersScreen} 
         options={{ 
           title: 'Commandes',
           tabBarBadge: unreadOrdersCount > 0 ? unreadOrdersCount : undefined,
           tabBarBadgeStyle: { backgroundColor: getColor.accent, fontSize: 10 }
         }} 
       />
-      <ClientTab.Screen name="ClientSearch" component={Screens.ClientSearchScreen} options={{ title: 'Recherche' }} />
-      <ClientTab.Screen name="Wishlist" component={Screens.WishlistScreen} options={{ title: 'Favoris' }} />
-      <ClientTab.Screen name="ClientProfile" component={Screens.ClientProfileScreen} options={{ title: 'Profil' }} />
+      <ClientTab.Screen name="ClientSearch" component={ClientSearchScreen} options={{ title: 'Recherche' }} />
+      <ClientTab.Screen name="Wishlist" component={WishlistScreen} options={{ title: 'Favoris' }} />
+      <ClientTab.Screen name="ClientProfile" component={ClientProfileScreen} options={{ title: 'Profil' }} />
     </ClientTab.Navigator>
   );
 });
@@ -258,8 +371,8 @@ const SellerTabs: React.FC = React.memo(() => {
 
   return (
     <SellerTab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color }) => (
+      screenOptions={({ route }: { route: { name: string } }) => ({
+        tabBarIcon: ({ focused, color }: { focused: boolean; color: string }) => (
           <Ionicons 
             name={getIconName(route.name, focused)} 
             size={iconSize} 
@@ -300,12 +413,12 @@ const SellerTabs: React.FC = React.memo(() => {
         headerShown: false,
       })}
     >
-      <SellerTab.Screen name="SellerDashboard" component={Screens.SellerDashboardScreen} options={{ title: 'Dashboard' }} />
-      <SellerTab.Screen name="SellerProducts" component={Screens.SellerProductsScreen} options={{ title: 'Produits' }} />
-      <SellerTab.Screen name="SellerOrders" component={Screens.SellerOrdersScreen} options={{ title: 'Commandes' }} />
-      <SellerTab.Screen name="SellerCollection" component={Screens.SellerCollectionScreen} options={{ title: 'Collections' }} />
-      <SellerTab.Screen name="SellerClients" component={Screens.SellerClientsScreen} options={{ title: 'Clients' }} />
-      <SellerTab.Screen name="SellerStore" component={Screens.SellerStoreScreen} options={{ title: 'Boutique' }} />
+      <SellerTab.Screen name="SellerDashboard" component={SellerDashboardScreen} options={{ title: 'Dashboard' }} />
+      <SellerTab.Screen name="SellerProducts" component={SellerProductsScreen} options={{ title: 'Produits' }} />
+      <SellerTab.Screen name="SellerOrders" component={SellerOrdersScreen} options={{ title: 'Commandes' }} />
+      <SellerTab.Screen name="SellerCollection" component={SellerCollectionScreen} options={{ title: 'Collections' }} />
+      <SellerTab.Screen name="SellerClients" component={SellerClientsScreen} options={{ title: 'Clients' }} />
+      <SellerTab.Screen name="SellerStore" component={SellerStoreScreen} options={{ title: 'Boutique' }} />
     </SellerTab.Navigator>
   );
 });
@@ -436,7 +549,8 @@ export const AppNavigator: React.FC = () => {
       setLoading(true);
       try {
         if (!supabase?.auth) {
-          setInitialRoute('ClientTabs');
+          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
           return;
         }
 
@@ -456,7 +570,13 @@ export const AppNavigator: React.FC = () => {
 
             // Déterminer la route initiale
             const route = await getInitialRouteForRole(role as UserRole, userData.id);
-            setInitialRoute(route);
+            const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+            
+            if (route === 'ClientTabs' && !onboardingCompleted) {
+              setInitialRoute('ClientOnboarding');
+            } else {
+              setInitialRoute(route);
+            }
             return;
           }
         }
@@ -468,14 +588,17 @@ export const AppNavigator: React.FC = () => {
             setUser(anonSession.user);
             setSession(anonSession);
           }
-          setInitialRoute('ClientTabs');
+          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
         } catch (anonError) {
           // If anonymous sign in fails, just continue as guest
-          setInitialRoute('ClientTabs');
+          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
         }
       } catch (error) {
         errorHandler.handleAuthError(error as Error, 'SessionRestoration');
-        setInitialRoute('ClientTabs');
+        const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+        setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
       } finally {
         setLoading(false);
         setIsReady(true);
@@ -566,83 +689,87 @@ export const AppNavigator: React.FC = () => {
         }}
       >
         {/* Routes publiques */}
-        <Stack.Screen name="Landing" component={Screens.LandingScreen} />
-        <Stack.Screen name="About" component={Screens.AboutStaticScreen} options={{ title: 'À propos' }} />
-        <Stack.Screen name="SellerAuth" component={Screens.SellerAuthScreen} />
-        <Stack.Screen name="ResetPassword" component={Screens.ResetPasswordScreen} />
-        <Stack.Screen name="SellerEmailConfirm" component={Screens.SellerEmailConfirmScreen} />
-        <Stack.Screen name="SubscriptionExpired" component={Screens.SubscriptionExpiredScreen} />
+        <Stack.Screen name="Landing" component={LandingScreen} />
+        <Stack.Screen name="ClientOnboarding" component={ClientOnboardingScreen} />
+        <Stack.Screen name="About" component={AboutStaticScreen} options={{ title: 'À propos' }} />
+        <Stack.Screen name="SellerAuth" component={SellerAuthScreen} />
+        <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        <Stack.Screen name="SellerEmailConfirm" component={SellerEmailConfirmScreen} />
+        <Stack.Screen name="SubscriptionExpired" component={SubscriptionExpiredScreen} />
         
         {/* Routes principales */}
         <Stack.Screen name="ClientTabs" component={ClientTabs} />
         <Stack.Screen name="SellerTabs" component={SellerTabs} />
-        <Stack.Screen name="AdminDashboard" component={Screens.AdminDashboardScreen} />
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
         
         {/* Routes clients */}
-        <Stack.Screen name="ClientDetail" component={Screens.ClientDetailScreen} />
-        <Stack.Screen name="ClientOrderDetail" component={Screens.ClientOrderDetailScreen} />
-        <Stack.Screen name="ClientEdit" component={Screens.ClientEditScreen} />
-        <Stack.Screen name="ClientAllStores" component={Screens.ClientAllStoresScreen} />
-        <Stack.Screen name="ClientAllProducts" component={Screens.ClientAllProductsScreen} />
-        <Stack.Screen name="StoreDetail" component={Screens.StoreDetailScreen} />
-        <Stack.Screen name="ProductDetail" component={Screens.ProductDetailScreen} />
-        <Stack.Screen name="Cart" component={Screens.CartScreen} />
-        <Stack.Screen name="Checkout" component={Screens.CheckoutScreen} />
-        <Stack.Screen name="Payment" component={Screens.PaymentScreen} />
-        <Stack.Screen name="BulkPayment" component={Screens.BulkPaymentScreen} />
-        <Stack.Screen name="Confirmation" component={Screens.ConfirmationScreen} />
-        <Stack.Screen name="Notifications" component={Screens.NotificationsScreen} />
-        <Stack.Screen name="PersonalInfo" component={Screens.PersonalInfoScreen} />
-        <Stack.Screen name="Address" component={Screens.AddressScreen} />
-        <Stack.Screen name="Security" component={Screens.SecurityScreen} />
-        <Stack.Screen name="Help" component={Screens.HelpScreen} />
-        <Stack.Screen name="AccountSuspended" component={Screens.AccountSuspendedScreen} />
+        <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
+        <Stack.Screen name="ClientOrderDetail" component={ClientOrderDetailScreen} />
+        <Stack.Screen name="ClientEdit" component={ClientEditScreen} />
+        <Stack.Screen name="ClientAllStores" component={ClientAllStoresScreen} />
+        <Stack.Screen name="ClientAllProducts" component={ClientAllProductsScreen} />
+        <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
+        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="Cart" component={CartScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+        <Stack.Screen name="Payment" component={PaymentScreen} />
+        <Stack.Screen name="BulkPayment" component={BulkPaymentScreen} />
+        <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
+        <Stack.Screen name="Address" component={AddressScreen} />
+        <Stack.Screen name="Security" component={SecurityScreen} />
+        <Stack.Screen name="Help" component={HelpScreen} />
+        <Stack.Screen name="AccountSuspended" component={AccountSuspendedScreen} />
         
         {/* Routes vendeurs */}
-        <Stack.Screen name="SellerAddStore" component={Screens.SellerAddStoreScreen} />
-        <Stack.Screen name="SellerCaisse" component={Screens.SellerCaisseScreen} />
-        <Stack.Screen name="SellerAddProduct" component={Screens.SellerAddProductScreen} />
-        <Stack.Screen name="SellerEditProduct" component={Screens.SellerEditProductScreen} />
-        <Stack.Screen name="SellerEditCollection" component={Screens.SellerEditCollectionScreen} />
-        <Stack.Screen name="SellerCollectionProducts" component={Screens.SellerCollectionProductsScreen} />
-        <Stack.Screen name="SellerOrderDetail" component={Screens.SellerOrderDetailScreen} />
-        <Stack.Screen name="SellerProductActions" component={Screens.SellerProductActionsScreen} />
-        <Stack.Screen name="SellerSale" component={Screens.SellerSaleScreen} />
-        <Stack.Screen name="SellerRestock" component={Screens.SellerRestockScreen} />
-        <Stack.Screen name="SellerLowStock" component={Screens.SellerLowStockScreen} />
-        <Stack.Screen name="SellerAnalytics" component={Screens.SellerAnalyticsScreen} />
-        <Stack.Screen name="SellerReports" component={Screens.SellerReportsScreen} />
-        <Stack.Screen name="SellerRefunds" component={Screens.SellerRefundsScreen} />
-        <Stack.Screen name="SellerAccounting" component={Screens.SellerAccountingScreen} />
+        <Stack.Screen name="SellerAddStore" component={SellerAddStoreScreen} />
+        <Stack.Screen name="SellerCaisse" component={SellerCaisseScreen} />
+        <Stack.Screen name="SellerAddProduct" component={SellerAddProductScreen} />
+        <Stack.Screen name="SellerEditProduct" component={SellerEditProductScreen} />
+        <Stack.Screen name="SellerEditCollection" component={SellerEditCollectionScreen} />
+        <Stack.Screen name="SellerCollectionProducts" component={SellerCollectionProductsScreen} />
+        <Stack.Screen name="SellerOrderDetail" component={SellerOrderDetailScreen} />
+        <Stack.Screen name="SellerProductActions" component={SellerProductActionsScreen} />
+        <Stack.Screen name="SellerSale" component={SellerSaleScreen} />
+        <Stack.Screen name="SellerLowStock" component={SellerLowStockScreen} />
+        <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
+        <Stack.Screen name="SellerReports" component={SellerReportsScreen} />
+        <Stack.Screen name="SellerStockHistory" component={SellerStockHistoryScreen} />
+        <Stack.Screen name="SellerRefunds" component={SellerRefundsScreen} />
+
+        <Stack.Screen name="SellerAccounting" component={SellerAccountingScreen} />
+        <Stack.Screen name="SellerReturns" component={SellerReturnsScreen} />
+        <Stack.Screen name="SellerCoupons" component={SellerCouponsScreen} />
         
         {/* Routes admin */}
-        <Stack.Screen name="AdminSettings" component={Screens.AdminSettingsScreen} />
-        <Stack.Screen name="AdminUsers" component={Screens.AdminUsersScreen} />
-        <Stack.Screen name="AdminStores" component={Screens.AdminStoresScreen} />
-        <Stack.Screen name="AdminCategories" component={Screens.AdminCategoriesScreen} />
-        <Stack.Screen name="AdminSubscriptions" component={Screens.AdminSubscriptionsScreen} />
-        <Stack.Screen name="AdminPayments" component={Screens.AdminPaymentsScreen} />
-        <Stack.Screen name="AdminAdministrators" component={Screens.AdminAdministratorsScreen} />
-        <Stack.Screen name="AdminFeatured" component={Screens.AdminFeaturedScreen} />
-        <Stack.Screen name="AdminReports" component={Screens.AdminReportsScreen} />
-        <Stack.Screen name="AdminAnalytics" component={Screens.AdminAnalyticsScreen} />
-        <Stack.Screen name="AdminProfile" component={Screens.AdminProfileScreen} />
-        <Stack.Screen name="AdminActivity" component={Screens.AdminActivityScreen} />
-        <Stack.Screen name="AdminRevenueDetails" component={Screens.AdminRevenueDetailsScreen} />
-        <Stack.Screen name="AdminNotifications" component={Screens.AdminNotificationsScreen} />
-        <Stack.Screen name="AdminSendNotification" component={Screens.AdminSendNotificationScreen} />
-        <Stack.Screen name="AdminAPKUpdates" component={Screens.AdminAPKUpdatesScreen} />
-        <Stack.Screen name="AdminCountries" component={Screens.AdminCountriesScreen} />
-        <Stack.Screen name="AdminCities" component={Screens.AdminCitiesScreen} />
-        <Stack.Screen name="AdminBanners" component={Screens.AdminBannersScreen} />
-        <Stack.Screen name="AdminBannerForm" component={Screens.AdminBannerFormScreen} />
+        <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
+        <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
+        <Stack.Screen name="AdminStores" component={AdminStoresScreen} />
+        <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />
+        <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionsScreen} />
+        <Stack.Screen name="AdminPayments" component={AdminPaymentsScreen} />
+        <Stack.Screen name="AdminAdministrators" component={AdminAdministratorsScreen} />
+        <Stack.Screen name="AdminFeatured" component={AdminFeaturedScreen} />
+        <Stack.Screen name="AdminReports" component={AdminReportsScreen} />
+        <Stack.Screen name="AdminAnalytics" component={AdminAnalyticsScreen} />
+        <Stack.Screen name="AdminProfile" component={AdminProfileScreen} />
+        <Stack.Screen name="AdminActivity" component={AdminActivityScreen} />
+        <Stack.Screen name="AdminRevenueDetails" component={AdminRevenueDetailsScreen} />
+        <Stack.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
+        <Stack.Screen name="AdminSendNotification" component={AdminSendNotificationScreen} />
+        <Stack.Screen name="AdminAPKUpdates" component={AdminAPKUpdatesScreen} />
+        <Stack.Screen name="AdminCountries" component={AdminCountriesScreen} />
+        <Stack.Screen name="AdminCities" component={AdminCitiesScreen} />
+        <Stack.Screen name="AdminBanners" component={AdminBannersScreen} />
+        <Stack.Screen name="AdminBannerForm" component={AdminBannerFormScreen} />
         
         {/* Routes info */}
-        <Stack.Screen name="Features" component={Screens.FeaturesScreen} />
-        <Stack.Screen name="Pricing" component={Screens.PricingScreen} />
-        <Stack.Screen name="SellerChangePlan" component={Screens.SellerChangePlanScreen} />
-        <Stack.Screen name="AgentChat" component={Screens.SellerAgentChatScreen} />
-        <Stack.Screen name="AdminAgentChat" component={Screens.AdminAgentScreen} />
+        <Stack.Screen name="Features" component={FeaturesScreen} />
+        <Stack.Screen name="Pricing" component={PricingScreen} />
+        <Stack.Screen name="SellerChangePlan" component={SellerChangePlanScreen} />
+        <Stack.Screen name="AgentChat" component={SellerAgentChatScreen} />
+        <Stack.Screen name="AdminAgentChat" component={AdminAgentScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -655,3 +782,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+
+export default AppNavigator;

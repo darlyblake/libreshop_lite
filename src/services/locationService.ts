@@ -123,6 +123,25 @@ export const locationService = {
   },
 
   /**
+   * Calculer la distance entre la position de l'utilisateur et une boutique.
+   * Retourne la distance en km ou null si les coordonnées ne sont pas valides.
+   */
+  calculateDistanceToStore(
+    userCoords: LocationCoords | null,
+    store: { latitude?: number; longitude?: number } | null
+  ): number | null {
+    if (!userCoords || !store || store.latitude === undefined || store.longitude === undefined) {
+      return null;
+    }
+    return this.calculateDistance(
+      userCoords.latitude,
+      userCoords.longitude,
+      store.latitude,
+      store.longitude
+    );
+  },
+
+  /**
    * Ouvrir l'itinéraire dans Google Maps
    */
   async openDirections(destLat: number, destLon: number, destName: string): Promise<void> {

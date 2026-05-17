@@ -22,11 +22,13 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { Product } from '../lib/supabase';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { Toast } from '../components/Toast';
 
 interface FormData {
   name: string;
   description: string;
   price: string;
+  costPrice: string;
   comparePrice: string;
   stock: string;
   lowStockThreshold: string;
@@ -54,6 +56,7 @@ export const SellerEditProductScreen: React.FC = () => {
     name: '',
     description: '',
     price: '',
+    costPrice: '',
     comparePrice: '',
     stock: '',
     lowStockThreshold: '5',
@@ -64,6 +67,12 @@ export const SellerEditProductScreen: React.FC = () => {
     isPhysicalSale: true,
     images: [],
   });
+
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' });
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ visible: true, message, type });
+  };
 
   useEffect(() => {
     loadProduct();
@@ -76,6 +85,7 @@ export const SellerEditProductScreen: React.FC = () => {
         name: product.name,
         description: product.description || '',
         price: product.price.toString(),
+        costPrice: product.cost_price?.toString() || '',
         comparePrice: product.compare_price?.toString() || '',
         stock: product.stock.toString(),
         lowStockThreshold: product.low_stock_threshold?.toString() || '5',
@@ -191,26 +201,45 @@ export const SellerEditProductScreen: React.FC = () => {
         }
       }
 
-      await productService.update(productId, {
+      const updatePayload: any = {
         name: formData.name,
         description: formData.description,
-        price: parseFloat(formData.price),
-        compare_price: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
-        stock: formData.stock ? parseInt(formData.stock) : 0,
-        low_stock_threshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : 5,
-        reference: formData.reference,
-        category: formData.category,
-        is_active: formData.isActive,
-        is_online_sale: formData.isOnlineSale,
-        is_physical_sale: formData.isPhysicalSale,
-        images: uploadedImages,
-      });
-      Alert.alert('Succès', 'Produit mis à jour avec succès', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    } catch (error) {
+        price: parseFloat(formData.price) || 0,
+        reference: formData.reference || '',
+        category: formData.category || '',
+        is_active: !!formData.isActive,
+        is_online_sale: !!formData.isOnlineSale,
+        is_physical_sale: !!formData.isPhysicalSale,
+        images: uploadedImages || [],
+      };
+
+      // Handle optional numeric fields safely
+      const parseSafeFloat = (val: string) => {
+        const parsed = parseFloat(val);
+        return isNaN(parsed) ? null : parsed;
+      };
+
+      const parseSafeInt = (val: string, fallback: number) => {
+        const parsed = parseInt(val);
+        return isNaN(parsed) ? fallback : parsed;
+      };
+
+      updatePayload.cost_price = parseSafeFloat(formData.costPrice);
+      updatePayload.compare_price = parseSafeFloat(formData.comparePrice);
+      updatePayload.stock = parseSafeInt(formData.stock, 0);
+      updatePayload.low_stock_threshold = parseSafeInt(formData.lowStockThreshold, 5);
+
+      await productService.update(productId, updatePayload);
+      
+      showToast('Produit mis à jour avec succès');
+      
+      setTimeout(() => {
+        navigation.goBack();
+      }, 1500);
+    } catch (error: any) {
+      console.error('[ProductUpdate] Error:', error);
       errorHandler.handleDatabaseError(error as Error, 'ProductUpdate');
-      Alert.alert('Erreur', 'Impossible de mettre à jour le produit');
+      Alert.alert('Erreur', 'Impossible de mettre à jour le produit. Veuillez réessayer.');
     } finally {
       setIsLoading(false);
     }
@@ -228,11 +257,12 @@ export const SellerEditProductScreen: React.FC = () => {
           onPress: async () => {
             try {
               await productService.delete(productId);
-              Alert.alert('Succès', 'Produit supprimé', [
-                { text: 'OK', onPress: () => navigation.goBack() },
-              ]);
+              showToast('Produit supprimé avec succès');
+              setTimeout(() => {
+                navigation.goBack();
+              }, 1500);
             } catch (error) {
-              Alert.alert('Erreur', 'Impossible de supprimer le produit');
+              showToast('Impossible de supprimer le produit', 'error');
             }
           },
         },
@@ -313,14 +343,21 @@ export const SellerEditProductScreen: React.FC = () => {
           </View>
           <View style={styles.halfInput}>
             <Input
-              label="Prix comparatif"
-              value={formData.comparePrice}
-              onChangeText={(value) => updateField('comparePrice', value)}
+              label="Prix d'achat (FCFA)"
+              value={formData.costPrice}
+              onChangeText={(value) => updateField('costPrice', value)}
               placeholder="0"
               keyboardType="numeric"
             />
           </View>
         </View>
+        <Input
+          label="Prix comparatif"
+          value={formData.comparePrice}
+          onChangeText={(value) => updateField('comparePrice', value)}
+          placeholder="0"
+          keyboardType="numeric"
+        />
         <View style={styles.row}>
           <View style={styles.halfInput}>
             <Input

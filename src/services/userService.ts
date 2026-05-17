@@ -1,8 +1,52 @@
 import { supabase } from '../lib/supabase';
 import { User } from '../lib/supabase';
 
+// Helper function to check if user can modify target profile
+async function canModifyProfile(targetUserId: string): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase!.auth.getUser();
+    if (!user) return false;
+
+    const currentUserRole = user.user_metadata?.role || user.app_metadata?.role;
+    
+    // Admins can modify any profile
+    if (currentUserRole === 'admin') return true;
+    
+    // Users can only modify their own profile
+    return user.id === targetUserId;
+  } catch (error) {
+    console.error('Error checking profile modification permission:', error);
+    return false;
+  }
+}
+
+// Helper function to check if user can view target profile
+async function canViewProfile(targetUserId: string): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase!.auth.getUser();
+    if (!user) return false;
+
+    const currentUserRole = user.user_metadata?.role || user.app_metadata?.role;
+    
+    // Admins can view any profile
+    if (currentUserRole === 'admin') return true;
+    
+    // Users can view their own profile
+    return user.id === targetUserId;
+  } catch (error) {
+    console.error('Error checking profile view permission:', error);
+    return false;
+  }
+}
+
 export const userService = {
   async getProfile(userId: string): Promise<User> {
+    // Check permission
+    const canView = await canViewProfile(userId);
+    if (!canView) {
+      throw new Error('Accès non autorisé');
+    }
+
     const { data, error } = await supabase!
       .from('users')
       .select('*')
@@ -13,6 +57,12 @@ export const userService = {
   },
 
   async getOrCreateProfile(userId: string): Promise<User> {
+    // Check permission - only for own profile or admin
+    const canView = await canViewProfile(userId);
+    if (!canView) {
+      throw new Error('Accès non autorisé');
+    }
+
     // Use maybeSingle to avoid crash if user doesn't exist yet
     const { data, error } = await supabase!
       .from('users')
@@ -31,6 +81,12 @@ export const userService = {
   },
 
   async upsertProfile(userId: string, updates: Partial<User>): Promise<User> {
+    // Check permission
+    const canModify = await canModifyProfile(userId);
+    if (!canModify) {
+      throw new Error('Accès non autorisé');
+    }
+
     const authRes = await supabase!.auth.getUser();
     const email = authRes.data.user?.email;
     // Anonymous users do not have an email. Our `public.users.email` column is NOT NULL,
@@ -54,6 +110,12 @@ export const userService = {
   },
 
   async updateProfile(userId: string, updates: Partial<User>): Promise<User> {
+    // Check permission
+    const canModify = await canModifyProfile(userId);
+    if (!canModify) {
+      throw new Error('Accès non autorisé');
+    }
+
     const { data, error } = await supabase!
       .from('users')
       .update(updates)
@@ -65,6 +127,12 @@ export const userService = {
   },
 
   async uploadAvatar(userId: string, avatarUrl: string): Promise<User> {
+    // Check permission
+    const canModify = await canModifyProfile(userId);
+    if (!canModify) {
+      throw new Error('Accès non autorisé');
+    }
+
     const { data, error } = await supabase!
       .from('users')
       .update({ avatar_url: avatarUrl })
@@ -76,6 +144,12 @@ export const userService = {
   },
 
   async updatePhone(userId: string, phone: string): Promise<User> {
+    // Check permission
+    const canModify = await canModifyProfile(userId);
+    if (!canModify) {
+      throw new Error('Accès non autorisé');
+    }
+
     const { data, error } = await supabase!
       .from('users')
       .update({ phone })
@@ -87,6 +161,12 @@ export const userService = {
   },
 
   async updateFullName(userId: string, fullName: string): Promise<User> {
+    // Check permission
+    const canModify = await canModifyProfile(userId);
+    if (!canModify) {
+      throw new Error('Accès non autorisé');
+    }
+
     const { data, error } = await supabase!
       .from('users')
       .update({ full_name: fullName })
@@ -98,6 +178,12 @@ export const userService = {
   },
 
   async updateWhatsappNumber(userId: string, whatsappNumber: string): Promise<User> {
+    // Check permission
+    const canModify = await canModifyProfile(userId);
+    if (!canModify) {
+      throw new Error('Accès non autorisé');
+    }
+
     const { data, error } = await supabase!
       .from('users')
       .update({ whatsapp_number: whatsappNumber })

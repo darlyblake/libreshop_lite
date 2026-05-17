@@ -1,4 +1,10 @@
-import { supabase } from '../lib/supabase';
+import { useSupabase } from '../lib/supabase';
+import { productService } from './productService';
+import { stockMovementService } from './stockMovementService';
+import { accountingService } from './accountingService';
+
+// Getter sécurisé pour s'assurer que supabase n'est jamais null (résout ts(18047))
+const getSupabase = () => useSupabase();
 
 // Types pour les remboursements
 export interface RefundRequest {
@@ -49,6 +55,7 @@ export interface RefundReason {
 export const refundService = {
   // Créer une demande de remboursement
   async createRefund(request: RefundRequest): Promise<Refund> {
+    const supabase = getSupabase();
     try {
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -84,6 +91,7 @@ export const refundService = {
 
   // Approuver un remboursement
   async approveRefund(refundId: string, processedBy: string, notes?: string): Promise<Refund> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refunds')
@@ -108,6 +116,46 @@ export const refundService = {
           .eq('id', data.order_id);
       }
 
+      // 1. Remettre les produits retournés en stock et enregistrer le mouvement
+      const items = data.items || [];
+      for (const item of items) {
+        try {
+          const prodId = item.productId || item.product_id;
+          if (prodId) {
+            const product = await productService.getById(prodId);
+            if (product) {
+              const currentStock = product.stock || 0;
+              const quantityReturned = Number(item.quantity || 1);
+              
+              await stockMovementService.create({
+                product_id: prodId,
+                quantity_changed: quantityReturned,
+                previous_stock: currentStock,
+                new_stock: currentStock + quantityReturned,
+                type: 'return',
+                reason: `Retour commande #${data.order_id?.slice(0, 8)}`,
+                notes: notes,
+                created_by: processedBy,
+              });
+            }
+          }
+        } catch (stockErr) {
+          console.error(`[RefundService] Error restoring stock for item:`, stockErr);
+        }
+      }
+
+      // 2. Enregistrer l'opération comptable
+      try {
+        await accountingService.recordRefund({
+          order_id: data.order_id,
+          store_id: data.store_id,
+          amount: data.amount,
+          reason: data.reason || 'Retour commande client',
+        });
+      } catch (accountingErr) {
+        console.error(`[RefundService] Error recording accounting refund:`, accountingErr);
+      }
+
       return this.mapToRefund(data);
     } catch (error) {
       console.error('Error approving refund:', error);
@@ -117,6 +165,7 @@ export const refundService = {
 
   // Rejeter un remboursement
   async rejectRefund(refundId: string, processedBy: string, notes?: string): Promise<Refund> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refunds')
@@ -141,6 +190,7 @@ export const refundService = {
 
   // Marquer un remboursement comme traité
   async markAsProcessed(refundId: string, processedBy: string): Promise<Refund> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refunds')
@@ -165,6 +215,7 @@ export const refundService = {
 
   // Obtenir tous les remboursements d'un magasin
   async getRefundsByStore(storeId: string, status?: string): Promise<Refund[]> {
+    const supabase = getSupabase();
     try {
       let query = supabase
         .from('refunds')
@@ -189,6 +240,7 @@ export const refundService = {
 
   // Obtenir les remboursements d'une commande
   async getRefundsByOrder(orderId: string): Promise<Refund[]> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refunds')
@@ -207,6 +259,7 @@ export const refundService = {
 
   // Obtenir un remboursement par ID
   async getRefundById(refundId: string): Promise<Refund | null> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refunds')
@@ -225,6 +278,7 @@ export const refundService = {
 
   // Obtenir les raisons de remboursement
   async getRefundReasons(): Promise<RefundReason[]> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refund_reasons')
@@ -243,6 +297,7 @@ export const refundService = {
 
   // Créer une raison de remboursement
   async createRefundReason(reason: string, category: 'product' | 'delivery' | 'service' | 'other', description?: string): Promise<RefundReason> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refund_reasons')
@@ -266,6 +321,7 @@ export const refundService = {
 
   // Mettre à jour une raison de remboursement
   async updateRefundReason(reasonId: string, updates: Partial<RefundReason>): Promise<RefundReason> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refund_reasons')
@@ -285,6 +341,7 @@ export const refundService = {
 
   // Supprimer (désactiver) une raison de remboursement
   async deleteRefundReason(reasonId: string): Promise<void> {
+    const supabase = getSupabase();
     try {
       const { error } = await supabase
         .from('refund_reasons')
@@ -300,6 +357,7 @@ export const refundService = {
 
   // Calculer le montant remboursable pour une commande
   async calculateRefundableAmount(orderId: string): Promise<number> {
+    const supabase = getSupabase();
     try {
       const { data: order, error } = await supabase
         .from('orders')
@@ -329,6 +387,7 @@ export const refundService = {
 
   // Automatisation: Approuver automatiquement les remboursements sous un certain montant
   async autoApproveRefunds(storeId: string, maxAmount: number): Promise<Refund[]> {
+    const supabase = getSupabase();
     try {
       const { data, error } = await supabase
         .from('refunds')
@@ -367,6 +426,7 @@ export const refundService = {
     processedCount: number;
     averageRefundAmount: number;
   }> {
+    const supabase = getSupabase();
     try {
       let query = supabase
         .from('refunds')

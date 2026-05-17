@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import {
   View,
@@ -12,6 +12,7 @@ import {
   StatusBar,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -24,7 +25,7 @@ import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
 import { useSupabase } from '../lib/supabase';
 import { contactStore } from '../services/contactService';
-import { exportOrdersToPDF, exportOrderToPDF } from '../utils/pdfExport';
+import { exportOrdersToPDF, exportOrderToPDF, exportBatchOrdersToPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
 
 // Types
@@ -163,6 +164,49 @@ export const SellerOrdersScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [nextCursor, setNextCursor] = React.useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+
+  // 🖨️ Sélection multiple pour impression en masse
+  const [selectionMode, setSelectionMode] = React.useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = React.useState<Set<string>>(new Set());
+
+  const toggleOrderSelection = (id: string) => {
+    setSelectedOrderIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedOrderIds.size === filteredOrders.length) {
+      setSelectedOrderIds(new Set());
+    } else {
+      setSelectedOrderIds(new Set(filteredOrders.map(o => o.id)));
+    }
+  };
+
+  const handleBatchPrint = async () => {
+    const selected = filteredOrders.filter(o => selectedOrderIds.has(o.id));
+    if (selected.length === 0) {
+      Alert.alert('Info', 'Sélectionnez au moins une commande');
+      return;
+    }
+    const ordersData = selected.map(o => ({
+      id: o.id,
+      customerName: o.customer,
+      customerPhone: o.phone,
+      shippingAddress: o.deliveryAddress,
+      items: o.items.map(it => ({ name: it.name, quantity: it.quantity || 1, price: it.price || 0 })),
+      totalAmount: o.total,
+      paymentMethod: o.paymentMethod,
+      paymentStatus: o.paymentStatus || 'pending',
+      status: o.status,
+      createdAt: o.isoDate || o.date,
+      storeName,
+    }));
+    await exportBatchOrdersToPDF(ordersData, storeName || 'Ma Boutique');
+  };
+
 
   const filtersWithCounts = useMemo(() => {
     return FILTERS.map((filter) => {
@@ -542,9 +586,10 @@ Merci.`;
     await exportOrderToPDF(orderData);
   };
 
-  const renderOrder = (order: Order) => {
+  const renderOrder = useCallback((order: Order) => {
     const statusColor = order.isStuck ? COLORS.danger : getStatusColor(order.status);
     const paymentStatusColor = getPaymentStatusColor(order.paymentStatus);
+    const isSelected = selectedOrderIds.has(order.id);
 
     return (
       <View 
@@ -556,13 +601,32 @@ Merci.`;
             marginBottom: spacing.md,
             backgroundColor: COLORS.card,
             borderRadius: component.cardBorderRadius,
-            borderWidth: order.isStuck ? 2 : 0,
-            borderColor: order.isStuck ? COLORS.danger : 'transparent',
+            borderWidth: isSelected ? 2 : order.isStuck ? 2 : 0,
+            borderColor: isSelected ? COLORS.accent : order.isStuck ? COLORS.danger : 'transparent',
           }
         ]}
       >
+        {/* Checkbox en mode sélection */}
+        {selectionMode && (
+          <TouchableOpacity
+            onPress={() => toggleOrderSelection(order.id)}
+            style={{
+              position: 'absolute', top: spacing.md, right: spacing.md, zIndex: 10,
+              width: 24, height: 24, borderRadius: 12,
+              backgroundColor: isSelected ? COLORS.accent : COLORS.card,
+              borderWidth: 2, borderColor: isSelected ? COLORS.accent : COLORS.border,
+              alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
-          onPress={() => navigation.navigate('SellerOrderDetail', { orderId: order.id })}
+          onPress={() => {
+            if (selectionMode) { toggleOrderSelection(order.id); return; }
+            navigation.navigate('SellerOrderDetail', { orderId: order.id });
+          }}
+          onLongPress={() => { setSelectionMode(true); toggleOrderSelection(order.id); }}
           activeOpacity={0.7}
         >
           <LinearGradient
@@ -847,7 +911,19 @@ Merci.`;
         </View>
       </View>
     );
-  };
+  }, [
+    selectedOrderIds,
+    selectionMode,
+    updatingOrderId,
+    spacing,
+    fontSize,
+    component,
+    navigation,
+    handleContactCustomer,
+    handleStatusChange,
+  ]);
+
+  const renderOrderItem = useCallback(({ item }: { item: Order }) => renderOrder(item), [renderOrder]);
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
@@ -1309,6 +1385,30 @@ Merci.`;
         </View>
       </LinearGradient>
 
+      {/* Barre de sélection multiple */}
+      {selectionMode && (
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          backgroundColor: COLORS.accent, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+        }}>
+          <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedOrderIds(new Set()); }}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>✕ Annuler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSelectAll}>
+            <Text style={{ color: '#fff', fontWeight: '600' }}>
+              {selectedOrderIds.size === filteredOrders.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleBatchPrint}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 }}
+          >
+            <Ionicons name="print-outline" size={18} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '800' }}>Imprimer ({selectedOrderIds.size})</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Barre de recherche */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -1395,6 +1495,14 @@ Merci.`;
         </Text>
         
         <View style={styles.sortButtons}>
+          {/* Bouton activer mode sélection */}
+          <TouchableOpacity
+            style={[styles.sortButton, selectionMode && styles.sortButtonActive]}
+            onPress={() => { setSelectionMode(s => !s); setSelectedOrderIds(new Set()); }}
+          >
+            <Ionicons name="print-outline" size={fontSize.xs} color={selectionMode ? COLORS.accent : COLORS.textMuted} />
+            <Text style={[styles.sortButtonText, selectionMode && styles.sortButtonTextActive]}>Sélection</Text>
+          </TouchableOpacity>
           <TouchableOpacity 
             style={[
               styles.sortButton,
@@ -1467,7 +1575,7 @@ Merci.`;
 
       <FlatList
         data={filteredOrders}
-        renderItem={({ item }) => renderOrder(item)}
+        renderItem={renderOrderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -1480,10 +1588,11 @@ Merci.`;
         }
         onEndReached={loadMoreOrders}
         onEndReachedThreshold={0.3}
-        initialNumToRender={15}
+        initialNumToRender={8}
         maxToRenderPerBatch={10}
-        windowSize={10}
-        removeClippedSubviews={true}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS !== 'web'}
+        updateCellsBatchingPeriod={50}
         ListFooterComponent={
           <View>
             {loadingMore && (

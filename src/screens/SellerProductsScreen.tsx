@@ -384,7 +384,7 @@ export const SellerProductsScreen: React.FC = () => {
     return { label: `${stock} en stock`, color: COLORS.success, icon: 'checkmark-circle' as const };
   };
 
-  const renderProduct = (product: SupabaseProduct) => {
+  const renderProduct = useCallback((product: SupabaseProduct) => {
     const stockInfo = getStockInfo(product.stock);
     const hasPromo = product.compare_price && product.compare_price > (product.price || 0);
     const isSelected = selectedProducts.has(product.id);
@@ -420,7 +420,7 @@ export const SellerProductsScreen: React.FC = () => {
         {/* Image */}
         <View style={[styles.productImageContainer, isGrid && styles.productImageContainerGrid]}>
           {product.images && product.images[0] ? (
-            <Image source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 800) }} style={[styles.productImage, isGrid && styles.productImageGrid]} resizeMode="cover" />
+            <Image source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 400) }} style={[styles.productImage, isGrid && styles.productImageGrid]} resizeMode="cover" />
           ) : (
             <LinearGradient colors={[COLORS.border + '60', COLORS.border + '20']} style={[styles.productImage, isGrid && styles.productImageGrid, styles.imagePlaceholder]}>
               {isGrid ? (
@@ -547,7 +547,23 @@ export const SellerProductsScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [
+    selectedProducts,
+    viewMode,
+    grid,
+    width,
+    spacing,
+    isDesktop,
+    isTablet,
+    selectionMode,
+    navigation,
+    handleQuickToggleActive,
+    shareOrCopyProductUrl,
+    handleDuplicateProduct,
+    handleDeleteProduct
+  ]);
+
+  const renderProductItem = useCallback(({ item }: { item: SupabaseProduct }) => renderProduct(item), [renderProduct]);
 
   const renderGridLayout = () => {
     const numCols = isDesktop ? 3 : isTablet ? 2 : 2;
@@ -616,7 +632,7 @@ export const SellerProductsScreen: React.FC = () => {
               ]);
               return;
             }
-            if (store?.product_limit && products.length >= store.product_limit) {
+            if (store?.product_limit && store.product_limit !== -1 && products.length >= store.product_limit) {
               if (Platform.OS === 'web') {
                 window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`);
                 return;
@@ -641,11 +657,16 @@ export const SellerProductsScreen: React.FC = () => {
       <FlatList
         key={viewMode}
         data={filteredProducts}
-        renderItem={({ item }) => renderProduct(item)}
+        renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
         numColumns={viewMode === 'grid' ? 2 : 1}
         columnWrapperStyle={viewMode === 'grid' ? { justifyContent: 'space-between', paddingHorizontal: spacing.md } : undefined}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS !== 'web'}
+        updateCellsBatchingPeriod={50}
         contentContainerStyle={[
           styles.listContent, 
           { paddingHorizontal: spacing.md, paddingBottom: 100 }
@@ -735,7 +756,7 @@ export const SellerProductsScreen: React.FC = () => {
                     style={styles.emptyBtn}
                     onPress={() => {
                       console.log('[SellerProducts] emptyState add button pressed', { hasAnyCollection, storeProductLimit: store?.product_limit, productsLength: products.length });
-                      if (store?.product_limit && products.length >= store.product_limit) {
+                      if (store?.product_limit && store.product_limit !== -1 && products.length >= store.product_limit) {
                         if (Platform.OS === 'web') {
                           window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`);
                           return;
@@ -863,7 +884,7 @@ export const SellerProductsScreen: React.FC = () => {
               navigation.navigate('SellerCollection');
               return; 
             }
-            if (store?.product_limit && products.length >= store.product_limit) {
+            if (store?.product_limit && store.product_limit !== -1 && products.length >= store.product_limit) {
               if (Platform.OS === 'web') { window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`); return; }
               Alert.alert(
                 'Limite atteinte',
@@ -984,8 +1005,9 @@ export const SellerProductsScreen: React.FC = () => {
               store_id: storeId,
               collection_id: product.collectionId,
               name: String(product.name || '').trim(),
-              price: Number.parseInt(product.price, 10) || 0,
-              compare_price: product.comparePrice ? Number.parseInt(product.comparePrice, 10) : undefined,
+              price: parseFloat(product.price) || 0,
+              compare_price: product.comparePrice ? parseFloat(product.comparePrice) : null,
+              cost_price: (product as any).costPrice ? parseFloat((product as any).costPrice) : null,
               stock: Number.parseInt(product.stock || '0', 10) || 0,
               reference: product.barcode ? String(product.barcode) : undefined,
               images: uploadedUrls,

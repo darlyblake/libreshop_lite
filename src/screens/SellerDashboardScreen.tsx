@@ -93,7 +93,7 @@ interface TopProduct {
 
 // Fonction utilitaire pour le formatage
 const formatAmount = (amount: number) => {
-  return amount.toLocaleString() + ' FCA';
+  return amount.toLocaleString('fr-FR') + ' FCFA';
 };
 
 const formatTimeAgo = (isoDate?: string) => {
@@ -136,7 +136,7 @@ export const SellerDashboardScreen: React.FC = () => {
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [timeRange, setTimeRange] = useState<TimeRange>('7d');
+  const [timeRange, setTimeRange] = useState<TimeRange>('month');
 
   const [store, setStore] = useState<Partial<import('../lib/supabase').Store>>({});
   const [stats, setStats] = useState<Stat[]>([]);
@@ -348,7 +348,7 @@ export const SellerDashboardScreen: React.FC = () => {
         return Number.isFinite(t) && t >= prevStart.getTime() && t < prevEnd.getTime();
       });
 
-      const confirmedStatuses = new Set(['delivered']);
+      const confirmedStatuses = new Set(['paid', 'shipped', 'delivered']);
       const confirmedOrdersInRange = ordersInRange.filter((o: any) => confirmedStatuses.has(o.status));
       const confirmedOrdersPrevRange = ordersPrevRange.filter((o: any) => confirmedStatuses.has(o.status));
 
@@ -356,8 +356,8 @@ export const SellerDashboardScreen: React.FC = () => {
       const totalOrdersPrev = (orders as any[]).length; // Simplified for now
       const pendingOrders = (orders as any[]).filter((o: any) => o.status === 'pending').length;
       const deliveredOrders = (orders as any[]).filter((o: any) => o.status === 'delivered').length;
-      const totalRevenue = confirmedOrdersInRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
-      const totalRevenuePrev = confirmedOrdersPrevRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+      const totalRevenue = orders.filter((o: any) => confirmedStatuses.has(o.status)).reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+      const totalRevenuePrev = totalRevenue; // Simplified
 
       const revenueLabel = String(Math.round(totalRevenue)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
@@ -367,46 +367,7 @@ export const SellerDashboardScreen: React.FC = () => {
       const outOfStock = (products as any[]).filter((p: any) => Number(p?.stock || 0) <= 0);
       const noImage = (products as any[]).filter((p: any) => !Array.isArray(p?.images) || p.images.length === 0);
       
-      const maxOrders = 4;
-      const mappedOrders: DashboardOrder[] = orders.slice(0, maxOrders).map((o: any) => {
-        const itemsCount = Array.isArray(o.order_items)
-          ? o.order_items.reduce((sum: number, it: any) => sum + Number(it?.quantity || 0), 0)
-          : undefined;
-
-        const customerName = o?.customer_phone || 'Client';
-        return {
-          id: o.id,
-          customer: String(customerName),
-          amount: Number(o.total_amount || 0),
-          status: o.status as any,
-          time: formatTimeAgo(o.created_at),
-          items: itemsCount,
-        };
-      });
-
-      const orderActivities: Activity[] = orders.slice(0, 4).map((o: any) => ({
-        id: `order-${o.id}`,
-        text: `Nouvelle commande de ${o.customer_phone || 'client'} (${formatAmount(Number(o.total_amount))})`,
-        time: formatTimeAgo(o.created_at),
-        ts: new Date(o.created_at).getTime(),
-        icon: 'cart' as keyof typeof Ionicons.glyphMap,
-        type: 'order',
-      }));
-
-      const productActivities: Activity[] = (products as any[]).slice(0, 4).map((p: any) => ({
-        id: `product-${p.id}`,
-        text: `Produit "${p.name}" ${p.created_at ? 'ajouté' : 'mis à jour'}`,
-        time: formatTimeAgo(p.created_at || p.updated_at),
-        ts: new Date(p.created_at || p.updated_at || p.created_at).getTime(),
-        icon: 'cube' as keyof typeof Ionicons.glyphMap,
-        type: 'product',
-      }));
-
-      const recentActivities: Activity[] = [...orderActivities, ...productActivities]
-        .sort((a, b) => (Number.isFinite(b.ts) ? b.ts : 0) - (Number.isFinite(a.ts) ? a.ts : 0))
-        .slice(0, 4);
-
-      const finalActivities = recentActivities.length > 0 ? recentActivities : [];
+      const finalActivities: Activity[] = [];
       
       const dashboardStats = [
         {
@@ -416,14 +377,6 @@ export const SellerDashboardScreen: React.FC = () => {
           icon: 'cart' as const,
           positive: totalOrdersPrev <= 0 ? totalOrders > 0 : totalOrders >= totalOrdersPrev,
           color: COLORS.accent,
-        },
-        {
-          title: 'Revenus',
-          value: revenueLabel,
-          trend: formatTrend(totalRevenue, totalRevenuePrev),
-          icon: 'wallet' as const,
-          positive: totalRevenuePrev <= 0 ? totalRevenue > 0 : totalRevenue >= totalRevenuePrev,
-          color: COLORS.success,
         },
         {
           title: 'Produits actifs',
@@ -480,8 +433,6 @@ export const SellerDashboardScreen: React.FC = () => {
       ];
 
       setStats(dashboardStats);
-      setRecentOrders(mappedOrders);
-      setActivities(finalActivities);
       
       const dashboardSummary = { totalRevenue, pendingOrders, deliveredOrders, lowStockCount: lowStockProducts.length };
       setSummary(dashboardSummary);
@@ -972,15 +923,15 @@ export const SellerDashboardScreen: React.FC = () => {
       }
 
       if (action.screen === 'SellerAddProduct') {
-        navigation.navigate('SellerProducts');
+        navigation.navigate('SellerAddProduct');
       } else if (action.screen === 'StoreDetail') {
         navigation.navigate('StoreDetail', { storeId: action.storeId });
       } else {
-        navigation.navigate(action.screen);
+        navigation.navigate(action.screen as any);
       }
     };
 
-    const actions = [
+    const financeActions = [
       { 
         label: 'Caisse (POS)', 
         icon: 'card', 
@@ -989,12 +940,10 @@ export const SellerDashboardScreen: React.FC = () => {
         inactive: store?.cashier_active === false
       },
       { 
-        label: 'Voir ma boutique', 
-        icon: 'eye', 
-        color: COLORS.success,
-        screen: 'StoreDetail',
-        storeId: store?.id,
-        inactive: store?.online_store_active === false
+        label: 'Comptabilité', 
+        icon: 'calculator', 
+        color: COLORS.info,
+        screen: 'SellerAccounting' 
       },
       { 
         label: 'Rapports', 
@@ -1002,23 +951,45 @@ export const SellerDashboardScreen: React.FC = () => {
         color: COLORS.primary,
         screen: 'SellerReports' 
       },
+    ];
+
+    const storeActions = [
       { 
-        label: 'Comptabilité', 
-        icon: 'calculator', 
-        color: COLORS.info,
-        screen: 'SellerAccounting' 
+        label: 'Codes Promo', 
+        icon: 'ticket', 
+        color: COLORS.accent,
+        screen: 'SellerCoupons' 
+      },
+      { 
+        label: 'Retours', 
+        icon: 'refresh', 
+        color: COLORS.danger,
+        screen: 'SellerReturns' 
+      },
+      { 
+        label: 'Audit Stock', 
+        icon: 'journal', 
+        color: COLORS.primary,
+        screen: 'SellerStockHistory' 
+      },
+      { 
+        label: 'Ma Boutique', 
+        icon: 'eye', 
+        color: COLORS.success,
+        screen: 'StoreDetail',
+        storeId: store?.id,
+        inactive: store?.online_store_active === false
       },
     ];
 
-    const visibleActions = actions;
 
-    return (
-      <View style={styles.section}>
+    const renderActionGrid = (title: string, icon: string, items: any[]) => (
+      <View style={[styles.section, { marginBottom: spacing.xl }]}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
-            <Ionicons name="flash" size={fontSize.lg} color={COLORS.accent} />
+            <Ionicons name={icon as any} size={fontSize.lg} color={COLORS.accent} />
             <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>
-              Actions rapides
+              {title}
             </Text>
           </View>
         </View>
@@ -1027,44 +998,56 @@ export const SellerDashboardScreen: React.FC = () => {
           styles.quickActions,
           { 
             gap: spacing.md,
-            flexDirection: isMobile && !isLandscape ? 'row' : 'row',
-            flexWrap: isMobile && !isLandscape ? 'nowrap' : 'wrap',
+            flexDirection: 'row',
+            flexWrap: 'wrap',
           }
         ]}>
-          {visibleActions.map((action, index) => (
+          {items.map((action, index) => (
             <TouchableOpacity
               key={index}
               style={[
                 styles.quickAction,
                 {
-                  padding: spacing.lg,
+                  paddingVertical: spacing.xl,
+                  paddingHorizontal: spacing.sm,
                   backgroundColor: COLORS.card,
-                  borderRadius: component.cardBorderRadius,
-                  flex: isMobile && !isLandscape ? 1 : undefined,
-                  minWidth: isDesktop ? 200 : isTablet ? 180 : 'auto',
+                  borderRadius: RADIUS.lg,
+                  width: isMobile && !isLandscape ? (width - spacing.lg * 2 - spacing.md) / 2 : isDesktop ? 200 : isTablet ? 180 : 'auto',
+                  marginBottom: spacing.xs,
+                  opacity: action.inactive ? 0.6 : 1,
                 }
               ]}
               onPress={() => handleActionPress(action)}
               activeOpacity={0.7}
+              disabled={action.inactive}
             >
               <View style={[
                 styles.quickActionIcon,
                 { 
-                  backgroundColor: action.color + '20',
-                  width: component.fabSize,
-                  height: component.fabSize,
-                  borderRadius: component.fabBorderRadius,
+                  backgroundColor: action.color + '15',
+                  width: isMobile ? 56 : 64,
+                  height: isMobile ? 56 : 64,
+                  borderRadius: isMobile ? 28 : 32,
+                  borderWidth: 1,
+                  borderColor: action.color + '20',
                 }
               ]}>
-                <Ionicons name={action.inactive ? "lock-closed" : (action.icon as any)} size={fontSize.xl} color={action.inactive ? COLORS.textMuted : action.color} />
+                <Ionicons name={action.inactive ? "lock-closed" : (action.icon as any)} size={isMobile ? 26 : 30} color={action.inactive ? COLORS.textMuted : action.color} />
               </View>
-              <Text style={[styles.quickActionText, { fontSize: fontSize.sm, color: action.inactive ? COLORS.textMuted : COLORS.text }]}>
+              <Text style={[styles.quickActionText, { fontSize: fontSize.sm, color: action.inactive ? COLORS.textMuted : COLORS.text, marginTop: spacing.xs }]}>
                 {action.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
+    );
+
+    return (
+      <>
+        {renderActionGrid('Gestion Financière', 'cash-outline', financeActions)}
+        {renderActionGrid('Opérations Boutique', 'storefront-outline', storeActions)}
+      </>
     );
   };
 
@@ -1290,67 +1273,7 @@ export const SellerDashboardScreen: React.FC = () => {
           {renderAnalyticsButton()}
           {renderAlerts()}
           {renderQuickActions()}
-          {renderRecentOrders()}
-          {renderActivities()}
 
-          <View
-            style={[
-              styles.planRow,
-              {
-                marginTop: spacing.xl,
-                gap: spacing.md,
-                flexWrap: 'wrap',
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.planCard,
-                {
-                  backgroundColor: COLORS.card,
-                  borderRadius: component.cardBorderRadius,
-                  padding: spacing.lg,
-                  flexGrow: 1,
-                  minWidth: isMobile ? 160 : 220,
-                },
-              ]}
-            >
-              <View style={styles.planHeader}>
-                <Text style={[styles.planTitle, { fontSize: fontSize.xs }]}>Plan</Text>
-                <View style={[styles.planIcon, { backgroundColor: COLORS.accent + '20' }]}>
-                  <Ionicons name="ribbon" size={fontSize.lg} color={COLORS.accent} />
-                </View>
-              </View>
-              <Text style={[styles.planValue, { fontSize: fontSize.lg }]}>{planLabel}</Text>
-              {!!effectiveSubscriptionEnd && (
-                <Text style={[styles.planStatus, { fontSize: fontSize.xs }]}>
-                  {isExpired ? 'Expiré' : `Expire le ${planEndsAtLabel.split(',')[0]}`}
-                </Text>
-              )}
-            </View>
-
-            <View
-              style={[
-                styles.planCard,
-                {
-                  backgroundColor: COLORS.card,
-                  borderRadius: component.cardBorderRadius,
-                  padding: spacing.lg,
-                  flexGrow: 1,
-                  minWidth: isMobile ? 160 : 220,
-                },
-              ]}
-            >
-              <View style={styles.planHeader}>
-                <Text style={[styles.planTitle, { fontSize: fontSize.xs }]}>Revenus</Text>
-                <View style={[styles.planIcon, { backgroundColor: COLORS.success + '20' }]}>
-                  <Ionicons name="cash" size={fontSize.lg} color={COLORS.success} />
-                </View>
-              </View>
-              <Text style={[styles.planValue, { fontSize: fontSize.lg }]}>{formatAmount(summary.totalRevenue)}</Text>
-              <Text style={[styles.planStatus, { fontSize: fontSize.xs }]}>Période actuelle</Text>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
@@ -1851,18 +1774,32 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.border + '50',
+    // Premium Shadow
+    ...(Platform.OS === 'web' 
+      ? { boxShadow: '0px 2px 4px rgba(0,0,0,0.05)' }
+      : {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 4,
+          elevation: 2,
+        }
+    ),
   },
   quickActionIcon: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   quickActionText: {
-    fontWeight: '500',
-    color: COLORS.textSoft,
+    fontWeight: '600',
+    color: COLORS.text,
     textAlign: 'center',
+    fontSize: 13,
   },
   activityBlur: {
     borderRadius: RADIUS.lg,

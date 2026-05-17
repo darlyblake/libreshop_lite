@@ -13,9 +13,11 @@ import {
   TextInput,
   Modal,
   Platform,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
 import { Order, OrderItem, Product, Store, User } from '../lib/supabase';
@@ -24,12 +26,16 @@ import { contactStore } from '../services/contactService';
 import { useAuthStore } from '../store';
 import { useNotificationStore } from '../store/notificationStore';
 import { notificationService } from '../services/notificationService';
+import { returnService } from '../services/returnService';
+import { OrderTimeline, OrderCardSkeleton } from '../components';
 
 // Types étendus
 interface OrderWithDetails extends Order {
   store?: Store;
   seller?: User;
   order_items: (OrderItem & { product?: Product })[];
+  delivery_fee?: number;
+  tax_amount?: number;
 }
 
 interface OrderFilters {
@@ -38,7 +44,30 @@ interface OrderFilters {
   storeId?: string;
 }
 
+const EmptyOrdersAnimation = ({ color }: { color: string }) => {
+  const translateY = useSharedValue(0);
+  
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-12, { duration: 1200 }),
+        withTiming(0, { duration: 1200 })
+      ),
+      -1,
+      true
+    );
+  }, []);
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }]
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Ionicons name="receipt-outline" size={80} color={color} />
+    </Animated.View>
+  );
+};
 
 const getStatusColor = (status: string, p: LegacyPalette) => {
   switch (status) {
@@ -122,6 +151,10 @@ export const ClientOrdersScreen: React.FC = () => {
   const [markingAsReceived, setMarkingAsReceived] = useState<string | null>(null);
   const [cancelingOrder, setCancelingOrder] = useState<string | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<OrderWithDetails | null>(null);
+  const [returnModalVisible, setReturnModalVisible] = useState(false);
+  const [returnItem, setReturnItem] = useState<{order: OrderWithDetails, item: any} | null>(null);
+  const [returnReason, setReturnReason] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
 
   const palette = useLegacyPalette();
   const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
@@ -320,6 +353,61 @@ export const ClientOrdersScreen: React.FC = () => {
     }
   };
 
+  const contactSellerOnWhatsApp = (item: any, reason: string) => {
+    const storePhone = item.order.store?.phone || item.order.store?.whatsapp_number;
+    if (!storePhone) {
+      Alert.alert('Info', 'Demande enregistrée. Contactez le vendeur pour les photos.');
+      return;
+    }
+    const message = `Bonjour, je viens de lancer une demande de retour pour le produit ${item.item.product?.name} (Commande #${item.order.id.slice(0, 8)}).\n\nMotif : ${reason}\n\nVoici les photos :`;
+    const url = `whatsapp://send?phone=${storePhone.replace(/\+/g, '')}&text=${encodeURIComponent(message)}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Erreur', 'WhatsApp n\'est pas installé sur cet appareil');
+    });
+  };
+
+  // Gérer la demande de retour
+  const handleRequestReturn = async () => {
+    if (!returnItem || !returnReason.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir un motif pour le retour');
+      return;
+    }
+
+    try {
+      setSubmittingReturn(true);
+      const reason = returnReason;
+      await returnService.requestReturn({
+        order_id: returnItem.order.id,
+        store_id: returnItem.order.store_id,
+        product_id: returnItem.item.product_id,
+        quantity: returnItem.item.quantity,
+        reason: reason,
+        refund_amount: Number(returnItem.item.price) * Number(returnItem.item.quantity),
+        user_id: user?.id as any
+      } as any);
+
+      setReturnModalVisible(false);
+      setReturnReason('');
+      
+      Alert.alert(
+        'Demande envoyée',
+        'Voulez-vous contacter le vendeur sur WhatsApp pour envoyer les photos ?',
+        [
+          { text: 'Plus tard', style: 'cancel' },
+          { 
+            text: 'Oui, WhatsApp', 
+            onPress: () => contactSellerOnWhatsApp(returnItem, reason) 
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error requesting return:', error);
+      Alert.alert('Erreur', 'Impossible d\'envoyer la demande de retour');
+    } finally {
+      setSubmittingReturn(false);
+    }
+  };
+
   // Rafraîchir
   const onRefresh = useCallback(() => {
     const run = async () => {
@@ -337,8 +425,8 @@ export const ClientOrdersScreen: React.FC = () => {
 
   // Obtenir les boutiques uniques pour les filtres
   const uniqueStores = useMemo(() => {
-    const stores = orders.map(order => order.store).filter(Boolean);
-    return Array.from(new Map(stores.map(store => [store?.id, store])).values());
+    const stores = orders.map(order => order.store).filter((s): s is Store => !!s);
+    return Array.from(new Map(stores.map(store => [store.id, store])).values());
   }, [orders]);
 
   // Rendu d’une commande
@@ -392,131 +480,111 @@ export const ClientOrdersScreen: React.FC = () => {
         key={order.id} 
         style={[
           styles.orderCard,
+          { padding: SPACING.lg, borderRadius: RADIUS.xl, shadowColor: palette.text, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: palette.border },
           hasUpdate && { borderColor: palette.accent, borderWidth: 2, backgroundColor: palette.accent + '05' }
         ]}
       >
         {/* Header avec statut */}
-        <View style={styles.orderHeader}>
-          <View style={styles.orderInfo}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.md }}>
+          <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={styles.orderId}>Commande #{String(order.id).split('-')[0].toUpperCase()}</Text>
+              <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: palette.text }}>Commande #{String(order.id).split('-')[0].toUpperCase()}</Text>
               {hasUpdate && (
                 <View style={{ backgroundColor: palette.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>MAJ</Text>
                 </View>
               )}
             </View>
-          <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
-          {order.store?.name ? (
-            <Text style={styles.storeInline} numberOfLines={1}>{order.store.name}</Text>
-          ) : null}
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status, palette) }]}>
-          <Text style={styles.statusText}>{getStatusLabel(order.status)}</Text>
-        </View>
-      </View>
-
-      {/* Boutique */}
-      {order.store && (
-        <View style={styles.storeInfo}>
-          <Ionicons name="storefront-outline" size={16} color={palette.textMuted} />
-          <Text style={styles.storeName}>{order.store.name}</Text>
-        </View>
-      )}
-
-      {/* Produits */}
-      <View style={styles.productsList}>
-        {order.order_items.slice(0, 3).map((item, index) => (
-          <View key={index} style={styles.productItem}>
-            <Text style={styles.productName} numberOfLines={1}>
-              {item.product?.name || 'Produit'}
-            </Text>
-            <Text style={styles.productQuantity}>
-              {item.quantity}x {item.price} FCA
-            </Text>
+            <Text style={{ fontSize: FONT_SIZE.sm, color: palette.textMuted, marginTop: 2 }}>{formatDate(order.created_at)}</Text>
+            {order.store?.name && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                <Ionicons name="storefront" size={12} color={palette.textMuted} style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }} numberOfLines={1}>{order.store.name}</Text>
+              </View>
+            )}
           </View>
-        ))}
-        {order.order_items.length > 3 && (
-          <Text style={styles.moreProducts}>
-            +{order.order_items.length - 3} autres produits...
-          </Text>
-        )}
-      </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status, palette) + '20', borderWidth: 0, marginTop: 0 }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(order.status, palette) }]}>{getStatusLabel(order.status)}</Text>
+          </View>
+        </View>
 
-      {/* Total */}
-      <View style={styles.orderTotal}>
-        {(() => {
-          const amt = computeAmounts(order);
-          return (
-            <>
-              <View style={{flex: 1}}>
-                <Text style={styles.subtotalLabel}>Sous-total</Text>
-                <Text style={styles.subtotalValue}>{amt.subtotal.toLocaleString()} FCA</Text>
-                {amt.delivery ? <Text style={styles.detailSmall}>Livraison: {amt.delivery.toLocaleString()} FCA</Text> : null}
-                {amt.tax ? <Text style={styles.detailSmall}>TVA: {amt.tax.toLocaleString()} FCA</Text> : null}
-              </View>
-              <View style={{alignItems: 'flex-end'}}>
-                <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalAmount}>{amt.total.toLocaleString()} FCA</Text>
-              </View>
-            </>
-          );
-        })()}
-      </View>
+        {/* Produits */}
+        <View style={{ backgroundColor: palette.bg, borderRadius: RADIUS.md, padding: SPACING.sm, marginBottom: SPACING.md }}>
+          {order.order_items.slice(0, 3).map((item, index) => (
+            <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+              <Text style={{ fontSize: FONT_SIZE.sm, color: palette.text, flex: 1, marginRight: SPACING.sm }} numberOfLines={1}>
+                <Text style={{ fontWeight: '700' }}>{item.quantity}x</Text> {item.product?.name || 'Produit inconnu'}
+              </Text>
+              <Text style={{ fontSize: FONT_SIZE.sm, color: palette.text, fontWeight: '600' }}>
+                {(item.price * item.quantity).toLocaleString()} FCA
+              </Text>
+            </View>
+          ))}
+          {order.order_items.length > 3 && (
+            <Text style={{ fontSize: FONT_SIZE.xs, color: palette.accent, fontWeight: '600', marginTop: 4 }}>
+              + {order.order_items.length - 3} autres articles...
+            </Text>
+          )}
+        </View>
 
-      {/* Actions */}
-      <View style={styles.orderActions}>
-        {order.status === 'shipped' && (
+        {/* Total */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md }}>
+          <Text style={{ fontSize: FONT_SIZE.sm, color: palette.textMuted }}>Total ({order.order_items.reduce((acc, item) => acc + item.quantity, 0)} article{order.order_items.reduce((acc, item) => acc + item.quantity, 0) > 1 ? 's' : ''})</Text>
+          <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '800', color: palette.accent }}>{computeAmounts(order).total.toLocaleString()} FCA</Text>
+        </View>
+
+        {/* Actions */}
+        <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+          {order.status === 'shipped' && (
+            <TouchableOpacity 
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: palette.success + '15' }}
+              onPress={() => markAsReceived(order.id)}
+              disabled={markingAsReceived === order.id}
+            >
+              {markingAsReceived === order.id ? (
+                <ActivityIndicator color={palette.success} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={16} color={palette.success} />
+                  <Text style={{ marginLeft: 6, fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.success }}>Reçu</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          
           <TouchableOpacity 
-            style={[styles.actionButton, styles.receivedButton]}
-            onPress={() => markAsReceived(order.id)}
-            disabled={markingAsReceived === order.id}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: '#25D36615' }}
+            onPress={() => contactSeller(order)}
           >
-            {markingAsReceived === order.id ? (
-              <ActivityIndicator color={palette.text} size="small" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle" size={18} color={palette.text} />
-                <Text style={styles.actionButtonText}>Comme reçu</Text>
-              </>
-            )}
+            <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+            <Text style={{ marginLeft: 6, fontSize: FONT_SIZE.sm, fontWeight: '600', color: '#25D366' }}>Contacter</Text>
           </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.contactButton]}
-          onPress={() => contactSeller(order)}
-        >
-          <Ionicons name="logo-whatsapp" size={18} color={palette.text} />
-          <Text style={styles.actionButtonText}>Contacter</Text>
-        </TouchableOpacity>
 
-        {(order.status === 'pending' || order.status === 'paid') && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
-            onPress={() => confirmCancel(order)}
-            disabled={cancelingOrder === order.id}
+          {(order.status === 'pending' || order.status === 'paid') && (
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: palette.danger + '10' }}
+              onPress={() => confirmCancel(order)}
+              disabled={cancelingOrder === order.id}
+            >
+              {cancelingOrder === order.id ? (
+                <ActivityIndicator color={palette.danger} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="close" size={16} color={palette.danger} />
+                  <Text style={{ marginLeft: 4, fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.danger }}>Annuler</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          <TouchableOpacity 
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: palette.accent + '15' }}
+            onPress={() => viewOrderDetails(order)}
           >
-            {cancelingOrder === order.id ? (
-              <ActivityIndicator color={palette.text} size="small" />
-            ) : (
-              <>
-                <Ionicons name="close-circle" size={18} color={palette.text} />
-                <Text style={styles.actionButtonText}>Annuler</Text>
-              </>
-            )}
+            <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.accent }}>Détails</Text>
           </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.detailsButton]}
-          onPress={() => viewOrderDetails(order)}
-        >
-          <Ionicons name="eye-outline" size={18} color={palette.accent} />
-          <Text style={[styles.actionButtonText, { color: palette.accent }]}>Détails</Text>
-        </TouchableOpacity>
+        </View>
       </View>
-    </View>
     );
   };
 
@@ -578,14 +646,15 @@ export const ClientOrdersScreen: React.FC = () => {
 
       {/* Liste des commandes */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={palette.accent} size="large" />
-          <Text style={styles.loadingText}>Chargement de vos commandes...</Text>
-        </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.ordersList}>
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <OrderCardSkeleton key={`order-sk-${idx}`} />
+          ))}
+        </ScrollView>
       ) : filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="receipt-outline" size={64} color={palette.textMuted} />
-          <Text style={styles.emptyTitle}>Aucune commande trouvée</Text>
+          <EmptyOrdersAnimation color={palette.textMuted} />
+          <Text style={[styles.emptyTitle, { marginTop: 16 }]}>Aucune commande trouvée</Text>
           <Text style={styles.emptySubtitle}>
             {searchQuery ? 'Essayez une autre recherche' : 'Commencez vos achats pour voir vos commandes ici'}
           </Text>
@@ -714,6 +783,52 @@ export const ClientOrdersScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Modal Demande de Retour */}
+      <Modal
+        animationType="fade"
+        transparent
+        visible={returnModalVisible}
+        onRequestClose={() => setReturnModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.returnModal}>
+            <Text style={styles.modalTitle}>Demander un retour</Text>
+            <Text style={styles.returnSubtitle}>
+              Produit : {returnItem?.item?.product?.name}
+            </Text>
+            
+            <TextInput
+              style={styles.returnInput}
+              placeholder="Motif du retour (ex: taille trop petite, défectueux...)"
+              multiline
+              numberOfLines={4}
+              value={returnReason}
+              onChangeText={setReturnReason}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: palette.bg }]}
+                onPress={() => setReturnModalVisible(false)}
+              >
+                <Text style={{ color: palette.text }}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, { backgroundColor: palette.accent }]}
+                onPress={handleRequestReturn}
+                disabled={submittingReturn}
+              >
+                {submittingReturn ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Envoyer la demande</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Modal détails commande */}
       {selectedOrder && (
         <Modal
@@ -731,119 +846,104 @@ export const ClientOrdersScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalContent}>
-                <View style={styles.detailTotals}>
-                  {(() => {
-                    const amt = computeAmounts(selectedOrder as OrderWithDetails | null);
-                    return (
-                      <>
-                        <View style={{flex: 1}}>
-                          <Text style={styles.subtotalLabel}>Sous-total</Text>
-                          <Text style={styles.subtotalValue}>{amt.subtotal.toLocaleString()} FCA</Text>
-                          {amt.delivery ? <Text style={styles.detailSmall}>Livraison: {amt.delivery.toLocaleString()} FCA</Text> : null}
-                          {amt.tax ? <Text style={styles.detailSmall}>TVA: {amt.tax.toLocaleString()} FCA</Text> : null}
-                        </View>
-                        <View style={{alignItems: 'flex-end'}}>
-                          <Text style={styles.totalLabel}>Total</Text>
-                          <Text style={styles.totalAmount}>{amt.total.toLocaleString()} FCA</Text>
-                        </View>
-                      </>
-                    );
-                  })()}
+              <ScrollView style={[styles.modalContent, { paddingHorizontal: 0, paddingBottom: 40 }]}>
+                {/* Total Recap Header */}
+                <View style={{ backgroundColor: palette.accent + '10', padding: SPACING.lg, borderRadius: RADIUS.lg, marginHorizontal: SPACING.lg, marginBottom: SPACING.xl, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: palette.accent + '30' }}>
+                  <View>
+                    <Text style={{ fontSize: FONT_SIZE.sm, color: palette.textMuted, marginBottom: 4 }}>Total de la commande</Text>
+                    <Text style={{ fontSize: FONT_SIZE.xl, fontWeight: '800', color: palette.accent }}>{computeAmounts(selectedOrder as OrderWithDetails | null).total.toLocaleString()} FCA</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>Sous-total: {computeAmounts(selectedOrder as OrderWithDetails | null).subtotal.toLocaleString()} FCA</Text>
+                    {computeAmounts(selectedOrder as OrderWithDetails | null).delivery ? <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 2 }}>Livraison: {computeAmounts(selectedOrder as OrderWithDetails | null).delivery.toLocaleString()} FCA</Text> : null}
+                    {computeAmounts(selectedOrder as OrderWithDetails | null).tax ? <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 2 }}>TVA: {computeAmounts(selectedOrder as OrderWithDetails | null).tax.toLocaleString()} FCA</Text> : null}
+                  </View>
                 </View>
 
                 {/* Timeline / étapes */}
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailSectionTitle}>Étapes de la commande</Text>
-                  {computeOrderSteps(selectedOrder).map(step => (
-                    <View key={step.key} style={styles.stepRow}>
-                      <View style={[styles.stepBullet, step.done && { backgroundColor: palette.accent }]} />
-                      <View style={styles.stepTextWrap}>
-                        <Text style={[styles.stepLabel, step.done ? { color: palette.text } : { color: palette.textMuted }]}>{step.label}</Text>
-                        {step.date ? <Text style={styles.stepDate}>{formatDate(step.date)}</Text> : null}
-                      </View>
-                    </View>
-                  ))}
+                <View style={[styles.detailSection, { paddingHorizontal: 0, overflow: 'visible' }]}>
+                  <Text style={[styles.detailSectionTitle, { paddingHorizontal: SPACING.lg }]}>Suivi de commande</Text>
+                  <OrderTimeline status={selectedOrder.status} />
                 </View>
 
-                <View style={styles.detailSection}>
+                <View style={[styles.detailSection, { paddingHorizontal: SPACING.lg }]}>
                   <Text style={styles.detailSectionTitle}>Boutique</Text>
-                  <Text style={styles.detailText}>{selectedOrder.store?.name}</Text>
-                  {selectedOrder.store?.phone && (
-                    <Text style={styles.detailText}>{selectedOrder.store.phone}</Text>
-                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.bg, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border }}>
+                    <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: palette.accent + '15', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md }}>
+                      <Ionicons name="storefront" size={20} color={palette.accent} />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: palette.text }}>{selectedOrder.store?.name || (selectedOrder as any).stores?.name || 'Boutique inconnue'}</Text>
+                      {(selectedOrder.store?.phone || (selectedOrder as any).stores?.phone) && (
+                        <Text style={{ fontSize: FONT_SIZE.sm, color: palette.textMuted, marginTop: 2 }}>{selectedOrder.store?.phone || (selectedOrder as any).stores?.phone}</Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
 
                 {/* Produits */}
-                <View style={styles.detailSection}>
+                <View style={[styles.detailSection, { paddingHorizontal: SPACING.lg }]}>
                   <Text style={styles.detailSectionTitle}>Produits ({selectedOrder.order_items.length})</Text>
-                  {selectedOrder.order_items.map((item, index) => (
-                    <View key={index} style={styles.detailItem}>
-                      <Text style={styles.detailProductName}>
-                        {item.quantity}x {item.product?.name || 'Produit'}
-                      </Text>
-                      <Text style={styles.detailProductPrice}>
-                        {item.price} FCA
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Total détail */}
-                <View style={styles.detailSection}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Sous-total:</Text>
-                    <Text style={styles.detailValue}>{computeAmounts(selectedOrder).subtotal.toLocaleString()} FCA</Text>
-                  </View>
-                  {computeAmounts(selectedOrder).delivery ? (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Livraison:</Text>
-                      <Text style={styles.detailValue}>{computeAmounts(selectedOrder).delivery.toLocaleString()} FCA</Text>
-                    </View>
-                  ) : null}
-                  {computeAmounts(selectedOrder).tax ? (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>TVA:</Text>
-                      <Text style={styles.detailValue}>{computeAmounts(selectedOrder).tax.toLocaleString()} FCA</Text>
-                    </View>
-                  ) : null}
-                  <View style={[styles.detailRow, styles.totalRow]}>
-                    <Text style={styles.detailTotalLabel}>Total:</Text>
-                    <Text style={styles.detailTotalValue}>{computeAmounts(selectedOrder).total.toLocaleString()} FCA</Text>
+                  <View style={{ backgroundColor: palette.bg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, overflow: 'hidden' }}>
+                    {selectedOrder.order_items.map((item, index) => (
+                      <View key={index} style={[{ flexDirection: 'row', alignItems: 'center', padding: SPACING.md }, index !== selectedOrder.order_items.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.border }]}>
+                        <View style={{ width: 48, height: 48, borderRadius: 8, backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md, borderWidth: 1, borderColor: palette.border }}>
+                          <Ionicons name="cube-outline" size={24} color={palette.textMuted} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.text }}>{item.product?.name || 'Produit inconnu'}</Text>
+                          <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 4 }}>Quantité: {item.quantity}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '700', color: palette.text }}>{(item.price * item.quantity).toLocaleString()} FCA</Text>
+                          <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 4 }}>{item.price.toLocaleString()} / u</Text>
+                        </View>
+                        {selectedOrder.status === 'delivered' && (
+                          <TouchableOpacity 
+                            style={[styles.returnItemButton, { marginTop: 0, marginLeft: SPACING.sm }]}
+                            onPress={() => {
+                              setReturnItem({ order: selectedOrder, item });
+                              setReturnModalVisible(true);
+                            }}
+                          >
+                            <Ionicons name="refresh-outline" size={14} color={palette.accent} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ))}
                   </View>
                 </View>
               </ScrollView>
 
-              <View style={{padding: SPACING.lg, borderTopWidth: 1, borderTopColor: palette.border, flexDirection: 'row', gap: SPACING.sm}}>
+              <View style={{padding: SPACING.lg, borderTopWidth: 1, borderTopColor: palette.border, flexDirection: 'row', gap: SPACING.md}}>
                 {/* Seller/admin: accept payment button */}
                 {(user && (user.role === 'seller' || user.role === 'admin') && selectedOrder && selectedOrder.payment_status !== 'paid' && (user.role === 'admin' || selectedOrder.store?.user_id === user.id)) && (
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.receivedButton]}
+                    style={[styles.actionButton, styles.receivedButton, { flex: 1, justifyContent: 'center' }]}
                     onPress={() => {
                       setSelectedOrder(null);
                       acceptPayment(selectedOrder.id);
                     }}
                   >
-                    <Ionicons name="checkmark-circle" size={18} color={palette.text} />
-                    <Text style={styles.actionButtonText}>Accepter la commande</Text>
+                    <Ionicons name="checkmark-circle" size={18} color={'white'} />
+                    <Text style={[styles.actionButtonText, { color: 'white' }]}>Accepter</Text>
                   </TouchableOpacity>
                 )}
 
                 {selectedOrder && (selectedOrder.status === 'pending' || selectedOrder.status === 'paid') && (
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.cancelButton]}
+                    style={[styles.actionButton, styles.cancelButton, { flex: 1, justifyContent: 'center' }]}
                     onPress={() => {
                       setSelectedOrder(null);
                       confirmCancel(selectedOrder);
                     }}
                   >
-                    <Ionicons name="close-circle" size={18} color={palette.text} />
-                    <Text style={styles.actionButtonText}>Annuler la commande</Text>
+                    <Ionicons name="close-circle" size={18} color={'white'} />
+                    <Text style={[styles.actionButtonText, { color: 'white' }]}>Annuler</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={[styles.actionButton, styles.detailsButton]} onPress={() => setSelectedOrder(null)}>
-                  <Ionicons name="arrow-back" size={18} color={palette.accent} />
-                  <Text style={[styles.actionButtonText, { color: palette.accent }]}>Fermer</Text>
+                <TouchableOpacity style={[styles.actionButton, styles.detailsButton, { flex: 1, justifyContent: 'center', backgroundColor: palette.bg, borderWidth: 1, borderColor: palette.border }]} onPress={() => setSelectedOrder(null)}>
+                  <Text style={[styles.actionButtonText, { color: palette.text, marginLeft: 0 }]}>Fermer</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1147,7 +1247,7 @@ function createClientOrdersStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     backgroundColor: palette.success,
   },
   contactButton: {
-    backgroundColor: palette.whatsapp || '#25D366',
+    backgroundColor: '#25D366',
   },
   detailsButton: {
     backgroundColor: palette.accent + '10',
@@ -1297,6 +1397,71 @@ function createClientOrdersStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     fontSize: FONT_SIZE.lg,
     fontWeight: '700',
     color: palette.accent,
+  },
+  detailItemContainer: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.border,
+  },
+  returnItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: palette.accent + '10',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  returnItemButtonText: {
+    fontSize: 12,
+    color: palette.accent,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  returnModal: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: palette.card,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 5,
+  },
+  returnSubtitle: {
+    fontSize: 14,
+    color: palette.textMuted,
+    marginBottom: 16,
+  },
+  returnInput: {
+    backgroundColor: palette.bg,
+    borderRadius: 8,
+    padding: 12,
+    height: 100,
+    textAlignVertical: 'top',
+    color: palette.text,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginBottom: 20,
+  },
+  detailTotals: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: palette.border,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
   },
 });
 }

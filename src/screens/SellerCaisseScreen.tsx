@@ -290,7 +290,7 @@ export const SellerCaisseScreen = () => {
      RENDER PRODUCT CARD
   ====================== */
 
-  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
+  const renderProduct = useCallback(({ item, index }: { item: Product; index: number }) => {
     const stockColor = item.stock > 10 ? COLORS.success : item.stock > 0 ? COLORS.warning : COLORS.danger;
     const cartItem = cart.find(i => i.id === item.id);
     const quantity = cartItem ? cartItem.quantity : 0;
@@ -355,13 +355,13 @@ export const SellerCaisseScreen = () => {
         </LinearGradient>
       </TouchableOpacity>
     );
-  };
+  }, [cart, numColumns, addToCart]);
 
   /* ======================
      RENDER CART ITEM
   ====================== */
 
-  const renderCartItem = ({ item }: { item: CartItem }) => (
+  const renderCartItem = useCallback(({ item }: { item: CartItem }) => (
     <View style={styles.cartItem}>
       <View style={styles.cartItemLeft}>
         <View style={styles.cartItemIcon}>
@@ -397,7 +397,7 @@ export const SellerCaisseScreen = () => {
         </Text>
       </View>
     </View>
-  );
+  ), [removeFromCart, addToCart]);
 
   /* ======================
      CHECKOUT
@@ -446,6 +446,8 @@ export const SellerCaisseScreen = () => {
         user_id: user?.id || '',
         store_id: storeId,
         total_amount: total,
+        tax_amount: tax,
+        delivery_fee: 0,
         status: 'paid',
         payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod === 'card' ? 'card' : 'mobile_money',
         payment_status: 'paid',
@@ -462,6 +464,7 @@ export const SellerCaisseScreen = () => {
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
+        cost_price: item.cost_price,
       }));
       await orderService.createItems(itemsPayload);
 
@@ -859,6 +862,11 @@ export const SellerCaisseScreen = () => {
             }
             contentContainerStyle={styles.productGrid}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS !== 'web'}
+            updateCellsBatchingPeriod={50}
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Ionicons name="search-outline" size={48} color="#334155" />

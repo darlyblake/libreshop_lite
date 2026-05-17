@@ -25,6 +25,7 @@ import { cloudinaryService } from '../services/cloudinaryService';
 import { authService } from '../services/authService';
 import { navigateToClientTab } from '../navigation/clientNavigation';
 import type { ClientTabParamList } from '../navigation/types';
+import * as ImagePicker from 'expo-image-picker';
 
 const CLIENT_TAB_NAMES: (keyof ClientTabParamList)[] = [
   'ClientHome',
@@ -62,6 +63,47 @@ export const ClientProfileScreen: React.FC = () => {
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [addressesCount, setAddressesCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const handlePickAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission requise', 'Nous avons besoin d’accès à vos photos pour changer votre photo de profil.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setUploadingAvatar(true);
+        const uploadedUrl = await cloudinaryService.uploadImage(result.assets[0].uri);
+        
+        if (uploadedUrl && user?.id) {
+          await authService.updateProfile(user.id, {
+            avatar_url: uploadedUrl,
+          });
+          
+          const { setUser } = useAuthStore.getState();
+          setUser({
+            ...user,
+            avatar_url: uploadedUrl,
+          });
+          Alert.alert('Succès ✓', 'Votre photo de profil a été mise à jour !');
+        }
+      }
+    } catch (e: any) {
+      errorHandler.handle(e, 'Avatar Upload error', ErrorCategory.USER_INPUT, ErrorSeverity.MEDIUM);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la photo de profil.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // States for Restore History
   const [showRestoreModal, setShowRestoreModal] = useState(false);
@@ -86,13 +128,13 @@ export const ClientProfileScreen: React.FC = () => {
           const favorites = await wishlistService.getByUser(String(user.id));
           setFavoritesCount(favorites.length);
         } catch (wishlistError: any) {
-          errorHandler.handle(wishlistError instanceof Error ? wishlistError : new Error(String(wishlistError)), 'Wishlist table not found:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+          errorHandler.handle(wishlistError, 'Wishlist table not found');
           setFavoritesCount(0);
         }
 
         setAddressesCount(user.address ? 1 : 0);
       } catch (error) {
-        errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error loading user data:', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+        errorHandler.handle(error, 'Error loading user data');
       } finally {
         setLoading(false);
       }
@@ -387,6 +429,33 @@ export const ClientProfileScreen: React.FC = () => {
       color: getColor.textMuted,
       marginTop: 8,
     },
+    avatarWrapper: {
+      position: 'relative',
+    },
+    cameraBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: getColor.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: getColor.card,
+    },
+    avatarLoadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
   }), [getColor, spacing, radius, fontSize, isDark]);
 
   const renderMenuItem = (item: any, index: number) => (
@@ -413,13 +482,24 @@ export const ClientProfileScreen: React.FC = () => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
-          {user?.avatar_url ? (
-            <Image source={{ uri: cloudinaryService.getOptimizedUrl(user.avatar_url, 800) }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarInitials}>{getUserInitials()}</Text>
-            </View>
-          )}
+          <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8} style={styles.avatarWrapper}>
+            {user?.avatar_url ? (
+              <Image source={{ uri: cloudinaryService.getOptimizedUrl(user.avatar_url, 150) }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                <Text style={styles.avatarInitials}>{getUserInitials()}</Text>
+              </View>
+            )}
+            {uploadingAvatar ? (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator color="#fff" size="small" />
+              </View>
+            ) : (
+              <View style={styles.cameraBadge}>
+                <Ionicons name="camera" size={14} color="#FFF" />
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.userName}>
               {user?.full_name || 'Utilisateur'}
@@ -439,9 +519,7 @@ export const ClientProfileScreen: React.FC = () => {
           </View>
           <TouchableOpacity
             style={styles.editButton}
-            onPress={() =>
-              Alert.alert('Bientôt disponible', 'La modification du profil sera disponible prochainement.')
-            }
+            onPress={() => navigation.navigate('PersonalInfo')}
           >
             <Ionicons name="pencil" size={18} color={getColor.accent} />
           </TouchableOpacity>
@@ -496,6 +574,12 @@ export const ClientProfileScreen: React.FC = () => {
           <Ionicons name="log-out-outline" size={22} color={getColor.error} />
           <Text style={styles.logoutText}>Déconnexion</Text>
         </TouchableOpacity>
+
+        <View style={styles.appInfo}>
+          <Text style={styles.logoText}>libreshop</Text>
+          <Text style={styles.appVersion}>Version 2.4.0 — Premium</Text>
+          <Text style={styles.appDate}>Fait avec ❤️ pour l’Afrique Centrale</Text>
+        </View>
       </ScrollView>
 
       {/* Restore History Modal */}

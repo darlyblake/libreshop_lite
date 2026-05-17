@@ -120,7 +120,7 @@ export const SellerCollectionProductsScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
         
-        <Image source={{ uri: cloudinaryService.getOptimizedUrl(imageUri, 800) }} style={styles.productImage} />
+        <Image source={{ uri: cloudinaryService.getOptimizedUrl(imageUri, 400) }} style={styles.productImage} />
         
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{product.name}</Text>

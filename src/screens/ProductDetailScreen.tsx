@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, memo } from "react";
 import {
   errorHandler,
   ErrorCategory,
@@ -40,6 +40,7 @@ import { storeService } from '../services/storeService';
 import { productLikesService } from '../services/productLikesService';
 import { authService } from '../services/authService';
 import { contactStore } from '../services/contactService';
+import { getStoreStatus } from "../utils/storeStatus";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -82,6 +83,22 @@ export const ProductDetailScreen: React.FC = () => {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   const [activeTab, setActiveTab] = useState<'description' | 'characteristics' | 'reviews' | 'similar'>('description');
+
+  // Animation de vol vers le panier
+  const flyAnimation = useRef(new Animated.Value(0)).current;
+  const [isFlying, setIsFlying] = useState(false);
+
+  const startFlyAnimation = () => {
+    setIsFlying(true);
+    flyAnimation.setValue(0);
+    Animated.timing(flyAnimation, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsFlying(false);
+    });
+  };
 
   const isWideScreen = width >= 1024;
 
@@ -188,6 +205,11 @@ export const ProductDetailScreen: React.FC = () => {
       category: product.category || "",
     };
   }, [product, store]);
+
+  const storeStatus = useMemo(() => {
+    if (!store) return { isOpen: true };
+    return getStoreStatus(store);
+  }, [store]);
 
   const averageRating = useMemo(() => {
     if (!reviews.length) return null;
@@ -570,6 +592,8 @@ export const ProductDetailScreen: React.FC = () => {
         .similar-img{height:90px}
         .similar-name{font-size:12px}
       }
+      .btn-disabled { opacity: 0.5; cursor: not-allowed !important; pointer-events: none; }
+      .closed-warning-web { margin-top: 12px; padding: 12px; background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; color: #b91c1c; font-size: 14px; font-weight: 600; text-align: center; }
     `;
 
     return (
@@ -639,6 +663,25 @@ export const ProductDetailScreen: React.FC = () => {
                 </>
               ) : null}
             </div>
+
+            {/* TAGS URGENCE WEB */}
+            <div className="flex-gap-8 mt-12 mb-8 flex-wrap" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px', marginBottom: '8px' }}>
+               {((product as any)?.view_count > 0) && (
+                 <div style={{ backgroundColor: '#fff0ed', color: '#e11d48', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', border: '1px solid #ffe4e0', display: 'flex', alignItems: 'center' }}>
+                   🔥 {(product as any)?.view_count} personnes regardent
+                 </div>
+               )}
+               {productData.inStock && (Number((product as any)?.stock) > 0) && (Number((product as any)?.stock) <= 5) && (
+                 <div style={{ backgroundColor: '#fff7ed', color: '#ea580c', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', border: '1px solid #ffedd5', display: 'flex', alignItems: 'center' }}>
+                   ⚠️ Plus que {(product as any)?.stock} en stock, faites vite !
+                 </div>
+               )}
+               {productData.inStock && (Number((product as any)?.stock) > 5 || !(product as any)?.stock) && (
+                 <div style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '6px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', border: '1px solid #d1fae5', display: 'flex', alignItems: 'center' }}>
+                   ✅ En stock
+                 </div>
+               )}
+            </div>
             <div className="description mt-12">{productData.description}</div>
 
             <div className="web-actions">
@@ -647,13 +690,32 @@ export const ProductDetailScreen: React.FC = () => {
                 <div>{quantity}</div>
                 <button onClick={() => setQuantity((q) => Math.min(99, q + 1))}>+</button>
               </div>
-              <button className="web-btn web-buy" onClick={handleBuyNowWeb}>⚡ Acheter maintenant</button>
+              <button 
+                className={`web-btn web-buy ${!storeStatus.isOpen ? 'btn-disabled' : ''}`} 
+                onClick={handleBuyNowWeb}
+                disabled={!storeStatus.isOpen}
+              >
+                ⚡ {storeStatus.isOpen ? 'Acheter maintenant' : 'Indisponible'}
+              </button>
             </div>
 
             <div className="mt-12 flex-gap-8">
-              <button className={`web-btn web-cart ${cartButtonAnimation ? 'btn-pulse' : ''}`} onClick={handleAddToCartWeb}>🛒 Ajouter au panier</button>
+              <button 
+                className={`web-btn web-cart ${cartButtonAnimation ? 'btn-pulse' : ''} ${!storeStatus.isOpen ? 'btn-disabled' : ''}`} 
+                onClick={handleAddToCartWeb}
+                disabled={!storeStatus.isOpen}
+              >
+                🛒 {storeStatus.isOpen ? 'Ajouter au panier' : 'Boutique fermée'}
+              </button>
               <a className={`web-btn web-discuss`} href="#" target="_blank" rel="noreferrer" onClick={(e:any) => { e.preventDefault(); void contactStore({ rawPhone: waNumberRaw, message: waMessage, fallback: 'tel-or-copy' }); }}>💬 Discuter</a>
             </div>
+            {!storeStatus.isOpen && (
+              <div className="closed-warning-web">
+                {storeStatus.reason === 'paused' 
+                  ? "Boutique temporairement fermée. Les commandes ne sont pas acceptées pour le moment." 
+                  : `Boutique fermée. Réouverture prévue à ${storeStatus.nextOpening || 'votre prochaine visite'}.`}
+              </div>
+            )}
             <div className="mt-12">
               <div className="web-tabs">
                 <div className={`web-tab ${activeTab === 'description' ? 'active' : ''}`} onClick={() => setActiveTab('description')}>Description</div>
@@ -684,8 +746,9 @@ export const ProductDetailScreen: React.FC = () => {
                           <div key={r.id || Math.random()} className="review">
                             <img className="review-avatar" src={((r as any).avatar_url) || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200'} alt={r.user_name || 'client'} />
                             <div className="review-body">
-                              <div className="flex-gap-8">
+                              <div className="flex-gap-8" style={{ alignItems: 'center' }}>
                                 <div className="review-name">{r.user_name || 'Anonyme'}</div>
+                                <div style={{ backgroundColor: '#ecfdf5', color: '#059669', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>⭐ Achat Vérifié</div>
                                 <div className="review-rating">{'★'.repeat(Math.round(Number(r.rating) || 0))}</div>
                               </div>
                               <div className="review-comment">{r.comment}</div>
@@ -847,7 +910,7 @@ export const ProductDetailScreen: React.FC = () => {
     }
   };
 
-  const renderImageGallery = () => (
+  const MemoizedImageGallery = useMemo(() => (
     <View
       style={[styles.imageSection, isWideScreen && styles.imageSectionDesktop]}
     >
@@ -939,7 +1002,7 @@ export const ProductDetailScreen: React.FC = () => {
         )}
       </View>
     </View>
-  );
+  ), [isWideScreen, productData?.images, productData?.comparePrice, productData?.price, loading, selectedImageIndex, isDesktop, width]);
 
   const renderStorePill = () => {
     if (!productData?.store?.id) return null;
@@ -969,76 +1032,78 @@ export const ProductDetailScreen: React.FC = () => {
     );
   };
 
-  const AnimatedHeader = () => (
-    <Animated.View
-      style={[
-        styles.animatedHeader,
-        {
-          height: headerHeight,
-          opacity: headerOpacity,
-          paddingTop: insets.top,
-        },
-      ]}
-    >
-      <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={styles.animatedHeaderContent}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() =>
-            navigation.navigate("ClientTabs", { screen: "ClientHome" })
-          }
-        >
-          <Ionicons name="arrow-back" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.animatedHeaderTitle} numberOfLines={1}>
-          {productData?.name || ""}
-        </Text>
-        <View style={styles.headerActions}>
+  const MemoizedAnimatedHeader = useMemo(() => {
+    return (
+      <Animated.View
+        style={[
+          styles.animatedHeader,
+          {
+            height: headerHeight,
+            opacity: headerOpacity,
+            paddingTop: insets.top,
+          },
+        ]}
+      >
+        <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={styles.animatedHeaderContent}>
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => navigation.navigate('Cart')}
+            onPress={() =>
+              navigation.navigate("ClientTabs", { screen: "ClientHome" })
+            }
           >
-            <View style={styles.cartIconContainer}>
-              <Ionicons name="bag-handle" size={22} color="white" />
-              {items.length > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{items.length}</Text>
-                </View>
-              )}
+            <Ionicons name="arrow-back" size={24} color="white" />
+          </TouchableOpacity>
+          <Text style={styles.animatedHeaderTitle} numberOfLines={1}>
+            {productData?.name || ""}
+          </Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('Cart')}
+            >
+              <View style={styles.cartIconContainer}>
+                <Ionicons name="bag-handle" size={22} color="white" />
+                {items.length > 0 && (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>{items.length}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => {
+                if (product) {
+                  const shareUrl = `https://libreshop.shop/api/product?id=${product.id}`;
+                  shareContent({
+                    title: product.name,
+                    description: product.description || '',
+                    url: shareUrl,
+                    imageUrl: product.images?.[0] || undefined,
+                    price: `${product.price.toLocaleString()} XOF`,
+                    type: 'product',
+                  });
+                }
+              }}
+            >
+              <Ionicons name="share-outline" size={22} color="white" />
+            </TouchableOpacity>
+            <View style={styles.headerLikeContainer}>
+              <LikeButton
+                productId={String(productId || "")}
+                userId={user?.id ? String(user.id) : undefined}
+                showCount={false}
+                size="medium"
+                showLabel={false}
+                variant="rounded"
+              />
             </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => {
-              if (product) {
-                const shareUrl = `https://libreshop.shop/api/product?id=${product.id}`;
-                shareContent({
-                  title: product.name,
-                  description: product.description || '',
-                  url: shareUrl,
-                  imageUrl: product.images?.[0] || undefined,
-                  price: `${product.price.toLocaleString()} XOF`,
-                  type: 'product',
-                });
-              }
-            }}
-          >
-            <Ionicons name="share-outline" size={22} color="white" />
-          </TouchableOpacity>
-          <View style={styles.headerLikeContainer}>
-            <LikeButton
-              productId={String(productId || "")}
-              userId={user?.id ? String(user.id) : undefined}
-              showCount={false}
-              size="medium"
-              showLabel={false}
-              variant="rounded"
-            />
           </View>
         </View>
-      </View>
-    </Animated.View>
-  );
+      </Animated.View>
+    );
+  }, [headerHeight, headerOpacity, insets.top, navigation, productData?.name, items.length, product, productId, user?.id]);
 
   if (loading) {
     return (
@@ -1145,7 +1210,7 @@ export const ProductDetailScreen: React.FC = () => {
       />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.bg }]} />
 
-      <AnimatedHeader />
+      {MemoizedAnimatedHeader}
 
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
@@ -1165,9 +1230,10 @@ export const ProductDetailScreen: React.FC = () => {
               styles.productGrid,
               isWideScreen && styles.productGridDesktop,
             ]}
-          >{
-            renderImageGallery()
-          }<View style={[styles.productInfo, { paddingHorizontal: isDesktop ? SPACING.lg : SPACING.md, paddingTop: isDesktop ? SPACING.md : SPACING.sm }]}>{renderStorePill()}
+          >
+            {MemoizedImageGallery}
+            <View style={[styles.productInfo, { paddingHorizontal: isDesktop ? SPACING.lg : SPACING.md, paddingTop: isDesktop ? SPACING.md : SPACING.sm }]}>
+              {renderStorePill()}
               <Text
                 style={[
                   styles.productTitle,
@@ -1199,7 +1265,28 @@ export const ProductDetailScreen: React.FC = () => {
                   </Text>
                 </View>
                 <Text style={styles.reviewsCount}>{reviews.length} avis</Text>
-              </View><TouchableOpacity
+              </View>
+
+              {/* TAAAGS URGENCE & PREUVE SOCIALE NATIVE */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, marginBottom: 12 }}>
+                {(product as any)?.view_count > 0 && (
+                  <View style={{ backgroundColor: '#fff0ed', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ffe4e0' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#e11d48' }}>🔥 {(product as any)?.view_count} personnes regardent</Text>
+                  </View>
+                )}
+                {productData.inStock && Number((product as any)?.stock) > 0 && Number((product as any)?.stock) <= 5 && (
+                  <View style={{ backgroundColor: '#fff7ed', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#ffedd5' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#ea580c' }}>⚠️ Plus que {(product as any)?.stock} en stock !</Text>
+                  </View>
+                )}
+                {productData.inStock && (Number((product as any)?.stock) > 5 || !(product as any)?.stock) && (
+                  <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#d1fae5' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#059669' }}>✅ En stock</Text>
+                  </View>
+                )}
+              </View>
+
+              <TouchableOpacity
                 style={styles.chatBtn}
                 onPress={handleDiscussWithSeller}
                 activeOpacity={0.85}
@@ -1363,6 +1450,9 @@ export const ProductDetailScreen: React.FC = () => {
                       <Text style={styles.commentAuthor} numberOfLines={1}>
                         {review.user_name}
                       </Text>
+                      <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6, marginRight: 'auto' }}>
+                        <Text style={{ color: '#059669', fontSize: 10, fontWeight: 'bold' }}>⭐ Achat Vérifié</Text>
+                      </View>
                       <Text style={styles.commentDate}>
                         {new Date(review.created_at).toLocaleDateString()}
                       </Text>
@@ -1398,6 +1488,11 @@ export const ProductDetailScreen: React.FC = () => {
             <Text style={styles.stickyCurrency}>FCFA</Text>
           </Text>
         </View>
+        {!storeStatus.isOpen && (
+          <View style={{ position: 'absolute', top: -30, left: 0, right: 0, backgroundColor: COLORS.danger, paddingVertical: 4, alignItems: 'center' }}>
+            <Text style={{ color: 'white', fontSize: 10, fontWeight: '700' }}>BOUTIQUE FERMÉE - COMMANDES BLOQUÉES</Text>
+          </View>
+        )}
         <View style={styles.stickyButtonsRow}>
           <TouchableOpacity
             style={[
@@ -1405,7 +1500,7 @@ export const ProductDetailScreen: React.FC = () => {
               !productData.inStock && styles.buyNowBtnDisabled,
             ]}
             onPress={() => {
-              if (!productData.inStock) return;
+              if (!productData.inStock || !storeStatus.isOpen) return;
               if (!product) {
                 Alert.alert("Erreur", "Produit indisponible");
                 return;
@@ -1416,7 +1511,7 @@ export const ProductDetailScreen: React.FC = () => {
               );
               navigation.navigate('Cart');
             }}
-            disabled={!productData.inStock}
+            disabled={!productData.inStock || !storeStatus.isOpen}
             activeOpacity={0.85}
           >
             <Ionicons name="flash" size={18} color="white" />
@@ -1429,7 +1524,7 @@ export const ProductDetailScreen: React.FC = () => {
               cartButtonAnimation && styles.addToCartBtnAnimated,
             ]}
             onPress={() => {
-              if (!productData.inStock) return;
+              if (!productData.inStock || !storeStatus.isOpen) return;
               if (!product) {
                 Alert.alert("Erreur", "Produit indisponible");
                 return;
@@ -1438,13 +1533,13 @@ export const ProductDetailScreen: React.FC = () => {
               void Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success,
               );
-              Alert.alert("Succès", "Produit ajouté au panier !");
 
               // Animation feedback
               setCartButtonAnimation(true);
+              startFlyAnimation();
               setTimeout(() => setCartButtonAnimation(false), 300);
             }}
-            disabled={!productData.inStock}
+            disabled={!productData.inStock || !storeStatus.isOpen}
             activeOpacity={0.85}
           >
             <Text style={styles.addToCartText}>Ajouter au panier</Text>
@@ -1505,6 +1600,51 @@ export const ProductDetailScreen: React.FC = () => {
             ))}
           </View>
         </View>
+      )}
+
+      {isFlying && productData?.images?.[0] && (
+        <Animated.Image
+          source={{ uri: cloudinaryService.getOptimizedUrl(productData.images[0], 200) }}
+          style={{
+            position: 'absolute',
+            zIndex: 9999,
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            bottom: 80,
+            left: SCREEN_WIDTH / 2 - 30,
+            transform: [
+              {
+                translateX: flyAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, SCREEN_WIDTH / 2 - 60],
+                })
+              },
+              {
+                translateY: flyAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -(SCREEN_HEIGHT - 140)],
+                })
+              },
+              {
+                scale: flyAnimation.interpolate({
+                  inputRange: [0, 0.4, 1],
+                  outputRange: [0.5, 1.2, 0.15],
+                })
+              },
+              {
+                rotate: flyAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '360deg'],
+                })
+              }
+            ],
+            opacity: flyAnimation.interpolate({
+              inputRange: [0, 0.8, 1],
+              outputRange: [1, 1, 0],
+            })
+          }}
+        />
       )}
     </View>
   );

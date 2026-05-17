@@ -10,8 +10,10 @@ import {
   Switch,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { type Collection } from '../lib/supabase';
@@ -43,6 +45,14 @@ export const SellerAddProductScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (!showCameraScanner) return;
+    updateField('reference', data);
+    setShowCameraScanner(false);
+  };
   const [images, setImages] = useState<string[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -227,7 +237,8 @@ export const SellerAddProductScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Ajouter un produit</Text>
 
       <View style={styles.section}>
@@ -320,12 +331,39 @@ export const SellerAddProductScreen: React.FC = () => {
             />
           </View>
         </View>
-        <Input
-          label="Référence"
-          value={formData.reference}
-          onChangeText={(value) => updateField('reference', value)}
-          placeholder="SKU-001"
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Input
+              label="Référence"
+              value={formData.reference}
+              onChangeText={(value) => updateField('reference', value)}
+              placeholder="SKU-001"
+            />
+          </View>
+          <TouchableOpacity 
+            style={{ 
+              marginBottom: 16, 
+              padding: 12, 
+              backgroundColor: COLORS.accent + '15', 
+              borderRadius: RADIUS.md,
+              height: 48,
+              justifyContent: 'center',
+              alignItems: 'center'
+            }}
+            onPress={async () => {
+              if (!permission?.granted) {
+                const status = await requestPermission();
+                if (!status.granted) {
+                  Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
+                  return;
+                }
+              }
+              setShowCameraScanner(true);
+            }}
+          >
+            <Ionicons name="barcode-outline" size={24} color={COLORS.accent} />
+          </TouchableOpacity>
+        </View>
         <Input
           label="Catégorie"
           value={formData.category}
@@ -446,7 +484,44 @@ export const SellerAddProductScreen: React.FC = () => {
         />
       </View>
     </ScrollView>
-  );
+
+    {/* MODAL SCANNER CAMÉRA */}
+    <Modal
+      visible={showCameraScanner}
+      animationType="slide"
+      onRequestClose={() => setShowCameraScanner(false)}
+    >
+      <View style={styles.cameraContainer}>
+        <CameraView
+          style={styles.camera}
+          onBarcodeScanned={handleBarcodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+          }}
+        >
+          <View style={styles.cameraOverlay}>
+            <View style={styles.cameraHeader}>
+              <TouchableOpacity 
+                style={styles.closeCameraButton}
+                onPress={() => setShowCameraScanner(false)}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.cameraTargetContainer}>
+              <View style={styles.cameraTarget} />
+            </View>
+
+            <View style={styles.cameraFooter}>
+              <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
+            </View>
+          </View>
+        </CameraView>
+      </View>
+    </Modal>
+  </>
+);
 };
 
 const styles = StyleSheet.create({
@@ -543,6 +618,57 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+  },
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  cameraHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: Platform.OS === 'ios' ? 40 : 20,
+  },
+  closeCameraButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraTargetContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraTarget: {
+    width: 250,
+    height: 150,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  cameraFooter: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  cameraHint: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
 });
 

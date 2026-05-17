@@ -1,5 +1,27 @@
 import { supabase } from '../lib/supabase';
 
+// Helper function to check if current user is admin
+async function isAdmin(): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase!.auth.getUser();
+    if (!user) return false;
+
+    const role = user.user_metadata?.role || user.app_metadata?.role;
+    return role === 'admin';
+  } catch (error) {
+    console.error('Error checking admin role:', error);
+    return false;
+  }
+}
+
+// Helper function to enforce admin access
+async function requireAdmin(): Promise<void> {
+  const adminCheck = await isAdmin();
+  if (!adminCheck) {
+    throw new Error('Accès non autorisé');
+  }
+}
+
 export interface DashboardStats {
   totalUsers: number;
   totalStores: number;
@@ -22,6 +44,7 @@ export interface Activity {
 
 export const adminService = {
   async getDashboardStats(): Promise<DashboardStats> {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     
     const [
@@ -72,6 +95,7 @@ export const adminService = {
   },
 
   async getRecentActivity(): Promise<Omit<Activity, '_createdAt'>[]> {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
 
     const [usersRes, storesRes, ordersRes, notificationsRes] = await Promise.all([
@@ -173,7 +197,9 @@ export const adminService = {
     return `Il y a ${diffDays} j`;
   },
   
+
   async getStoresWithDetails(): Promise<any[]> {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     
     const { data, error } = await supabase
@@ -188,19 +214,19 @@ export const adminService = {
       (data || []).map(async (store: any) => {
         try {
           // Fetch orders for this store
-          const { data: ordersData } = await supabase
+          const { data: ordersData } = await supabase!
             .from('orders')
             .select('id,total_amount,status,created_at')
             .eq('store_id', store.id);
-          
+        
           // Fetch products for this store
-          const { data: productsData } = await supabase
+          const { data: productsData } = await supabase!
             .from('products')
             .select('id,name,stock,is_active,price')
             .eq('store_id', store.id);
-          
+        
           // Fetch reviews for this store
-          const { data: reviewsData } = await supabase
+          const { data: reviewsData } = await supabase!
             .from('store_reviews')
             .select('rating')
             .eq('store_id', store.id);
@@ -281,7 +307,7 @@ export const adminService = {
             subEnd: store.subscription_end ? String(store.subscription_end) : '-',
             subStatus: store.subscription_status || '-',
             subDuration: store.subscription_start && store.subscription_end ? 
-              Math.ceil(new Date(store.subscription_end).getTime() - new Date(s.subscription_start).getTime()) / (1000 * 60 * 60 * 24 * 30) : '-',
+              Math.ceil(new Date(store.subscription_end).getTime() - new Date(store.subscription_start).getTime()) / (1000 * 60 * 60 * 24 * 30) : '-',
             productLimit: store.product_limit ?? undefined,
             visible: store.visible ?? true,
             joinDate: store.created_at ? String(store.created_at) : '-',
@@ -303,25 +329,51 @@ export const adminService = {
   },
   
   async updateStoreStatus(storeId: string, nextStatus: 'active' | 'suspended' | 'pending') {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('stores')
       .update({ status: nextStatus })
       .eq('id', storeId)
-      .select('id,status')
+      .select('id,status,user_id,name')
       .single();
       
     if (error) throw error;
+
+    // 🔔 Notifier le vendeur du changement de statut de sa boutique
+    if (data?.user_id) {
+      const { notificationService } = await import('./notificationService');
+      const isApproved = nextStatus === 'active';
+      const isSuspended = nextStatus === 'suspended';
+      if (isApproved || isSuspended) {
+        await notificationService.create({
+          user_id: data.user_id,
+          title: isApproved
+            ? '✅ Boutique approuvée !'
+            : isSuspended
+            ? '⚠️ Boutique suspendue'
+            : '📋 Statut de boutique mis à jour',
+          body: isApproved
+            ? `Votre boutique "${data.name || ''}" a été approuvée par l'administration. Elle est maintenant visible.`
+            : `Votre boutique "${data.name || ''}" a été suspendue. Contactez le support pour plus d'informations.`,
+          type: 'system',
+          data: { storeId, status: nextStatus },
+        }).catch(console.warn);
+      }
+    }
+
     return data;
   },
   
   async deleteStore(storeId: string) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { error } = await supabase.from('stores').delete().eq('id', storeId);
     if (error) throw error;
   },
 
   async getUsers() {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     
     // First, fetch users with basic info
@@ -454,18 +506,43 @@ export const adminService = {
   },
 
   async updateUserStatus(userId: string, status: string) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('users')
       .update({ status })
       .eq('id', userId)
-      .select('id,status')
+      .select('id,status,full_name,role')
       .single();
     if (error) throw error;
+
+    // 🔔 Notifier le vendeur si son compte est approuvé ou suspendu
+    if (data?.role === 'seller' || data?.role === 'client') {
+      const { notificationService } = await import('./notificationService');
+      if (status === 'active') {
+        await notificationService.create({
+          user_id: userId,
+          title: '✅ Compte activé',
+          body: `Votre compte a été activé par l'administration. Vous pouvez maintenant accéder à toutes les fonctionnalités.`,
+          type: 'system',
+          data: { userId, status },
+        }).catch(console.warn);
+      } else if (status === 'suspended' || status === 'banned') {
+        await notificationService.create({
+          user_id: userId,
+          title: '🚫 Compte suspendu',
+          body: `Votre compte a été suspendu par l'administration. Contactez le support pour plus d'informations.`,
+          type: 'system',
+          data: { userId, status },
+        }).catch(console.warn);
+      }
+    }
+
     return data;
   },
 
   async updateUserSuspensionReason(userId: string, reason: string) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { error } = await supabase
       .from('users')
@@ -475,6 +552,7 @@ export const adminService = {
   },
 
   async updateUserProfile(userId: string, data: { full_name: string; email: string; phone: string }) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { error } = await supabase
       .from('users')
@@ -488,18 +566,35 @@ export const adminService = {
   },
 
   async validateSeller(userId: string) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('users')
       .update({ status: 'active', role: 'seller' })
       .eq('id', userId)
-      .select('id,status,role')
+      .select('id,status,role,full_name')
       .single();
     if (error) throw error;
+
+    // 🔔 Notifier le vendeur que son compte a été approuvé
+    try {
+      const { notificationService } = await import('./notificationService');
+      await notificationService.create({
+        user_id: userId,
+        title: '🎉 Compte vendeur approuvé !',
+        body: `Bienvenue ${data?.full_name || ''} ! Votre compte vendeur a été validé par l'administration. Vous pouvez maintenant créer votre boutique et commencer à vendre.`,
+        type: 'system',
+        data: { userId, role: 'seller' },
+      });
+    } catch (e) {
+      console.warn('Failed to send seller validation notification:', e);
+    }
+
     return data;
   },
 
   async getPaymentsStores() {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('stores')
@@ -512,6 +607,7 @@ export const adminService = {
   },
 
   async getStorePaymentHistory(storeId: string) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('payment_history')
@@ -524,6 +620,7 @@ export const adminService = {
   },
 
   async addPaymentHistory(storeId: string, payment: any) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('payment_history')
@@ -543,6 +640,7 @@ export const adminService = {
   },
 
   async updateStoreBilling(storeId: string, updates: any) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('stores')
@@ -555,6 +653,7 @@ export const adminService = {
   },
 
   async syncUserRolesWithStores() {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     
     // Get all users with stores
@@ -586,6 +685,7 @@ export const adminService = {
   },
 
   async fixAnonymousUsers() {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     
     // Get all users with 'Anonyme' as full_name
@@ -602,13 +702,19 @@ export const adminService = {
     }
     
     // Update anonymous users with their email as name
-    const { data: updatedUsers, error: updateError } = await supabase
-      .from('users')
-      .update({ full_name: supabase.raw('COALESCE(NULLIF(full_name, \'Anonyme\'), email)') })
-      .in('id', anonymousUsers.map(u => u.id))
-      .select('id,full_name');
-    
-    if (updateError) throw updateError;
+    const updatedUsers = await Promise.all(
+      anonymousUsers.map(async (u: any) => {
+        const newName = u.email || u.full_name;
+        const { data, error } = await supabase!
+          .from('users')
+          .update({ full_name: newName })
+          .eq('id', u.id)
+          .select('id,full_name')
+          .single();
+        if (error) throw error;
+        return data;
+      })
+    );
     
     console.log(`[AdminService] Fixed ${updatedUsers?.length || 0} anonymous users`);
     return { fixed: updatedUsers?.length || 0, users: updatedUsers };
@@ -616,6 +722,7 @@ export const adminService = {
 
   // Administrator management methods
   async getAdministrators() {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('administrators')
@@ -626,6 +733,7 @@ export const adminService = {
   },
 
   async addAdministrator(admin: any) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('administrators')
@@ -643,6 +751,7 @@ export const adminService = {
   },
 
   async updateAdministrator(id: string, updates: any) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { data, error } = await supabase
       .from('administrators')
@@ -655,6 +764,7 @@ export const adminService = {
   },
 
   async deleteAdministrator(id: string) {
+    await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
     const { error } = await supabase
       .from('administrators')

@@ -197,7 +197,7 @@ export const WishlistScreen: React.FC = () => {
       <Image 
         source={{ uri: cloudinaryService.getOptimizedUrl(item.product?.images?.[0] || 
                (item.product as any)?.image_url || 
-               'https://via.placeholder.com/400?text=Produit', 800) }} 
+               'https://via.placeholder.com/400?text=Produit', 300) }} 
         style={styles.productImage} 
       />
       <View style={styles.productInfo}>
@@ -248,7 +248,7 @@ export const WishlistScreen: React.FC = () => {
     >
       <Image
         source={{ uri: cloudinaryService.getOptimizedUrl(follow.store?.logo_url || 
-               'https://via.placeholder.com/150?text=Boutique', 800) }}
+               'https://via.placeholder.com/150?text=Boutique', 150) }}
         style={styles.storeLogo}
       />
       <View style={styles.storeInfo}>

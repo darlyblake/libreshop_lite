@@ -14,6 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
@@ -23,6 +24,31 @@ import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
 import { notificationService } from '../services/notificationService';
 import { cloudinaryService } from '../services/cloudinaryService';
+
+const EmptyCartAnimation = ({ color }: { color: string }) => {
+  const translateY = useSharedValue(0);
+  
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-15, { duration: 1000 }),
+        withTiming(0, { duration: 1000 })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }]
+  }));
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Ionicons name="cart-outline" size={80} color={color} />
+    </Animated.View>
+  );
+};
 
 export const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -120,7 +146,7 @@ export const CartScreen: React.FC = () => {
   const renderCartItem = (item: (typeof items)[number]) => (
     <View key={item.product.id} style={styles.cartItem}>
       {item.product.images?.[0] ? (
-        <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 800) }} style={styles.itemImage} />
+        <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 300) }} style={styles.itemImage} />
       ) : (
         <View style={styles.itemImagePlaceholder}>
           <Ionicons name="image-outline" size={28} color={palette.textMuted} />
@@ -184,9 +210,9 @@ export const CartScreen: React.FC = () => {
       >
         <View style={styles.cartSection}>
           {items.length === 0 ? (
-            <View style={{ paddingVertical: SPACING.xxxl, alignItems: 'center' }}>
-              <Ionicons name="cart-outline" size={64} color={palette.textMuted} />
-              <Text style={{ marginTop: SPACING.md, color: palette.textMuted, fontSize: FONT_SIZE.md }}>
+            <View style={{ paddingVertical: SPACING.xxxl, alignItems: 'center', marginTop: 40 }}>
+              <EmptyCartAnimation color={palette.textMuted} />
+              <Text style={{ marginTop: SPACING.xl, color: palette.textMuted, fontSize: FONT_SIZE.md, fontWeight: '600' }}>
                 Ton panier est vide
               </Text>
             </View>

@@ -18,9 +18,9 @@ export interface MonthlySalesReport {
   totalItemsSold: number;
 }
 
-export interface CategorySalesReport {
-  categoryName: string;
-  categoryId: string;
+export interface CollectionSalesReport {
+  collectionName: string;
+  collectionId: string;
   totalRevenue: number;
   totalOrders: number;
   totalItemsSold: number;
@@ -45,7 +45,7 @@ export interface ReturnReport {
   quantity: number;
   reason: string;
   refundAmount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'requested' | 'approved' | 'rejected' | 'shipped' | 'received' | 'completed' | 'cancelled';
 }
 
 export interface InventoryReport {
@@ -73,7 +73,7 @@ export interface ClientReport {
 export interface ReportData {
   dailySales: DailySalesReport[];
   monthlySales: MonthlySalesReport[];
-  categorySales: CategorySalesReport[];
+  collectionSales: CollectionSalesReport[];
   margins: MarginReport[];
   returns: ReturnReport[];
   inventory: InventoryReport[];
@@ -83,28 +83,15 @@ export interface ReportData {
 export const reportsService = {
   // Rapport des ventes par jour
   async getDailySalesReport(storeId: string, startDate: Date, endDate: Date): Promise<DailySalesReport[]> {
-    try {
-      const { data, error } = await supabase
-        .rpc('get_daily_sales_report', {
-          p_store_id: storeId,
-          p_start_date: startDate.toISOString(),
-          p_end_date: endDate.toISOString(),
-        });
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching daily sales report:', error);
-      // Fallback: calculate manually
-      return this.calculateDailySalesManually(storeId, startDate, endDate);
-    }
+    // We use the manual calculation directly to avoid 404 errors from missing RPC functions
+    return this.calculateDailySalesManually(storeId, startDate, endDate);
   },
 
   async calculateDailySalesManually(storeId: string, startDate: Date, endDate: Date): Promise<DailySalesReport[]> {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total, items')
+        .select('created_at, total_amount, order_items(quantity)')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -124,9 +111,9 @@ export const reportsService = {
           totalItemsSold: 0,
         };
 
-        existing.totalRevenue += order.total || 0;
+        existing.totalRevenue += order.total_amount || 0;
         existing.totalOrders += 1;
-        existing.totalItemsSold += order.items?.length || 0;
+        existing.totalItemsSold += (order.order_items || []).reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
         existing.averageOrderValue = existing.totalRevenue / existing.totalOrders;
 
         dailyMap.set(date, existing);
@@ -147,7 +134,7 @@ export const reportsService = {
 
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('created_at, total, items')
+        .select('created_at, total_amount, order_items(quantity)')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -169,18 +156,18 @@ export const reportsService = {
           totalItemsSold: 0,
         };
 
-        existing.totalRevenue += order.total || 0;
+        existing.totalRevenue += order.total_amount || 0;
         existing.totalOrders += 1;
-        existing.totalItemsSold += order.items?.length || 0;
+        existing.totalItemsSold += (order.order_items || []).reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
         existing.averageOrderValue = existing.totalRevenue / existing.totalOrders;
 
         monthlyMap.set(month, existing);
       });
 
       return Array.from(monthlyMap.values()).sort((a, b) => {
-        const monthA = new Date(a.year, new Date(`${a.month} 1, ${a.year}`).getMonth(), 1);
-        const monthB = new Date(b.year, new Date(`${b.month} 1, ${b.year}`).getMonth(), 1);
-        return monthA.getTime() - monthB.getTime();
+        const monthIndexA = new Date(`${a.month} 1, ${a.year}`).getMonth();
+        const monthIndexB = new Date(`${b.month} 1, ${b.year}`).getMonth();
+        return monthIndexA - monthIndexB;
       });
     } catch (error) {
       console.error('Error fetching monthly sales report:', error);
@@ -188,12 +175,12 @@ export const reportsService = {
     }
   },
 
-  // Rapport des ventes par catégorie
-  async getCategorySalesReport(storeId: string, startDate: Date, endDate: Date): Promise<CategorySalesReport[]> {
+  // Rapport des ventes par collection
+  async getCollectionSalesReport(storeId: string, startDate: Date, endDate: Date): Promise<CollectionSalesReport[]> {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('items, total')
+        .select('total_amount, order_items(quantity, price, products(collection_id, collections(name)))')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -201,38 +188,41 @@ export const reportsService = {
 
       if (error) throw error;
 
-      const categoryMap = new Map<string, CategorySalesReport>();
+      const collectionMap = new Map<string, CollectionSalesReport>();
       let totalRevenue = 0;
 
       orders?.forEach((order: any) => {
-        order.items?.forEach((item: any) => {
-          const category = item.category || 'Non catégorisé';
-          const existing = categoryMap.get(category) || {
-            categoryName: category,
-            categoryId: item.category_id || '',
+        order.order_items?.forEach((item: any) => {
+          const collectionId = item.products?.collection_id || 'unassigned';
+          const collectionName = item.products?.collections?.name || 'Sans collection';
+          
+          const existing = collectionMap.get(collectionId) || {
+            collectionName: collectionName,
+            collectionId: collectionId,
             totalRevenue: 0,
             totalOrders: 0,
             totalItemsSold: 0,
             percentage: 0,
           };
 
-          existing.totalRevenue += item.price * item.quantity || 0;
+          const itemTotal = (item.price || 0) * (item.quantity || 0);
+          existing.totalRevenue += itemTotal;
           existing.totalOrders += 1;
           existing.totalItemsSold += item.quantity || 0;
 
-          categoryMap.set(category, existing);
-          totalRevenue += item.price * item.quantity || 0;
+          collectionMap.set(collectionId, existing);
+          totalRevenue += itemTotal;
         });
       });
 
-      const reports = Array.from(categoryMap.values());
+      const reports = Array.from(collectionMap.values());
       reports.forEach(report => {
-        report.percentage = totalRevenue > 0 ? (report.totalRevenue / totalRevenue) * 100 : 0;
+        report.percentage = totalRevenue > 0 ? Number(((report.totalRevenue / totalRevenue) * 100).toFixed(2)) : 0;
       });
 
       return reports.sort((a, b) => b.totalRevenue - a.totalRevenue);
     } catch (error) {
-      console.error('Error fetching category sales report:', error);
+      console.error('Error fetching collection sales report:', error);
       return [];
     }
   },
@@ -249,7 +239,7 @@ export const reportsService = {
 
       const { data: orders, error: ordersError } = await supabase
         .from('orders')
-        .select('items')
+        .select('order_items(product_id, quantity, price)')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString())
@@ -260,10 +250,10 @@ export const reportsService = {
       const productSales = new Map<string, { quantity: number; totalRevenue: number }>();
 
       orders?.forEach((order: any) => {
-        order.items?.forEach((item: any) => {
+        order.order_items?.forEach((item: any) => {
           const existing = productSales.get(item.product_id) || { quantity: 0, totalRevenue: 0 };
           existing.quantity += item.quantity || 0;
-          existing.totalRevenue += item.price * item.quantity || 0;
+          existing.totalRevenue += (item.price || 0) * (item.quantity || 0);
           productSales.set(item.product_id, existing);
         });
       });
@@ -303,31 +293,26 @@ export const reportsService = {
     try {
       const { data, error } = await supabase
         .from('returns')
-        .select('id, order_id, created_at, product_name, quantity, reason, refund_amount, status')
+        .select('id, order_id, created_at, reason, refund_amount, status, products(name), quantity')
         .eq('store_id', storeId)
         .gte('created_at', startDate.toISOString())
         .lte('created_at', endDate.toISOString());
 
       if (error) throw error;
 
-      const reports: ReturnReport[] = [];
-
-      data?.forEach((item: any) => {
-        reports.push({
-          orderId: item.order_id,
-          orderDate: item.created_at,
-          productName: item.product_name,
-          quantity: item.quantity,
-          reason: item.reason,
-          refundAmount: item.refund_amount,
-          status: item.status,
-        });
-      });
+      const reports: ReturnReport[] = (data || []).map((item: any) => ({
+        orderId: item.order_id,
+        orderDate: item.created_at,
+        productName: item.products?.name || 'Produit inconnu',
+        quantity: item.quantity || 1,
+        reason: item.reason || 'Non spécifié',
+        refundAmount: item.refund_amount || 0,
+        status: item.status || 'requested',
+      }));
 
       return reports.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
     } catch (error) {
       console.error('Error fetching return report:', error);
-      // Fallback: returns table might not exist yet
       return [];
     }
   },
@@ -379,7 +364,7 @@ export const reportsService = {
     try {
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('customer_name, customer_phone, total, created_at')
+        .select('customer_name, customer_phone, total_amount, created_at')
         .eq('store_id', storeId)
         .in('status', ['paid', 'delivered']);
 
@@ -388,7 +373,7 @@ export const reportsService = {
       const clientMap = new Map<string, ClientReport>();
 
       orders?.forEach((order: any) => {
-        const phone = order.customer_phone || '';
+        const phone = order.customer_phone || 'Inconnu';
         const existing = clientMap.get(phone) || {
           clientId: phone,
           clientName: order.customer_name || 'Client inconnu',
@@ -401,7 +386,7 @@ export const reportsService = {
         };
 
         existing.totalOrders += 1;
-        existing.totalSpent += order.total || 0;
+        existing.totalSpent += order.total_amount || 0;
         existing.lastOrderDate = order.created_at;
         existing.averageOrderValue = existing.totalSpent / existing.totalOrders;
 
@@ -430,11 +415,11 @@ export const reportsService = {
   // Obtenir tous les rapports
   async getAllReports(storeId: string, startDate: Date, endDate: Date): Promise<ReportData> {
     try {
-      const [dailySales, monthlySales, categorySales, margins, returns, inventory, clients] =
+      const [dailySales, monthlySales, collectionSales, margins, returns, inventory, clients] =
         await Promise.all([
           this.getDailySalesReport(storeId, startDate, endDate),
           this.getMonthlySalesReport(storeId, startDate.getFullYear()),
-          this.getCategorySalesReport(storeId, startDate, endDate),
+          this.getCollectionSalesReport(storeId, startDate, endDate),
           this.getMarginReport(storeId, startDate, endDate),
           this.getReturnReport(storeId, startDate, endDate),
           this.getInventoryReport(storeId),
@@ -444,7 +429,7 @@ export const reportsService = {
       return {
         dailySales,
         monthlySales,
-        categorySales,
+        collectionSales,
         margins,
         returns,
         inventory,
@@ -455,7 +440,7 @@ export const reportsService = {
       return {
         dailySales: [],
         monthlySales: [],
-        categorySales: [],
+        collectionSales: [],
         margins: [],
         returns: [],
         inventory: [],
@@ -468,8 +453,52 @@ export const reportsService = {
   exportToCSV(data: any[], filename: string): string {
     if (data.length === 0) return '';
 
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(row => Object.values(row).join(',')).join('\n');
+    // Mappage des en-têtes anglais -> français
+    const headerMap: Record<string, string> = {
+      'collectionName': 'Collection',
+      'collectionId': 'ID_Collection',
+      'totalRevenue': 'Revenu_Total',
+      'totalOrders': 'Nb_Commandes',
+      'totalItemsSold': 'Articles_Vendus',
+      'percentage': 'Pourcentage',
+      'date': 'Date',
+      'month': 'Mois',
+      'year': 'Année',
+      'averageOrderValue': 'Panier_Moyen',
+      'productName': 'Produit',
+      'costPrice': 'Prix_Achat',
+      'sellingPrice': 'Prix_Vente',
+      'margin': 'Marge_Unitaire',
+      'marginPercentage': 'Marge_%',
+      'totalMargin': 'Marge_Totale',
+      'quantitySold': 'Qté_Vendue',
+      'orderId': 'ID_Commande',
+      'reason': 'Raison',
+      'refundAmount': 'Montant_Remboursé',
+      'status': 'Statut',
+      'currentStock': 'Stock_Actuel',
+      'clientName': 'Client',
+      'clientPhone': 'Téléphone',
+      'totalSpent': 'Total_Dépensé'
+    };
+
+    const keys = Object.keys(data[0]);
+    const headers = keys.map(k => headerMap[k] || k).join(',');
+    
+    const rows = data.map(row => {
+      return keys.map(k => {
+        let val = row[k];
+        // Formatage spécial pour les nombres
+        if (typeof val === 'number') {
+          if (k.toLowerCase().includes('percentage') || k === 'percentage') {
+            return val.toFixed(2);
+          }
+          return val;
+        }
+        return `"${val}"`; // On entoure les strings de guillemets pour éviter les problèmes avec les virgules
+      }).join(',');
+    }).join('\n');
+
     return `${headers}\n${rows}`;
   },
 };

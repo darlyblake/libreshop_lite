@@ -37,10 +37,11 @@ import { storeService } from '../services/storeService';
 import { productService } from '../services/productService';
 import { homeBannerService } from '../services/homeBannerService';
 import { collectionService } from '../services/collectionService';
-import { useCartStore } from '../store';
+import { useCartStore, useAuthStore } from '../store';
 import { categoryService } from '../services/categoryService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { cacheService } from '../services/cacheService';
+import { recommendationService, RecommendedProduct } from '../services/recommendationService';
 import { CACHE_TTL } from '../config/cacheConfig';
 import { cacheMonitor } from '../utils/cacheMonitor';
 
@@ -92,6 +93,26 @@ export const ClientHomeScreen: React.FC = () => {
 
   // Initialize state with reducer
   const { state, dispatch } = useClientHomeState();
+
+  const user = useAuthStore((s) => s.user);
+  const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+
+  const loadRecommendations = useCallback(async () => {
+    try {
+      setLoadingRecommendations(true);
+      const data = await recommendationService.getRecommendations(user?.id || null);
+      setRecommendations(data || []);
+    } catch (e) {
+      console.warn("[ClientHome] Failed to load recommendations:", e);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadRecommendations();
+  }, [loadRecommendations]);
 
   // Destructure state for easier reading
   const {
@@ -160,8 +181,13 @@ export const ClientHomeScreen: React.FC = () => {
     };
   }, []);
 
-  // Grille fixe 2x2 pour tous les écrans
-  const numProductColumns = 2;
+  // Grille adaptative en fonction de la taille de l'écran pour un rendu premium sur mobile et PC
+  const numProductColumns = useMemo(() => {
+    if (width >= 1024) return 5; // PC / Large screens
+    if (width >= 768) return 4;  // Tablets
+    return 2;                    // Mobile
+  }, [width]);
+
   const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
 
   const responsiveProductCardWidth = useMemo(() => {
@@ -239,6 +265,7 @@ export const ClientHomeScreen: React.FC = () => {
       try {
         if (!refresh) dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
+        loadRecommendations();
 
         // Parallel data loading with individual error handling
         const [storesResult, productsResult, bannersResult] = await Promise.allSettled([
@@ -323,7 +350,7 @@ export const ClientHomeScreen: React.FC = () => {
         dispatch({ type: 'SET_REFRESHING', payload: false });
       }
     },
-    [dispatch, productSort, selectedCategory, products.length, stores.length]
+    [dispatch, productSort, selectedCategory, products.length, stores.length, loadRecommendations]
   );
 
   useEffect(() => {
@@ -501,7 +528,7 @@ export const ClientHomeScreen: React.FC = () => {
     );
   }, [SPACING.xl, scrollX, styles, handleBannerPress]);
 
-  const renderCategoryChip = (category: string) => {
+  const renderCategoryChip = useCallback((category: string) => {
     const isActive = selectedCollection === category;
     return (
       <TouchableOpacity
@@ -514,7 +541,7 @@ export const ClientHomeScreen: React.FC = () => {
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [selectedCollection, styles.categoryChip, styles.categoryChipActive, styles.categoryChipText, styles.categoryChipTextActive, handleCategoryPress]);
 
   const renderStoreCard = useCallback(({ item }: { item: Store }) => (
     <StoreCard
@@ -544,425 +571,525 @@ export const ClientHomeScreen: React.FC = () => {
   // Calcul des dimensions responsive
   const storeCardWidth = isDesktop ? 220 : isTablet ? 200 : 180;
 
+  // Header Component de la FlatList (regroupe tout sauf la grille de produits principale)
+  const renderHeader = useCallback(() => {
+    if (loading || error) return null;
+
+    return (
+      <View style={styles.maxWidthContainer}>
+        <LinearGradient
+          colors={[palette.accent, palette.accentDark || palette.accent]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View style={styles.headerContent}>
+            <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoAnim }] }]}> 
+              <Animated.Text style={[styles.logoText, { transform: [{ scale: pulseAnim }] }]} numberOfLines={1} adjustsFontSizeToFit>Libreshop</Animated.Text>
+              <Text style={styles.logoSlogan} numberOfLines={1}>Achetez local, vivez mieux</Text>
+            </Animated.View>
+            <TouchableOpacity
+              style={styles.openShopButton}
+              onPress={() => navigation.navigate('SellerAuth')}
+            >
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="storefront" size={16} color="white" />
+                {!isMobile && (
+                  <Text style={styles.openShopButtonText}>Ouvrir ma boutique</Text>
+                )}
+              </Animated.View>
+            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => navigation.navigate('Cart')}
+              >
+                <Ionicons name="cart-outline" size={22} color="white" />
+                {items.length > 0 && (
+                  <View style={styles.cartBadge}>
+                    <Text style={styles.cartBadgeText}>{items.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Search Bar */}
+          <SearchBar
+            value={state.searchQuery}
+            onChangeText={(text) => dispatch({ type: 'SET_SEARCH_QUERY', payload: text })}
+            onFocus={() => {
+              navigation.navigate('ClientSearch', { query: state.searchQuery });
+            }}
+            onVoiceStart={() => {
+              navigation.navigate('ClientSearch', { query: state.searchQuery, startVoice: true });
+            }}
+            onSubmitEditing={() => {
+              if (state.searchQuery.trim()) {
+                navigation.navigate('ClientSearch', { query: state.searchQuery });
+              }
+            }}
+            onClear={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
+            placeholder="Rechercher un produit, une boutique..."
+            style={styles.searchBar}
+          />
+        </LinearGradient>
+
+        {/* Banner Carousel */}
+        {carouselBanners.length > 0 ? (
+          <View style={styles.bannerSection}>
+            <Animated.FlatList
+              ref={flatListRef}
+              data={carouselBanners}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                { useNativeDriver: Platform.OS !== 'web' }
+              )}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / (SCREEN_WIDTH - SPACING.xl * 2));
+                dispatch({ type: 'SET_CURRENT_BANNER_INDEX', payload: index });
+              }}
+              renderItem={renderBannerItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.bannerList}
+              snapToInterval={SCREEN_WIDTH - SPACING.xl * 2}
+              decelerationRate="fast"
+              getItemLayout={(_, index) => ({
+                length: SCREEN_WIDTH - SPACING.xl * 2,
+                offset: (SCREEN_WIDTH - SPACING.xl * 2) * index,
+                index,
+              })}
+              snapToAlignment="center"
+              onScrollBeginDrag={() => dispatch({ type: 'SET_IS_PAUSED', payload: true })}
+              onScrollEndDrag={() => {
+                setTimeout(() => dispatch({ type: 'SET_IS_PAUSED', payload: false }), 2000);
+              }}
+              onScrollToIndexFailed={(info) => {
+                const wait = new Promise(resolve => setTimeout(resolve, 500));
+                wait.then(() => {
+                  flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+                });
+              }}
+              windowSize={5}
+              initialNumToRender={3}
+              maxToRenderPerBatch={3}
+              removeClippedSubviews={Platform.OS !== 'web'}
+            />
+
+            {/* Pagination Dots */}
+            <View style={styles.paginationContainer}>
+              {carouselBanners.map((_, index) => (
+                <TouchableOpacity
+                  key={index}
+                  onPress={() => {
+                    flatListRef.current?.scrollToIndex({ index, animated: true });
+                    dispatch({ type: 'SET_CURRENT_BANNER_INDEX', payload: index });
+                  }}
+                >
+                  <View style={[
+                    styles.paginationDot,
+                    currentBannerIndex === index && styles.paginationDotActive,
+                  ]} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.quickAction} onPress={handleFlashDeals}>
+            <LinearGradient
+              colors={[palette.accent + '20', palette.accent + '05']}
+              style={styles.quickActionIcon}
+            >
+              <Ionicons name="flash" size={24} color={palette.accent} />
+            </LinearGradient>
+            <Text style={styles.quickActionText}>Flash deals</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={handleBonPlans}>
+            <LinearGradient
+              colors={[palette.success + '20', palette.success + '05']}
+              style={styles.quickActionIcon}
+            >
+              <Ionicons name="gift" size={24} color={palette.success} />
+            </LinearGradient>
+            <Text style={styles.quickActionText}>Bons plans</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={handleNouveautes}>
+            <LinearGradient
+              colors={[palette.warning + '20', palette.warning + '05']}
+              style={styles.quickActionIcon}
+            >
+              <Ionicons name="star" size={24} color={palette.warning} />
+            </LinearGradient>
+            <Text style={styles.quickActionText}>Nouveautés</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={handleFavorites}>
+            <LinearGradient
+              colors={[palette.info + '20', palette.info + '05']}
+              style={styles.quickActionIcon}
+            >
+              <Ionicons name="heart" size={24} color={palette.info} />
+            </LinearGradient>
+            <Text style={styles.quickActionText}>Favoris</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Categories */}
+        <View style={styles.categoriesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Catégories populaires</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
+              <Text style={styles.seeAll}>Voir tout</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoriesList}
+          >
+            {categoriesList.map(renderCategoryChip)}
+          </ScrollView>
+        </View>
+
+        {/* Featured Stores */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Boutiques populaires</Text>
+              <Text style={styles.sectionSubtitle}>
+                {selectedCategory && selectedCategory !== 'Toutes' 
+                  ? `Dans ${selectedCategory}`
+                  : 'Le meilleur du commerce local'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
+              <Text style={styles.seeAll}>Tout voir</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storesList}
+            snapToInterval={storeCardWidth + SPACING.md}
+            decelerationRate="fast"
+          >
+            {loadingStores ? (
+              [1, 2, 3].map((i) => (
+                <StoreCardSkeleton key={i} />
+              ))
+            ) : stores.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Aucune boutique pour cette catégorie</Text>
+              </View>
+            ) : (
+              stores.slice(0, 5).map((item) => (
+                <StoreCard
+                  key={item.id}
+                  name={item.name}
+                  category={item.category}
+                  description={item.description}
+                  logoUrl={item.logo_url}
+                  orderCount={item.total_orders || (Array.isArray(item.store_stats) ? item.store_stats[0]?.customers_count : item.store_stats?.customers_count) || 0}
+                  followersCount={(Array.isArray(item.store_stats) ? item.store_stats[0]?.followers_count : item.store_stats?.followers_count) || 0}
+                  onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
+                />
+              ))
+            )}
+          </ScrollView>
+        </View>
+
+        {promoBanners.length > 0 ? (
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handleBannerPress(promoBanners[0])}
+            style={styles.promoSection}
+          >
+            <LinearGradient
+              colors={[
+                normalizeHexColor(promoBanners[0].color) || palette.danger,
+                palette.dangerGradient[1],
+              ]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.promoBanner}
+            >
+              <View style={styles.promoContent}>
+                <Text style={styles.promoTitle}>{promoBanners[0].title}</Text>
+                {promoBanners[0].subtitle ? (
+                  <Text style={styles.promoSubtitle}>{promoBanners[0].subtitle}</Text>
+                ) : null}
+                <View style={styles.promoButton}>
+                  <Text style={styles.promoButtonText}>Je profite</Text>
+                  <Ionicons name="arrow-forward" size={18} color="white" />
+                </View>
+              </View>
+              {promoBanners[0].image_url ? (
+                <Image source={{ uri: cloudinaryService.getOptimizedUrl(promoBanners[0].image_url, 800) }} style={styles.promoImage} />
+              ) : null}
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : null}
+
+        {/* Category Showcase - Amazon style */}
+        <CategoryShowcase
+          categories={categoriesList}
+          onNavigate={(cat) => handleCategoryPress(cat)}
+        />
+
+        {/* AI Recommendations Section */}
+        {(loadingRecommendations || recommendations.length > 0) && (
+          <View style={styles.recommendationsSection}>
+            <View style={[styles.sectionHeader, { paddingHorizontal: SPACING.xl }]}>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.sectionTitle}>Recommandé pour vous</Text>
+                  <LinearGradient
+                    colors={[palette.accent, palette.accent2 || palette.accent]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.aiBadge}
+                  >
+                    <Text style={styles.aiBadgeText}>✨ IA LibreShop</Text>
+                  </LinearGradient>
+                </View>
+                <Text style={styles.sectionSubtitle}>Sélections personnalisées d'après vos goûts</Text>
+              </View>
+            </View>
+
+            {loadingRecommendations ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recommendationsList}
+              >
+                {[1, 2, 3, 4].map((i) => (
+                  <View key={i} style={{ width: 170 }}>
+                    <ProductCardSkeleton />
+                  </View>
+                ))}
+              </ScrollView>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recommendationsList}
+                decelerationRate="fast"
+                snapToInterval={170 + SPACING.md}
+              >
+                {recommendations.map((item, idx) => (
+                  <View key={item.product.id || idx} style={styles.recommendedCardWrapper}>
+                    <ProductCard
+                      name={item.product.name}
+                      price={item.product.price}
+                      comparePrice={item.product.compare_price}
+                      imageUrl={item.product.images?.[0]}
+                      onPress={() => navigation.navigate('ProductDetail', { productId: item.product.id })}
+                    />
+                    <View style={styles.aiReasonContainer}>
+                      <Ionicons name="sparkles" size={10} color={palette.accent} />
+                      <Text style={styles.aiReasonText} numberOfLines={2}>
+                        {item.reason}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
+        {/* Featured Products Header */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View>
+              <Text style={styles.sectionTitle}>Produits</Text>
+              <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('ClientAllProducts')}>
+              <Text style={styles.seeAll}>Voir tout</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Sort tabs */}
+          <SortTabs
+            options={SORT_OPTIONS}
+            selected={productSort}
+            onSelect={(id) => handleProductSortChange(id as any)}
+          />
+        </View>
+
+        {/* Mapped loading skeleton loaders if products list is currently loading products */}
+        {loadingProducts && products.length === 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, paddingHorizontal: SPACING.xl }}>
+            {[1, 2, 3, 4].map((i) => (
+              <View key={i} style={{ width: responsiveProductCardWidth }}>
+                <ProductCardSkeleton />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }, [
+    loading,
+    error,
+    palette,
+    logoAnim,
+    pulseAnim,
+    navigation,
+    isMobile,
+    items,
+    state.searchQuery,
+    carouselBanners,
+    currentBannerIndex,
+    categoriesList,
+    selectedCategory,
+    loadingStores,
+    stores,
+    promoBanners,
+    loadingRecommendations,
+    recommendations,
+    productSort,
+    SORT_OPTIONS,
+    loadingProducts,
+    products.length,
+    responsiveProductCardWidth,
+    SPACING,
+    storeCardWidth,
+    renderBannerItem,
+    renderCategoryChip,
+    handleProductSortChange,
+  ]);
+
+  // Footer Component de la FlatList (regroupe la newsletter et le bouton Charger plus)
+  const renderFooter = useCallback(() => {
+    if (loading || error) return null;
+
+    return (
+      <View style={styles.maxWidthContainer}>
+        {/* Newsletter */}
+        <View style={styles.newsletterSection}>
+          <Text style={styles.newsletterTitle}>Ne manquez aucune offre</Text>
+          <Text style={styles.newsletterText}>
+            Inscrivez-vous à notre newsletter et recevez -10% sur votre première commande
+          </Text>
+          {newsletterSuccess ? (
+            <View style={styles.newsletterSuccess}>
+              <Ionicons name="checkmark-circle" size={24} color={palette.success} />
+              <Text style={styles.newsletterSuccessText}>Merci de votre inscription !</Text>
+            </View>
+          ) : (
+            <View style={styles.newsletterForm}>
+              <TextInput
+                style={styles.newsletterInput}
+                placeholder="Votre adresse email"
+                placeholderTextColor={palette.textMuted}
+                value={newsletterEmail}
+                onChangeText={(email) => dispatch({ type: 'SET_NEWSLETTER_EMAIL', payload: email })}
+                keyboardType="email-address"
+                editable={!newsletterLoading}
+              />
+              <TouchableOpacity
+                style={[styles.newsletterButton, newsletterLoading && styles.newsletterButtonDisabled]}
+                onPress={handleNewsletterSubscribe}
+                disabled={newsletterLoading}
+              >
+                {newsletterLoading ? (
+                  <ActivityIndicator size="small" color={palette.text} />
+                ) : (
+                  <>
+                    <Text style={styles.newsletterButtonText}>S'inscrire</Text>
+                    <Ionicons name="mail-outline" size={18} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Load More */}
+        {hasMoreProducts && (
+          <View style={styles.loadMoreContainer}>
+            <TouchableOpacity
+              style={styles.loadMoreButton}
+              onPress={handleLoadMoreProducts}
+              disabled={loadingMoreProducts}
+            >
+              {loadingMoreProducts ? (
+                <ActivityIndicator size="small" color={palette.accent} />
+              ) : (
+                <>
+                  <Ionicons name="refresh" size={16} color={palette.accent} />
+                  <Text style={styles.loadMoreText}>Charger plus de produits</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  }, [
+    loading,
+    error,
+    newsletterSuccess,
+    newsletterEmail,
+    newsletterLoading,
+    hasMoreProducts,
+    loadingMoreProducts,
+    palette,
+    handleNewsletterSubscribe,
+    handleLoadMoreProducts,
+  ]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={palette.bg} />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={palette.accent}
-            colors={[palette.accent]}
-          />
-        }
-      >
-        <View style={styles.maxWidthContainer}>
-          <LinearGradient
-            colors={[palette.accent, palette.accentDark || palette.accent]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
-            <View style={styles.headerContent}>
-              <Animated.View style={[styles.logoContainer, { transform: [{ scale: logoAnim }] }]}> 
-                <Animated.Text style={[styles.logoText, { transform: [{ scale: pulseAnim }] }]} numberOfLines={1} adjustsFontSizeToFit>Libreshop</Animated.Text>
-                <Text style={styles.logoSlogan} numberOfLines={1}>Achetez local, vivez mieux</Text>
-              </Animated.View>
-              <TouchableOpacity
-                style={styles.openShopButton}
-                onPress={() => navigation.navigate('SellerAuth')}
-              >
-                <Animated.View style={{ transform: [{ scale: pulseAnim }], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Ionicons name="storefront" size={16} color="white" />
-                  {!isMobile && (
-                    <Text style={styles.openShopButtonText}>Ouvrir ma boutique</Text>
-                  )}
-                </Animated.View>
-              </TouchableOpacity>
-              <View style={styles.headerActions}>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={() => navigation.navigate('Cart')}
-                >
-                  <Ionicons name="cart-outline" size={22} color="white" />
-                  {items.length > 0 && (
-                    <View style={styles.cartBadge}>
-                      <Text style={styles.cartBadgeText}>{items.length}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Search Bar */}
-            <SearchBar
-              value={state.searchQuery}
-              onChangeText={(text) => dispatch({ type: 'SET_SEARCH_QUERY', payload: text })}
-              onFocus={() => {
-                // Navigate to full search page when user focuses/clicks the search bar
-                navigation.navigate('ClientSearch', { query: state.searchQuery });
-              }}
-              onVoiceStart={() => {
-                // Navigate to ClientSearch and start voice recognition there
-                navigation.navigate('ClientSearch', { query: state.searchQuery, startVoice: true });
-              }}
-              onSubmitEditing={() => {
-                if (state.searchQuery.trim()) {
-                  navigation.navigate('ClientSearch', { query: state.searchQuery });
-                }
-              }}
-              onClear={() => dispatch({ type: 'SET_SEARCH_QUERY', payload: '' })}
-              placeholder="Rechercher un produit, une boutique..."
-              style={styles.searchBar}
-            />
-          </LinearGradient>
-
-          {/* Loading/Error State */}
-          {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={palette.accent} />
-              <Text style={styles.loadingText}>Chargement des meilleures offres...</Text>
-            </View>
-          )}
-
-          {error && !loading && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="warning-outline" size={64} color={palette.danger} />
-              <Text style={styles.errorTitle}>Oups !</Text>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
-                <Text style={styles.retryButtonText}>Réessayer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!loading && !error && (
-            <>
-              {/* Banner Carousel */}
-              {carouselBanners.length > 0 ? (
-                <View style={styles.bannerSection}>
-                  <Animated.FlatList
-                    ref={flatListRef}
-                    data={carouselBanners}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onScroll={Animated.event(
-                      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-                      { useNativeDriver: Platform.OS !== 'web' }
-                    )}
-                    onMomentumScrollEnd={(event) => {
-                      const index = Math.round(event.nativeEvent.contentOffset.x / (SCREEN_WIDTH - SPACING.xl * 2));
-                      dispatch({ type: 'SET_CURRENT_BANNER_INDEX', payload: index });
-                    }}
-                    renderItem={renderBannerItem}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={styles.bannerList}
-                    snapToInterval={SCREEN_WIDTH - SPACING.xl * 2}
-                    decelerationRate="fast"
-                    getItemLayout={(_, index) => ({
-                      length: SCREEN_WIDTH - SPACING.xl * 2,
-                      offset: (SCREEN_WIDTH - SPACING.xl * 2) * index,
-                      index,
-                    })}
-                    snapToAlignment="center"
-                    onScrollBeginDrag={() => dispatch({ type: 'SET_IS_PAUSED', payload: true })}
-                    onScrollEndDrag={() => {
-                      setTimeout(() => dispatch({ type: 'SET_IS_PAUSED', payload: false }), 2000);
-                    }}
-                    onScrollToIndexFailed={(info) => {
-                      const wait = new Promise(resolve => setTimeout(resolve, 500));
-                      wait.then(() => {
-                        flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
-                      });
-                    }}
-                    windowSize={5}
-                    initialNumToRender={3}
-                    maxToRenderPerBatch={3}
-                    removeClippedSubviews={Platform.OS !== 'web'}
-                  />
-
-                  {/* Pagination Dots */}
-                  <View style={styles.paginationContainer}>
-                    {carouselBanners.map((_, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        onPress={() => {
-                          flatListRef.current?.scrollToIndex({ index, animated: true });
-                          dispatch({ type: 'SET_CURRENT_BANNER_INDEX', payload: index });
-                        }}
-                      >
-                        <View style={[
-                          styles.paginationDot,
-                          currentBannerIndex === index && styles.paginationDotActive,
-                        ]} />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-
-              {/* Quick Actions */}
-              <View style={styles.quickActions}>
-                <TouchableOpacity style={styles.quickAction} onPress={handleFlashDeals}>
-                  <LinearGradient
-                    colors={[palette.accent + '20', palette.accent + '05']}
-                    style={styles.quickActionIcon}
-                  >
-                    <Ionicons name="flash" size={24} color={palette.accent} />
-                  </LinearGradient>
-                  <Text style={styles.quickActionText}>Flash deals</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction} onPress={handleBonPlans}>
-                  <LinearGradient
-                    colors={[palette.success + '20', palette.success + '05']}
-                    style={styles.quickActionIcon}
-                  >
-                    <Ionicons name="gift" size={24} color={palette.success} />
-                  </LinearGradient>
-                  <Text style={styles.quickActionText}>Bons plans</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction} onPress={handleNouveautes}>
-                  <LinearGradient
-                    colors={[palette.warning + '20', palette.warning + '05']}
-                    style={styles.quickActionIcon}
-                  >
-                    <Ionicons name="star" size={24} color={palette.warning} />
-                  </LinearGradient>
-                  <Text style={styles.quickActionText}>Nouveautés</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickAction} onPress={handleFavorites}>
-                  <LinearGradient
-                    colors={[palette.info + '20', palette.info + '05']}
-                    style={styles.quickActionIcon}
-                  >
-                    <Ionicons name="heart" size={24} color={palette.info} />
-                  </LinearGradient>
-                  <Text style={styles.quickActionText}>Favoris</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Categories */}
-              <View style={styles.categoriesSection}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Catégories populaires</Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
-                    <Text style={styles.seeAll}>Voir tout</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoriesList}
-                >
-                  {categoriesList.map(renderCategoryChip)}
-                </ScrollView>
-              </View>
-
-              {/* Featured Stores */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View>
-                    <Text style={styles.sectionTitle}>Boutiques populaires</Text>
-                    <Text style={styles.sectionSubtitle}>
-                      {selectedCategory && selectedCategory !== 'Toutes' 
-                        ? `Dans ${selectedCategory}`
-                        : 'Le meilleur du commerce local'}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
-                    <Text style={styles.seeAll}>Tout voir</Text>
-                  </TouchableOpacity>
-                </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.storesList}
-                  snapToInterval={storeCardWidth + SPACING.md}
-                  decelerationRate="fast"
-                >
-                  {loadingStores ? (
-                    [1, 2, 3].map((i) => (
-                      <StoreCardSkeleton key={i} />
-                    ))
-                  ) : stores.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                      <Text style={styles.emptyText}>Aucune boutique pour cette catégorie</Text>
-                    </View>
-                  ) : (
-                    stores.slice(0, 5).map((item) => (
-                      <StoreCard
-                        key={item.id}
-                        name={item.name}
-                        category={item.category}
-                        description={item.description}
-                        logoUrl={item.logo_url}
-                        orderCount={item.total_orders || (Array.isArray(item.store_stats) ? item.store_stats[0]?.customers_count : item.store_stats?.customers_count) || 0}
-                        followersCount={(Array.isArray(item.store_stats) ? item.store_stats[0]?.followers_count : item.store_stats?.followers_count) || 0}
-                        onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
-                      />
-                    ))
-                  )}
-                </ScrollView>
-              </View>
-
-              {promoBanners.length > 0 ? (
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  onPress={() => handleBannerPress(promoBanners[0])}
-                  style={styles.promoSection}
-                >
-                  <LinearGradient
-                    colors={[
-                      normalizeHexColor(promoBanners[0].color) || palette.danger,
-                      palette.dangerGradient[1],
-                    ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.promoBanner}
-                  >
-                    <View style={styles.promoContent}>
-                      <Text style={styles.promoTitle}>{promoBanners[0].title}</Text>
-                      {promoBanners[0].subtitle ? (
-                        <Text style={styles.promoSubtitle}>{promoBanners[0].subtitle}</Text>
-                      ) : null}
-                      <View style={styles.promoButton}>
-                        <Text style={styles.promoButtonText}>Je profite</Text>
-                        <Ionicons name="arrow-forward" size={18} color="white" />
-                      </View>
-                    </View>
-                    {promoBanners[0].image_url ? (
-                      <Image source={{ uri: cloudinaryService.getOptimizedUrl(promoBanners[0].image_url, 800) }} style={styles.promoImage} />
-                    ) : null}
-                  </LinearGradient>
-                </TouchableOpacity>
-              ) : null}
-
-              {/* Category Showcase - Amazon style */}
-              <CategoryShowcase
-                categories={categoriesList}
-                onNavigate={(cat) => handleCategoryPress(cat)}
-              />
-
-              {/* Featured Products */}
-              <View style={styles.section}>
-                <View style={styles.sectionHeader}>
-                  <View>
-                    <Text style={styles.sectionTitle}>Produits</Text>
-                    <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => navigation.navigate('ClientAllProducts')}>
-                    <Text style={styles.seeAll}>Voir tout</Text>
-                  </TouchableOpacity>
-                </View>
-                {/* Sort tabs */}
-                <SortTabs
-                  options={SORT_OPTIONS}
-                  selected={productSort}
-                  onSelect={(id) => handleProductSortChange(id as any)}
-                />
-
-                {loadingProducts ? (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
-                    {[1, 2, 3, 4].map((i) => (
-                      <View key={i} style={{ width: responsiveProductCardWidth }}>
-                        <ProductCardSkeleton />
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View style={styles.productsList}>
-                    {products.map((item) => (
-                      <View 
-                        key={item.id} 
-                        style={[
-                          styles.productCardWrapper, 
-                          { width: responsiveProductCardWidth }
-                        ]}
-                      >
-                        <ProductCard
-                          name={item.name}
-                          price={item.price}
-                          comparePrice={item.compare_price}
-                          imageUrl={item.images?.[0]}
-                          onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
-                        />
-                        <Text style={styles.storeNameLabel} numberOfLines={1}>
-                          {item.stores?.name || 'Boutique'}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-
-              {/* Newsletter */}
-              <View style={styles.newsletterSection}>
-                <Text style={styles.newsletterTitle}>Ne manquez aucune offre</Text>
-                <Text style={styles.newsletterText}>
-                  Inscrivez-vous à notre newsletter et recevez -10% sur votre première commande
-                </Text>
-                {newsletterSuccess ? (
-                  <View style={styles.newsletterSuccess}>
-                    <Ionicons name="checkmark-circle" size={24} color={palette.success} />
-                    <Text style={styles.newsletterSuccessText}>Merci de votre inscription !</Text>
-                  </View>
-                ) : (
-                  <View style={styles.newsletterForm}>
-                    <TextInput
-                      style={styles.newsletterInput}
-                      placeholder="Votre adresse email"
-                      placeholderTextColor={palette.textMuted}
-                      value={newsletterEmail}
-                      onChangeText={(email) => dispatch({ type: 'SET_NEWSLETTER_EMAIL', payload: email })}
-                      keyboardType="email-address"
-                      editable={!newsletterLoading}
-                    />
-                    <TouchableOpacity
-                      style={[styles.newsletterButton, newsletterLoading && styles.newsletterButtonDisabled]}
-                      onPress={handleNewsletterSubscribe}
-                      disabled={newsletterLoading}
-                    >
-                      {newsletterLoading ? (
-                        <ActivityIndicator size="small" color={palette.text} />
-                      ) : (
-                        <>
-                          <Text style={styles.newsletterButtonText}>S'inscrire</Text>
-                          <Ionicons name="mail-outline" size={18} color="white" />
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-
-              {/* Load More */}
-              {hasMoreProducts && (
-                <View style={styles.loadMoreContainer}>
-                  <TouchableOpacity
-                    style={styles.loadMoreButton}
-                    onPress={handleLoadMoreProducts}
-                    disabled={loadingMoreProducts}
-                  >
-                    {loadingMoreProducts ? (
-                      <ActivityIndicator size="small" color={palette.accent} />
-                    ) : (
-                      <>
-                        <Ionicons name="refresh" size={16} color={palette.accent} />
-                        <Text style={styles.loadMoreText}>Charger plus de produits</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          )}
+      
+      {loading && products.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={palette.accent} />
+          <Text style={styles.loadingText}>Chargement des meilleures offres...</Text>
         </View>
-      </ScrollView>
+      ) : error && products.length === 0 ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="warning-outline" size={64} color={palette.danger} />
+          <Text style={styles.errorTitle}>Oups !</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => loadData()}>
+            <Text style={styles.retryButtonText}>Réessayer</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          key={`products-grid-${numProductColumns}`}
+          data={products}
+          renderItem={renderProductCard}
+          keyExtractor={(item) => item.id}
+          numColumns={numProductColumns}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={renderFooter}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: 0 }]}
+          columnWrapperStyle={numProductColumns > 1 ? {
+            paddingHorizontal: SPACING.xl,
+            justifyContent: 'flex-start',
+            gap: SPACING.md,
+          } : undefined}
+          
+          // Performance Tuning Options:
+          initialNumToRender={6}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS !== 'web'}
+          updateCellsBatchingPeriod={50}
+        />
+      )}
 
       {/* PWA Install Button - Only on Web */}
       {Platform.OS === 'web' && <PWAInstallButton />}
@@ -1475,6 +1602,47 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       fontSize: FONT_SIZE.md,
       color: palette.textMuted,
       textAlign: 'center',
+    },
+
+    // AI Recommendations
+    recommendationsSection: {
+      marginBottom: SPACING.xl,
+    },
+    recommendationsList: {
+      paddingLeft: SPACING.xl,
+      paddingRight: SPACING.md,
+      gap: SPACING.md,
+      paddingBottom: SPACING.xs,
+    },
+    recommendedCardWrapper: {
+      width: 170,
+      gap: SPACING.xs,
+    },
+    aiBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: RADIUS.sm,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    aiBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
+    aiReasonContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 4,
+      marginTop: 2,
+      paddingHorizontal: SPACING.xs,
+    },
+    aiReasonText: {
+      fontSize: FONT_SIZE.xs - 1,
+      color: palette.accent,
+      fontWeight: '600',
+      flex: 1,
+      lineHeight: 13,
     },
   });
 }

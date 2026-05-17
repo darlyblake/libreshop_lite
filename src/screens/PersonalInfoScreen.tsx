@@ -15,6 +15,7 @@ import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
+import { locationService } from '../services/locationService';
 
 export const PersonalInfoScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -28,6 +29,36 @@ export const PersonalInfoScreen: React.FC = () => {
     whatsapp_number: user?.whatsapp_number || '',
     address: user?.address || '',
   });
+  const [locating, setLocating] = useState(false);
+
+  const handleGetCurrentLocation = async () => {
+    setLocating(true);
+    try {
+      const position = await locationService.getCurrentPosition();
+      if (!position) {
+        Alert.alert('Erreur', 'Impossible de récupérer votre position actuelle. Assurez-vous d’activer le GPS.');
+        return;
+      }
+      
+      const addr = await locationService.reverseGeocode(position.latitude, position.longitude);
+      if (addr && addr.street) {
+        setFormData(prev => ({
+          ...prev,
+          address: addr.street || ''
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          address: `Lat: ${position.latitude.toFixed(5)}, Lon: ${position.longitude.toFixed(5)}`
+        }));
+      }
+    } catch (e) {
+      errorHandler.handle(e, 'Location address error');
+      Alert.alert('Erreur', 'Une erreur s’est produite lors de la détection de l’adresse.');
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!formData.full_name.trim()) {
@@ -140,6 +171,20 @@ export const PersonalInfoScreen: React.FC = () => {
     saveButtonDisabled: {
       backgroundColor: getColor.border,
     },
+    locationButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radius.sm,
+      backgroundColor: getColor.accent + '15',
+    },
+    locationButtonText: {
+      fontSize: fontSize.xs,
+      fontWeight: '600',
+      color: getColor.accent,
+    },
   });
 
   return (
@@ -205,7 +250,23 @@ export const PersonalInfoScreen: React.FC = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Adresse</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <Text style={styles.label}>Adresse</Text>
+              <TouchableOpacity 
+                style={styles.locationButton} 
+                onPress={handleGetCurrentLocation}
+                disabled={locating}
+              >
+                {locating ? (
+                  <ActivityIndicator size="small" color={getColor.accent} />
+                ) : (
+                  <>
+                    <Ionicons name="location" size={14} color={getColor.accent} />
+                    <Text style={styles.locationButtonText}>Ma position</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
               value={formData.address}

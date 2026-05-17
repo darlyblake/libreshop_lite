@@ -124,7 +124,7 @@ export const SellerLowStockScreen: React.FC = () => {
 
         <TouchableOpacity 
           style={styles.restockButton}
-          onPress={() => navigation.navigate('SellerRestock', { productId: item.product_id })}
+          onPress={() => navigation.navigate('SellerStockHistory', { productId: item.product_id, openRestockModal: true })}
         >
           <Ionicons name="add-circle" size={20} color={COLORS.accent} />
           <Text style={styles.restockButtonText}>Réapprovisionner</Text>
