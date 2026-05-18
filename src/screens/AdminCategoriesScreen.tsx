@@ -25,20 +25,29 @@ interface Category {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   status: 'active' | 'inactive';
+  store_type: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
   createdAt: string;
 }
+
+const STORE_TYPES = [
+  { id: 'general', title: 'Boutique', icon: 'storefront-outline' },
+  { id: 'restaurant', title: 'Restaurant', icon: 'restaurant-outline' },
+  { id: 'bar', title: 'Bar / Lounge', icon: 'beer-outline' },
+  { id: 'hotel', title: 'Hôtel', icon: 'bed-outline' },
+  { id: 'logement', title: 'Logement', icon: 'home-outline' },
+] as const;
 
 export const AdminCategoriesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<'all' | 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement'>('all');
 
   const [categories, setCategories] = useState<Category[]>([]);
 
   const loadCategories = async () => {
     try {
       const data = await categoryService.getAll();
-      // adapt response shape if necessary
       setCategories(
         data.map(c => ({
           id: c.id,
@@ -46,6 +55,7 @@ export const AdminCategoriesScreen: React.FC = () => {
           description: c.description || '-',
           icon: (c.icon as keyof typeof Ionicons.glyphMap) || 'grid-outline',
           status: c.status || 'active',
+          store_type: c.store_type || 'general',
           createdAt: c.created_at || new Date().toISOString(),
         }))
       );
@@ -59,11 +69,13 @@ export const AdminCategoriesScreen: React.FC = () => {
   }, []);
 
   const filteredCategories = useMemo(() => {
-    return categories.filter(category =>
-      category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (category.description && category.description.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [categories, searchQuery]);
+    return categories.filter(category => {
+      const matchesSearch = category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (category.description && category.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesType = selectedTypeFilter === 'all' || category.store_type === selectedTypeFilter;
+      return matchesSearch && matchesType;
+    });
+  }, [categories, searchQuery, selectedTypeFilter]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -76,6 +88,7 @@ export const AdminCategoriesScreen: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newIcon, setNewIcon] = useState<string>('grid-outline');
+  const [newStoreType, setNewStoreType] = useState<'general' | 'restaurant' | 'bar' | 'hotel' | 'logement'>('general');
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
   // when a category is selected for editing, populate the inputs
@@ -84,6 +97,7 @@ export const AdminCategoriesScreen: React.FC = () => {
       setNewName(editingCategory.name);
       setNewDesc(editingCategory.description === '-' ? '' : editingCategory.description);
       setNewIcon(editingCategory.icon as string);
+      setNewStoreType(editingCategory.store_type || 'general');
     }
   }, [editingCategory]);
 
@@ -134,6 +148,7 @@ export const AdminCategoriesScreen: React.FC = () => {
     setNewName('');
     setNewDesc('');
     setNewIcon('grid-outline');
+    setNewStoreType('general');
     setEditingCategory(null);
   };
 
@@ -148,9 +163,16 @@ export const AdminCategoriesScreen: React.FC = () => {
           name: newName.trim(),
           description: newDesc.trim() || '-',
           icon: newIcon as any,
+          store_type: newStoreType,
         });
         setCategories(categories.map(c =>
-          c.id === updatedRecord.id ? { ...c, name: updatedRecord.name, description: updatedRecord.description || '-', icon: (updatedRecord.icon as any) } : c
+          c.id === updatedRecord.id ? { 
+            ...c, 
+            name: updatedRecord.name, 
+            description: updatedRecord.description || '-', 
+            icon: (updatedRecord.icon as any),
+            store_type: updatedRecord.store_type || 'general'
+          } : c
         ));
         Alert.alert('Catégorie modifiée', `${updatedRecord.name} a été mise à jour.`);
       } else {
@@ -159,6 +181,7 @@ export const AdminCategoriesScreen: React.FC = () => {
           description: newDesc.trim() || '-',
           icon: newIcon as any,
           status: 'active',
+          store_type: newStoreType,
         });
         const toAdd: Category = {
           id: created.id,
@@ -166,6 +189,7 @@ export const AdminCategoriesScreen: React.FC = () => {
           description: created.description || '-',
           icon: (created.icon as any) || 'grid-outline',
           status: created.status || 'active',
+          store_type: created.store_type || 'general',
           createdAt: created.created_at || new Date().toISOString(),
         };
         setCategories([toAdd, ...categories]);
@@ -242,6 +266,57 @@ export const AdminCategoriesScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Types Filters */}
+      <View style={styles.filterSection}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.filterCapsule,
+              selectedTypeFilter === 'all' && styles.filterCapsuleActive
+            ]}
+            onPress={() => setSelectedTypeFilter('all')}
+          >
+            <Ionicons 
+              name="apps-outline" 
+              size={14} 
+              color={selectedTypeFilter === 'all' ? COLORS.accent : COLORS.textMuted} 
+            />
+            <Text style={[
+              styles.filterCapsuleText,
+              selectedTypeFilter === 'all' && styles.filterCapsuleTextActive
+            ]}>
+              Tous
+            </Text>
+          </TouchableOpacity>
+          {STORE_TYPES.map(type => (
+            <TouchableOpacity
+              key={type.id}
+              style={[
+                styles.filterCapsule,
+                selectedTypeFilter === type.id && styles.filterCapsuleActive
+              ]}
+              onPress={() => setSelectedTypeFilter(type.id)}
+            >
+              <Ionicons 
+                name={type.icon as any} 
+                size={14} 
+                color={selectedTypeFilter === type.id ? COLORS.accent : COLORS.textMuted} 
+              />
+              <Text style={[
+                styles.filterCapsuleText,
+                selectedTypeFilter === type.id && styles.filterCapsuleTextActive
+              ]}>
+                {type.title}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Categories List */}
       {/* Add Category Modal */}
       <Modal
@@ -276,6 +351,32 @@ export const AdminCategoriesScreen: React.FC = () => {
                 onChangeText={setNewDesc}
                 multiline
               />
+
+              <Text style={styles.modalLabel}>Type de commerce lié</Text>
+              <View style={styles.modalStoreTypeContainer}>
+                {STORE_TYPES.map(type => (
+                  <TouchableOpacity
+                    key={type.id}
+                    style={[
+                      styles.modalStoreTypeCard,
+                      newStoreType === type.id && styles.modalStoreTypeCardActive
+                    ]}
+                    onPress={() => setNewStoreType(type.id)}
+                  >
+                    <Ionicons 
+                      name={type.icon as any} 
+                      size={12} 
+                      color={newStoreType === type.id ? COLORS.accent : COLORS.textMuted} 
+                    />
+                    <Text style={[
+                      styles.modalStoreTypeCardText,
+                      newStoreType === type.id && styles.modalStoreTypeCardTextActive
+                    ]}>
+                      {type.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
               <Text style={{ color: COLORS.textMuted, marginBottom: 8 }}>Choisir une icône</Text>
               <FlatList
@@ -360,6 +461,26 @@ export const AdminCategoriesScreen: React.FC = () => {
                         {category.status === 'active' ? 'Actif' : 'Inactif'}
                       </Text>
                     </View>
+
+                    {/* Store Type Badge */}
+                    <View style={[
+                      styles.statusBadge,
+                      { 
+                        backgroundColor: COLORS.accent + '15',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 2,
+                      }
+                    ]}>
+                      <Ionicons 
+                        name={STORE_TYPES.find(t => t.id === category.store_type)?.icon as any || 'storefront-outline'} 
+                        size={10} 
+                        color={COLORS.accent} 
+                      />
+                      <Text style={[styles.statusText, { color: COLORS.accent }]}>
+                        {STORE_TYPES.find(t => t.id === category.store_type)?.title || 'Boutique'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -432,6 +553,74 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accent,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  filterSection: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  filterScrollContent: {
+    gap: SPACING.xs,
+    paddingRight: SPACING.lg,
+  },
+  filterCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  filterCapsuleActive: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accent + '15',
+  },
+  filterCapsuleText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  filterCapsuleTextActive: {
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  modalLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  modalStoreTypeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  modalStoreTypeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  modalStoreTypeCardActive: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accent + '15',
+  },
+  modalStoreTypeCardText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  modalStoreTypeCardTextActive: {
+    color: COLORS.accent,
+    fontWeight: '600',
   },
   searchSection: {
     paddingHorizontal: SPACING.lg,
