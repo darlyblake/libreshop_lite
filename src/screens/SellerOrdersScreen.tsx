@@ -25,6 +25,7 @@ import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
 import { useSupabase } from '../lib/supabase';
 import { contactStore } from '../services/contactService';
+import { notificationService } from '../services/notificationService';
 import { exportOrdersToPDF, exportOrderToPDF, exportBatchOrdersToPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
 

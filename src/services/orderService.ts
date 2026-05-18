@@ -288,17 +288,38 @@ export const orderService = {
     if (!order) throw new Error("Commande non trouvée");
 
     const client = useSupabase();
-    
-    const { data, error } = await client.rpc('confirm_order_payment', {
-      p_order_id: orderId
-    });
-    
-    if (error) throw error;
-    
-    // Notification
-    await this.sendCustomerNotification(order, 'paid');
+    try {
+      const { data, error } = await client.rpc('confirm_order_payment', {
+        p_order_id: orderId
+      });
+      
+      if (error) throw error;
+      
+      // Notification
+      await this.sendCustomerNotification(order, 'paid');
+      return data;
+    } catch (e: any) {
+      console.warn('confirm_order_payment RPC missing or failed, falling back to direct update', e?.message || e);
+      try {
+        const { data: updated, error: updErr } = await client
+          .from('orders')
+          .update({ 
+            status: 'paid',
+            payment_status: 'paid'
+          })
+          .eq('id', orderId)
+          .select('*, stores(name)')
+          .single();
 
-    return data;
+        if (updErr) throw updErr;
+
+        // Notification
+        await this.sendCustomerNotification(updated || order, 'paid');
+        return updated || order;
+      } catch (e2) {
+        throw e2 || e;
+      }
+    }
   },
 
   async cancelOrderRobust(orderId: string) {
