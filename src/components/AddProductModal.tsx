@@ -5,7 +5,6 @@ import {
   Modal,
   ScrollView,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -17,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { cloudinaryService } from '../services/cloudinaryService';
@@ -36,7 +36,7 @@ interface Product {
   costPrice: string;
   comparePrice: string;
   stock: string;
-  barcode?: string; // code barre facultatif
+  barcode?: string;
   description: string;
   images: string[];
   collectionId: string;
@@ -49,7 +49,6 @@ interface AddProductModalProps {
   onClose: () => void;
   onAdd: (product: Product) => void;
   collections: CollectionOption[];
-  
   title?: string;
 }
 
@@ -61,25 +60,27 @@ const getStyles = (theme: any) => {
   return StyleSheet.create({
     modalOverlay: {
       flex: 1,
-      backgroundColor: COLORS.bg + 'E6',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
       justifyContent: 'flex-end',
     },
     modalContent: {
       backgroundColor: COLORS.card,
       borderTopLeftRadius: RADIUS.xl,
       borderTopRightRadius: RADIUS.xl,
-      height: '90%',
-      paddingBottom: SPACING.lg,
+      height: '92%',
+      paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     },
     modalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
       paddingHorizontal: SPACING.lg,
       paddingTop: SPACING.lg,
       paddingBottom: SPACING.md,
       borderBottomWidth: 1,
       borderBottomColor: COLORS.border,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
     },
     modalTitle: {
       fontSize: FONT_SIZE.lg,
@@ -87,19 +88,72 @@ const getStyles = (theme: any) => {
       color: COLORS.text,
     },
     closeButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: COLORS.bg,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: COLORS.border,
     },
+    // Step indicator styles
+    stepIndicatorContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: SPACING.md,
+      paddingHorizontal: SPACING.md,
+    },
+    stepDot: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepDotActive: {
+      borderColor: COLORS.accent,
+      backgroundColor: COLORS.accent,
+    },
+    stepDotCompleted: {
+      borderColor: COLORS.success,
+      backgroundColor: COLORS.success,
+    },
+    stepDotText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: COLORS.textSoft,
+    },
+    stepDotTextActive: {
+      color: '#fff',
+    },
+    stepDotTextCompleted: {
+      color: '#fff',
+    },
+    stepLine: {
+      flex: 1,
+      height: 2,
+      backgroundColor: COLORS.border,
+      marginHorizontal: SPACING.xs,
+    },
+    stepLineActive: {
+      backgroundColor: COLORS.accent,
+    },
+    stepSubText: {
+      textAlign: 'center',
+      fontSize: 12,
+      color: COLORS.textSoft,
+      fontWeight: '600',
+      marginTop: 6,
+    },
     modalBody: {
       flex: 1,
       paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.md,
+      paddingVertical: SPACING.lg,
     },
     modalInput: {
       marginBottom: SPACING.lg,
@@ -107,7 +161,7 @@ const getStyles = (theme: any) => {
     inputLabel: {
       fontSize: FONT_SIZE.sm,
       fontWeight: '600',
-      color: COLORS.text,
+      color: COLORS.textSoft,
       marginBottom: SPACING.sm,
     },
     required: {
@@ -122,18 +176,16 @@ const getStyles = (theme: any) => {
       fontSize: FONT_SIZE.md,
       color: COLORS.text,
       backgroundColor: COLORS.bg,
-      pointerEvents: 'auto' as const,
     },
     inputError: {
       borderColor: COLORS.danger,
-      backgroundColor: COLORS.danger + '08',
+      backgroundColor: COLORS.danger + '05',
     },
     errorText: {
       color: COLORS.danger,
       fontSize: FONT_SIZE.xs,
       fontWeight: '600',
       marginTop: SPACING.xs,
-      marginLeft: SPACING.xs,
     },
     selectInput: {
       borderWidth: 1,
@@ -146,15 +198,74 @@ const getStyles = (theme: any) => {
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: SPACING.sm,
-      pointerEvents: 'auto' as const,
     },
     textArea: {
-      height: 100,
+      height: 120,
       textAlignVertical: 'top',
     },
+    stockRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.lg,
+      backgroundColor: COLORS.bg,
+      paddingVertical: SPACING.md,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginTop: SPACING.xs,
+    },
+    stockButton: {
+      padding: SPACING.xs,
+    },
+    stockValue: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '800',
+      color: COLORS.text,
+      minWidth: 60,
+      textAlign: 'center',
+    },
+    // Toggle / Switch styles
+    toggleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: COLORS.bg,
+      padding: SPACING.md,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginTop: SPACING.xs,
+    },
+    toggleLabel: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '600',
+      color: COLORS.text,
+    },
+    toggleButton: {
+      width: 50,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: COLORS.border,
+      padding: 2,
+      justifyContent: 'center',
+    },
+    toggleButtonActive: {
+      backgroundColor: COLORS.accent,
+    },
+    toggleThumb: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: '#fff',
+    },
+    toggleThumbActive: {
+      alignSelf: 'flex-end',
+    },
+    // Picker list styles
     pickerOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+      backgroundColor: 'rgba(0,0,0,0.5)',
       justifyContent: 'flex-end',
     },
     pickerContent: {
@@ -225,7 +336,7 @@ const getStyles = (theme: any) => {
     },
     pickerItemSelected: {
       borderColor: COLORS.accent,
-      backgroundColor: COLORS.accent + '10',
+      backgroundColor: COLORS.accent + '08',
     },
     pickerItemLeft: {
       flexDirection: 'row',
@@ -288,22 +399,25 @@ const getStyles = (theme: any) => {
       fontSize: FONT_SIZE.md,
     },
     pickerConfirmText: {
-      color: COLORS.text,
+      color: '#fff',
       fontWeight: '600',
       fontSize: FONT_SIZE.md,
     },
-    imagesContainer: {
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg, // Added vertical padding
+    // Image uploader styles
+    imagesGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: SPACING.md,
+      marginTop: SPACING.xs,
     },
     imageItem: {
       position: 'relative',
-      marginRight: SPACING.md,
+      width: '30%',
+      aspectRatio: 1,
     },
     imagePreview: {
-      width: 100,
-      height: 100,
+      width: '100%',
+      height: '100%',
       borderRadius: RADIUS.md,
       borderWidth: 1,
       borderColor: COLORS.border,
@@ -312,8 +426,8 @@ const getStyles = (theme: any) => {
       position: 'absolute',
       top: 0,
       left: 0,
-      width: 100,
-      height: 100,
+      right: 0,
+      bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.5)',
       borderRadius: RADIUS.md,
       alignItems: 'center',
@@ -329,12 +443,30 @@ const getStyles = (theme: any) => {
       backgroundColor: COLORS.danger,
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 30,
-      elevation: 5,
+      zIndex: 10,
+    },
+    enhanceImageButton: {
+      position: 'absolute',
+      bottom: -6,
+      left: '5%',
+      right: '5%',
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: COLORS.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 4,
+      zIndex: 10,
+    },
+    enhanceImageText: {
+      color: 'white',
+      fontSize: 9,
+      fontWeight: '700',
     },
     addImageButton: {
-      width: 100,
-      height: 100,
+      width: '30%',
+      aspectRatio: 1,
       borderRadius: RADIUS.md,
       borderWidth: 2,
       borderStyle: 'dashed',
@@ -344,66 +476,16 @@ const getStyles = (theme: any) => {
       backgroundColor: COLORS.bg,
     },
     addImageText: {
-      fontSize: FONT_SIZE.xs,
+      fontSize: 10,
       color: COLORS.textMuted,
-      marginTop: SPACING.xs,
-    },
-    stockRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: SPACING.md,
-    },
-    stockButton: {
-      padding: SPACING.xs,
-    },
-    stockValue: {
-      fontSize: FONT_SIZE.lg,
-      fontWeight: '700',
-      color: COLORS.text,
-      minWidth: 40,
-      textAlign: 'center',
-    },
-    modalActions: {
-      flexDirection: 'row',
-      gap: SPACING.md,
-      paddingHorizontal: SPACING.lg,
-      paddingTop: SPACING.md,
-      borderTopWidth: 1,
-      borderTopColor: COLORS.border,
-    },
-    modalButton: {
-      flex: 1,
-      paddingVertical: SPACING.md,
-      borderRadius: RADIUS.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-      pointerEvents: 'auto' as const,
-    },
-    cancelButton: {
-      backgroundColor: COLORS.bg,
-      borderWidth: 1,
-      borderColor: COLORS.border,
-    },
-    confirmButton: {
-      backgroundColor: COLORS.accent,
-    },
-    cancelButtonText: {
-      color: COLORS.text,
+      marginTop: 4,
       fontWeight: '600',
-      fontSize: FONT_SIZE.md,
     },
-    confirmButtonText: {
-      color: COLORS.text,
-      fontWeight: '600',
-      fontSize: FONT_SIZE.md,
-    },
-    // Dynamic Attributes Styling
+    // Dynamic attributes panel
     dynamicAttrsSection: {
       backgroundColor: COLORS.bg,
       borderRadius: RADIUS.lg,
       padding: SPACING.md,
-      marginBottom: SPACING.lg,
       borderWidth: 1,
       borderColor: COLORS.border,
     },
@@ -423,6 +505,12 @@ const getStyles = (theme: any) => {
       color: COLORS.textMuted,
       marginBottom: SPACING.md,
     },
+    attrChipsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 4,
+    },
     attrChip: {
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs + 2,
@@ -430,52 +518,56 @@ const getStyles = (theme: any) => {
       borderWidth: 1,
       borderColor: COLORS.border,
       backgroundColor: COLORS.card,
-      marginTop: SPACING.xs,
     },
     attrChipActive: {
       borderColor: COLORS.accent,
-      backgroundColor: COLORS.accent + '15',
+      backgroundColor: COLORS.accent + '10',
     },
     attrChipText: {
       fontSize: FONT_SIZE.sm,
-      color: COLORS.textMuted,
+      color: COLORS.textSoft,
       fontWeight: '600',
     },
     attrChipTextActive: {
       color: COLORS.accent,
     },
-    // Web-specific fixes for modal interaction
-    webInteractiveElement: Platform.OS === 'web' ? {
-      pointerEvents: 'auto' as const,
-    } : {},
-    imagesErrorContainer: {
-      borderWidth: 2,
-      borderColor: COLORS.danger,
+    // Bottom actions
+    modalActions: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.border,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: SPACING.md,
       borderRadius: RADIUS.md,
-      padding: SPACING.md,
-    },
-    toggleButton: {
-      width: 50,
-      height: 28,
-      borderRadius: 14,
-      borderWidth: 2,
-      borderColor: COLORS.border,
-      backgroundColor: COLORS.bg,
-      justifyContent: 'center',
       alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: SPACING.xs,
     },
-    toggleButtonActive: {
+    cancelButton: {
+      backgroundColor: COLORS.bg,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    confirmButton: {
       backgroundColor: COLORS.accent,
-      borderColor: COLORS.accent,
     },
-    toggleText: {
-      fontSize: FONT_SIZE.lg,
-      fontWeight: '700',
-      color: COLORS.textMuted,
+    cancelButtonText: {
+      color: COLORS.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
     },
-    toggleTextActive: {
-      color: COLORS.card,
+    confirmButtonText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: FONT_SIZE.md,
     },
+    // Camera modal
     cameraContainer: {
       flex: 1,
       backgroundColor: '#000',
@@ -543,21 +635,27 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   const initialCollectionId = collections && collections.length > 0 ? collections[0]!.id : '';
+  const [currentStep, setCurrentStep] = useState(1);
+
+  // Picker States
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
   const [collectionSearch, setCollectionSearch] = useState('');
   const [pendingCollectionId, setPendingCollectionId] = useState(initialCollectionId);
+
+  // Form States
   const [newProduct, setNewProduct] = useState<Product>({
     name: '',
     price: '',
     costPrice: '',
     comparePrice: '',
-    stock: '',
+    stock: '1',
     barcode: undefined,
     description: '',
     images: [],
     collectionId: initialCollectionId,
     featured: false,
   });
+
   const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showCameraScanner, setShowCameraScanner] = useState(false);
@@ -570,6 +668,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     if (!showCameraScanner) return;
     setNewProduct(prev => ({ ...prev, barcode: data }));
     setShowCameraScanner(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   React.useEffect(() => {
@@ -643,96 +742,123 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     String(c.name || '').toLowerCase().includes(collectionSearch.toLowerCase())
   );
 
-  const handleAddProduct = () => {
+  // Step validation
+  const validateStep = (step: number): boolean => {
     const errors: Record<string, string> = {};
 
-    // Validation champs obligatoires
-    if (!newProduct.name || !newProduct.name.trim()) {
-      errors.name = 'Nom requis';
-    } else if (newProduct.name.trim().length < 3) {
-      errors.name = 'Min 3 caractères';
-    }
-
-    if (!newProduct.price || !newProduct.price.trim()) {
-      errors.price = 'Prix requis';
-    } else if (isNaN(Number(newProduct.price)) || Number(newProduct.price) <= 0) {
-      errors.price = 'Prix invalide (> 0)';
-    }
-
-    if (!newProduct.stock || !newProduct.stock.trim()) {
-      errors.stock = 'Stock requis';
-    } else if (isNaN(Number(newProduct.stock)) || Number(newProduct.stock) < 0) {
-      errors.stock = 'Stock invalide (≥ 0)';
-    }
-
-    if (newProduct.costPrice && newProduct.costPrice.trim()) {
-      if (isNaN(Number(newProduct.costPrice)) || Number(newProduct.costPrice) < 0) {
-        errors.costPrice = 'Prix invalide (≥ 0)';
+    if (step === 1) {
+      if (!newProduct.collectionId) {
+        errors.collection = 'Collection requise';
+      }
+      if (!newProduct.name || !newProduct.name.trim()) {
+        errors.name = 'Nom requis';
+      } else if (newProduct.name.trim().length < 3) {
+        errors.name = 'Min 3 caractères';
+      }
+      if (!newProduct.description || !newProduct.description.trim()) {
+        errors.description = 'Description requise';
+      } else if (newProduct.description.trim().length < 3) {
+        errors.description = 'Min 3 caractères';
       }
     }
 
-    if (!newProduct.collectionId) {
-      errors.collection = 'Collection requise';
-    }
+    if (step === 2) {
+      if (!newProduct.price || !newProduct.price.trim()) {
+        errors.price = 'Prix requis';
+      } else if (isNaN(Number(newProduct.price)) || Number(newProduct.price) <= 0) {
+        errors.price = 'Prix de vente invalide (> 0)';
+      }
 
-    if (!newProduct.description || !newProduct.description.trim()) {
-      errors.description = 'Description requise';
-    } else if (newProduct.description.trim().length < 3) {
-      errors.description = 'Min 3 caractères';
-    }
-
-    if (!newProduct.images || newProduct.images.length === 0) {
-      errors.images = 'Au moins 1 image requise';
-    }
-
-    // Validate dynamic attributes
-    categorySchema.forEach((attr) => {
-      const val = productAttributes[attr.name];
-      if (attr.required) {
-        if (attr.type === 'multiselect') {
-          if (!Array.isArray(val) || val.length === 0) {
-            errors[`attr_${attr.name}`] = `${attr.label} requis`;
-          }
-        } else {
-          if (val === undefined || val === null || String(val).trim() === '') {
-            errors[`attr_${attr.name}`] = `${attr.label} requis`;
-          }
+      if (newProduct.costPrice && newProduct.costPrice.trim()) {
+        if (isNaN(Number(newProduct.costPrice)) || Number(newProduct.costPrice) < 0) {
+          errors.costPrice = "Prix d'achat invalide (≥ 0)";
         }
       }
-    });
 
-    // S'il y a des erreurs, les afficher et arrêter
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      console.warn('[AddProductModal] Validation errors:', errors);
+      if (newProduct.comparePrice && newProduct.comparePrice.trim()) {
+        if (isNaN(Number(newProduct.comparePrice)) || Number(newProduct.comparePrice) <= 0) {
+          errors.comparePrice = 'Prix comparé invalide';
+        } else if (Number(newProduct.comparePrice) <= Number(newProduct.price)) {
+          errors.comparePrice = 'Doit être > prix de vente';
+        }
+      }
+
+      if (!newProduct.stock || !newProduct.stock.trim()) {
+        errors.stock = 'Stock requis';
+      } else if (isNaN(Number(newProduct.stock)) || Number(newProduct.stock) < 0) {
+        errors.stock = 'Stock invalide (≥ 0)';
+      }
+    }
+
+    if (step === 3) {
+      categorySchema.forEach((attr) => {
+        const val = productAttributes[attr.name];
+        if (attr.required) {
+          if (attr.type === 'multiselect') {
+            if (!Array.isArray(val) || val.length === 0) {
+              errors[`attr_${attr.name}`] = `${attr.label} requis`;
+            }
+          } else {
+            if (val === undefined || val === null || String(val).trim() === '') {
+              errors[`attr_${attr.name}`] = `${attr.label} requis`;
+            }
+          }
+        }
+      });
+    }
+
+    if (step === 4) {
+      if (!newProduct.images || newProduct.images.length === 0) {
+        errors.images = 'Au moins 1 image requise';
+      }
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setFieldErrors({});
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // If Step 2 and there are no dynamic attributes, we skip step 3!
+      if (currentStep === 2 && categorySchema.length === 0) {
+        setCurrentStep(4);
+      } else {
+        setCurrentStep(prev => prev + 1);
+      }
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const handlePrev = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFieldErrors({});
+    if (currentStep === 4 && categorySchema.length === 0) {
+      setCurrentStep(2);
+    } else {
+      setCurrentStep(prev => Math.max(1, prev - 1));
+    }
+  };
+
+  const handleAddProduct = () => {
+    if (!validateStep(4)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
-    // Réinitialiser les erreurs si tout est valide
-    setFieldErrors({});
-
-    // Validation prix comparé (optionnel mais si rempli, doit être valide)
-    if (newProduct.comparePrice && newProduct.comparePrice.trim()) {
-      if (isNaN(Number(newProduct.comparePrice)) || Number(newProduct.comparePrice) <= 0) {
-        setFieldErrors({ comparePrice: 'Prix invalide (> 0)' });
-        return;
-      }
-      if (Number(newProduct.comparePrice) <= Number(newProduct.price)) {
-        setFieldErrors({ comparePrice: 'Doit être > prix de vente' });
-        return;
-      }
-    }
-
-    console.log('[AddProductModal] ✅ Validation passed, calling onAdd()', { ...newProduct, attributes: productAttributes });
     onAdd({ ...newProduct, attributes: productAttributes });
-    
-    // Reset form
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Reset Form
     setNewProduct({
       name: '',
       price: '',
       costPrice: '',
       comparePrice: '',
-      stock: '',
+      stock: '1',
       barcode: undefined,
       description: '',
       images: [],
@@ -740,6 +866,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       featured: false,
     });
     setProductAttributes({});
+    setCurrentStep(1);
   };
 
   const handleAddImage = () => {
@@ -757,12 +884,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           allowsEditing: true,
         });
 
-        // newer versions use `canceled` flag
-        if (result.canceled) {
-          return;
-        }
+        if (result.canceled) return;
 
-        // images available in assets array
         const uri = result.assets && result.assets[0] ? result.assets[0].uri : undefined;
         if (uri) {
           setNewProduct({
@@ -782,7 +905,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       ...newProduct,
       images: newProduct.images.filter((_, i) => i !== index),
     });
-    // Remove from enhancing state if present
     const nextEnhancing = { ...enhancingImages };
     delete nextEnhancing[index];
     setEnhancingImages(nextEnhancing);
@@ -793,26 +915,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     if (!uri || enhancingImages[index]) return;
 
     try {
-      console.log('[AddProductModal] Enhancing image at index:', index);
       setEnhancingImages(prev => ({ ...prev, [index]: true }));
-      
-      // 1. Remove background locally (100% Free)
-      console.log('[AddProductModal] Calling imageProcessorService.removeBackground...');
       const processedUri = await imageProcessorService.removeBackground(uri);
-      console.log('[AddProductModal] Enhancement complete. New URI length:', processedUri.length);
       
-      // 2. Update state
       const nextImages = [...newProduct.images];
       nextImages[index] = processedUri;
       
-      setNewProduct(prev => ({
-        ...prev,
-        images: nextImages
-      }));
-
+      setNewProduct(prev => ({ ...prev, images: nextImages }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       console.error('[AddProductModal] Enhancement failed:', e);
-      Alert.alert('Erreur', "L'amélioration automatique a échoué. Vérifiez votre connexion ou réessayez.");
+      Alert.alert('Erreur', "L'amélioration automatique a échoué. Réessayez.");
     } finally {
       setEnhancingImages(prev => ({ ...prev, [index]: false }));
     }
@@ -821,13 +934,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const incrementStock = () => {
     const current = parseInt(newProduct.stock || '0', 10);
     setNewProduct({ ...newProduct, stock: String(current + 1) });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const decrementStock = () => {
     const current = parseInt(newProduct.stock || '0', 10);
     if (current <= 0) return;
     setNewProduct({ ...newProduct, stock: String(current - 1) });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
+
+  const totalSteps = categorySchema.length > 0 ? 4 : 3;
 
   return (
     <Modal
@@ -835,180 +952,241 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={onClose}
-      presentationStyle={Platform.OS === 'ios' ? 'overFullScreen' : 'overFullScreen'}
+      presentationStyle="overFullScreen"
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
       >
         <View style={styles.modalContent}>
+          {/* Modal Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{title}</Text>
-            <TouchableOpacity 
-              style={styles.closeButton} 
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={28} color={COLORS.textMuted} />
-            </TouchableOpacity>
+            <View style={styles.headerRow}>
+              <Text style={styles.modalTitle}>{title}</Text>
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <Ionicons name="close" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Premium step progress tracker */}
+            <View style={styles.stepIndicatorContainer}>
+              {/* Step 1 */}
+              <View style={[styles.stepDot, currentStep >= 1 && styles.stepDotActive, currentStep > 1 && styles.stepDotCompleted]}>
+                <Text style={[styles.stepDotText, currentStep >= 1 && styles.stepDotTextActive, currentStep > 1 && styles.stepDotTextCompleted]}>
+                  {currentStep > 1 ? '✓' : '1'}
+                </Text>
+              </View>
+              <View style={[styles.stepLine, currentStep > 1 && styles.stepLineActive]} />
+
+              {/* Step 2 */}
+              <View style={[styles.stepDot, currentStep >= 2 && styles.stepDotActive, currentStep > 2 && styles.stepDotCompleted]}>
+                <Text style={[styles.stepDotText, currentStep >= 2 && styles.stepDotTextActive, currentStep > 2 && styles.stepDotTextCompleted]}>
+                  {currentStep > 2 ? '✓' : '2'}
+                </Text>
+              </View>
+              <View style={[styles.stepLine, currentStep > 2 && styles.stepLineActive]} />
+
+              {/* Step 3 (Optional specs) */}
+              {categorySchema.length > 0 && (
+                <>
+                  <View style={[styles.stepDot, currentStep >= 3 && styles.stepDotActive, currentStep > 3 && styles.stepDotCompleted]}>
+                    <Text style={[styles.stepDotText, currentStep >= 3 && styles.stepDotTextActive, currentStep > 3 && styles.stepDotTextCompleted]}>
+                      {currentStep > 3 ? '✓' : '3'}
+                    </Text>
+                  </View>
+                  <View style={[styles.stepLine, currentStep > 3 && styles.stepLineActive]} />
+                </>
+              )}
+
+              {/* Step 4 / Final */}
+              <View style={[styles.stepDot, currentStep === 4 && styles.stepDotActive]}>
+                <Text style={[styles.stepDotText, currentStep === 4 && styles.stepDotTextActive]}>
+                  {categorySchema.length > 0 ? '4' : '3'}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.stepSubText}>
+              {currentStep === 1 && 'Étape 1 : Informations de base'}
+              {currentStep === 2 && 'Étape 2 : Prix & Stock'}
+              {currentStep === 3 && 'Étape 3 : Spécifications techniques'}
+              {currentStep === 4 && 'Étape 4 : Images du produit'}
+            </Text>
           </View>
 
-          <ScrollView
-            style={styles.modalBody}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>
-                Collection <Text style={styles.required}>*</Text>
-              </Text>
-              <TouchableOpacity style={[styles.selectInput, fieldErrors.collection && styles.inputError]} onPress={openCollectionPicker} activeOpacity={0.8}>
-                <Text style={{ color: newProduct.collectionId ? COLORS.text : COLORS.textMuted }} numberOfLines={1}>
-                  {collections?.find((c) => c.id === newProduct.collectionId)?.name || 'Sélectionner une collection'}
-                </Text>
-                <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
-              </TouchableOpacity>
-              {fieldErrors.collection && <Text style={styles.errorText}>{fieldErrors.collection}</Text>}
-            </View>
+          {/* Modal Body */}
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            {/* STEP 1 : BASIC INFORMATIONS */}
+            {currentStep === 1 && (
+              <View>
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>
+                    Collection <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TouchableOpacity style={[styles.selectInput, fieldErrors.collection && styles.inputError]} onPress={openCollectionPicker} activeOpacity={0.8}>
+                    <Text style={{ color: newProduct.collectionId ? COLORS.text : COLORS.textMuted }} numberOfLines={1}>
+                      {collections?.find((c) => c.id === newProduct.collectionId)?.name || 'Sélectionner une collection'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                  {fieldErrors.collection && <Text style={styles.errorText}>{fieldErrors.collection}</Text>}
+                </View>
 
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>
-                Nom du produit <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.input, fieldErrors.name && styles.inputError]}
-                placeholder="Ex: iPhone 15 Pro"
-                placeholderTextColor={COLORS.textMuted}
-                value={newProduct.name}
-                onChangeText={(text) =>
-                  setNewProduct({ ...newProduct, name: text })
-                }
-              />
-              {fieldErrors.name && <Text style={styles.errorText}>{fieldErrors.name}</Text>}
-            </View>
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>
+                    Nom du produit <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.name && styles.inputError]}
+                    placeholder="Ex: Robe en soie rouge, Pizza Reine"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newProduct.name}
+                    onChangeText={(text) => setNewProduct({ ...newProduct, name: text })}
+                  />
+                  {fieldErrors.name && <Text style={styles.errorText}>{fieldErrors.name}</Text>}
+                </View>
 
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>
-                Prix <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.input, fieldErrors.price && styles.inputError]}
-                placeholder="Ex: 850000"
-                placeholderTextColor={COLORS.textMuted}
-                value={newProduct.price}
-                onChangeText={(text) =>
-                  setNewProduct({ ...newProduct, price: text })
-                }
-                keyboardType="numeric"
-              />
-              {fieldErrors.price && <Text style={styles.errorText}>{fieldErrors.price}</Text>}
-            </View>
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>
+                    Description <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={[styles.input, styles.textArea, fieldErrors.description && styles.inputError]}
+                    placeholder="Présentez brièvement le produit à vos clients..."
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newProduct.description}
+                    onChangeText={(text) => setNewProduct({ ...newProduct, description: text })}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                  {fieldErrors.description && <Text style={styles.errorText}>{fieldErrors.description}</Text>}
+                </View>
 
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>
-                Prix d'achat (pour calcul des bénéfices)
-              </Text>
-              <TextInput
-                style={[styles.input, fieldErrors.costPrice && styles.inputError]}
-                placeholder="Ex: 500000"
-                placeholderTextColor={COLORS.textMuted}
-                value={newProduct.costPrice}
-                onChangeText={(text) =>
-                  setNewProduct({ ...newProduct, costPrice: text })
-                }
-                keyboardType="numeric"
-              />
-              {fieldErrors.costPrice && <Text style={styles.errorText}>{fieldErrors.costPrice}</Text>}
-            </View>
-
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>Prix comparé</Text>
-              <TextInput
-                style={[styles.input, fieldErrors.comparePrice && styles.inputError]}
-                placeholder="Ex: 950000"
-                placeholderTextColor={COLORS.textMuted}
-                value={newProduct.comparePrice}
-                onChangeText={(text) =>
-                  setNewProduct({ ...newProduct, comparePrice: text })
-                }
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Code barre */}
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>Code barre</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder="0001234567890"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={newProduct.barcode || ''}
-                  onChangeText={(text) =>
-                    setNewProduct({ ...newProduct, barcode: text })
-                  }
-                  keyboardType="numeric"
-                />
-                <TouchableOpacity
-                  style={{
-                    padding: 12,
-                    backgroundColor: COLORS.accent + '15',
-                    borderRadius: 8,
-                    height: 48,
-                    width: 48,
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}
-                  onPress={async () => {
-                    if (!cameraPermission?.granted) {
-                      const status = await requestCameraPermission();
-                      if (!status.granted) {
-                        Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
-                        return;
-                      }
-                    }
-                    setShowCameraScanner(true);
-                  }}
-                >
-                  <Ionicons name="barcode-outline" size={24} color={COLORS.accent} />
-                </TouchableOpacity>
+                <View style={styles.modalInput}>
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Mettre le produit en vedette (Accueil)</Text>
+                    <TouchableOpacity 
+                      style={[styles.toggleButton, newProduct.featured && styles.toggleButtonActive]}
+                      onPress={() => {
+                        setNewProduct({ ...newProduct, featured: !newProduct.featured });
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <View style={[styles.toggleThumb, newProduct.featured && styles.toggleThumbActive]} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-            </View>
+            )}
 
-            <View style={[styles.modalInput, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-              <Text style={styles.inputLabel}>Ajouter en vedette (Accueil)</Text>
-              <TouchableOpacity 
-                style={[styles.toggleButton, newProduct.featured && styles.toggleButtonActive]}
-                onPress={() => setNewProduct({ ...newProduct, featured: !newProduct.featured })}
-              >
-                <Text style={[styles.toggleText, newProduct.featured && styles.toggleTextActive]}>
-                  {newProduct.featured ? '✓' : '○'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {/* STEP 2 : PRICE & STOCK */}
+            {currentStep === 2 && (
+              <View>
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>
+                    Prix de vente (F CFA) <Text style={styles.required}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.price && styles.inputError]}
+                    placeholder="Ex: 15000"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newProduct.price}
+                    onChangeText={(text) => setNewProduct({ ...newProduct, price: text })}
+                    keyboardType="numeric"
+                  />
+                  {fieldErrors.price && <Text style={styles.errorText}>{fieldErrors.price}</Text>}
+                </View>
 
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>Stock</Text>
-              <View style={styles.stockRow}>
-                <TouchableOpacity style={styles.stockButton} onPress={decrementStock}>
-                  <Ionicons name="remove-circle-outline" size={24} color={COLORS.danger} />
-                </TouchableOpacity>
-                <Text style={styles.stockValue}>{newProduct.stock || '0'}</Text>
-                <TouchableOpacity style={styles.stockButton} onPress={incrementStock}>
-                  <Ionicons name="add-circle-outline" size={24} color={COLORS.success} />
-                </TouchableOpacity>
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>Prix d'achat (Optionnel - Pour calculer vos bénéfices)</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.costPrice && styles.inputError]}
+                    placeholder="Ex: 10000"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newProduct.costPrice}
+                    onChangeText={(text) => setNewProduct({ ...newProduct, costPrice: text })}
+                    keyboardType="numeric"
+                  />
+                  {fieldErrors.costPrice && <Text style={styles.errorText}>{fieldErrors.costPrice}</Text>}
+                </View>
+
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>Prix comparé (Prix barré - Idéal pour les promotions)</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.comparePrice && styles.inputError]}
+                    placeholder="Ex: 20000"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={newProduct.comparePrice}
+                    onChangeText={(text) => setNewProduct({ ...newProduct, comparePrice: text })}
+                    keyboardType="numeric"
+                  />
+                  {fieldErrors.comparePrice && <Text style={styles.errorText}>{fieldErrors.comparePrice}</Text>}
+                </View>
+
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>Stock disponible</Text>
+                  <View style={styles.stockRow}>
+                    <TouchableOpacity style={styles.stockButton} onPress={decrementStock}>
+                      <Ionicons name="remove-circle-outline" size={28} color={COLORS.danger} />
+                    </TouchableOpacity>
+                    <Text style={styles.stockValue}>{newProduct.stock || '0'}</Text>
+                    <TouchableOpacity style={styles.stockButton} onPress={incrementStock}>
+                      <Ionicons name="add-circle-outline" size={28} color={COLORS.success} />
+                    </TouchableOpacity>
+                  </View>
+                  {fieldErrors.stock && <Text style={styles.errorText}>{fieldErrors.stock}</Text>}
+                </View>
+
+                {/* Barcode scanner */}
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>Code-barres / EAN (Optionnel)</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="0001234567890"
+                      placeholderTextColor={COLORS.textMuted}
+                      value={newProduct.barcode || ''}
+                      onChangeText={(text) => setNewProduct({ ...newProduct, barcode: text })}
+                      keyboardType="numeric"
+                    />
+                    <TouchableOpacity
+                      style={{
+                        padding: 12,
+                        backgroundColor: COLORS.accent + '15',
+                        borderRadius: 8,
+                        height: 48,
+                        width: 48,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}
+                      onPress={async () => {
+                        if (!cameraPermission?.granted) {
+                          const status = await requestCameraPermission();
+                          if (!status.granted) {
+                            Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner.');
+                            return;
+                          }
+                        }
+                        setShowCameraScanner(true);
+                      }}
+                    >
+                      <Ionicons name="barcode-outline" size={24} color={COLORS.accent} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-              {fieldErrors.stock && <Text style={styles.errorText}>{fieldErrors.stock}</Text>}
-            </View>
+            )}
 
-            {/* Dynamic Attributes Section */}
-            {categorySchema.length > 0 && (
+            {/* STEP 3 : TECHNICAL SPECIFICATIONS (DYNAMIC FIELDS) */}
+            {currentStep === 3 && categorySchema.length > 0 && (
               <View style={styles.dynamicAttrsSection}>
                 <View style={styles.dynamicAttrsHeader}>
                   <Ionicons name="sparkles-outline" size={18} color={COLORS.accent} />
-                  <Text style={styles.dynamicAttrsTitle}>Informations complémentaires</Text>
+                  <Text style={styles.dynamicAttrsTitle}>Caractères spécifiques</Text>
                 </View>
                 <Text style={styles.dynamicAttrsSubtitle}>
-                  Remplissez ces caractéristiques spécifiques pour améliorer la visibilité de votre produit.
+                  Spécifiez les options disponibles pour vos produits (ex: Couleurs, Tailles) héritées de la catégorie.
                 </Text>
 
                 {categorySchema.map((attr) => {
@@ -1022,7 +1200,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                       {attr.type === 'text' && (
                         <TextInput
                           style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
-                          placeholder={`Entrez ${attr.label.toLowerCase()}`}
+                          placeholder={`Saisir ${attr.label.toLowerCase()}`}
                           placeholderTextColor={COLORS.textMuted}
                           value={val || ''}
                           onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
@@ -1032,7 +1210,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                       {attr.type === 'number' && (
                         <TextInput
                           style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
-                          placeholder={`Entrez ${attr.label.toLowerCase()}`}
+                          placeholder={`Saisir ${attr.label.toLowerCase()}`}
                           placeholderTextColor={COLORS.textMuted}
                           keyboardType="numeric"
                           value={val !== undefined && val !== null ? String(val) : ''}
@@ -1041,22 +1219,16 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                       )}
 
                       {attr.type === 'select' && (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                        <View style={styles.attrChipsRow}>
                           {attr.options?.map((opt: string) => {
                             const selected = val === opt;
                             return (
                               <TouchableOpacity
                                 key={opt}
-                                style={[
-                                  styles.attrChip,
-                                  selected && styles.attrChipActive
-                                ]}
+                                style={[styles.attrChip, selected && styles.attrChipActive]}
                                 onPress={() => setProductAttributes(prev => ({ ...prev, [attr.name]: opt }))}
                               >
-                                <Text style={[
-                                  styles.attrChipText,
-                                  selected && styles.attrChipTextActive
-                                ]}>
+                                <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
                                   {opt}
                                 </Text>
                               </TouchableOpacity>
@@ -1066,26 +1238,20 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                       )}
 
                       {attr.type === 'multiselect' && (
-                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                        <View style={styles.attrChipsRow}>
                           {attr.options?.map((opt: string) => {
                             const arr = Array.isArray(val) ? val : [];
                             const selected = arr.includes(opt);
                             return (
                               <TouchableOpacity
                                 key={opt}
-                                style={[
-                                  styles.attrChip,
-                                  selected && styles.attrChipActive
-                                ]}
+                                style={[styles.attrChip, selected && styles.attrChipActive]}
                                 onPress={() => {
                                   const next = selected ? arr.filter((x: any) => x !== opt) : [...arr, opt];
                                   setProductAttributes(prev => ({ ...prev, [attr.name]: next }));
                                 }}
                               >
-                                <Text style={[
-                                  styles.attrChipText,
-                                  selected && styles.attrChipTextActive
-                                ]}>
+                                <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
                                   {opt}
                                 </Text>
                               </TouchableOpacity>
@@ -1103,101 +1269,96 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               </View>
             )}
 
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>
-                Description <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.input, styles.textArea, fieldErrors.description && styles.inputError]}
-                placeholder="Description du produit (minimum 3 caractères)..."
-                placeholderTextColor={COLORS.textMuted}
-                value={newProduct.description}
-                onChangeText={(text) =>
-                  setNewProduct({ ...newProduct, description: text })
-                }
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-              {fieldErrors.description && <Text style={styles.errorText}>{fieldErrors.description}</Text>}
-            </View>
+            {/* STEP 4 : IMAGES & UPLOADER */}
+            {currentStep === 4 && (
+              <View>
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>
+                    Photos du produit ({newProduct.images.length}/5) <Text style={styles.required}>*</Text>
+                  </Text>
+                  
+                  <View style={styles.imagesGrid}>
+                    {newProduct.images.map((image, index) => (
+                      <View key={index} style={styles.imageItem}>
+                        <Image
+                          source={{ uri: cloudinaryService.getOptimizedUrl(image, 800) }}
+                          style={[styles.imagePreview, enhancingImages[index] && { opacity: 0.4 }]}
+                        />
+                        <TouchableOpacity
+                          style={styles.removeImageButton}
+                          onPress={() => handleRemoveImage(index)}
+                        >
+                          <Ionicons name="close" size={14} color="#fff" />
+                        </TouchableOpacity>
 
-            <View style={styles.modalInput}>
-              <Text style={styles.inputLabel}>
-                Images ({newProduct.images.length}/5) <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={fieldErrors.images ? styles.imagesErrorContainer : {}}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.imagesContainer}
-                >
-                {newProduct.images.map((image, index) => (
-                  <View key={index} style={styles.imageItem}>
-                    <Image
-                      source={{ uri: cloudinaryService.getOptimizedUrl(image, 800) }}
-                      style={[styles.imagePreview, enhancingImages[index] && { opacity: 0.5 }]}
-                    />
-                    <TouchableOpacity
-                      style={styles.removeImageButton}
-                      onPress={() => handleRemoveImage(index)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <Ionicons name="close" size={14} color="#fff" />
-                    </TouchableOpacity>
-                    
-                    {enhancingImages[index] ? (
-                      <View style={styles.imageLoadingOverlay}>
-                        <ActivityIndicator color="#fff" size="small" />
+                        {/* IA Background Removal Button */}
+                        {!enhancingImages[index] && (
+                          <TouchableOpacity
+                            style={styles.enhanceImageButton}
+                            onPress={() => handleEnhanceImage(index)}
+                          >
+                            <Ionicons name="sparkles" size={10} color="#fff" />
+                            <Text style={styles.enhanceImageText}>Améliorer</Text>
+                          </TouchableOpacity>
+                        )}
+                        
+                        {enhancingImages[index] && (
+                          <View style={styles.imageLoadingOverlay}>
+                            <ActivityIndicator color="#fff" size="small" />
+                          </View>
+                        )}
                       </View>
-                    ) : null}
-                  </View>
-                ))}
+                    ))}
 
-                {newProduct.images.length < 5 && (
-                  <TouchableOpacity
-                    style={styles.addImageButton}
-                    onPress={handleAddImage}
-                  >
-                    <Ionicons name="add" size={24} color={COLORS.textMuted} />
-                    <Text style={styles.addImageText}>Ajouter</Text>
-                  </TouchableOpacity>
-                )}
-              </ScrollView>
+                    {newProduct.images.length < 5 && (
+                      <TouchableOpacity style={styles.addImageButton} onPress={handleAddImage}>
+                        <Ionicons name="camera-outline" size={28} color={COLORS.textMuted} />
+                        <Text style={styles.addImageText}>Ajouter</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {fieldErrors.images && <Text style={styles.errorText}>{fieldErrors.images}</Text>}
+                </View>
               </View>
-              {fieldErrors.images && <Text style={styles.errorText}>{fieldErrors.images}</Text>}
-            </View>
+            )}
           </ScrollView>
 
+          {/* Modal Footer Actions */}
           <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.cancelButtonText}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.confirmButton]}
-              onPress={handleAddProduct}
-            >
-              <Text style={styles.confirmButtonText}>Ajouter</Text>
-            </TouchableOpacity>
+            {currentStep > 1 ? (
+              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={handlePrev}>
+                <Ionicons name="arrow-back" size={18} color={COLORS.text} />
+                <Text style={styles.cancelButtonText}>Retour</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+            )}
+
+            {currentStep < totalSteps ? (
+              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleNext}>
+                <Text style={styles.confirmButtonText}>Suivant</Text>
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleAddProduct}>
+                <Text style={styles.confirmButtonText}>Ajouter le produit</Text>
+                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </KeyboardAvoidingView>
 
-      <Modal
-        visible={showCollectionPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCollectionPicker(false)}
-      >
+      {/* SELECTOR : COLLECTION */}
+      <Modal visible={showCollectionPicker} animationType="slide" transparent={true} onRequestClose={() => setShowCollectionPicker(false)}>
         <View style={styles.pickerOverlay}>
           <View style={styles.pickerContent}>
             <View style={styles.pickerHeader}>
               <Text style={styles.pickerTitle}>Choisir une collection</Text>
               <TouchableOpacity onPress={() => setShowCollectionPicker(false)}>
-                <Ionicons name="close" size={22} color={COLORS.text} />
+                <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
@@ -1205,7 +1366,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               <Ionicons name="search-outline" size={18} color={COLORS.textMuted} />
               <TextInput
                 style={styles.pickerSearchInput}
-                placeholder="Rechercher..."
+                placeholder="Rechercher une collection..."
                 placeholderTextColor={COLORS.textMuted}
                 value={collectionSearch}
                 onChangeText={setCollectionSearch}
@@ -1216,7 +1377,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
               {filteredCollectionOptions.length === 0 ? (
                 <View style={styles.pickerEmpty}>
-                  <Text style={styles.pickerEmptyText}>Aucune collection</Text>
+                  <Text style={styles.pickerEmptyText}>Aucune collection disponible</Text>
                 </View>
               ) : (
                 filteredCollectionOptions.map((c) => {
@@ -1236,11 +1397,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                           {c.name}
                         </Text>
                       </View>
-                      {selected ? (
-                        <Ionicons name="checkmark" size={18} color={COLORS.accent} />
-                      ) : (
-                        <View style={{ width: 18 }} />
-                      )}
+                      {selected && <Ionicons name="checkmark" size={18} color={COLORS.accent} />}
                     </TouchableOpacity>
                   );
                 })
@@ -1248,10 +1405,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             </ScrollView>
 
             <View style={styles.pickerActions}>
-              <TouchableOpacity
-                style={[styles.pickerButton, styles.pickerCancelButton]}
-                onPress={() => setShowCollectionPicker(false)}
-              >
+              <TouchableOpacity style={[styles.pickerButton, styles.pickerCancelButton]} onPress={() => setShowCollectionPicker(false)}>
                 <Text style={styles.pickerCancelText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1273,11 +1427,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       </Modal>
 
       {/* MODAL SCANNER CAMÉRA */}
-      <Modal
-        visible={showCameraScanner}
-        animationType="slide"
-        onRequestClose={() => setShowCameraScanner(false)}
-      >
+      <Modal visible={showCameraScanner} animationType="slide" onRequestClose={() => setShowCameraScanner(false)}>
         <View style={styles.cameraContainer}>
           <CameraView
             style={styles.camera}
@@ -1288,10 +1438,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           >
             <View style={styles.cameraOverlay}>
               <View style={styles.cameraHeader}>
-                <TouchableOpacity 
-                  style={styles.closeCameraButton}
-                  onPress={() => setShowCameraScanner(false)}
-                >
+                <TouchableOpacity style={styles.closeCameraButton} onPress={() => setShowCameraScanner(false)}>
                   <Ionicons name="close" size={28} color="#fff" />
                 </TouchableOpacity>
               </View>
