@@ -13,6 +13,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -169,6 +170,7 @@ export const SellerOrdersScreen: React.FC = () => {
   // 🖨️ Sélection multiple pour impression en masse
   const [selectionMode, setSelectionMode] = React.useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = React.useState<Set<string>>(new Set());
+  const [guideModalVisible, setGuideModalVisible] = React.useState(false);
 
   const toggleOrderSelection = (id: string) => {
     setSelectedOrderIds(prev => {
@@ -1319,6 +1321,114 @@ Merci.`;
       color: COLORS.text,
       fontWeight: '600',
     },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: COLORS.bg,
+      borderTopLeftRadius: RADIUS.lg,
+      borderTopRightRadius: RADIUS.lg,
+      maxHeight: '85%',
+      paddingBottom: spacing.xl,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: COLORS.border,
+    },
+    modalTitle: {
+      fontSize: fontSize.md || 16,
+      fontWeight: '700',
+      color: COLORS.text,
+    },
+    modalForm: {
+      padding: spacing.md,
+    },
+    guideCard: {
+      marginBottom: spacing.md,
+      borderRadius: RADIUS.md,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    guideCardGradient: {
+      padding: spacing.md,
+    },
+    guideCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+      gap: spacing.sm,
+    },
+    guideIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    guideCardTitle: {
+      fontSize: fontSize.sm || 14,
+      fontWeight: '700',
+    },
+    guideCardBody: {
+      fontSize: fontSize.xs || 12,
+      color: COLORS.textSoft,
+      lineHeight: 18,
+      marginBottom: spacing.sm,
+    },
+    bulletList: {
+      gap: spacing.xs,
+    },
+    bulletItem: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.xs,
+    },
+    bulletText: {
+      fontSize: fontSize.xs || 12,
+      color: COLORS.textSoft,
+      flex: 1,
+      lineHeight: 18,
+    },
+    stepContainer: {
+      gap: spacing.md,
+      marginTop: spacing.xs,
+    },
+    stepRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+    },
+    stepNumberBadge: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+    },
+    stepNumberText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    stepTitle: {
+      fontSize: fontSize.xs || 12,
+      fontWeight: '700',
+      color: COLORS.text,
+    },
+    stepDesc: {
+      fontSize: fontSize.xs || 12,
+      color: COLORS.textMuted,
+      lineHeight: 16,
+      marginTop: 2,
+    },
   }), [spacing, fontSize, component]);
 
   return (
@@ -1364,6 +1474,12 @@ Merci.`;
           </View>
 
           <View style={styles.headerRight}>
+            <TouchableOpacity 
+              style={[styles.headerButton, { backgroundColor: COLORS.accent + '20' }]}
+              onPress={() => setGuideModalVisible(true)}
+            >
+              <Ionicons name="help-circle-outline" size={fontSize.lg} color={COLORS.accent} />
+            </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.headerButton, { backgroundColor: COLORS.card }]}
               onPress={handleExportAllOrders}
@@ -1646,6 +1762,140 @@ Merci.`;
           orders.length === 0 && { flex: 1 }
         ]}
       />
+
+      {/* Guide Modal */}
+      <Modal
+        visible={guideModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setGuideModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="book-outline" size={22} color={COLORS.accent} />
+                <Text style={styles.modalTitle}>Guide : Comptabilité & Commandes</Text>
+              </View>
+              <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalForm} showsVerticalScrollIndicator={false}>
+              
+              {/* Section 1: Comptabilisation & Trésorerie */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(76, 175, 80, 0.1)', 'rgba(76, 175, 80, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+                      <Ionicons name="cash-outline" size={20} color={COLORS.success} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.success }]}>1. Entrées Comptables (Trésorerie)</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Vos revenus et statistiques financières sont calculés en temps réel. Une vente s'enregistre officiellement dans vos rapports dès que :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.bulletText}>La commande est marquée comme <Text style={{ fontWeight: '700' }}>Payée</Text> (Caisse ou paiement validé).</Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.bulletText}>La commande atteint le statut final <Text style={{ fontWeight: '700' }}>Livrée</Text> (comptabilisation à la livraison).</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 2: Mouvements de stock */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(33, 150, 243, 0.1)', 'rgba(33, 150, 243, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(33, 150, 243, 0.15)' }]}>
+                      <Ionicons name="cube-outline" size={20} color={COLORS.primary} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.primary }]}>2. Mouvements de Stock (Cycle)</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Pour garantir que vous ne vendiez jamais deux fois le même article en ligne et en caisse (survente) :
+                  </Text>
+                  <View style={styles.stepContainer}>
+                    <View style={styles.stepRow}>
+                      <View style={[styles.stepNumberBadge, { backgroundColor: COLORS.primary }]}>
+                        <Text style={styles.stepNumberText}>1</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.stepTitle}>Dépréciation à l'Acceptation</Text>
+                        <Text style={styles.stepDesc}>Dès que vous acceptez une commande, l'article est "réservé" (déduit du stock physique) pour le client.</Text>
+                      </View>
+                    </View>
+                    <View style={styles.stepRow}>
+                      <View style={[styles.stepNumberBadge, { backgroundColor: COLORS.warning }]}>
+                        <Text style={styles.stepNumberText}>2</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.stepTitle}>Restauration automatique à l'Annulation</Text>
+                        <Text style={styles.stepDesc}>Si une commande en cours de préparation est annulée, le stock est réinjecté automatiquement et un log "Retour" est tracé.</Text>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 3: Bonnes pratiques */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(255, 152, 0, 0.1)', 'rgba(255, 152, 0, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(255, 152, 0, 0.15)' }]}>
+                      <Ionicons name="bulb-outline" size={20} color={COLORS.warning} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.warning }]}>3. Conseils de Gestion</Text>
+                  </View>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Pertes & Vols :</Text> Utilisez le bouton d'audit dans l'historique de stock pour déclarer les pertes, vols ou anomalies manuellement.
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Validation de paiement :</Text> Confirmez toujours les paiements dès réception des fonds pour avoir des rapports mensuels impeccables.
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setGuideModalVisible(false)}
+                style={{ 
+                  marginTop: spacing.md, 
+                  backgroundColor: COLORS.accent,
+                  paddingVertical: spacing.md,
+                  borderRadius: RADIUS.lg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.md }}>J'ai compris</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
