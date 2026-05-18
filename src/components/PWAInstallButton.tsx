@@ -144,13 +144,20 @@ export const PWAInstallButton: React.FC = () => {
     } else {
       // iOS or browsers without native prompt — show manual instructions
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      Alert.alert(
-        'Installer LibreShop',
-        isIOS
-          ? 'Sur Safari :\n\n1. Appuyez sur l\'icône "Partager" (⬆) en bas\n2. Sélectionnez "Sur l\'écran d\'accueil"\n3. Appuyez sur "Ajouter"'
-          : 'Sur Chrome :\n\n1. Appuyez sur le menu ⋮ en haut à droite\n2. Sélectionnez "Ajouter à l\'écran d\'accueil"\n3. Confirmez l\'installation',
-        [{ text: 'Compris', style: 'default' }]
-      );
+      const title = 'Installer LibreShop';
+      const instructions = isIOS
+        ? 'Sur Safari :\n\n1. Appuyez sur l\'icône "Partager" (⬆) en bas de l\'écran.\n2. Sélectionnez "Sur l\'écran d\'accueil".\n3. Appuyez sur "Ajouter" en haut à droite.'
+        : 'Sur votre navigateur :\n\n1. Appuyez sur le menu (les 3 petits points ⋮ ou l\'icône de partage).\n2. Sélectionnez "Ajouter à l\'écran d\'accueil" ou "Installer l\'application".\n3. Confirmez l\'installation.';
+      
+      if (Platform.OS === 'web') {
+        window.alert(`${title}\n\n${instructions}`);
+      } else {
+        Alert.alert(
+          title,
+          instructions,
+          [{ text: 'Compris', style: 'default' }]
+        );
+      }
     }
   };
 
