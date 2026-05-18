@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
@@ -171,6 +172,24 @@ export const SellerOrdersScreen: React.FC = () => {
   const [selectionMode, setSelectionMode] = React.useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = React.useState<Set<string>>(new Set());
   const [guideModalVisible, setGuideModalVisible] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkFirstTime = async () => {
+      try {
+        const hasShown = await AsyncStorage.getItem('@libreshop:orders_guide_shown');
+        if (!hasShown) {
+          setGuideModalVisible(true);
+          await AsyncStorage.setItem('@libreshop:orders_guide_shown', 'true');
+        }
+      } catch (error) {
+        console.warn('Error reading orders guide flag:', error);
+      }
+    };
+    const timer = setTimeout(() => {
+      checkFirstTime();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const toggleOrderSelection = (id: string) => {
     setSelectedOrderIds(prev => {
@@ -2022,6 +2041,48 @@ Merci.`;
                       <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
                       <Text style={styles.bulletText}>
                         <Text style={{ fontWeight: '700' }}>Validation de paiement :</Text> Confirmez toujours les paiements dès réception des fonds pour avoir des rapports mensuels impeccables.
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 4: Navigation & Traitements en Masse */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(139, 92, 246, 0.1)', 'rgba(139, 92, 246, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
+                      <Ionicons name="flash-outline" size={20} color={COLORS.accent} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.accent }]}>4. Raccourcis & Traitement en Masse</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Pour traiter efficacement un grand volume de commandes (100+) sans clics répétitifs :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="arrow-forward" size={14} color={COLORS.accent} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Activer la Sélection :</Text> Faites un **appui long** sur n'importe quelle commande pour activer le mode sélection multiple.
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="arrow-forward" size={14} color={COLORS.accent} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Sélection Multiple :</Text> Cochez plusieurs commandes en appuyant simplement dessus. Vous pouvez aussi cliquer sur **"Tout sélectionner"** en haut à droite du bandeau.
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="arrow-forward" size={14} color={COLORS.accent} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Bandeau d'Actions (en bas) :</Text> Faites glisser horizontalement le bandeau violet pour choisir votre action :
+                        {"\n"}• <Text style={{ fontWeight: '600' }}>Accepter ()</Text> en masse les commandes en attente.
+                        {"\n"}• <Text style={{ fontWeight: '600' }}>Payer ()</Text> en masse les paiements en attente.
+                        {"\n"}• <Text style={{ fontWeight: '600' }}>Picking List</Text> pour générer le bordereau consolidé des articles à préparer.
+                        {"\n"}• <Text style={{ fontWeight: '600' }}>Imprimer Factures</Text> pour générer tous les PDFs individuels en un seul fichier.
                       </Text>
                     </View>
                   </View>
