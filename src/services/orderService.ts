@@ -303,11 +303,37 @@ export const orderService = {
 
   async cancelOrderRobust(orderId: string) {
     const order: any = await this.getById(orderId);
+    const client = useSupabase();
+    
     if (order && ['accepted', 'paid', 'shipped'].includes(order.status)) {
       await this.logOrderStockMovementsBeforeUpdate(order, 'return');
+
+      // Restauration du stock physique des produits dans la base de données
+      const items = order.order_items || [];
+      for (const item of items) {
+        const product = item.products;
+        if (!product) continue;
+
+        try {
+          const { data: freshProduct } = await client
+            .from('products')
+            .select('stock')
+            .eq('id', product.id)
+            .single();
+
+          if (freshProduct) {
+            const qty = Number(item.quantity || 0);
+            await client
+              .from('products')
+              .update({ stock: freshProduct.stock + qty })
+              .eq('id', product.id);
+          }
+        } catch (sErr) {
+          console.warn('Failed to restore stock for product during cancellation:', sErr);
+        }
+      }
     }
 
-    const client = useSupabase();
     try {
       const { data, error } = await client.rpc('cancel_order_robust', {
         p_order_id: orderId
