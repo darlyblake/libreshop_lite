@@ -26,6 +26,8 @@ interface Category {
   icon: keyof typeof Ionicons.glyphMap;
   status: 'active' | 'inactive';
   store_type: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
+  parent_id?: string | null;
+  attribute_schema?: any[];
   createdAt: string;
 }
 
@@ -56,6 +58,8 @@ export const AdminCategoriesScreen: React.FC = () => {
           icon: (c.icon as keyof typeof Ionicons.glyphMap) || 'grid-outline',
           status: c.status || 'active',
           store_type: c.store_type || 'general',
+          parent_id: c.parent_id || null,
+          attribute_schema: Array.isArray(c.attribute_schema) ? c.attribute_schema : [],
           createdAt: c.created_at || new Date().toISOString(),
         }))
       );
@@ -83,13 +87,30 @@ export const AdminCategoriesScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  interface AttributeField {
+    name: string;
+    label: string;
+    type: 'text' | 'number' | 'select' | 'multiselect';
+    options?: string[];
+    required: boolean;
+  }
+
   // Add category modal state
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newIcon, setNewIcon] = useState<string>('grid-outline');
   const [newStoreType, setNewStoreType] = useState<'general' | 'restaurant' | 'bar' | 'hotel' | 'logement'>('general');
+  const [newParentId, setNewParentId] = useState<string | null>(null);
+  const [attributesList, setAttributesList] = useState<AttributeField[]>([]);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+
+  // Single attribute creation form state
+  const [attrName, setAttrName] = useState('');
+  const [attrLabel, setAttrLabel] = useState('');
+  const [attrType, setAttrType] = useState<'text' | 'number' | 'select' | 'multiselect'>('text');
+  const [attrOptionsRaw, setAttrOptionsRaw] = useState('');
+  const [attrRequired, setAttrRequired] = useState(false);
 
   // when a category is selected for editing, populate the inputs
   React.useEffect(() => {
@@ -98,6 +119,8 @@ export const AdminCategoriesScreen: React.FC = () => {
       setNewDesc(editingCategory.description === '-' ? '' : editingCategory.description);
       setNewIcon(editingCategory.icon as string);
       setNewStoreType(editingCategory.store_type || 'general');
+      setNewParentId(editingCategory.parent_id || null);
+      setAttributesList(editingCategory.attribute_schema || []);
     }
   }, [editingCategory]);
 
@@ -149,7 +172,58 @@ export const AdminCategoriesScreen: React.FC = () => {
     setNewDesc('');
     setNewIcon('grid-outline');
     setNewStoreType('general');
+    setNewParentId(null);
+    setAttributesList([]);
     setEditingCategory(null);
+
+    // Reset single attribute creator inputs
+    setAttrName('');
+    setAttrLabel('');
+    setAttrType('text');
+    setAttrOptionsRaw('');
+    setAttrRequired(false);
+  };
+
+  const addAttributeToSchema = () => {
+    if (!attrName.trim() || !attrLabel.trim()) {
+      Alert.alert('Erreur', 'La clé technique et le libellé sont requis.');
+      return;
+    }
+    const cleanKey = attrName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^\w]/g, '');
+    if (attributesList.some(a => a.name === cleanKey)) {
+      Alert.alert('Erreur', 'Un attribut avec cette clé technique existe déjà.');
+      return;
+    }
+
+    const options = (attrType === 'select' || attrType === 'multiselect')
+      ? attrOptionsRaw.split(',').map(o => o.trim()).filter(Boolean)
+      : undefined;
+
+    if ((attrType === 'select' || attrType === 'multiselect') && (!options || options.length === 0)) {
+      Alert.alert('Erreur', 'Veuillez saisir au moins une option pour ce type de champ.');
+      return;
+    }
+
+    const newField: AttributeField = {
+      name: cleanKey,
+      label: attrLabel.trim(),
+      type: attrType,
+      options,
+      required: attrRequired,
+    };
+
+    setAttributesList([...attributesList, newField]);
+    
+    // Clear form inputs
+    setAttrName('');
+    setAttrLabel('');
+    setAttrType('text');
+    setAttrOptionsRaw('');
+    setAttrRequired(false);
+  };
+
+  const removeAttributeFromSchema = (name: string) => {
+    setAttributesList(attributesList.filter(a => a.name !== name));
   };
 
   const submitNewCategory = async () => {
@@ -164,6 +238,8 @@ export const AdminCategoriesScreen: React.FC = () => {
           description: newDesc.trim() || '-',
           icon: newIcon as any,
           store_type: newStoreType,
+          parent_id: newParentId,
+          attribute_schema: attributesList,
         });
         setCategories(categories.map(c =>
           c.id === updatedRecord.id ? { 
@@ -171,7 +247,9 @@ export const AdminCategoriesScreen: React.FC = () => {
             name: updatedRecord.name, 
             description: updatedRecord.description || '-', 
             icon: (updatedRecord.icon as any),
-            store_type: updatedRecord.store_type || 'general'
+            store_type: updatedRecord.store_type || 'general',
+            parent_id: updatedRecord.parent_id || null,
+            attribute_schema: Array.isArray(updatedRecord.attribute_schema) ? updatedRecord.attribute_schema : [],
           } : c
         ));
         Alert.alert('Catégorie modifiée', `${updatedRecord.name} a été mise à jour.`);
@@ -182,6 +260,8 @@ export const AdminCategoriesScreen: React.FC = () => {
           icon: newIcon as any,
           status: 'active',
           store_type: newStoreType,
+          parent_id: newParentId,
+          attribute_schema: attributesList,
         });
         const toAdd: Category = {
           id: created.id,
@@ -190,6 +270,8 @@ export const AdminCategoriesScreen: React.FC = () => {
           icon: (created.icon as any) || 'grid-outline',
           status: created.status || 'active',
           store_type: created.store_type || 'general',
+          parent_id: created.parent_id || null,
+          attribute_schema: Array.isArray(created.attribute_schema) ? created.attribute_schema : [],
           createdAt: created.created_at || new Date().toISOString(),
         };
         setCategories([toAdd, ...categories]);
@@ -334,7 +416,8 @@ export const AdminCategoriesScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.addModalBody}>
+            <ScrollView style={styles.addModalBody} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+              {/* Category name */}
               <TextInput
                 placeholder="Nom de la catégorie"
                 placeholderTextColor={COLORS.textMuted}
@@ -346,70 +429,197 @@ export const AdminCategoriesScreen: React.FC = () => {
               <TextInput
                 placeholder="Description (optionnelle)"
                 placeholderTextColor={COLORS.textMuted}
-                style={[styles.input, { height: 80 }]}
+                style={[styles.input, { height: 70 }]}
                 value={newDesc}
                 onChangeText={setNewDesc}
                 multiline
               />
 
-              <Text style={styles.modalLabel}>Type de commerce lié</Text>
+              {/* Store type selector */}
+              <Text style={styles.modalLabel}>Type de commerce</Text>
               <View style={styles.modalStoreTypeContainer}>
                 {STORE_TYPES.map(type => (
                   <TouchableOpacity
                     key={type.id}
-                    style={[
-                      styles.modalStoreTypeCard,
-                      newStoreType === type.id && styles.modalStoreTypeCardActive
-                    ]}
-                    onPress={() => setNewStoreType(type.id)}
+                    style={[styles.modalStoreTypeCard, newStoreType === type.id && styles.modalStoreTypeCardActive]}
+                    onPress={() => { setNewStoreType(type.id); setNewParentId(null); }}
                   >
-                    <Ionicons 
-                      name={type.icon as any} 
-                      size={12} 
-                      color={newStoreType === type.id ? COLORS.accent : COLORS.textMuted} 
-                    />
-                    <Text style={[
-                      styles.modalStoreTypeCardText,
-                      newStoreType === type.id && styles.modalStoreTypeCardTextActive
-                    ]}>
+                    <Ionicons name={type.icon as any} size={12} color={newStoreType === type.id ? COLORS.accent : COLORS.textMuted} />
+                    <Text style={[styles.modalStoreTypeCardText, newStoreType === type.id && styles.modalStoreTypeCardTextActive]}>
                       {type.title}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={{ color: COLORS.textMuted, marginBottom: 8 }}>Choisir une icône</Text>
+              {/* Parent category selector */}
+              <Text style={styles.modalLabel}>Catégorie parente (optionnel)</Text>
+              <View style={styles.parentSelectorContainer}>
+                <TouchableOpacity
+                  style={[styles.parentOption, newParentId === null && styles.parentOptionActive]}
+                  onPress={() => setNewParentId(null)}
+                >
+                  <Ionicons name="apps-outline" size={13} color={newParentId === null ? COLORS.accent : COLORS.textMuted} />
+                  <Text style={[styles.parentOptionText, newParentId === null && styles.parentOptionTextActive]}>
+                    Aucune (catégorie principale)
+                  </Text>
+                </TouchableOpacity>
+                {categories
+                  .filter(c => !c.parent_id && c.store_type === newStoreType)
+                  .map(c => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.parentOption, newParentId === c.id && styles.parentOptionActive]}
+                      onPress={() => setNewParentId(c.id)}
+                    >
+                      <Ionicons name={c.icon} size={13} color={newParentId === c.id ? COLORS.accent : COLORS.textMuted} />
+                      <Text style={[styles.parentOptionText, newParentId === c.id && styles.parentOptionTextActive]} numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                }
+              </View>
+
+              {/* Icon chooser */}
+              <Text style={styles.modalLabel}>Icône</Text>
               <FlatList
                 data={ICON_OPTIONS}
                 keyExtractor={(i) => i}
-                numColumns={4}
+                numColumns={5}
                 style={styles.iconGrid}
-                contentContainerStyle={{ paddingBottom: SPACING.md }}
-                nestedScrollEnabled={true}
-                showsVerticalScrollIndicator={true}
+                contentContainerStyle={{ paddingBottom: SPACING.sm }}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={[
-                      styles.iconOption,
-                      item === newIcon ? styles.iconSelected : null,
-                    ]}
+                    style={[styles.iconOption, item === newIcon && styles.iconSelected]}
                     onPress={() => setNewIcon(item)}
                   >
-                    <Ionicons name={item as any} size={22} color={item === newIcon ? COLORS.text : COLORS.text} />
+                    <Ionicons name={item as any} size={20} color={COLORS.text} />
                   </TouchableOpacity>
                 )}
               />
 
-              <View style={styles.modalActions}>
+              {/* ── Attribute Schema Builder ── */}
+              <View style={styles.attrBuilderSection}>
+                <View style={styles.attrBuilderHeader}>
+                  <Ionicons name="options-outline" size={16} color={COLORS.accent} />
+                  <Text style={styles.attrBuilderTitle}>Paramètres du formulaire produit</Text>
+                </View>
+                <Text style={styles.attrBuilderSubtitle}>
+                  Définissez les champs qui seront demandés lors de l'ajout d'un produit dans cette catégorie.
+                </Text>
+
+                {/* Existing attributes list */}
+                {attributesList.length > 0 && (
+                  <View style={styles.attrList}>
+                    {attributesList.map((attr, idx) => (
+                      <View key={idx} style={styles.attrRow}>
+                        <View style={styles.attrRowLeft}>
+                          <Ionicons
+                            name={attr.type === 'text' ? 'text-outline' : attr.type === 'number' ? 'calculator-outline' : 'list-outline'}
+                            size={14}
+                            color={COLORS.accent}
+                          />
+                          <View>
+                            <Text style={styles.attrRowLabel}>{attr.label}</Text>
+                            <Text style={styles.attrRowMeta}>
+                              clé: <Text style={{ color: COLORS.accent }}>{attr.name}</Text>
+                              {'  '}type: {attr.type}
+                              {attr.required ? '  ⚠ requis' : ''}
+                            </Text>
+                            {attr.options && (
+                              <View style={styles.optionChips}>
+                                {attr.options.map((opt, oi) => (
+                                  <View key={oi} style={styles.optionChip}>
+                                    <Text style={styles.optionChipText}>{opt}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        <TouchableOpacity onPress={() => removeAttributeFromSchema(attr.name)} style={styles.attrDeleteBtn}>
+                          <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* New attribute mini form */}
+                <View style={styles.attrForm}>
+                  <View style={{ flexDirection: 'row', gap: SPACING.xs }}>
+                    <TextInput
+                      placeholder="Clé (ex: size)"
+                      placeholderTextColor={COLORS.textMuted}
+                      style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                      value={attrName}
+                      onChangeText={setAttrName}
+                      autoCapitalize="none"
+                    />
+                    <TextInput
+                      placeholder="Libellé (ex: Taille)"
+                      placeholderTextColor={COLORS.textMuted}
+                      style={[styles.input, { flex: 1.5, marginBottom: 0 }]}
+                      value={attrLabel}
+                      onChangeText={setAttrLabel}
+                    />
+                  </View>
+
+                  {/* Type selector */}
+                  <View style={styles.attrTypeRow}>
+                    {(['text', 'number', 'select', 'multiselect'] as const).map(t => (
+                      <TouchableOpacity
+                        key={t}
+                        style={[styles.attrTypeBtn, attrType === t && styles.attrTypeBtnActive]}
+                        onPress={() => setAttrType(t)}
+                      >
+                        <Text style={[styles.attrTypeBtnText, attrType === t && styles.attrTypeBtnTextActive]}>{t}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {(attrType === 'select' || attrType === 'multiselect') && (
+                    <TextInput
+                      placeholder="Options séparées par des virgules (ex: S, M, L, XL)"
+                      placeholderTextColor={COLORS.textMuted}
+                      style={styles.input}
+                      value={attrOptionsRaw}
+                      onChangeText={setAttrOptionsRaw}
+                    />
+                  )}
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.xs }}>
+                    <TouchableOpacity
+                      style={[styles.requiredToggle, attrRequired && styles.requiredToggleActive]}
+                      onPress={() => setAttrRequired(!attrRequired)}
+                    >
+                      <Ionicons name={attrRequired ? 'checkbox' : 'square-outline'} size={16} color={attrRequired ? COLORS.accent : COLORS.textMuted} />
+                      <Text style={[styles.requiredToggleText, attrRequired && { color: COLORS.accent }]}>Champ obligatoire</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.addAttrButton} onPress={addAttributeToSchema}>
+                      <Ionicons name="add" size={16} color={COLORS.text} />
+                      <Text style={styles.addAttrButtonText}>Ajouter</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
+              {/* Submit row */}
+              <View style={[styles.modalActions, { marginTop: SPACING.lg }]}>
                 <TouchableOpacity style={styles.modalActionButton} onPress={closeAddModal}>
                   <Text style={styles.modalActionText}>Annuler</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.modalActionButton, { backgroundColor: COLORS.accent }]} onPress={submitNewCategory}>
-                  <Text style={[styles.modalActionText, { color: COLORS.text }]}>{editingCategory ? 'Mettre à jour' : 'Créer'}</Text>
+                <TouchableOpacity style={[styles.modalActionButton, { backgroundColor: COLORS.accent, flex: 1 }]} onPress={submitNewCategory}>
+                  <Text style={[styles.modalActionText, { color: COLORS.text, textAlign: 'center' }]}>
+                    {editingCategory ? '✓ Mettre à jour' : '+ Créer la catégorie'}
+                  </Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -424,100 +634,125 @@ export const AdminCategoriesScreen: React.FC = () => {
           />
         }
       >
-        {filteredCategories.map((category) => (
-          <Card key={category.id} style={styles.categoryCard}>
-            <View style={styles.categoryHeader}>
-              <View style={styles.categoryInfo}>
-                <View style={styles.categoryIcon}>
-                  <Ionicons 
-                    name={category.icon} 
-                    size={24} 
-                    color={category.status === 'active' ? COLORS.accent : COLORS.textMuted} 
-                  />
-                </View>
-                <View style={styles.categoryDetails}>
-                  <Text style={styles.categoryName}>{category.name}</Text>
-                  <Text style={styles.categoryDescription}>{category.description}</Text>
-                  <View style={styles.categoryMeta}>
-                    <Text style={styles.productCount}>
-                      Catégorie active
-                    </Text>
-                    <View style={[
-                      styles.statusBadge,
-                      { 
-                        backgroundColor: category.status === 'active' 
-                          ? COLORS.success + '20' 
-                          : COLORS.textMuted + '20' 
-                      }
-                    ]}>
-                      <Text style={[
-                        styles.statusText,
-                        { 
-                          color: category.status === 'active' 
-                            ? COLORS.success 
-                            : COLORS.textMuted 
-                        }
-                      ]}>
-                        {category.status === 'active' ? 'Actif' : 'Inactif'}
-                      </Text>
+        {/* ── Grouped Hierarchical List: Parents then Children ── */}
+        {filteredCategories
+          .filter(cat => !cat.parent_id)
+          .map(parent => {
+            const children = filteredCategories.filter(c => c.parent_id === parent.id);
+            return (
+              <View key={parent.id} style={styles.parentGroup}>
+                {/* ── Parent Card ── */}
+                <Card style={styles.parentCard}>
+                  <View style={styles.categoryHeader}>
+                    <View style={styles.categoryInfo}>
+                      <View style={[styles.categoryIcon, { backgroundColor: COLORS.accent + '20' }]}>
+                        <Ionicons name={parent.icon} size={22} color={COLORS.accent} />
+                      </View>
+                      <View style={styles.categoryDetails}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.categoryName}>{parent.name}</Text>
+                          <View style={styles.parentBadge}>
+                            <Text style={styles.parentBadgeText}>Principale</Text>
+                          </View>
+                        </View>
+                        {parent.description !== '-' && (
+                          <Text style={styles.categoryDescription} numberOfLines={1}>{parent.description}</Text>
+                        )}
+                        {/* General attribute chips */}
+                        {parent.attribute_schema && parent.attribute_schema.length > 0 && (
+                          <View style={styles.attrChipsRow}>
+                            <Ionicons name="layers-outline" size={10} color={COLORS.textMuted} />
+                            {parent.attribute_schema.map((attr: any, i: number) => (
+                              <View key={i} style={styles.attrChip}>
+                                <Text style={styles.attrChipText}>{attr.label}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                        <View style={styles.categoryMeta}>
+                          <View style={[styles.statusBadge, { backgroundColor: parent.status === 'active' ? COLORS.success + '20' : COLORS.textMuted + '20' }]}>
+                            <Text style={[styles.statusText, { color: parent.status === 'active' ? COLORS.success : COLORS.textMuted }]}>
+                              {parent.status === 'active' ? 'Actif' : 'Inactif'}
+                            </Text>
+                          </View>
+                          <View style={[styles.statusBadge, { backgroundColor: COLORS.accent + '15', flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
+                            <Ionicons name={STORE_TYPES.find(t => t.id === parent.store_type)?.icon as any || 'storefront-outline'} size={10} color={COLORS.accent} />
+                            <Text style={[styles.statusText, { color: COLORS.accent }]}>
+                              {STORE_TYPES.find(t => t.id === parent.store_type)?.title || 'Boutique'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
                     </View>
-
-                    {/* Store Type Badge */}
-                    <View style={[
-                      styles.statusBadge,
-                      { 
-                        backgroundColor: COLORS.accent + '15',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 2,
-                      }
-                    ]}>
-                      <Ionicons 
-                        name={STORE_TYPES.find(t => t.id === category.store_type)?.icon as any || 'storefront-outline'} 
-                        size={10} 
-                        color={COLORS.accent} 
-                      />
-                      <Text style={[styles.statusText, { color: COLORS.accent }]}>
-                        {STORE_TYPES.find(t => t.id === category.store_type)?.title || 'Boutique'}
-                      </Text>
+                    <View style={styles.categoryActions}>
+                      <TouchableOpacity style={styles.actionButton} onPress={() => handleCategoryAction(parent, 'edit')}>
+                        <Ionicons name="create-outline" size={16} color={COLORS.accent} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, parent.status === 'active' ? styles.deactivateButton : styles.activateButton]}
+                        onPress={() => handleCategoryAction(parent, 'toggle')}
+                      >
+                        <Ionicons name={parent.status === 'active' ? 'pause' : 'play'} size={16} color={COLORS.text} />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </View>
-              </View>
-              
-              <View style={styles.categoryActions}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => handleCategoryAction(category, 'edit')}
-                >
-                  <Ionicons name="create-outline" size={18} color={COLORS.accent} />
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    category.status === 'active' ? styles.deactivateButton : styles.activateButton
-                  ]}
-                  onPress={() => handleCategoryAction(category, 'toggle')}
-                >
-                  <Ionicons 
-                    name={category.status === 'active' ? 'pause' : 'play'} 
-                    size={18} 
-                    color={COLORS.text} 
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            <View style={styles.categoryFooter}>
-              <Text style={styles.createdAt}>
-                Créée le {new Date(category.createdAt).toLocaleDateString('fr-FR')}
-              </Text>
-            </View>
-          </Card>
-        ))}
+                  {/* ── Subcategory Rows ── */}
+                  {children.length > 0 && (
+                    <View style={styles.childrenContainer}>
+                      {children.map((child, ci) => (
+                        <View key={child.id} style={[styles.childRow, ci < children.length - 1 && styles.childRowBorder]}>
+                          <View style={styles.childConnector}>
+                            <View style={styles.childConnectorLine} />
+                            <Ionicons name={child.icon} size={15} color={COLORS.textMuted} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.childName}>{child.name}</Text>
+                            {/* Specific attributes */}
+                            {child.attribute_schema && child.attribute_schema.length > 0 && (
+                              <View style={styles.attrChipsRow}>
+                                {child.attribute_schema.map((attr: any, ai: number) => (
+                                  <View key={ai} style={[styles.attrChip, { backgroundColor: COLORS.accent + '10' }]}>
+                                    <Text style={[styles.attrChipText, { color: COLORS.accent }]}>{attr.label}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 4 }}>
+                            <TouchableOpacity style={styles.childActionBtn} onPress={() => openEditModal(child)}>
+                              <Ionicons name="create-outline" size={14} color={COLORS.accent} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.childActionBtn} onPress={() => handleCategoryAction(child, 'delete')}>
+                              <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
 
-        {filteredCategories.length === 0 && (
+                  {/* + Add subcategory button */}
+                  <TouchableOpacity
+                    style={styles.addSubcatButton}
+                    onPress={() => {
+                      setEditingCategory(null);
+                      setNewParentId(parent.id);
+                      setNewStoreType(parent.store_type);
+                      setAttributesList([]);
+                      setAddModalVisible(true);
+                    }}
+                  >
+                    <Ionicons name="add-circle-outline" size={14} color={COLORS.accent} />
+                    <Text style={styles.addSubcatButtonText}>Ajouter une sous-catégorie</Text>
+                  </TouchableOpacity>
+                </Card>
+              </View>
+            );
+          })
+        }
+
+        {filteredCategories.filter(c => !c.parent_id).length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="grid-outline" size={48} color={COLORS.textMuted} />
             <Text style={styles.emptyText}>Aucune catégorie trouvée</Text>
@@ -818,5 +1053,273 @@ const styles = StyleSheet.create({
   modalActionText: {
     color: COLORS.text,
     fontWeight: '600',
+  },
+  // ── Hierarchy ──
+  parentGroup: {
+    marginBottom: SPACING.md,
+  },
+  parentCard: {
+    padding: SPACING.md,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.accent + '60',
+  },
+  parentBadge: {
+    backgroundColor: COLORS.accent + '20',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+  },
+  parentBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  childrenContainer: {
+    marginTop: SPACING.md,
+    marginLeft: SPACING.sm,
+    borderLeftWidth: 2,
+    borderLeftColor: COLORS.border,
+    paddingLeft: SPACING.sm,
+  },
+  childRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  childRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  childConnector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  childConnectorLine: {
+    width: 8,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  childName: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  childActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addSubcatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  addSubcatButtonText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.accent,
+  },
+  // ── Attribute Chips ──
+  attrChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  attrChip: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.full,
+  },
+  attrChipText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  // ── Parent selector ──
+  parentSelectorContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  parentOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+  },
+  parentOptionActive: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accent + '15',
+  },
+  parentOptionText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  parentOptionTextActive: {
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  // ── Attribute Builder ──
+  attrBuilderSection: {
+    marginTop: SPACING.md,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+  },
+  attrBuilderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  attrBuilderTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  attrBuilderSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    lineHeight: 16,
+    marginBottom: SPACING.md,
+  },
+  attrList: {
+    gap: 2,
+    marginBottom: SPACING.md,
+  },
+  attrRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  attrRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    flex: 1,
+  },
+  attrRowLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  attrRowMeta: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  attrDeleteBtn: {
+    padding: 4,
+  },
+  attrForm: {
+    backgroundColor: COLORS.bg,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.sm,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderStyle: 'dashed',
+  },
+  attrTypeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: SPACING.xs,
+  },
+  attrTypeBtn: {
+    flex: 1,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.bg,
+    alignItems: 'center',
+  },
+  attrTypeBtnActive: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accent + '15',
+  },
+  attrTypeBtnText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  attrTypeBtnTextActive: {
+    color: COLORS.accent,
+    fontWeight: '700',
+  },
+  requiredToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  requiredToggleActive: {},
+  requiredToggleText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  addAttrButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+  },
+  addAttrButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  optionChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginTop: 3,
+  },
+  optionChip: {
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: RADIUS.full,
+  },
+  optionChipText: {
+    fontSize: 9,
+    color: COLORS.textMuted,
   },
 });
