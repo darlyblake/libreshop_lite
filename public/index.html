@@ -240,17 +240,33 @@
         window.google = window.google || {};
         window.google.translate = { TranslateElement: null };
         
-        // Prevent DOM mutations from external sources
-        const originalInsertBefore = Element.prototype.insertBefore;
-        const originalAppendChild = Element.prototype.appendChild;
-        const originalRemoveChild = Element.prototype.removeChild;
-        
-        window.__isReactRendering = false;
+        // Prevent DOM mutations from external sources (Google Translate, extension injections)
+        const originalInsertBefore = Node.prototype.insertBefore;
+        const originalAppendChild = Node.prototype.appendChild;
+        const originalRemoveChild = Node.prototype.removeChild;
         
         // Store original methods for React usage
-        Element.prototype._originalInsertBefore = originalInsertBefore;
-        Element.prototype._originalAppendChild = originalAppendChild;
-        Element.prototype._originalRemoveChild = originalRemoveChild;
+        Node.prototype._originalInsertBefore = originalInsertBefore;
+        Node.prototype._originalAppendChild = originalAppendChild;
+        Node.prototype._originalRemoveChild = originalRemoveChild;
+        
+        // Shield removeChild from throwing NotFoundError when external extensions mutate the DOM
+        Node.prototype.removeChild = function(child) {
+          if (child && child.parentNode !== this) {
+            console.warn("[DOM Shield] Tried to remove a node that is not a child of this node:", this, child);
+            return child;
+          }
+          return originalRemoveChild.call(this, child);
+        };
+        
+        // Shield insertBefore from throwing NotFoundError when external extensions mutate the DOM
+        Node.prototype.insertBefore = function(newNode, referenceNode) {
+          if (referenceNode && referenceNode.parentNode !== this) {
+            console.warn("[DOM Shield] Tried to insertBefore a reference node that is not a child of this node:", this, referenceNode);
+            return originalAppendChild.call(this, newNode);
+          }
+          return originalInsertBefore.call(this, newNode, referenceNode);
+        };
         
         // Initialize root element protection
         document.addEventListener('DOMContentLoaded', () => {

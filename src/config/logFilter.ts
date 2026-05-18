@@ -16,7 +16,10 @@ const IGNORED_PATTERNS: RegExp[] = [
   /SyntaxError: Unexpected end of input/, // external inject script failure (e.g. Vercel feedback widget)
   /Blocked aria-hidden on an element/, // react-dom aria-hidden warning
   /useNativeDriver is not supported/, // react-native-web Animated warning
-  /increment_product_views/ // supabase rpc 404 fetch error logs
+  /increment_product_views/, // supabase rpc 404 fetch error logs
+  /Failed to execute 'removeChild'/, // google translate extension crash
+  /\[DOM Shield\]/, // our defensive dom protective logs
+  /NotFoundError: Failed to execute/ // dom exception string
 ];
 
 function shouldIgnore(args: any[]): boolean {
