@@ -321,10 +321,15 @@
         console.log('beforeinstallprompt event fired', e);
         e.preventDefault();
         deferredPrompt = e;
+        window.deferredPrompt = e; // Export globally for React component!
 
-        // Don't show banner if React PWA component is available
-        if (!window.ReactNativeWebView) {
+        // Don't show HTML banner if React PWA component is available and mounted
+        const root = document.getElementById('root');
+        const isReactMounted = root && root.children.length > 0;
+        if (!window.ReactNativeWebView && !isReactMounted) {
           installBanner.style.display = 'block';
+        } else {
+          installBanner.style.display = 'none';
         }
       });
       
@@ -343,6 +348,7 @@
           }
 
           deferredPrompt = null;
+          window.deferredPrompt = null; // Clear global as well!
           installBanner.style.display = 'none';
         } else {
           console.log('No install prompt available on click');

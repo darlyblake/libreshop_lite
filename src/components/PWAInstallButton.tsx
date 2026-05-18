@@ -61,10 +61,32 @@ export const PWAInstallButton: React.FC = () => {
       return;
     }
 
+    // Check if the global deferred prompt is already set (by the index.html listener)
+    const checkGlobalPrompt = () => {
+      const globalPrompt = (window as any).deferredPrompt;
+      if (globalPrompt) {
+        setDeferredPrompt(globalPrompt);
+        setShowInstallPrompt(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately on mount
+    checkGlobalPrompt();
+
+    // Set up a quick interval to check for it as the page completes loading
+    const checkInterval = setInterval(() => {
+      if (checkGlobalPrompt()) {
+        clearInterval(checkInterval);
+      }
+    }, 500);
+
     // Listen for Chrome/Android native install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
+      (window as any).deferredPrompt = e; // Sync globally
       setShowInstallPrompt(true);
     };
 
@@ -72,6 +94,7 @@ export const PWAInstallButton: React.FC = () => {
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
+      try { delete (window as any).deferredPrompt; } catch (err) { (window as any).deferredPrompt = null; }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -94,6 +117,7 @@ export const PWAInstallButton: React.FC = () => {
     }, 5000);
 
     return () => {
+      clearInterval(checkInterval);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
       clearTimeout(iOSTimer);
