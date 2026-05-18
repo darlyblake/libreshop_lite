@@ -10,6 +10,31 @@ export const initializeDOMProtection = () => {
     return;
   }
 
+  // Shield Node.prototype from Google Translate / extension DOM mutations
+  try {
+    const originalRemoveChild = Node.prototype.removeChild;
+    const originalInsertBefore = Node.prototype.insertBefore;
+    const originalAppendChild = Node.prototype.appendChild;
+
+    (Node.prototype as any).removeChild = function(this: Node, child: any) {
+      if (child && child.parentNode !== this) {
+        console.warn("[DOM Shield] Intercepted removeChild for non-child node:", this, child);
+        return child;
+      }
+      return originalRemoveChild.call(this, child);
+    };
+
+    (Node.prototype as any).insertBefore = function(this: Node, newNode: any, referenceNode: any) {
+      if (referenceNode && referenceNode.parentNode !== this) {
+        console.warn("[DOM Shield] Intercepted insertBefore for non-child reference node:", this, referenceNode);
+        return originalAppendChild.call(this, newNode);
+      }
+      return originalInsertBefore.call(this, newNode, referenceNode);
+    };
+  } catch (e) {
+    console.debug('Failed to patch Node.prototype:', e);
+  }
+
   // Disable Google Translate API
   (window as any).google = (window as any).google || {};
   (window as any).google.translate = { TranslateElement: null };
