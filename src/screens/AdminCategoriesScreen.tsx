@@ -105,6 +105,16 @@ export const AdminCategoriesScreen: React.FC = () => {
   const [attributesList, setAttributesList] = useState<AttributeField[]>([]);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 
+  // Accordion / Collapsible categories state
+  const [expandedParents, setExpandedParents] = useState<string[]>([]);
+  const toggleParentExpand = (parentId: string) => {
+    if (expandedParents.includes(parentId)) {
+      setExpandedParents(expandedParents.filter(id => id !== parentId));
+    } else {
+      setExpandedParents([...expandedParents, parentId]);
+    }
+  };
+
   // Single attribute creation form state
   const [attrName, setAttrName] = useState('');
   const [attrLabel, setAttrLabel] = useState('');
@@ -644,13 +654,22 @@ export const AdminCategoriesScreen: React.FC = () => {
                 {/* ── Parent Card ── */}
                 <Card style={styles.parentCard}>
                   <View style={styles.categoryHeader}>
-                    <View style={styles.categoryInfo}>
+                    <TouchableOpacity 
+                      style={styles.categoryInfo} 
+                      onPress={() => toggleParentExpand(parent.id)}
+                      activeOpacity={0.7}
+                    >
                       <View style={[styles.categoryIcon, { backgroundColor: COLORS.accent + '20' }]}>
                         <Ionicons name={parent.icon} size={22} color={COLORS.accent} />
                       </View>
                       <View style={styles.categoryDetails}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text style={styles.categoryName}>{parent.name}</Text>
+                          <Ionicons 
+                            name={expandedParents.includes(parent.id) ? "chevron-down" : "chevron-forward"} 
+                            size={14} 
+                            color={COLORS.textMuted} 
+                          />
                           <View style={styles.parentBadge}>
                             <Text style={styles.parentBadgeText}>Principale</Text>
                           </View>
@@ -683,7 +702,7 @@ export const AdminCategoriesScreen: React.FC = () => {
                           </View>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.categoryActions}>
                       <TouchableOpacity style={styles.actionButton} onPress={() => handleCategoryAction(parent, 'edit')}>
                         <Ionicons name="create-outline" size={16} color={COLORS.accent} />
@@ -697,55 +716,60 @@ export const AdminCategoriesScreen: React.FC = () => {
                     </View>
                   </View>
 
-                  {/* ── Subcategory Rows ── */}
-                  {children.length > 0 && (
-                    <View style={styles.childrenContainer}>
-                      {children.map((child, ci) => (
-                        <View key={child.id} style={[styles.childRow, ci < children.length - 1 && styles.childRowBorder]}>
-                          <View style={styles.childConnector}>
-                            <View style={styles.childConnectorLine} />
-                            <Ionicons name={child.icon} size={15} color={COLORS.textMuted} />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.childName}>{child.name}</Text>
-                            {/* Specific attributes */}
-                            {child.attribute_schema && child.attribute_schema.length > 0 && (
-                              <View style={styles.attrChipsRow}>
-                                {child.attribute_schema.map((attr: any, ai: number) => (
-                                  <View key={ai} style={[styles.attrChip, { backgroundColor: COLORS.accent + '10' }]}>
-                                    <Text style={[styles.attrChipText, { color: COLORS.accent }]}>{attr.label}</Text>
-                                  </View>
-                                ))}
+                  {/* ── Collapsible Content: Subcategories & Create Subcategory Button ── */}
+                  {expandedParents.includes(parent.id) && (
+                    <>
+                      {/* ── Subcategory Rows ── */}
+                      {children.length > 0 && (
+                        <View style={styles.childrenContainer}>
+                          {children.map((child, ci) => (
+                            <View key={child.id} style={[styles.childRow, ci < children.length - 1 && styles.childRowBorder]}>
+                              <View style={styles.childConnector}>
+                                <View style={styles.childConnectorLine} />
+                                <Ionicons name={child.icon} size={15} color={COLORS.textMuted} />
                               </View>
-                            )}
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 4 }}>
-                            <TouchableOpacity style={styles.childActionBtn} onPress={() => openEditModal(child)}>
-                              <Ionicons name="create-outline" size={14} color={COLORS.accent} />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.childActionBtn} onPress={() => handleCategoryAction(child, 'delete')}>
-                              <Ionicons name="trash-outline" size={14} color="#ef4444" />
-                            </TouchableOpacity>
-                          </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.childName}>{child.name}</Text>
+                                {/* Specific attributes */}
+                                {child.attribute_schema && child.attribute_schema.length > 0 && (
+                                  <View style={styles.attrChipsRow}>
+                                    {child.attribute_schema.map((attr: any, ai: number) => (
+                                      <View key={ai} style={[styles.attrChip, { backgroundColor: COLORS.accent + '10' }]}>
+                                        <Text style={[styles.attrChipText, { color: COLORS.accent }]}>{attr.label}</Text>
+                                      </View>
+                                    ))}
+                                  </View>
+                                )}
+                              </View>
+                              <View style={{ flexDirection: 'row', gap: 4 }}>
+                                <TouchableOpacity style={styles.childActionBtn} onPress={() => openEditModal(child)}>
+                                  <Ionicons name="create-outline" size={14} color={COLORS.accent} />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.childActionBtn} onPress={() => handleCategoryAction(child, 'delete')}>
+                                  <Ionicons name="trash-outline" size={14} color="#ef4444" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          ))}
                         </View>
-                      ))}
-                    </View>
-                  )}
+                      )}
 
-                  {/* + Add subcategory button */}
-                  <TouchableOpacity
-                    style={styles.addSubcatButton}
-                    onPress={() => {
-                      setEditingCategory(null);
-                      setNewParentId(parent.id);
-                      setNewStoreType(parent.store_type);
-                      setAttributesList([]);
-                      setAddModalVisible(true);
-                    }}
-                  >
-                    <Ionicons name="add-circle-outline" size={14} color={COLORS.accent} />
-                    <Text style={styles.addSubcatButtonText}>Ajouter une sous-catégorie</Text>
-                  </TouchableOpacity>
+                      {/* + Add subcategory button */}
+                      <TouchableOpacity
+                        style={styles.addSubcatButton}
+                        onPress={() => {
+                          setEditingCategory(null);
+                          setNewParentId(parent.id);
+                          setNewStoreType(parent.store_type);
+                          setAttributesList([]);
+                          setAddModalVisible(true);
+                        }}
+                      >
+                        <Ionicons name="add-circle-outline" size={14} color={COLORS.accent} />
+                        <Text style={styles.addSubcatButtonText}>Ajouter une sous-catégorie</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </Card>
               </View>
             );
