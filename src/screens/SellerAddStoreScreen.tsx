@@ -44,6 +44,7 @@ interface Category {
   slug: string;
   icon?: string;
   color?: string;
+  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
   subcategories?: Category[];
 }
 
@@ -51,6 +52,7 @@ interface FormData {
   name: string;
   slug: string;
   description: string;
+  store_type: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
   category: string;
   email: string;
   phone: string;
@@ -65,6 +67,7 @@ interface FormData {
 const STORE_VALIDATION_RULES = {
   name: { required: true, minLength: 2, maxLength: 50 },
   slug: { required: true, minLength: 3, pattern: /^[a-z0-9-]+$/ },
+  store_type: { required: true },
   category: { required: true },
   email: { required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ },
   phone: { required: true, minLength: 8 },
@@ -72,6 +75,14 @@ const STORE_VALIDATION_RULES = {
   country_id: { required: true },
   city_id: { required: true },
 };
+
+const STORE_TYPES = [
+  { id: 'general', title: '🛍️ Boutique', icon: 'storefront-outline' },
+  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline' },
+  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline' },
+  { id: 'hotel', title: '🏨 Hôtel', icon: 'bed-outline' },
+  { id: 'logement', title: '🏠 Logement', icon: 'home-outline' },
+] as const;
 
 const SellerAddStoreScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
@@ -132,6 +143,7 @@ const SellerAddStoreScreen: React.FC = () => {
       name: '',
       slug: '',
       description: '',
+      store_type: 'general',
       category: '',
       email: user?.email || '',
       phone: '',
@@ -319,7 +331,7 @@ const SellerAddStoreScreen: React.FC = () => {
     let isValid = true;
     
     if (currentStep === 1) {
-      const step1Fields = ['name', 'slug', 'category'];
+      const step1Fields = ['name', 'slug', 'store_type', 'category'];
       step1Fields.forEach(field => {
         const err = validateField(field);
         if (err) {
@@ -434,6 +446,37 @@ const SellerAddStoreScreen: React.FC = () => {
           {slugStatus === 'available' && <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />}
           {slugStatus === 'taken' && <Ionicons name="close-circle" size={20} color={COLORS.danger} />}
         </View>
+      </View>
+
+      <Text style={styles.inputLabel}>Type d'activité de la boutique</Text>
+      <View style={styles.storeTypeContainer}>
+        {STORE_TYPES.map(type => (
+          <TouchableOpacity 
+            key={type.id} 
+            style={[
+              styles.storeTypeCard, 
+              values.store_type === type.id && styles.storeTypeCardActive
+            ]}
+            onPress={() => {
+              void Haptics.selectionAsync();
+              setFieldValue('store_type', type.id);
+              setFieldValue('category', ''); // Reset category on type change
+              setSelectedSubcategory('');
+            }}
+          >
+            <Ionicons 
+              name={type.icon as any} 
+              size={16} 
+              color={values.store_type === type.id ? COLORS.accent : COLORS.textMuted} 
+            />
+            <Text style={[
+              styles.storeTypeCardText, 
+              values.store_type === type.id && styles.storeTypeCardTextActive
+            ]}>
+              {type.title}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <TouchableOpacity 
@@ -687,7 +730,7 @@ const SellerAddStoreScreen: React.FC = () => {
               </View>
             ) : (
               <FlatList
-                data={categories}
+                data={categories.filter(cat => !cat.store_type || cat.store_type === values.store_type)}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={styles.categoryItem} onPress={() => {
@@ -868,6 +911,45 @@ const getStyles = (themeContext: any) => {
     zIndex: 2,
     height: 24,
     justifyContent: 'center',
+  },
+  storeTypeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  storeTypeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    gap: SPACING.xs,
+  },
+  storeTypeCardActive: {
+    borderColor: COLORS.accent,
+    backgroundColor: COLORS.accent + '15',
+  },
+  storeTypeCardText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  storeTypeCardTextActive: {
+    color: COLORS.accent,
+    fontWeight: '600',
+  },
+  inputLabel: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.xs,
+    marginTop: SPACING.xs,
   },
   seoTipCard: {
     flexDirection: 'row',
