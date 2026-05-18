@@ -134,6 +134,7 @@ export interface Store {
   name: string;
   slug: string;
   description?: string;
+  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
   category: string;
   subcategory?: string;
   logo_url?: string;
@@ -201,6 +202,7 @@ export interface Product {
   compare_price?: number;
   cost_price?: number;
   stock: number;
+  attributes?: Record<string, any>;
   low_stock_threshold?: number;
   low_stock_alert_sent?: boolean;
   reference?: string;
@@ -293,6 +295,8 @@ export interface Category {
   icon?: string;
   parent_id?: string | null;
   status?: 'active' | 'inactive';
+  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
+  attribute_schema?: any[];
   order_index?: number;
   created_at?: string;
   updated_at?: string;
