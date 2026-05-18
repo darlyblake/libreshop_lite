@@ -27,7 +27,7 @@ import { useAuthStore } from '../store';
 import { useNotificationStore } from '../store/notificationStore';
 import { notificationService } from '../services/notificationService';
 import { returnService } from '../services/returnService';
-import { OrderTimeline, OrderCardSkeleton } from '../components';
+import { OrderTimeline, OrderCardSkeleton, RequireAuthPlaceholder } from '../components';
 
 // Types étendus
 interface OrderWithDetails extends Order {
@@ -139,6 +139,16 @@ const generateWhatsAppMessage = (order: OrderWithDetails): string => {
 export const ClientOrdersScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
+
+  if (!user) {
+    return (
+      <RequireAuthPlaceholder
+        title="Mes Commandes"
+        description="Connectez-vous avec Google pour suivre en temps réel vos commandes, consulter vos reçus de paiement et gérer vos retours."
+        icon="receipt-outline"
+      />
+    );
+  }
   
   // États principaux
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);

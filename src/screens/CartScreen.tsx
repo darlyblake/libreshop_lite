@@ -19,6 +19,7 @@ import { useLegacyPalette, type LegacyPalette } from '../hooks/useLegacyPalette'
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useCartStore, useAuthStore } from '../store';
+import { RequireAuthPlaceholder } from '../components';
 import { storeService } from '../services/storeService';
 import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
@@ -137,6 +138,16 @@ export const CartScreen: React.FC = () => {
       `${out.length} article(s) indisponible(s) ${out.length > 1 ? 'ont été retirés' : 'a été retiré'} du panier.`,
     );
   }, [stockCheckKey]);
+
+  if (!user) {
+    return (
+      <RequireAuthPlaceholder
+        title="Mon Panier"
+        description="Connectez-vous avec Google pour synchroniser votre panier sur tous vos appareils, commander en toute sécurité et suivre vos livraisons."
+        icon="cart-outline"
+      />
+    );
+  }
 
   const taxRate = store?.tax_rate || 0; // legacy single-store rate for label
   const shippingPrice = store?.shipping_price || 0; // legacy single-store shipping

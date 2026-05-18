@@ -33,4 +33,5 @@ export { StoreMap } from './StoreMap';
 export { WebMap } from './WebMap';
 export { LocationPicker } from './LocationPicker';
 export { ClientAuthModal } from './ClientAuthModal';
+export { RequireAuthPlaceholder } from './RequireAuthPlaceholder';
 

@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { useAuthStore } from '../store';
+import { RequireAuthPlaceholder } from '../components';
 import { sessionStorage } from '../lib/storage';
 import { orderService } from '../services/orderService';
 import { wishlistService } from '../services/wishlistService';
@@ -57,6 +58,17 @@ const MENU_ITEMS: Array<{
 export const ClientProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
+
+  if (!user) {
+    return (
+      <RequireAuthPlaceholder
+        title="Mon profil"
+        description="Connectez-vous avec Google pour gérer vos informations personnelles, consulter votre historique et configurer vos adresses de livraison."
+        icon="person-circle-outline"
+      />
+    );
+  }
+
   const { getColor, spacing, radius, fontSize, isDark } = useTheme();
   useThemeRefresh(); // Force le re-rendu au changement de thème
   

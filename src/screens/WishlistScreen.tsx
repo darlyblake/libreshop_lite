@@ -23,6 +23,7 @@ import { wishlistService } from '../services/wishlistService';
 import { storeService, StoreFollower } from '../services/storeService';
 import { Product, Store } from '../lib/supabase';
 import { Button } from '../components/Button';
+import { RequireAuthPlaceholder } from '../components';
 import { cloudinaryService } from '../services/cloudinaryService';
 
 const { width } = Dimensions.get('window');
@@ -285,29 +286,11 @@ export const WishlistScreen: React.FC = () => {
 
   if (!user) {
     return (
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={goBackSafe}>
-            <Ionicons name="arrow-back" size={24} color={palette.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mes favoris</Text>
-          <View style={styles.headerPlaceholder} />
-        </View>
-        
-        <View style={styles.emptyState}>
-          <Ionicons name="heart-outline" size={80} color={palette.textMuted} />
-          <Text style={styles.emptyTitle}>Connectez-vous</Text>
-          <Text style={styles.emptyText}>
-            Connectez-vous pour voir vos produits favoris et boutiques suivies
-          </Text>
-          <Button
-            title="Se connecter"
-            onPress={() => navigation.navigate('Login')}
-            style={styles.loginButton}
-          />
-        </View>
-      </View>
+      <RequireAuthPlaceholder
+        title="Mes Favoris"
+        description="Connectez-vous avec Google pour enregistrer vos produits coups de cœur et suivre les actualités de vos boutiques préférées."
+        icon="heart-outline"
+      />
     );
   }
 
