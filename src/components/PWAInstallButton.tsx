@@ -34,6 +34,7 @@ export const PWAInstallButton: React.FC = () => {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [showInstructionModal, setShowInstructionModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'android' | 'ios' | 'desktop'>('android');
+  const [currentStep, setCurrentStep] = useState(1);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;
@@ -156,6 +157,7 @@ export const PWAInstallButton: React.FC = () => {
       }
     } else {
       // Show modern instruction modal
+      setCurrentStep(1);
       setShowInstructionModal(true);
     }
   };
@@ -168,7 +170,90 @@ export const PWAInstallButton: React.FC = () => {
     }
   };
 
+  const handleTabChange = (tab: 'android' | 'ios' | 'desktop') => {
+    setActiveTab(tab);
+    setCurrentStep(1);
+  };
+
+  const getStepInfo = () => {
+    if (activeTab === 'android') {
+      switch (currentStep) {
+        case 1:
+          return {
+            icon: 'ellipsis-vertical-outline',
+            iconColor: '#3b82f6',
+            title: 'Ouvrez le menu Chrome',
+            desc: 'Appuyez sur les trois points verticaux (⋮) situés dans le coin supérieur droit de votre navigateur Chrome.',
+          };
+        case 2:
+          return {
+            icon: 'add-circle-outline',
+            iconColor: '#10b981',
+            title: 'Sélectionnez l\'installation',
+            desc: 'Faites défiler le menu vers le bas et appuyez sur "Installer l\'application" ou "Ajouter à l\'écran d\'accueil".',
+          };
+        default:
+          return {
+            icon: 'checkmark-circle-outline',
+            iconColor: '#8b5cf6',
+            title: 'Validez l\'installation',
+            desc: 'Appuyez sur "Installer". LibreShop apparaîtra instantanément sur votre écran d\'accueil !',
+          };
+      }
+    } else if (activeTab === 'ios') {
+      switch (currentStep) {
+        case 1:
+          return {
+            icon: 'share-outline',
+            iconColor: '#3b82f6',
+            title: 'Appuyez sur Partager',
+            desc: 'Depuis le navigateur Safari, appuyez sur le bouton Partager (le carré avec une flèche pointant vers le haut 📤) en bas de l\'écran.',
+          };
+        case 2:
+          return {
+            icon: 'add-outline',
+            iconColor: '#10b981',
+            title: 'Ajoutez à l\'écran d\'accueil',
+            desc: 'Faites défiler les options vers le bas et sélectionnez "Sur l\'écran d\'accueil" (accompagné d\'une icône ➕).',
+          };
+        default:
+          return {
+            icon: 'checkmark-circle-outline',
+            iconColor: '#8b5cf6',
+            title: 'Validez et profitez',
+            desc: 'Appuyez enfin sur "Ajouter" dans le coin supérieur droit pour installer l\'icône de LibreShop !',
+          };
+      }
+    } else {
+      switch (currentStep) {
+        case 1:
+          return {
+            icon: 'desktop-outline',
+            iconColor: '#3b82f6',
+            title: 'Trouvez l\'icône d\'installation',
+            desc: 'Dans la barre d\'adresse de votre navigateur en haut à droite, repérez l\'icône d\'ordinateur avec une flèche ou le symbole ⊕.',
+          };
+        case 2:
+          return {
+            icon: 'download-outline',
+            iconColor: '#10b981',
+            title: 'Lancez l\'installation',
+            desc: 'Cliquez sur cette icône pour ouvrir la boîte de dialogue d\'installation de LibreShop.',
+          };
+        default:
+          return {
+            icon: 'checkmark-circle-outline',
+            iconColor: '#8b5cf6',
+            title: 'Confirmez l\'installation',
+            desc: 'Cliquez sur le bouton "Installer". L\'application s\'ouvrira immédiatement dans sa propre fenêtre autonome !',
+          };
+      }
+    }
+  };
+
   if (isInstalled || !showInstallPrompt) return null;
+
+  const stepInfo = getStepInfo();
 
   return (
     <>
@@ -211,178 +296,82 @@ export const PWAInstallButton: React.FC = () => {
       {showInstructionModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            {/* Header */}
+            {/* Header with Close */}
             <View style={styles.modalHeader}>
-              <View style={styles.modalTitleContainer}>
-                <Ionicons name="download-outline" size={24} color={COLORS.accent} style={{ marginRight: 8 }} />
-                <Text style={styles.modalTitle}>Installer LibreShop</Text>
-              </View>
               <TouchableOpacity onPress={() => setShowInstructionModal(false)} style={styles.modalCloseButton}>
-                <Ionicons name="close" size={20} color={COLORS.text} />
+                <Ionicons name="close" size={18} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
+            {/* Title & Description */}
+            <Text style={styles.modalTitle}>Installer LibreShop !</Text>
             <Text style={styles.modalSubtitle}>
-              Installez LibreShop sur votre appareil pour naviguer plus rapidement, économiser vos données et y accéder en un clic comme une application native.
+              Ajoutez l'application sur votre écran d'accueil pour y accéder en un clic.
             </Text>
 
-            {/* Tabs */}
+            {/* Platforms Selector Tabs */}
             <View style={styles.tabContainer}>
               <TouchableOpacity 
                 style={[styles.tabButton, activeTab === 'android' && styles.activeTabButton]}
-                onPress={() => setActiveTab('android')}
+                onPress={() => handleTabChange('android')}
               >
-                <Ionicons name="logo-android" size={18} color={activeTab === 'android' ? COLORS.text : COLORS.textMuted} />
+                <Ionicons name="logo-android" size={15} color={activeTab === 'android' ? COLORS.accent : COLORS.textMuted} />
                 <Text style={[styles.tabText, activeTab === 'android' && styles.activeTabText]}>Android</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.tabButton, activeTab === 'ios' && styles.activeTabButton]}
-                onPress={() => setActiveTab('ios')}
+                onPress={() => handleTabChange('ios')}
               >
-                <Ionicons name="logo-apple" size={18} color={activeTab === 'ios' ? COLORS.text : COLORS.textMuted} />
-                <Text style={[styles.tabText, activeTab === 'ios' && styles.activeTabText]}>iPhone / iPad</Text>
+                <Ionicons name="logo-apple" size={15} color={activeTab === 'ios' ? COLORS.accent : COLORS.textMuted} />
+                <Text style={[styles.tabText, activeTab === 'ios' && styles.activeTabText]}>iPhone</Text>
               </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.tabButton, activeTab === 'desktop' && styles.activeTabButton]}
-                onPress={() => setActiveTab('desktop')}
+                onPress={() => handleTabChange('desktop')}
               >
-                <Ionicons name="desktop-outline" size={18} color={activeTab === 'desktop' ? COLORS.text : COLORS.textMuted} />
+                <Ionicons name="desktop-outline" size={15} color={activeTab === 'desktop' ? COLORS.accent : COLORS.textMuted} />
                 <Text style={[styles.tabText, activeTab === 'desktop' && styles.activeTabText]}>PC / Mac</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Steps Content */}
-            <View style={styles.stepsContainer}>
-              {activeTab === 'android' && (
-                <>
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>1</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Ouvrez le menu</Text>
-                      <Text style={styles.stepDesc}>
-                        Appuyez sur les <Text style={{fontWeight: '700', color: COLORS.accent}}>trois points verticaux (⋮)</Text> dans le coin supérieur droit de votre navigateur Chrome.
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>2</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Sélectionnez l'installation</Text>
-                      <Text style={styles.stepDesc}>
-                        Faites défiler le menu vers le bas et appuyez sur <Text style={{fontWeight: '700', color: COLORS.accent}}>"Installer l'application"</Text> ou <Text style={{fontWeight: '700', color: COLORS.accent}}>"Ajouter à l'écran d'accueil"</Text>.
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>3</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Validez et profitez !</Text>
-                      <Text style={styles.stepDesc}>
-                        Appuyez sur <Text style={{fontWeight: '700', color: COLORS.accent}}>"Installer"</Text>. LibreShop apparaîtra instantanément aux côtés de vos applications habituelles !
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {activeTab === 'ios' && (
-                <>
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>1</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Appuyez sur Partager</Text>
-                      <Text style={styles.stepDesc}>
-                        Depuis le navigateur Safari, appuyez sur le bouton de <Text style={{fontWeight: '700', color: COLORS.accent}}>partage (le carré avec une flèche pointant vers le haut 📤)</Text> situé dans la barre de navigation.
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>2</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Ajoutez à l'écran d'accueil</Text>
-                      <Text style={styles.stepDesc}>
-                        Faites défiler les options vers le bas et appuyez sur <Text style={{fontWeight: '700', color: COLORS.accent}}>"Sur l'écran d'accueil"</Text> (accompagné d'une icône ➕).
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>3</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Ajoutez l'application</Text>
-                      <Text style={styles.stepDesc}>
-                        Appuyez enfin sur <Text style={{fontWeight: '700', color: COLORS.accent}}>"Ajouter"</Text> dans le coin supérieur droit. L'icône de LibreShop s'ajoutera sur votre écran d'accueil iPhone !
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {activeTab === 'desktop' && (
-                <>
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>1</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Trouvez l'icône d'installation</Text>
-                      <Text style={styles.stepDesc}>
-                        Dans la barre d'adresse de Chrome/Edge en haut à droite, repérez l'icône <Text style={{fontWeight: '700', color: COLORS.accent}}>d'ordinateur avec une flèche de téléchargement 🖥️</Text> (ou l'icône ⊕).
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>2</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Lancez l'installation</Text>
-                      <Text style={styles.stepDesc}>
-                        Cliquez sur cette icône pour ouvrir la boîte de dialogue système d'installation de LibreShop.
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.stepItem}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepBadgeText}>3</Text>
-                    </View>
-                    <View style={styles.stepTextContainer}>
-                      <Text style={styles.stepTitle}>Confirmez et lancez !</Text>
-                      <Text style={styles.stepDesc}>
-                        Cliquez sur le bouton <Text style={{fontWeight: '700', color: COLORS.accent}}>"Installer"</Text>. LibreShop s'ouvrira immédiatement dans une fenêtre propre, fluide, sans barre de navigation Web.
-                      </Text>
-                    </View>
-                  </View>
-                </>
-              )}
+            {/* Step progress bar visualizer */}
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBarRow}>
+                <View style={[styles.progressPill, currentStep >= 1 ? styles.activeProgressPill : styles.inactiveProgressPill]} />
+                <View style={[styles.progressPill, currentStep >= 2 ? styles.activeProgressPill : styles.inactiveProgressPill]} />
+                <View style={[styles.progressPill, currentStep >= 3 ? styles.activeProgressPill : styles.inactiveProgressPill]} />
+              </View>
+              <Text style={styles.progressText}>Étape {currentStep} sur 3</Text>
             </View>
 
-            {/* Action button */}
+            {/* Giant Circular Icon Step */}
+            <View style={styles.iconCircleContainer}>
+              <View style={[styles.iconCircle, { backgroundColor: stepInfo.iconColor + '15' }]}>
+                <Ionicons name={stepInfo.icon as any} size={36} color={stepInfo.iconColor} />
+              </View>
+            </View>
+
+            {/* Step Title & Details */}
+            <Text style={styles.stepTitle}>{stepInfo.title}</Text>
+            <Text style={styles.stepDesc}>{stepInfo.desc}</Text>
+
+            {/* Next / Action Button */}
             <TouchableOpacity 
               style={styles.modalActionButton}
-              onPress={() => setShowInstructionModal(false)}
+              onPress={() => {
+                if (currentStep < 3) {
+                  setCurrentStep(currentStep + 1);
+                } else {
+                  setShowInstructionModal(false);
+                }
+              }}
               activeOpacity={0.8}
             >
-              <Text style={styles.modalActionButtonText}>J'ai compris, merci !</Text>
+              <Text style={styles.modalActionButtonText}>
+                {currentStep < 3 ? 'Suivant ➔' : 'J\'ai compris ! ➔'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -511,7 +500,6 @@ const getStyles = (theme: any) => {
       alignItems: 'center',
       zIndex: 99999,
       padding: SPACING.md,
-      // For web fixed viewport modal overlay
       ...(Platform.OS === 'web' && {
         position: 'fixed',
         backdropFilter: 'blur(10px)',
@@ -519,12 +507,14 @@ const getStyles = (theme: any) => {
     },
     modalCard: {
       width: '100%',
-      maxWidth: 460,
+      maxWidth: 400,
       backgroundColor: COLORS.card,
-      borderRadius: RADIUS.lg,
+      borderRadius: 24,
       borderWidth: 1,
       borderColor: COLORS.border,
-      padding: SPACING.lg,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.xl,
+      alignItems: 'center',
       elevation: 24,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 10 },
@@ -532,51 +522,50 @@ const getStyles = (theme: any) => {
       shadowRadius: 20,
     },
     modalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: SPACING.md,
-    },
-    modalTitleContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    modalTitle: {
-      fontSize: FONT_SIZE.lg,
-      fontWeight: '700',
-      color: COLORS.text,
+      position: 'absolute',
+      top: 16,
+      right: 16,
+      zIndex: 10,
     },
     modalCloseButton: {
       width: 32,
       height: 32,
       borderRadius: 16,
-      backgroundColor: COLORS.border + '30',
+      backgroundColor: COLORS.border + '25',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    modalTitle: {
+      fontSize: FONT_SIZE.lg + 2,
+      fontWeight: '700',
+      color: COLORS.text,
+      textAlign: 'center',
+      marginBottom: 6,
     },
     modalSubtitle: {
       fontSize: FONT_SIZE.sm,
       color: COLORS.textMuted,
+      textAlign: 'center',
       lineHeight: 20,
-      marginBottom: SPACING.lg,
+      marginBottom: SPACING.md,
     },
     tabContainer: {
       flexDirection: 'row',
-      backgroundColor: COLORS.border + '15',
-      borderRadius: RADIUS.md,
-      padding: 4,
+      backgroundColor: COLORS.border + '12',
+      borderRadius: 20,
+      padding: 3,
+      width: '100%',
       marginBottom: SPACING.lg,
-      gap: 4,
+      gap: 2,
     },
     tabButton: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 10,
-      borderRadius: RADIUS.sm,
-      gap: 6,
+      paddingVertical: 8,
+      borderRadius: 18,
+      gap: 4,
     },
     activeTabButton: {
       backgroundColor: COLORS.card,
@@ -584,60 +573,72 @@ const getStyles = (theme: any) => {
       borderColor: COLORS.border,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
     },
     tabText: {
-      fontSize: FONT_SIZE.xs,
+      fontSize: FONT_SIZE.xs - 1,
       fontWeight: '600',
       color: COLORS.textMuted,
     },
     activeTabText: {
       color: COLORS.text,
     },
-    stepsContainer: {
-      gap: SPACING.md,
-      marginBottom: SPACING.xl,
+    progressContainer: {
+      alignItems: 'center',
+      marginBottom: SPACING.lg,
     },
-    stepItem: {
+    progressBarRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: SPACING.md,
+      gap: 6,
+      marginBottom: 6,
     },
-    stepBadge: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: COLORS.accent + '20',
-      borderWidth: 1,
-      borderColor: COLORS.accent,
+    progressPill: {
+      width: 32,
+      height: 6,
+      borderRadius: 3,
+    },
+    activeProgressPill: {
+      backgroundColor: COLORS.accent,
+    },
+    inactiveProgressPill: {
+      backgroundColor: COLORS.border + '40',
+    },
+    progressText: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '600',
+      color: COLORS.textMuted,
+    },
+    iconCircleContainer: {
+      marginBottom: SPACING.md,
+    },
+    iconCircle: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 2,
-    },
-    stepBadgeText: {
-      fontSize: FONT_SIZE.sm,
-      fontWeight: '700',
-      color: COLORS.accent,
-    },
-    stepTextContainer: {
-      flex: 1,
     },
     stepTitle: {
-      fontSize: FONT_SIZE.md,
-      fontWeight: '600',
+      fontSize: FONT_SIZE.md + 2,
+      fontWeight: '700',
       color: COLORS.text,
-      marginBottom: 4,
+      textAlign: 'center',
+      marginBottom: SPACING.xs,
     },
     stepDesc: {
       fontSize: FONT_SIZE.sm,
       color: COLORS.textMuted,
-      lineHeight: 18,
+      textAlign: 'center',
+      lineHeight: 20,
+      paddingHorizontal: SPACING.sm,
+      marginBottom: SPACING.xl,
     },
     modalActionButton: {
       backgroundColor: COLORS.accent,
-      paddingVertical: SPACING.md,
-      borderRadius: RADIUS.md,
+      paddingVertical: 14,
+      borderRadius: 30, // heavy pill rounding as in screenshot
+      width: '100%',
       alignItems: 'center',
       justifyContent: 'center',
     },
