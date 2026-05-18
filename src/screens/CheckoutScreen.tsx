@@ -26,6 +26,7 @@ import { authService } from '../services/authService';
 import { locationService, LocationCoords } from '../services/locationService';
 import { couponService } from '../services/couponService';
 import { getStoreStatus } from '../utils/storeStatus';
+import { addressService } from '../services/addressService';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -297,46 +298,47 @@ export const CheckoutScreen: React.FC = () => {
   const loadAddresses = async () => {
     if (!user) return;
     try {
-      const key = `@libreshop_addresses_${user.id}`;
-      const stored = await AsyncStorage.getItem(key);
-      let list: any[] = [];
-      if (stored) {
-        list = JSON.parse(stored);
-        setAddresses(list);
-      } else if (user.address) {
-        // Migration of legacy main address
-        const migrationAddr = {
-          id: '1',
-          label: 'Adresse principale',
-          city: '',
-          address: user.address,
-          is_default: true,
-        };
-        list = [migrationAddr];
-        setAddresses(list);
-        await AsyncStorage.setItem(key, JSON.stringify(list));
-      } else {
-        setAddresses([]);
+      // 1. Migration one-shot depuis AsyncStorage → Supabase (une seule fois par user)
+      await addressService.migrateFromLocal(user.id);
+
+      // 2. Toujours récupérer le profil frais depuis Supabase avant de décider si
+      //    l'onboarding est nécessaire. L'objet `user` en store vient de auth.user (Google)
+      //    et ne contient PAS les champs customs de la table `users` (whatsapp_number, etc.)
+      let freshProfile: any = user;
+      try {
+        const profileFromDB = await userService.getProfile(user.id);
+        if (profileFromDB) {
+          freshProfile = profileFromDB;
+          // Mettre à jour le store avec le profil complet
+          const { setUser } = useAuthStore.getState();
+          setUser({ ...user, ...profileFromDB } as any);
+        }
+      } catch (profileErr) {
+        console.warn('Could not fetch fresh profile for onboarding check:', profileErr);
       }
 
-      // Check if onboarding is needed
-      const hasPhone = !!(user.whatsapp_number || user.phone);
+      // 3. Charger les adresses depuis Supabase (source de vérité)
+      const list = await addressService.getByUser(user.id);
+      setAddresses(list);
+
+      // 4. Décider si l'onboarding est nécessaire
+      const hasPhone = !!(freshProfile.whatsapp_number || freshProfile.phone);
       const hasAddress = list.length > 0;
 
       if (!hasPhone || !hasAddress) {
-        // Pre-fill fields from user profile if they exist
-        setOnboardingPhone(user.whatsapp_number || user.phone || '');
+        // Pré-remplir avec les données existantes du profil si disponibles
+        setOnboardingPhone(freshProfile.whatsapp_number || freshProfile.phone || '');
         setOnboardingAddress(prev => ({
           ...prev,
           city: '',
-          address: user.address || '',
+          address: freshProfile.address || '',
           label: 'Maison',
         }));
         setOnboardingStep(1);
         setIsOnboardingVisible(true);
       } else {
-        // If they already have a default address, select it
-        const def = list.find(a => a.is_default) || list[0];
+        // L'utilisateur a déjà tout — aller directement au checkout
+        const def = list.find((a: any) => a.is_default) || list[0];
         if (def) {
           handleSelectAddress(def);
         }
@@ -355,32 +357,28 @@ export const CheckoutScreen: React.FC = () => {
 
     setProcessing(true);
     try {
-      // 1. Update user profile on Supabase with the WhatsApp phone number
+      // 1. Mettre à jour le profil Supabase avec le numéro WhatsApp
       const updatedUser = await userService.upsertProfile(user.id, {
         whatsapp_number: onboardingPhone,
         phone: onboardingPhone,
       });
       useAuthStore.getState().setUser(updatedUser);
 
-      // 2. Create the first address object
-      const firstAddr = {
-        id: Date.now().toString(),
+      // 2. Sauvegarder la première adresse dans Supabase (pas AsyncStorage)
+      const savedAddr = await addressService.add(user.id, {
         label: onboardingAddress.label,
         city: onboardingAddress.city,
         address: onboardingAddress.address,
-        latitude: onboardingAddress.latitude,
-        longitude: onboardingAddress.longitude,
-        note: onboardingAddress.note,
+        latitude: onboardingAddress.latitude ?? null,
+        longitude: onboardingAddress.longitude ?? null,
+        note: onboardingAddress.note || null,
         is_default: true,
-      };
+      });
 
-      // 3. Save to AsyncStorage
-      const key = `@libreshop_addresses_${user.id}`;
-      await AsyncStorage.setItem(key, JSON.stringify([firstAddr]));
-      
-      // 4. Update local states
-      setAddresses([firstAddr]);
-      setSelectedAddressId(firstAddr.id);
+      // 3. Mettre à jour les états locaux
+      const newList = [savedAddr];
+      setAddresses(newList);
+      setSelectedAddressId(savedAddr.id);
       setFormData(prev => ({
         ...prev,
         phone: onboardingPhone,

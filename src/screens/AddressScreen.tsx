@@ -12,23 +12,14 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../store';
-import { authService } from '../services/authService';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
 import { locationService } from '../services/locationService';
+import { addressService } from '../services/addressService';
+import type { Address } from '../services/addressService';
 
-export interface Address {
-  id: string;
-  label: string;
-  city: string;
-  address: string;
-  latitude?: number;
-  longitude?: number;
-  note?: string;
-  is_default: boolean;
-}
+// Address type is now imported from addressService (Supabase-backed)
 
 export const AddressScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -85,33 +76,23 @@ export const AddressScreen: React.FC = () => {
 
   useEffect(() => {
     loadAddresses();
-  }, []);
-
-  const getStorageKey = () => user ? `@libreshop_addresses_${user.id}` : null;
+  }, [user]);
 
   const loadAddresses = async () => {
     if (!user) return;
+    setLoading(true);
     try {
-      const key = getStorageKey();
-      if (!key) return;
-      
-      const stored = await AsyncStorage.getItem(key);
-      if (stored) {
-        setAddresses(JSON.parse(stored));
-      } else if (user.address) {
-        // Migration of main user address
-        const migrationAddr: Address = {
-          id: '1',
-          label: 'Adresse principale',
-          city: '',
-          address: user.address,
-          is_default: true,
-        };
-        setAddresses([migrationAddr]);
-        await AsyncStorage.setItem(key, JSON.stringify([migrationAddr]));
-      }
+      // 1. Migration one-shot : transfère les adresses locales vers Supabase si besoin
+      await addressService.migrateFromLocal(user.id);
+
+      // 2. Charger depuis Supabase (source de vérité) avec mise à jour du cache
+      const list = await addressService.getByUser(user.id);
+      setAddresses(list);
     } catch (error) {
       errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error loading addresses:');
+      Alert.alert('Erreur', 'Impossible de charger vos adresses. Vérifiez votre connexion.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -124,35 +105,20 @@ export const AddressScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      const newAddress: Address = {
-        id: Date.now().toString(),
+      const isFirst = addresses.length === 0;
+      const newAddress = await addressService.add(user.id, {
         label: formData.label,
         city: formData.city,
         address: formData.address,
-        latitude: formData.latitude,
-        longitude: formData.longitude,
-        note: formData.note,
-        is_default: formData.is_default || addresses.length === 0,
-      };
+        latitude: formData.latitude ?? null,
+        longitude: formData.longitude ?? null,
+        note: formData.note || null,
+        is_default: formData.is_default || isFirst,
+      });
 
-      let updatedList = [...addresses];
-      if (newAddress.is_default) {
-        updatedList = updatedList.map(addr => ({ ...addr, is_default: false }));
-      }
-      updatedList.push(newAddress);
-      
+      // Refresh from DB
+      const updatedList = await addressService.getByUser(user.id);
       setAddresses(updatedList);
-      const key = getStorageKey();
-      if (key) {
-        await AsyncStorage.setItem(key, JSON.stringify(updatedList));
-      }
-      
-      // Update main profile address if default
-      if (newAddress.is_default) {
-        await authService.updateProfile(user.id, { address: newAddress.address });
-        const { setUser } = useAuthStore.getState();
-        setUser({ ...user, address: newAddress.address });
-      }
 
       setFormData({
         label: '',
@@ -164,10 +130,10 @@ export const AddressScreen: React.FC = () => {
         is_default: false,
       });
       setShowAddForm(false);
-      Alert.alert('Succès', 'Adresse ajoutée avec succès');
+      Alert.alert('Succès', 'Adresse ajoutée et synchronisée avec votre compte !');
     } catch (error) {
       errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error adding address:');
-      Alert.alert('Erreur', 'Impossible d\'ajouter cette adresse');
+      Alert.alert('Erreur', 'Impossible d\'ajouter cette adresse. Vérifiez votre connexion.');
     } finally {
       setLoading(false);
     }
@@ -176,24 +142,10 @@ export const AddressScreen: React.FC = () => {
   const handleSetDefault = async (addressId: string) => {
     if (!user) return;
     try {
-      const address = addresses.find(addr => addr.id === addressId);
-      if (!address) return;
-
-      const updatedList = addresses.map(addr => ({
-        ...addr,
-        is_default: addr.id === addressId
-      }));
-
+      await addressService.setDefault(addressId, user.id);
+      // Refresh
+      const updatedList = await addressService.getByUser(user.id);
       setAddresses(updatedList);
-      const key = getStorageKey();
-      if (key) {
-        await AsyncStorage.setItem(key, JSON.stringify(updatedList));
-      }
-
-      await authService.updateProfile(user.id, { address: address.address });
-      const { setUser } = useAuthStore.getState();
-      setUser({ ...user, address: address.address });
-
       Alert.alert('Succès', 'Adresse principale mise à jour');
     } catch (error) {
       errorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'Error setting default address:');
@@ -211,13 +163,14 @@ export const AddressScreen: React.FC = () => {
           text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
-            const updatedList = addresses.filter(addr => addr.id !== addressId);
-            setAddresses(updatedList);
-            const key = getStorageKey();
-            if (key) {
-              await AsyncStorage.setItem(key, JSON.stringify(updatedList));
+            try {
+              await addressService.remove(addressId, user!.id);
+              const updatedList = await addressService.getByUser(user!.id);
+              setAddresses(updatedList);
+              Alert.alert('Succès', 'Adresse supprimée');
+            } catch (e) {
+              Alert.alert('Erreur', 'Impossible de supprimer cette adresse.');
             }
-            Alert.alert('Succès', 'Adresse supprimée');
           }
         }
       ]
