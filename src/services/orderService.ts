@@ -242,6 +242,9 @@ export const orderService = {
     const order: any = await this.getById(orderId);
     if (!order) throw new Error("Commande non trouvée");
 
+    // Log stock movements to stock_movements table before updating stocks
+    await this.logOrderStockMovementsBeforeUpdate(order, 'sale');
+
     const client = useSupabase();
     try {
       const { data, error } = await client.rpc('accept_order', {
@@ -299,6 +302,11 @@ export const orderService = {
   },
 
   async cancelOrderRobust(orderId: string) {
+    const order: any = await this.getById(orderId);
+    if (order && ['accepted', 'paid', 'shipped'].includes(order.status)) {
+      await this.logOrderStockMovementsBeforeUpdate(order, 'return');
+    }
+
     const client = useSupabase();
     try {
       const { data, error } = await client.rpc('cancel_order_robust', {
@@ -603,5 +611,47 @@ export const orderService = {
     }) || [];
 
     return needNotification;
+  },
+
+  async logOrderStockMovementsBeforeUpdate(order: any, type: 'sale' | 'return') {
+    try {
+      const client = useSupabase();
+      const orderShortId = order.id.split('-')[0].toUpperCase();
+      const items = order.order_items || [];
+      
+      for (const item of items) {
+        const product = item.products;
+        if (!product) continue;
+
+        // Fetch fresh product stock to be completely safe
+        const { data: freshProduct } = await client
+          .from('products')
+          .select('stock')
+          .eq('id', product.id)
+          .single();
+
+        if (!freshProduct) continue;
+
+        const previousStock = freshProduct.stock;
+        const qty = Number(item.quantity || 0);
+        const qtyChanged = type === 'sale' ? -qty : qty;
+        const newStock = previousStock + qtyChanged;
+
+        await client.from('stock_movements').insert({
+          product_id: product.id,
+          quantity_changed: qtyChanged,
+          previous_stock: previousStock,
+          new_stock: newStock,
+          type: type,
+          reason: type === 'sale' ? 'Vente en ligne' : 'Retour client',
+          notes: type === 'sale' 
+            ? `Vente en ligne - Commande #${orderShortId}` 
+            : `Retour commande #${orderShortId}`,
+          created_by: order.user_id || null,
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to log stock movements for order:', err);
+    }
   },
 };

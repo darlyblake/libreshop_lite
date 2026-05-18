@@ -25,7 +25,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuthStore } from '../store';
-import { type Order } from '../lib/supabase';
+import { type Order, useSupabase } from '../lib/supabase';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { orderService } from '../services/orderService';
@@ -442,7 +442,7 @@ export const SellerCaisseScreen = () => {
 
     try {
       // Créer la commande dans Supabase
-      const orderPayload: Partial<Order> = {
+      const orderPayload: any = {
         user_id: user?.id || '',
         store_id: storeId,
         total_amount: total,
@@ -464,9 +464,28 @@ export const SellerCaisseScreen = () => {
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
-        cost_price: item.cost_price,
+        cost_price: (item as any).cost_price,
       }));
       await orderService.createItems(itemsPayload);
+
+      // Log stock movements to stock_movements table before updating stocks
+      const client = useSupabase();
+      for (const item of cart) {
+        try {
+          await client.from('stock_movements').insert({
+            product_id: item.id,
+            quantity_changed: -item.quantity,
+            previous_stock: item.stock, // original stock
+            new_stock: item.stock - item.quantity,
+            type: 'sale',
+            reason: 'Vente caisse',
+            notes: `Vente caisse - Ticket #${order.id.slice(0, 8).toUpperCase()} - Paiement : ${paymentMethod}`,
+            created_by: user?.id,
+          });
+        } catch (mErr) {
+          console.warn('Failed to log stock movement for caisse item:', mErr);
+        }
+      }
 
       // Décrémenter le stock via le RPC
       await orderService.processPayment(order.id);
