@@ -163,7 +163,30 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
 
   // Récupération de la sous-catégorie sélectionnée
   const selectedSubCategory = categories.find((c) => c.id === form.subCategoryId);
-  const defaultAttributes = selectedSubCategory?.attribute_schema || [];
+  const defaultAttributes = React.useMemo(() => {
+    if (!selectedSubCategory) return [];
+
+    // Attributs de la catégorie parente (hérités)
+    let parentAttrs: any[] = [];
+    if (selectedSubCategory.parent_id) {
+      const parentCategory = categories.find((c) => c.id === selectedSubCategory.parent_id);
+      if (parentCategory?.attribute_schema) {
+        parentAttrs = (parentCategory.attribute_schema || []).map((attr: any) => ({
+          ...attr,
+          isInherited: true,
+          parentName: parentCategory.name,
+        }));
+      }
+    }
+
+    // Attributs de la sous-catégorie
+    const subAttrs = (selectedSubCategory.attribute_schema || []).map((attr: any) => ({
+      ...attr,
+      isInherited: false,
+    }));
+
+    return [...parentAttrs, ...subAttrs];
+  }, [selectedSubCategory, categories]);
 
   const handleNext = () => {
     if (currentStep === 1) {
@@ -482,9 +505,17 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                                     <Text style={[styles.badgeText, { color: theme.getColor.error }]}>Requis</Text>
                                   </View>
                                 )}
-                                <View style={[styles.badge, { backgroundColor: theme.getColor.info + '15' }]}>
-                                  <Text style={[styles.badgeText, { color: theme.getColor.info }]}>Système</Text>
-                                </View>
+                                {attr.isInherited ? (
+                                  <View style={[styles.badge, { backgroundColor: theme.getColor.warning + '15' }]}>
+                                    <Text style={[styles.badgeText, { color: theme.getColor.warning }]} numberOfLines={1}>
+                                      Hérité ({attr.parentName})
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <View style={[styles.badge, { backgroundColor: theme.getColor.info + '15' }]}>
+                                    <Text style={[styles.badgeText, { color: theme.getColor.info }]}>Sous-catégorie</Text>
+                                  </View>
+                                )}
                               </View>
                             </View>
                           ))}
@@ -591,34 +622,6 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                     </ScrollView>
                   </View>
 
-                  {/* Couleur de couverture */}
-                  <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel}>Couleur visuelle</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {[
-                        theme.getColor.primary,
-                        theme.getColor.info,
-                        theme.getColor.accent,
-                        theme.getColor.success,
-                        theme.getColor.warning,
-                        theme.getColor.error,
-                        '#7c3aed',
-                        '#db2777',
-                      ].map((color, index) => (
-                        <TouchableOpacity
-                          key={`${color}-${index}`}
-                          style={[
-                            styles.colorOption,
-                            { backgroundColor: color },
-                            form.coverColor === color && styles.colorOptionSelected,
-                          ]}
-                          onPress={() => setForm({ ...form, coverColor: color })}
-                        >
-                          {form.coverColor === color && <Ionicons name="checkmark" size={14} color="white" />}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
 
                   {/* SECTION ATTRIBUTS PERSONNALISÉS */}
                   <View style={styles.customAttributesSection}>
