@@ -468,10 +468,10 @@ export const CheckoutScreen: React.FC = () => {
         setProcessing(false);
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
           const ok = window.confirm('Connexion requise: veuillez vous connecter pour passer commande. Voulez-vous vous connecter maintenant ?');
-          if (ok) showAuthModal({ type: 'CHECKOUT' });
+          if (ok) showAuthModal({ type: 'CHECKOUT', payload: { params: route.params } });
         } else {
           Alert.alert('Connexion requise', 'Veuillez vous connecter pour passer commande', [
-            { text: 'Se connecter', onPress: () => showAuthModal({ type: 'CHECKOUT' }) },
+            { text: 'Se connecter', onPress: () => showAuthModal({ type: 'CHECKOUT', payload: { params: route.params } }) },
             { text: 'Annuler', style: 'cancel' },
           ]);
         }

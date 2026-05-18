@@ -165,6 +165,8 @@ const linking = (() => {
         Landing: 'welcome',
         About: 'about',
         SellerEmailConfirm: 'auth/confirm',
+        Checkout: 'Checkout',
+        Payment: 'Payment',
             StoreDetail: 'store/:slug?',
         ProductDetail: 'product/:productId',
             // Password reset via deep link

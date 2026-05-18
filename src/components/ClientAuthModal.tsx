@@ -94,7 +94,7 @@ export const ClientAuthModal: React.FC = () => {
                   storeId: action.payload.product.store_id 
                 });
               } else if (action.type === 'CHECKOUT') {
-                navigation.navigate('Checkout');
+                navigation.navigate('Checkout', action.payload?.params);
               } else if (action.type === 'LIKE_PRODUCT') {
                 await productLikesService.toggleLike(currentUser.id, action.payload.productId);
               } else if (action.type === 'FOLLOW_STORE') {
@@ -144,8 +144,8 @@ export const ClientAuthModal: React.FC = () => {
             }, 0);
           } else if (action.type === 'CHECKOUT') {
             setTimeout(() => {
-              navigation.navigate('Checkout');
-            }, 0);
+              navigation.navigate('Checkout', action.payload?.params);
+            }, 500);
           } else if (action.type === 'LIKE_PRODUCT') {
             await productLikesService.toggleLike(user.id, action.payload.productId);
             Alert.alert('Succès', 'Produit ajouté à vos favoris !');

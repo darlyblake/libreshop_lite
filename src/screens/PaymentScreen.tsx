@@ -149,7 +149,7 @@ export const PaymentScreen: React.FC = () => {
         Alert.alert('Connexion requise', 'Veuillez vous connecter pour passer commande', [
           {
             text: 'Se connecter',
-            onPress: () => showAuthModal({ type: 'CHECKOUT' }),
+            onPress: () => showAuthModal({ type: 'CHECKOUT', payload: { params: route.params } }),
           },
           { text: 'Annuler', style: 'cancel' },
         ]);

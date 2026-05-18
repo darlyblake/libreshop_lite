@@ -92,7 +92,7 @@ export const ClientAuthScreen: React.FC = () => {
                 if (navigation.canGoBack()) {
                   navigation.goBack();
                 } else {
-                  navigation.replace('Cart');
+                  navigation.replace('Checkout', action.payload?.params);
                 }
               } else if (action.type === 'LIKE_PRODUCT') {
                 await productLikesService.toggleLike(currentUser.id, action.payload.productId);
