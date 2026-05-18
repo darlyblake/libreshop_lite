@@ -105,7 +105,22 @@ export const orderService = {
     }
 
     if (options?.search) {
-      query = query.or(`customer_name.ilike.%${options.search}%,customer_phone.ilike.%${options.search}%`);
+      const cleanSearch = options.search.trim().toLowerCase();
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanSearch);
+      const isHex = /^[0-9a-f]{1,8}$/i.test(cleanSearch);
+
+      if (isUuid) {
+        query = query.or(`customer_name.ilike.%${options.search}%,customer_phone.ilike.%${options.search}%,id.eq.${cleanSearch}`);
+      } else if (isHex) {
+        const padLength = 8 - cleanSearch.length;
+        const lowerHex = cleanSearch + '0'.repeat(padLength);
+        const upperHex = cleanSearch + 'f'.repeat(padLength);
+        const lowerBound = `${lowerHex}-0000-0000-0000-000000000000`;
+        const upperBound = `${upperHex}-ffff-ffff-ffff-ffffffffffff`;
+        query = query.or(`customer_name.ilike.%${options.search}%,customer_phone.ilike.%${options.search}%,and(id.gte.${lowerBound},id.lte.${upperBound})`);
+      } else {
+        query = query.or(`customer_name.ilike.%${options.search}%,customer_phone.ilike.%${options.search}%`);
+      }
     }
 
     if (options?.dateFrom) {
