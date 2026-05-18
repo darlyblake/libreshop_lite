@@ -1,7 +1,10 @@
-// LibreShop Service Worker - Enhanced PWA Support
-const CACHE_NAME = 'libreshop-v1.0.0';
-const STATIC_CACHE = 'libreshop-static-v1';
-const DYNAMIC_CACHE = 'libreshop-dynamic-v1';
+// LibreShop Service Worker - Auto-Update System
+// BUILD_VERSION is injected at deploy time by scripts/inject-build-id.js
+// Each new commit generates a unique version, forcing cache invalidation for all users
+const BUILD_VERSION = '20260518-d833322';
+const CACHE_NAME = `libreshop-${BUILD_VERSION}`;
+const STATIC_CACHE = `libreshop-static-${BUILD_VERSION}`;
+const DYNAMIC_CACHE = `libreshop-dynamic-${BUILD_VERSION}`;
 
 // Static assets to cache immediately
 const STATIC_ASSETS = [
@@ -15,7 +18,7 @@ const STATIC_ASSETS = [
   '/icon-512-maskable.png'
 ];
 
-// API routes that should not be cached
+// API routes that should never be cached
 const API_ROUTES = [
   '/api/v1/',
   '/rest/v1/',
@@ -23,191 +26,136 @@ const API_ROUTES = [
   '/auth/v1/'
 ];
 
-// Install Service Worker
+// ─── Install ─────────────────────────────────────────────────────────────────
 self.addEventListener('install', event => {
-  console.log('Service Worker installing...');
+  console.log(`[SW] Installing version ${BUILD_VERSION}...`);
   event.waitUntil(
     caches.open(STATIC_CACHE).then(async (cache) => {
-      console.log('Caching static assets (tolerant mode)');
-      // Attempt to fetch and cache each asset individually so a missing file
-      // doesn't fail the entire install step.
       for (const asset of STATIC_ASSETS) {
         try {
           const response = await fetch(asset, { cache: 'no-store' });
           if (response && response.ok) {
             await cache.put(asset, response.clone());
-            console.log('Cached', asset);
-          } else {
-            console.warn('Asset not cached (not ok):', asset);
           }
         } catch (err) {
-          console.warn('Asset fetch failed, skipping:', asset, err);
+          console.warn(`[SW] Skipping asset: ${asset}`, err);
         }
       }
-      console.log('Static assets caching step completed');
+      console.log(`[SW] Install complete — version ${BUILD_VERSION}`);
+      // Activate immediately without waiting for old tabs to close
       return self.skipWaiting();
-    }).catch(err => {
-      console.warn('Service Worker install encountered an error:', err);
     })
   );
 });
 
-// Activate Service Worker
+// ─── Activate ─────────────────────────────────────────────────────────────────
 self.addEventListener('activate', event => {
-  console.log('Service Worker activating...');
+  console.log(`[SW] Activating version ${BUILD_VERSION}...`);
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cacheName => {
-          // Delete old caches
-          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE && cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+        cacheNames
+          .filter(name => name !== STATIC_CACHE && name !== DYNAMIC_CACHE && name !== CACHE_NAME)
+          .map(name => {
+            console.log(`[SW] Deleting old cache: ${name}`);
+            return caches.delete(name);
+          })
       );
     }).then(() => {
-      console.log('Service Worker activated');
+      console.log(`[SW] Activated version ${BUILD_VERSION} — now controlling all clients`);
+      // Tell all open tabs about the update so React can show the update banner
+      return self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+    }).then(clients => {
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'SW_UPDATED',
+          version: BUILD_VERSION,
+        });
+      });
       return self.clients.claim();
     })
   );
 });
 
-// Helper function to determine if request is API
-const isApiRequest = (url) => {
-  return API_ROUTES.some(route => url.includes(route));
-};
+// ─── Fetch Strategy ────────────────────────────────────────────────────────────
+const isApiRequest = (url) => API_ROUTES.some(route => url.includes(route));
 
-// Helper function to determine if request should be cached
 const shouldCache = (request) => {
   const url = new URL(request.url);
-  
-  // Don't cache API requests
-  if (isApiRequest(url.pathname)) {
-    return false;
-  }
-  
-  // Don't cache POST/PUT/DELETE requests
-  if (request.method !== 'GET') {
-    return false;
-  }
-  
-  // Cache static assets and same-origin requests
-  if (url.origin === self.location.origin) {
-    return true;
-  }
-  
+  if (isApiRequest(url.pathname)) return false;
+  if (request.method !== 'GET') return false;
+  if (url.origin === self.location.origin) return true;
   return false;
 };
 
-// Fetch Event - Enhanced Strategy
 self.addEventListener('fetch', event => {
-  const request = event.request;
-  const url = new URL(request.url);
-  
-  // Skip cross-origin requests and API calls
-  if (!shouldCache(request)) {
-    return;
-  }
-  
+  if (!shouldCache(event.request)) return;
+
   event.respondWith(
-    caches.match(request)
-      .then(cachedResponse => {
-        // Strategy: Stale While Revalidate for cached content
-        if (cachedResponse) {
-          // Serve cached content immediately, then update in background
-          fetchAndCache(request);
-          return cachedResponse;
-        }
-        
-        // Network First for dynamic content
-        return fetch(request)
-          .then(response => {
-            // Cache successful responses
-            if (response.ok && response.status === 200) {
-              const responseToCache = response.clone();
-              caches.open(DYNAMIC_CACHE).then(cache => {
-                cache.put(request, responseToCache);
-              });
-            }
-            return response;
-          })
-          .catch(() => {
-            // Fallback to cache if network fails
-            return caches.match(request);
+    caches.match(event.request).then(cachedResponse => {
+      // Stale-while-revalidate: serve cache instantly, refresh in background
+      if (cachedResponse) {
+        // Refresh the cache in background
+        fetch(event.request).then(networkResponse => {
+          if (networkResponse && networkResponse.ok) {
+            caches.open(DYNAMIC_CACHE).then(cache => {
+              cache.put(event.request, networkResponse.clone());
+            });
+          }
+        }).catch(() => {});
+        return cachedResponse;
+      }
+
+      // No cache — go to network
+      return fetch(event.request).then(response => {
+        if (response.ok && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(DYNAMIC_CACHE).then(cache => {
+            cache.put(event.request, responseToCache);
           });
-      })
-      .catch(() => {
-        // Final fallback for critical resources
-        if (request.destination === 'document') {
+        }
+        return response;
+      }).catch(() => {
+        if (event.request.destination === 'document') {
           return caches.match('/index.html');
         }
         return new Response('Offline', { status: 503 });
-      })
+      });
+    })
   );
 });
 
-// Background fetch and cache
-const fetchAndCache = (request) => {
-  fetch(request)
-    .then(response => {
-      if (response.ok) {
-        const responseToCache = response.clone();
-        caches.open(DYNAMIC_CACHE).then(cache => {
-          cache.put(request, responseToCache);
-        });
-      }
-    })
-    .catch(err => {
-      console.log('Background fetch failed:', err);
-    });
-};
-
-// Handle messages from clients
+// ─── Messages from React app ───────────────────────────────────────────────────
 self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (!event.data) return;
+
+  // React asks the SW to apply the update immediately
+  if (event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] SKIP_WAITING received — activating now');
     self.skipWaiting();
   }
-  
-  // Handle cache updates
-  if (event.data && event.data.type === 'UPDATE_CACHE') {
-    event.waitUntil(
-      caches.open(DYNAMIC_CACHE).then(cache => {
-        return cache.add(event.data.url);
-      })
-    );
+
+  // React asks the current SW version
+  if (event.data.type === 'GET_VERSION') {
+    event.source?.postMessage({
+      type: 'SW_VERSION',
+      version: BUILD_VERSION,
+    });
   }
 });
 
-// Handle background sync for offline actions
-self.addEventListener('sync', event => {
-  if (event.tag === 'background-sync') {
-    event.waitUntil(
-      // Handle offline actions here
-      console.log('Background sync triggered')
-    );
-  }
-});
-
-// Handle push notifications (future enhancement)
+// ─── Push Notifications ───────────────────────────────────────────────────────
 self.addEventListener('push', event => {
-  if (event.data) {
-    const data = event.data.json();
-    const options = {
+  if (!event.data) return;
+  const data = event.data.json();
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
       body: data.body,
       icon: '/icon-192.png',
       badge: '/favicon.ico',
       vibrate: [100, 50, 100],
-      data: {
-        dateOfArrival: Date.now(),
-        primaryKey: 1
-      }
-    };
-    
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
-  }
+    })
+  );
 });
 
-console.log('Service Worker loaded successfully');
+console.log(`[SW] Loaded — version ${BUILD_VERSION}`);

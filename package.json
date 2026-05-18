@@ -10,7 +10,10 @@
     "build:web": "expo export:web && cd scripts && node generate-sitemap.js",
     "generate-sitemap": "node scripts/generate-sitemap.js",
     "setup-canvaskit": "node scripts/setup-canvaskit.js",
-    "dev:api": "node scripts/dev-api-server.js"
+    "dev:api": "node scripts/dev-api-server.js",
+    "inject-build-id": "node scripts/inject-build-id.js",
+    "predeploy": "node scripts/inject-build-id.js",
+    "prebuild": "node scripts/inject-build-id.js"
   },
   "dependencies": {
     "@babel/parser": "^7.29.2",

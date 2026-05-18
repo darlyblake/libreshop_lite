@@ -29,6 +29,7 @@ import { navigateToClientTab } from '../navigation/clientNavigation';
 import { errorHandler } from '../utils/errorHandler';
 import { StoreCard, ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase, SearchBar } from '../components';
 import { PWAInstallButton } from '../components/PWAInstallButton';
+import { PWAUpdateBanner } from '../components/PWAUpdateBanner';
 import { SortTabs } from '../components/SortTabs';
 import { useResponsive } from '../utils/responsive';
 import { useClientHomeState } from '../hooks/useClientHomeState';
@@ -1097,6 +1098,9 @@ export const ClientHomeScreen: React.FC = () => {
 
       {/* PWA Install Button - Only on Web */}
       {Platform.OS === 'web' && <PWAInstallButton />}
+
+      {/* PWA Update Banner - Slides in when a new version is deployed */}
+      {Platform.OS === 'web' && <PWAUpdateBanner />}
     </View>
   );
 };

@@ -277,36 +277,34 @@
         }, 5000);
       })();
       
-      // Enhanced Service Worker Registration for PWA
+      // ── Service Worker Registration with Auto-Update ────────────────────
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/service-worker.js')
           .then(registration => {
-            console.log('Service Worker registered successfully:', registration.scope);
-            
-            // Check for updates
+            console.log('[SW] Registered, scope:', registration.scope);
+
+            // Poll for updates every 60 seconds while the app is open
+            setInterval(() => { registration.update().catch(() => {}); }, 60_000);
+
+            // When a new service worker is found, activate it immediately.
+            // The React PWAUpdateBanner component will show a beautiful reload prompt.
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
-              if (newWorker) {
-                newWorker.addEventListener('statechange', () => {
-                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    // New version available
-                    if (confirm('Une nouvelle version de LibreShop est disponible. Voulez-vous mettre à jour ?')) {
-                      newWorker.postMessage({ type: 'SKIP_WAITING' });
-                      window.location.reload();
-                    }
-                  }
-                });
-              }
+              if (!newWorker) return;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('[SW] New version installed — activating...');
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
             });
           })
-          .catch(err => {
-            console.log('Service Worker registration failed:', err);
-          });
-        
-        // Handle service worker messages
+          .catch(err => console.warn('[SW] Registration failed:', err));
+
+        // Handle messages from Service Worker (SW_UPDATED handled by PWAUpdateBanner)
         navigator.serviceWorker.addEventListener('message', event => {
           if (event.data && event.data.type === 'CACHE_UPDATED') {
-            console.log('Cache updated:', event.data.url);
+            console.log('[SW] Cache updated:', event.data.url);
           }
         });
       }
