@@ -21,10 +21,12 @@ import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { imageProcessorService } from '../services/imageProcessorService';
+import { categoryService } from '../services/categoryService';
 
 interface CollectionOption {
   id: string;
   name: string;
+  category_id?: string | null;
 }
 
 interface Product {
@@ -38,6 +40,7 @@ interface Product {
   images: string[];
   collectionId: string;
   featured?: boolean;
+  attributes?: Record<string, any>;
 }
 
 interface AddProductModalProps {
@@ -394,6 +397,52 @@ const getStyles = (theme: any) => {
       fontWeight: '600',
       fontSize: FONT_SIZE.md,
     },
+    // Dynamic Attributes Styling
+    dynamicAttrsSection: {
+      backgroundColor: COLORS.bg,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.md,
+      marginBottom: SPACING.lg,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    dynamicAttrsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      marginBottom: SPACING.xs,
+    },
+    dynamicAttrsTitle: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '700',
+      color: COLORS.text,
+    },
+    dynamicAttrsSubtitle: {
+      fontSize: FONT_SIZE.xs,
+      color: COLORS.textMuted,
+      marginBottom: SPACING.md,
+    },
+    attrChip: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs + 2,
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.card,
+      marginTop: SPACING.xs,
+    },
+    attrChipActive: {
+      borderColor: COLORS.accent,
+      backgroundColor: COLORS.accent + '15',
+    },
+    attrChipText: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.textMuted,
+      fontWeight: '600',
+    },
+    attrChipTextActive: {
+      color: COLORS.accent,
+    },
     // Web-specific fixes for modal interaction
     webInteractiveElement: Platform.OS === 'web' ? {
       pointerEvents: 'auto' as const,
@@ -513,6 +562,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
+  const [categorySchema, setCategorySchema] = useState<any[]>([]);
+  const [productAttributes, setProductAttributes] = useState<Record<string, any>>({});
+
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (!showCameraScanner) return;
     setNewProduct(prev => ({ ...prev, barcode: data }));
@@ -529,6 +581,44 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   React.useEffect(() => {
     setPendingCollectionId(newProduct.collectionId || initialCollectionId);
   }, [newProduct.collectionId, initialCollectionId]);
+
+  React.useEffect(() => {
+    const fetchSchema = async () => {
+      const selectedCol = collections?.find(c => c.id === newProduct.collectionId);
+      if (selectedCol?.category_id) {
+        try {
+          const category = await categoryService.getById(selectedCol.category_id);
+          let schema = category.attribute_schema || [];
+          if (category.parent_id) {
+            try {
+              const parentCategory = await categoryService.getById(category.parent_id);
+              if (parentCategory.attribute_schema) {
+                schema = [...parentCategory.attribute_schema, ...schema];
+              }
+            } catch (err) {
+              console.warn('Failed to load parent category schema:', err);
+            }
+          }
+          setCategorySchema(schema);
+          
+          // Pre-populate with default values/empty values for the schema fields
+          const initialAttrs: Record<string, any> = {};
+          schema.forEach((attr: any) => {
+            initialAttrs[attr.name] = attr.type === 'multiselect' ? [] : '';
+          });
+          setProductAttributes(initialAttrs);
+        } catch (e) {
+          console.warn('Failed to fetch category schema:', e);
+          setCategorySchema([]);
+          setProductAttributes({});
+        }
+      } else {
+        setCategorySchema([]);
+        setProductAttributes({});
+      }
+    };
+    fetchSchema();
+  }, [newProduct.collectionId, collections]);
 
   const openCollectionPicker = () => {
     if (!collections || collections.length === 0) {
@@ -586,6 +676,22 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       errors.images = 'Au moins 1 image requise';
     }
 
+    // Validate dynamic attributes
+    categorySchema.forEach((attr) => {
+      const val = productAttributes[attr.name];
+      if (attr.required) {
+        if (attr.type === 'multiselect') {
+          if (!Array.isArray(val) || val.length === 0) {
+            errors[`attr_${attr.name}`] = `${attr.label} requis`;
+          }
+        } else {
+          if (val === undefined || val === null || String(val).trim() === '') {
+            errors[`attr_${attr.name}`] = `${attr.label} requis`;
+          }
+        }
+      }
+    });
+
     // S'il y a des erreurs, les afficher et arrêter
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -608,8 +714,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       }
     }
 
-    console.log('[AddProductModal] ✅ Validation passed, calling onAdd()', newProduct);
-    onAdd(newProduct);
+    console.log('[AddProductModal] ✅ Validation passed, calling onAdd()', { ...newProduct, attributes: productAttributes });
+    onAdd({ ...newProduct, attributes: productAttributes });
     
     // Reset form
     setNewProduct({
@@ -624,6 +730,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       collectionId: initialCollectionId,
       featured: false,
     });
+    setProductAttributes({});
   };
 
   const handleAddImage = () => {
@@ -883,6 +990,109 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               </View>
               {fieldErrors.stock && <Text style={styles.errorText}>{fieldErrors.stock}</Text>}
             </View>
+
+            {/* Dynamic Attributes Section */}
+            {categorySchema.length > 0 && (
+              <View style={styles.dynamicAttrsSection}>
+                <View style={styles.dynamicAttrsHeader}>
+                  <Ionicons name="sparkles-outline" size={18} color={COLORS.accent} />
+                  <Text style={styles.dynamicAttrsTitle}>Informations complémentaires</Text>
+                </View>
+                <Text style={styles.dynamicAttrsSubtitle}>
+                  Remplissez ces caractéristiques spécifiques pour améliorer la visibilité de votre produit.
+                </Text>
+
+                {categorySchema.map((attr) => {
+                  const val = productAttributes[attr.name];
+                  return (
+                    <View key={attr.name} style={styles.modalInput}>
+                      <Text style={styles.inputLabel}>
+                        {attr.label} {attr.required && <Text style={styles.required}>*</Text>}
+                      </Text>
+                      
+                      {attr.type === 'text' && (
+                        <TextInput
+                          style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
+                          placeholder={`Entrez ${attr.label.toLowerCase()}`}
+                          placeholderTextColor={COLORS.textMuted}
+                          value={val || ''}
+                          onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
+                        />
+                      )}
+
+                      {attr.type === 'number' && (
+                        <TextInput
+                          style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
+                          placeholder={`Entrez ${attr.label.toLowerCase()}`}
+                          placeholderTextColor={COLORS.textMuted}
+                          keyboardType="numeric"
+                          value={val !== undefined && val !== null ? String(val) : ''}
+                          onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
+                        />
+                      )}
+
+                      {attr.type === 'select' && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                          {attr.options?.map((opt: string) => {
+                            const selected = val === opt;
+                            return (
+                              <TouchableOpacity
+                                key={opt}
+                                style={[
+                                  styles.attrChip,
+                                  selected && styles.attrChipActive
+                                ]}
+                                onPress={() => setProductAttributes(prev => ({ ...prev, [attr.name]: opt }))}
+                              >
+                                <Text style={[
+                                  styles.attrChipText,
+                                  selected && styles.attrChipTextActive
+                                ]}>
+                                  {opt}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+
+                      {attr.type === 'multiselect' && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                          {attr.options?.map((opt: string) => {
+                            const arr = Array.isArray(val) ? val : [];
+                            const selected = arr.includes(opt);
+                            return (
+                              <TouchableOpacity
+                                key={opt}
+                                style={[
+                                  styles.attrChip,
+                                  selected && styles.attrChipActive
+                                ]}
+                                onPress={() => {
+                                  const next = selected ? arr.filter((x: any) => x !== opt) : [...arr, opt];
+                                  setProductAttributes(prev => ({ ...prev, [attr.name]: next }));
+                                }}
+                              >
+                                <Text style={[
+                                  styles.attrChipText,
+                                  selected && styles.attrChipTextActive
+                                ]}>
+                                  {opt}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+
+                      {fieldErrors[`attr_${attr.name}`] && (
+                        <Text style={styles.errorText}>{fieldErrors[`attr_${attr.name}`]}</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
             <View style={styles.modalInput}>
               <Text style={styles.inputLabel}>

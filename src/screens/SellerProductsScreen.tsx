@@ -508,7 +508,8 @@ export const SellerProductsScreen: React.FC = () => {
     const isSelected = selectedProducts.has(product.id);
     const isGrid = viewMode === 'grid';
 
-    const itemWidthStyle = isGrid ? { width: grid?.getColumnWidth ? grid.getColumnWidth(1) - 8 : Math.floor((width - spacing.md * 2) / (isDesktop ? 3 : isTablet ? 2 : 2)) } : undefined;
+    const cols = isDesktop ? 3 : 2;
+    const itemWidthStyle = isGrid ? { width: Math.floor((width - spacing.md * (cols + 1)) / cols) } : undefined;
 
     return (
       <TouchableOpacity
@@ -715,15 +716,15 @@ export const SellerProductsScreen: React.FC = () => {
         end={{ x: 1, y: 0 }}
         style={styles.header}
       >
-        <View>
-          <Text style={styles.headerTitle}>Mes Produits</Text>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <Text style={[styles.headerTitle, { flex: 0 }]} numberOfLines={1}>Mes Produits</Text>
           <View style={styles.planBadgeContainer}>
-            <Text style={styles.headerSubtitle}>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
               {products.length}
               {typeof store?.product_limit === 'number' ? (
                 store.product_limit === -1 ? ` / ∞` : ` / ${store.product_limit}`
               ) : ''} produit{products.length !== 1 ? 's' : ''}
-              {products.length > 0 ? " • Appuyez pour plus d'options" : ''}
+              {!isMobile && products.length > 0 ? " • Appuyez pour plus d'options" : ''}
             </Text>
             {store?.subscription_plan && (
               <View style={styles.planBadge}>
@@ -789,11 +790,11 @@ export const SellerProductsScreen: React.FC = () => {
 
       {/* Product list with pagination */}
       <FlatList
-        key={viewMode}
+        key={viewMode + '_' + (isDesktop ? '3' : '2')}
         data={filteredProducts}
         renderItem={renderProductItem}
         keyExtractor={(item) => item.id}
-        numColumns={viewMode === 'grid' ? 2 : 1}
+        numColumns={viewMode === 'grid' ? (isDesktop ? 3 : 2) : 1}
         columnWrapperStyle={viewMode === 'grid' ? { justifyContent: 'space-between', paddingHorizontal: spacing.md } : undefined}
         showsVerticalScrollIndicator={false}
         initialNumToRender={8}
@@ -1136,7 +1137,7 @@ export const SellerProductsScreen: React.FC = () => {
       <AddProductModal
         visible={showAddProductModal}
         onClose={() => setShowAddProductModal(false)}
-        collections={(collections || []).filter(c => c.is_active).map(c => ({ id: c.id, name: c.name }))}
+        collections={(collections || []).filter(c => c.is_active).map(c => ({ id: c.id, name: c.name, category_id: c.category_id }))}
         onAdd={async (product) => {
           if (!storeId) { Alert.alert('Erreur', 'Aucune boutique trouvée pour ce compte'); return; }
           if (!product.collectionId) { Alert.alert('Erreur', 'Veuillez sélectionner une collection'); return; }
@@ -1164,6 +1165,7 @@ export const SellerProductsScreen: React.FC = () => {
               is_active: true,
               is_online_sale: true,
               is_physical_sale: true,
+              attributes: product.attributes || {},
             } as any);
             setProducts(prev => [created as any as SupabaseProduct, ...prev]);
             setShowAddProductModal(false);
@@ -1383,7 +1385,7 @@ const styles = StyleSheet.create({
   // Header
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg, gap: SPACING.md },
   headerTitle: { fontSize: FONT_SIZE.xl, fontWeight: '800', color: '#fff', flex: 1 },
-  planBadgeContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  planBadgeContainer: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   headerSubtitle: { fontSize: FONT_SIZE.sm, color: 'rgba(255,255,255,0.8)' },
   planBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   planBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
@@ -1420,7 +1422,7 @@ const styles = StyleSheet.create({
   productCardSelected: { borderColor: COLORS.accent, borderWidth: 2 },
 
   // Product card (GRID)
-  productCardGrid: { flexDirection: 'column', borderRadius: RADIUS.lg, marginBottom: 0 },
+  productCardGrid: { flexDirection: 'column', borderRadius: RADIUS.lg, marginBottom: SPACING.md },
 
   // Image (LIST)
   productImageContainer: { position: 'relative' },
