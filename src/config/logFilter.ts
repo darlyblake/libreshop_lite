@@ -10,6 +10,13 @@ const IGNORED_PATTERNS: RegExp[] = [
   /Invalid Refresh Token/,
   /message channel closed/, // extension unhandled rejections
   /translate\.googleapis\.com/, // blocked translation API
+  /A listener indicated an asynchronous response/, // common extension warning
+  /\[DEPRECATED\] Default export is deprecated/, // zustand deprecation log injected via instrument script
+  /Failed to initialize Skia Web: Infinity/, // sometimes cached
+  /SyntaxError: Unexpected end of input/, // external inject script failure (e.g. Vercel feedback widget)
+  /Blocked aria-hidden on an element/, // react-dom aria-hidden warning
+  /useNativeDriver is not supported/, // react-native-web Animated warning
+  /increment_product_views/ // supabase rpc 404 fetch error logs
 ];
 
 function shouldIgnore(args: any[]): boolean {

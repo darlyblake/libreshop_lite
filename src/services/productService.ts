@@ -535,18 +535,17 @@ export const productService = {
   async incrementViews(productId: string) {
     const client = useSupabase();
     try {
-      // Try atomic RPC first (single DB round-trip, no SELECT needed)
-      const { error } = await client.rpc('increment_product_views', { p_product_id: productId });
-      if (error && (error.code === 'PGRST202' || String(error.message).includes('could not find'))) {
-        // RPC not available — fallback: fetch then update (2 queries, legacy behaviour)
-        const { data: current } = await client
-          .from('products').select('view_count').eq('id', productId).maybeSingle();
+      // Use legacy 2-step fetch+update to avoid throwing 404 network errors
+      // if the 'increment_product_views' RPC function is not deployed yet.
+      const { data: current } = await client
+        .from('products').select('view_count').eq('id', productId).maybeSingle();
+      
+      if (current) {
         await client
           .from('products')
-          .update({ view_count: (Number(current?.view_count) || 0) + 1 })
+          .update({ view_count: (Number(current.view_count) || 0) + 1 })
           .eq('id', productId);
       }
-      // All other errors are silently ignored — view count is non-critical
     } catch {
       // Non-critical: silently ignore
     }
