@@ -45,6 +45,7 @@ export const SellerStockHistoryScreen: React.FC = () => {
   
   const [selectedFilter, setSelectedFilter] = useState<FilterType>('all');
   const [adjustmentModalVisible, setAdjustmentModalVisible] = useState(false);
+  const [guideModalVisible, setGuideModalVisible] = useState(false);
   
   // Adjustment Form State
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -295,6 +296,13 @@ export const SellerStockHistoryScreen: React.FC = () => {
             <Text style={styles.headerTitle}>Audit & Mouvements de Stock</Text>
             <Text style={styles.headerSubtitle}>Suivi et traçabilité en temps réel</Text>
           </View>
+          <TouchableOpacity
+            style={styles.guideHeaderButton}
+            onPress={() => setGuideModalVisible(true)}
+          >
+            <Ionicons name="help-circle" size={18} color="#fff" />
+            <Text style={styles.guideHeaderButtonText}>Guide</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -469,6 +477,132 @@ export const SellerStockHistoryScreen: React.FC = () => {
                 onPress={handleSaveAdjustment}
                 disabled={saving}
                 style={{ marginTop: SPACING.lg }}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Guide Modal */}
+      <Modal
+        visible={guideModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setGuideModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="book-outline" size={22} color={COLORS.accent} />
+                <Text style={styles.modalTitle}>Guide : Comptabilité & Stocks</Text>
+              </View>
+              <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalForm} showsVerticalScrollIndicator={false}>
+              
+              {/* Section 1: Comptabilisation & Trésorerie */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(76, 175, 80, 0.1)', 'rgba(76, 175, 80, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+                      <Ionicons name="cash-outline" size={20} color={COLORS.success} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.success }]}>1. Entrées Comptables (Trésorerie)</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Vos revenus et statistiques financières sont calculés en temps réel. Une vente s'enregistre officiellement dans vos rapports dès que :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.bulletText}>La commande est marquée comme <Text style={{ fontWeight: '700' }}>Payée</Text> (Caisse ou paiement validé).</Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.bulletText}>La commande atteint le statut final <Text style={{ fontWeight: '700' }}>Livrée</Text> (comptabilisation à la livraison).</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 2: Mouvements de stock */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(33, 150, 243, 0.1)', 'rgba(33, 150, 243, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(33, 150, 243, 0.15)' }]}>
+                      <Ionicons name="cube-outline" size={20} color={COLORS.primary} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.primary }]}>2. Mouvements de Stock (Cycle)</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Pour garantir que vous ne vendiez jamais deux fois le même article en ligne et en caisse (survente) :
+                  </Text>
+                  <View style={styles.stepContainer}>
+                    <View style={styles.stepRow}>
+                      <View style={[styles.stepNumberBadge, { backgroundColor: COLORS.primary }]}>
+                        <Text style={styles.stepNumberText}>1</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.stepTitle}>Dépréciation à l'Acceptation</Text>
+                        <Text style={styles.stepDesc}>Dès que vous acceptez une commande, l'article est "réservé" (déduit du stock physique) pour le client.</Text>
+                      </View>
+                    </View>
+                    <View style={styles.stepRow}>
+                      <View style={[styles.stepNumberBadge, { backgroundColor: COLORS.warning }]}>
+                        <Text style={styles.stepNumberText}>2</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.stepTitle}>Restauration automatique à l'Annulation</Text>
+                        <Text style={styles.stepDesc}>Si une commande en cours de préparation est annulée, le stock est réinjecté automatiquement et un log "Retour" est tracé.</Text>
+                      </View>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 3: Bonnes pratiques */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(255, 152, 0, 0.1)', 'rgba(255, 152, 0, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(255, 152, 0, 0.15)' }]}>
+                      <Ionicons name="bulb-outline" size={20} color={COLORS.warning} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.warning }]}>3. Conseils de Gestion</Text>
+                  </View>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Pertes & Vols :</Text> Utilisez le bouton bleu "Enregistrer une perte, vol ou réassort" pour corriger manuellement votre inventaire dès qu'une anomalie en rayon est constatée.
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Validation de paiement :</Text> N'oubliez pas de marquer les commandes comme "Payées" dès réception des fonds pour avoir des rapports mensuels impeccables.
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <Button
+                title="J'ai compris"
+                onPress={() => setGuideModalVisible(false)}
+                style={{ marginTop: SPACING.md, backgroundColor: COLORS.accent }}
               />
             </ScrollView>
           </View>
@@ -720,5 +854,98 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.card,
     color: COLORS.text,
     fontSize: FONT_SIZE.sm,
+  },
+  guideHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.full,
+  },
+  guideHeaderButtonText: {
+    color: '#fff',
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+  },
+  guideCard: {
+    marginBottom: SPACING.md,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  guideCardGradient: {
+    padding: SPACING.md,
+  },
+  guideCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  guideIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideCardTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+  },
+  guideCardBody: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSoft,
+    lineHeight: 18,
+    marginBottom: SPACING.sm,
+  },
+  bulletList: {
+    gap: SPACING.xs,
+  },
+  bulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.xs,
+  },
+  bulletText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSoft,
+    flex: 1,
+    lineHeight: 18,
+  },
+  stepContainer: {
+    gap: SPACING.md,
+    marginTop: SPACING.xs,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+  },
+  stepNumberBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  stepNumberText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  stepTitle: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  stepDesc: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    lineHeight: 16,
+    marginTop: 2,
   },
 });
