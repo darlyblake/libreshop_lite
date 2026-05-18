@@ -56,6 +56,32 @@ export const userService = {
     return data;
   },
 
+  /**
+   * Récupère le profil de l'utilisateur actuellement connecté directement depuis Supabase.
+   * Ne fait PAS de vérification de permission JS supplémentaire — la politique RLS Supabase
+   * garantit déjà que chaque utilisateur ne peut voir que son propre profil.
+   * 
+   * Utiliser cette méthode quand la session OAuth vient d'être établie et que
+   * getProfile() pourrait échouer à cause d'une condition de course sur auth.getUser().
+   */
+  async getSelfProfile(userId: string): Promise<User | null> {
+    try {
+      const { data, error } = await supabase!
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) {
+        console.warn('[userService.getSelfProfile] DB error:', error.message);
+        return null;
+      }
+      return data;
+    } catch (e) {
+      console.warn('[userService.getSelfProfile] Unexpected error:', e);
+      return null;
+    }
+  },
+
   async getOrCreateProfile(userId: string): Promise<User> {
     // Check permission - only for own profile or admin
     const canView = await canViewProfile(userId);

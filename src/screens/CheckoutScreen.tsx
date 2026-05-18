@@ -301,20 +301,27 @@ export const CheckoutScreen: React.FC = () => {
       // 1. Migration one-shot depuis AsyncStorage → Supabase (une seule fois par user)
       await addressService.migrateFromLocal(user.id);
 
-      // 2. Toujours récupérer le profil frais depuis Supabase avant de décider si
-      //    l'onboarding est nécessaire. L'objet `user` en store vient de auth.user (Google)
-      //    et ne contient PAS les champs customs de la table `users` (whatsapp_number, etc.)
+      // 2. Récupérer le profil frais depuis Supabase.
+      //    On utilise getSelfProfile (sans vérification de permission JS) pour éviter
+      //    la race condition après OAuth : auth.getUser() peut retourner null quelques
+      //    millisecondes après la connexion Google, causant une erreur "Accès non autorisé"
+      //    dans getProfile() et un retour au profil en cache (sans whatsapp_number).
       let freshProfile: any = user;
-      try {
-        const profileFromDB = await userService.getProfile(user.id);
-        if (profileFromDB) {
-          freshProfile = profileFromDB;
-          // Mettre à jour le store avec le profil complet
-          const { setUser } = useAuthStore.getState();
-          setUser({ ...user, ...profileFromDB } as any);
-        }
-      } catch (profileErr) {
-        console.warn('Could not fetch fresh profile for onboarding check:', profileErr);
+
+      // Première tentative
+      let profileFromDB = await userService.getSelfProfile(user.id);
+
+      // Si null (session pas encore établie), on réessaie après 1 seconde
+      if (!profileFromDB) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        profileFromDB = await userService.getSelfProfile(user.id);
+      }
+
+      if (profileFromDB) {
+        freshProfile = profileFromDB;
+        // Mettre à jour le store avec le profil complet
+        const { setUser } = useAuthStore.getState();
+        setUser({ ...user, ...profileFromDB } as any);
       }
 
       // 3. Charger les adresses depuis Supabase (source de vérité)
