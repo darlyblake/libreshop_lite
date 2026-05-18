@@ -27,7 +27,7 @@ import { storeService } from '../services/storeService';
 import { useSupabase } from '../lib/supabase';
 import { contactStore } from '../services/contactService';
 import { notificationService } from '../services/notificationService';
-import { exportOrdersToPDF, exportOrderToPDF, exportBatchOrdersToPDF } from '../utils/pdfExport';
+import { exportOrdersToPDF, exportOrderToPDF, exportBatchOrdersToPDF, exportPickingListPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
 
 // Types
@@ -205,9 +205,125 @@ export const SellerOrdersScreen: React.FC = () => {
       paymentStatus: o.paymentStatus || 'pending',
       status: o.status,
       createdAt: o.isoDate || o.date,
-      storeName,
+      storeName: storeName || undefined,
     }));
     await exportBatchOrdersToPDF(ordersData, storeName || 'Ma Boutique');
+  };
+
+  const handleBatchPickingList = async () => {
+    const selected = filteredOrders.filter(o => selectedOrderIds.has(o.id));
+    if (selected.length === 0) {
+      Alert.alert('Info', 'Sélectionnez au moins une commande');
+      return;
+    }
+    const ordersData = selected.map(o => ({
+      id: o.id,
+      customerName: o.customer,
+      customerPhone: o.phone,
+      shippingAddress: o.deliveryAddress,
+      items: o.items.map(it => ({ name: it.name, quantity: it.quantity || 1, price: it.price || 0 })),
+      totalAmount: o.total,
+      paymentMethod: o.paymentMethod,
+      paymentStatus: o.paymentStatus || 'pending',
+      status: o.status,
+      createdAt: o.isoDate || o.date,
+      storeName: storeName || undefined,
+    }));
+    await exportPickingListPDF(ordersData, storeName || 'Ma Boutique');
+  };
+
+  const handleBatchAccept = async () => {
+    if (selectedOrderIds.size === 0) {
+      Alert.alert('Info', 'Sélectionnez au moins une commande');
+      return;
+    }
+    
+    const pendingSelectedIds = Array.from(selectedOrderIds).filter(id => {
+      const order = orders.find(o => o.id === id);
+      return order && order.status === 'pending';
+    });
+
+    if (pendingSelectedIds.length === 0) {
+      Alert.alert('Info', "Aucune des commandes sélectionnées n'est en attente (statut 'En attente')");
+      return;
+    }
+
+    Alert.alert(
+      'Accepter en masse',
+      `Accepter les ${pendingSelectedIds.length} commande(s) en attente sélectionnée(s) ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Oui, accepter', 
+          onPress: async () => {
+            setLoading(true);
+            try {
+              let successCount = 0;
+              for (const orderId of pendingSelectedIds) {
+                await orderService.acceptOrder(orderId);
+                successCount++;
+              }
+              Alert.alert('Succès', `${successCount} commande(s) acceptée(s) avec succès.`);
+              setSelectionMode(false);
+              setSelectedOrderIds(new Set());
+              loadOrders();
+            } catch (e) {
+              errorHandler.handleDatabaseError(e, 'Error in batch accept');
+              Alert.alert('Erreur', 'Un problème est survenu lors de la validation.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleBatchPay = async () => {
+    if (selectedOrderIds.size === 0) {
+      Alert.alert('Info', 'Sélectionnez au moins une commande');
+      return;
+    }
+    
+    const payableSelectedIds = Array.from(selectedOrderIds).filter(id => {
+      const order = orders.find(o => o.id === id);
+      return order && !['paid', 'delivered', 'cancelled'].includes(order.status);
+    });
+
+    if (payableSelectedIds.length === 0) {
+      Alert.alert('Info', "Aucune des commandes sélectionnées n'est éligible au paiement.");
+      return;
+    }
+
+    Alert.alert(
+      'Confirmer les paiements',
+      `Confirmer le paiement de ces ${payableSelectedIds.length} commande(s) sélectionnée(s) ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { 
+          text: 'Oui, valider', 
+          onPress: async () => {
+            setLoading(true);
+            try {
+              let successCount = 0;
+              for (const orderId of payableSelectedIds) {
+                await orderService.confirmOrderPayment(orderId);
+                successCount++;
+              }
+              Alert.alert('Succès', `Le paiement de ${successCount} commande(s) a été enregistré.`);
+              setSelectionMode(false);
+              setSelectedOrderIds(new Set());
+              loadOrders();
+            } catch (e) {
+              errorHandler.handleDatabaseError(e, 'Error in batch payment');
+              Alert.alert('Erreur', 'Un problème est survenu lors de l\'enregistrement des paiements.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
 
@@ -1505,24 +1621,57 @@ Merci.`;
       {/* Barre de sélection multiple */}
       {selectionMode && (
         <View style={{
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          backgroundColor: COLORS.accent, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+          backgroundColor: COLORS.accent, 
+          paddingHorizontal: spacing.md, 
+          paddingVertical: spacing.sm,
+          gap: spacing.sm,
         }}>
-          <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedOrderIds(new Set()); }}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>✕ Annuler</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleSelectAll}>
-            <Text style={{ color: '#fff', fontWeight: '600' }}>
-              {selectedOrderIds.size === filteredOrders.length ? 'Tout désélectionner' : 'Tout sélectionner'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleBatchPrint}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 }}
-          >
-            <Ionicons name="print-outline" size={18} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '800' }}>Imprimer ({selectedOrderIds.size})</Text>
-          </TouchableOpacity>
+          {/* Ligne 1: Infos et Sélection Globale */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyBetween: 'space-between', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.15)', paddingBottom: 6, justifyContent: 'space-between' } as any}>
+            <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedOrderIds(new Set()); }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.xs }}>✕ Quitter Sélection ({selectedOrderIds.size})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleSelectAll}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.xs }}>
+                {selectedOrderIds.size === filteredOrders.length ? '☑ Tout désélectionner' : '☐ Tout sélectionner'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Ligne 2: Actions de Masse */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingVertical: 2 } as any}>
+            <TouchableOpacity
+              onPress={handleBatchAccept}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
+            >
+              <Ionicons name="checkmark-circle-outline" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Accepter ({Array.from(selectedOrderIds).filter(id => orders.find(o => o.id === id)?.status === 'pending').length})</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleBatchPay}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
+            >
+              <Ionicons name="cash-outline" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Payer ({Array.from(selectedOrderIds).filter(id => !['paid', 'delivered', 'cancelled'].includes(orders.find(o => o.id === id)?.status || '')).length})</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleBatchPickingList}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
+            >
+              <Ionicons name="cube-outline" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Picking List (Préparation)</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleBatchPrint}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 }}
+            >
+              <Ionicons name="print-outline" size={14} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Imprimer Factures ({selectedOrderIds.size})</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       )}
 

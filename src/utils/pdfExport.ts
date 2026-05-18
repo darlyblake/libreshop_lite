@@ -594,8 +594,142 @@ export const exportBatchOrdersToPDF = async (
   }
 };
 
+// Export consolidated Picking List / Bordereau de préparation
+export const exportPickingListPDF = async (
+  orders: OrderData[],
+  storeName: string = 'Ma Boutique'
+): Promise<void> => {
+  try {
+    if (orders.length === 0) {
+      Alert.alert('Info', 'Aucune commande sélectionnée');
+      return;
+    }
+
+    // Consolidated item calculation
+    const itemMap: Record<string, { quantity: number; price: number }> = {};
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (itemMap[item.name]) {
+          itemMap[item.name].quantity += item.quantity;
+        } else {
+          itemMap[item.name] = { quantity: item.quantity, price: item.price };
+        }
+      });
+    });
+
+    const consolidatedItemsHTML = Object.entries(itemMap)
+      .map(([name, data]) => `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; font-weight: 700; color: #1e293b;">
+            ${name}
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: center; font-size: 16px; font-weight: 800; color: #4f46e5; background-color: #f5f3ff;">
+            ${data.quantity}
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right; font-size: 14px; color: #64748b;">
+            ${formatCurrency(data.price)}
+          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; text-align: right; font-size: 14px; font-weight: 700; color: #1e293b;">
+            ${formatCurrency(data.price * data.quantity)}
+          </td>
+        </tr>
+      `)
+      .join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Liste de Préparation Consolidée — ${storeName}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 30px; background: #fafafa; color: #1e293b; }
+          .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+          .header { text-align: center; border-bottom: 3px double #e2e8f0; padding-bottom: 20px; margin-bottom: 25px; }
+          .header h1 { font-size: 24px; color: #4f46e5; font-weight: 800; margin-bottom: 5px; }
+          .header p { color: #64748b; font-size: 14px; }
+          .meta-info { display: flex; justify-content: space-between; background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 13px; color: #475569; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }
+          th { background: #f1f5f9; color: #475569; font-weight: 700; font-size: 12px; text-transform: uppercase; padding: 12px; border-bottom: 2px solid #e2e8f0; }
+          td { padding: 12px; }
+          .total-row { background: #f8fafc; font-weight: 800; font-size: 16px; border-top: 2px solid #e2e8f0; }
+          .footer { text-align: center; color: #94a3b8; font-size: 11px; margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📦 Bordereau de Préparation Global</h1>
+            <p>${storeName}</p>
+          </div>
+          
+          <div class="meta-info">
+            <div>
+              <strong>Commandes incluses :</strong> ${orders.length} commandes<br>
+              <strong>Références :</strong> ${orders.map(o => '#' + o.id.slice(0, 8).toUpperCase()).join(', ')}
+            </div>
+            <div style="text-align: right;">
+              <strong>Date d'édition :</strong> ${new Date().toLocaleDateString('fr-FR')}<br>
+              <strong>Heure :</strong> ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="text-align: left;">Article</th>
+                <th style="text-align: center; width: 100px;">Quantité Totale</th>
+                <th style="text-align: right; width: 120px;">Prix unitaire</th>
+                <th style="text-align: right; width: 150px;">Sous-total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${consolidatedItemsHTML}
+              <tr class="total-row">
+                <td colspan="3" style="text-align: right; padding: 15px;">Valeur totale de la préparation</td>
+                <td style="text-align: right; padding: 15px; color: #4f46e5;">
+                  ${formatCurrency(orders.reduce((sum, o) => sum + o.totalAmount, 0))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <p>Ce bordereau regroupe tous les articles à rassembler dans les rayons pour honorer les commandes sélectionnées.</p>
+            <p style="margin-top: 5px;">Généré avec succès par LibreShop</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    if (Platform.OS === 'web') {
+      printHTMLOnWeb(html);
+      return;
+    }
+
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    const isShareAvailable = await Sharing.isAvailableAsync();
+    if (isShareAvailable) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Picking List — ${orders.length} commande(s)`,
+        UTI: 'com.adobe.pdf',
+      });
+    } else {
+      Alert.alert('Succès', `Picking list enregistrée: ${uri}`);
+    }
+  } catch (error) {
+    errorHandler.handleDatabaseError(error, 'Error exporting picking list PDF:');
+    Alert.alert('Erreur', 'Impossible de générer le bordereau de préparation');
+  }
+};
+
 
 export default {
   exportOrderToPDF,
   exportOrdersToPDF,
+  exportBatchOrdersToPDF,
+  exportPickingListPDF,
 };
