@@ -1014,6 +1014,7 @@ const styles = StyleSheet.create({
   addModalContainer: {
     width: '100%',
     maxWidth: 820,
+    maxHeight: '90%',
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
