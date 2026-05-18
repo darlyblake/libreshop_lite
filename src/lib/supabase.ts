@@ -311,6 +311,7 @@ export interface Collection {
   icon?: string;
   cover_color?: string;
   is_active: boolean;
+  custom_attributes?: any[];
   created_at: string;
 }
 

@@ -27,6 +27,7 @@ interface CollectionOption {
   id: string;
   name: string;
   category_id?: string | null;
+  custom_attributes?: any[];
 }
 
 interface Product {
@@ -585,20 +586,28 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   React.useEffect(() => {
     const fetchSchema = async () => {
       const selectedCol = collections?.find(c => c.id === newProduct.collectionId);
-      if (selectedCol?.category_id) {
+      if (selectedCol) {
         try {
-          const category = await categoryService.getById(selectedCol.category_id);
-          let schema = category.attribute_schema || [];
-          if (category.parent_id) {
-            try {
-              const parentCategory = await categoryService.getById(category.parent_id);
-              if (parentCategory.attribute_schema) {
-                schema = [...parentCategory.attribute_schema, ...schema];
+          let schema: any[] = [];
+          if (selectedCol.category_id) {
+            const category = await categoryService.getById(selectedCol.category_id);
+            schema = category.attribute_schema || [];
+            if (category.parent_id) {
+              try {
+                const parentCategory = await categoryService.getById(category.parent_id);
+                if (parentCategory.attribute_schema) {
+                  schema = [...parentCategory.attribute_schema, ...schema];
+                }
+              } catch (err) {
+                console.warn('Failed to load parent category schema:', err);
               }
-            } catch (err) {
-              console.warn('Failed to load parent category schema:', err);
             }
           }
+
+          // Merge custom attributes from the collection
+          const customAttributes = selectedCol.custom_attributes || [];
+          schema = [...schema, ...customAttributes];
+
           setCategorySchema(schema);
           
           // Pre-populate with default values/empty values for the schema fields

@@ -38,6 +38,7 @@ type UiCollection = {
   updatedAt: string;
   parentCategoryId?: string;
   coverColor?: string;
+  customAttributes?: any[];
 };
 
 // Couleurs pour les icônes
@@ -74,6 +75,7 @@ export const SellerCollectionScreen: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [storeType, setStoreType] = useState<string>('general');
   const [categories, setCategories] = useState<Category[]>([]);
   const [collections, setCollections] = useState<UiCollection[]>([]);
 
@@ -88,6 +90,7 @@ export const SellerCollectionScreen: React.FC = () => {
         return;
       }
       setStoreId(store.id);
+      setStoreType(store.store_type || 'general');
 
       const [cats, cols, prods] = await Promise.all([
         categoryService.getAll(),
@@ -114,6 +117,7 @@ export const SellerCollectionScreen: React.FC = () => {
         updatedAt: c.updated_at ? String(c.updated_at).slice(0, 10) : '',
         parentCategoryId: c.category_id || undefined,
         coverColor: c.cover_color || undefined,
+        customAttributes: (c as any).custom_attributes || [],
       }));
 
       setCollections(uiCols);
@@ -190,6 +194,7 @@ export const SellerCollectionScreen: React.FC = () => {
         icon: data.icon,
         cover_color: data.coverColor || null,
         is_active: data.isActive ?? true,
+        custom_attributes: (data as any).customAttributes || [],
       } as any);
 
       const uiCreated: UiCollection = {
@@ -203,6 +208,7 @@ export const SellerCollectionScreen: React.FC = () => {
         updatedAt: (created as any).updated_at ? String((created as any).updated_at).slice(0, 10) : '',
         parentCategoryId: (created as any).category_id || undefined,
         coverColor: (created as any).cover_color || undefined,
+        customAttributes: (created as any).custom_attributes || [],
       };
 
       setCollections((prev) => [uiCreated, ...prev]);
@@ -1173,11 +1179,9 @@ export const SellerCollectionScreen: React.FC = () => {
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddCollection}
-        categories={(categories || []).map((c) => ({
-          id: c.id,
-          name: c.name,
-          icon: (c as any).icon,
-        }))}
+        onEdit={() => {}}
+        categories={categories}
+        storeType={storeType}
       />
     </View>
   );

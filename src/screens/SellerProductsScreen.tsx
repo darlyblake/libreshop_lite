@@ -1137,7 +1137,7 @@ export const SellerProductsScreen: React.FC = () => {
       <AddProductModal
         visible={showAddProductModal}
         onClose={() => setShowAddProductModal(false)}
-        collections={(collections || []).filter(c => c.is_active).map(c => ({ id: c.id, name: c.name, category_id: c.category_id }))}
+        collections={(collections || []).filter(c => c.is_active).map(c => ({ id: c.id, name: c.name, category_id: c.category_id, custom_attributes: (c as any).custom_attributes }))}
         onAdd={async (product) => {
           if (!storeId) { Alert.alert('Erreur', 'Aucune boutique trouvée pour ce compte'); return; }
           if (!product.collectionId) { Alert.alert('Erreur', 'Veuillez sélectionner une collection'); return; }
