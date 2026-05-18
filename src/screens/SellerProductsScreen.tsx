@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { errorHandler } from '../utils/errorHandler';
 import {
   View,
@@ -78,6 +79,25 @@ export const SellerProductsScreen: React.FC = () => {
   // États pour le mode sélection
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [guideModalVisible, setGuideModalVisible] = useState(false);
+
+  useEffect(() => {
+    const checkFirstTime = async () => {
+      try {
+        const hasShown = await AsyncStorage.getItem('@libreshop:products_guide_shown');
+        if (!hasShown) {
+          setGuideModalVisible(true);
+          await AsyncStorage.setItem('@libreshop:products_guide_shown', 'true');
+        }
+      } catch (error) {
+        console.warn('Error reading products guide flag:', error);
+      }
+    };
+    const timer = setTimeout(() => {
+      checkFirstTime();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Advanced filters
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
@@ -614,41 +634,50 @@ export const SellerProductsScreen: React.FC = () => {
             )}
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => {
-            console.log('[SellerProducts] addButton pressed', { hasAnyCollection, storeProductLimit: store?.product_limit, productsLength: products.length });
-            if (!hasAnyCollection) {
-              if (Platform.OS === 'web') {
-                // web-friendly fallback
-                if (window.confirm("Aucune collection trouvée. Voulez-vous créer une collection maintenant ?")) {
-                  navigation.navigate('SellerCollection');
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+            onPress={() => setGuideModalVisible(true)}
+          >
+            <Ionicons name="help-circle-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              console.log('[SellerProducts] addButton pressed', { hasAnyCollection, storeProductLimit: store?.product_limit, productsLength: products.length });
+              if (!hasAnyCollection) {
+                if (Platform.OS === 'web') {
+                  // web-friendly fallback
+                  if (window.confirm("Aucune collection trouvée. Voulez-vous créer une collection maintenant ?")) {
+                    navigation.navigate('SellerCollection');
+                  }
+                  return;
                 }
+                Alert.alert('Collections requises', 'Créez d\'abord une collection pour organiser vos produits.', [
+                  { text: 'Créer une collection', onPress: () => navigation.navigate('SellerCollection') },
+                  { text: 'Annuler', style: 'cancel' },
+                ]);
                 return;
               }
-              Alert.alert('Collections requises', 'Créez d\'abord une collection pour organiser vos produits.', [
-                { text: 'Créer une collection', onPress: () => navigation.navigate('SellerCollection') },
-                { text: 'Annuler', style: 'cancel' },
-              ]);
-              return;
-            }
-            if (store?.product_limit && store.product_limit !== -1 && products.length >= store.product_limit) {
-              if (Platform.OS === 'web') {
-                window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`);
+              if (store?.product_limit && store.product_limit !== -1 && products.length >= store.product_limit) {
+                if (Platform.OS === 'web') {
+                  window.alert(`Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`);
+                  return;
+                }
+                Alert.alert(
+                  'Limite atteinte',
+                  `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
+                  [{ text: 'OK' }]
+                );
                 return;
               }
-              Alert.alert(
-                'Limite atteinte',
-                `Vous avez atteint la limite de ${store.product_limit} produits de votre plan "${store.subscription_plan}".`,
-                [{ text: 'OK' }]
-              );
-              return;
-            }
-            setShowAddProductModal(true);
-          }}
-        >
-          <Ionicons name="add" size={26} color="#fff" />
-        </TouchableOpacity>
+              setShowAddProductModal(true);
+            }}
+          >
+            <Ionicons name="add" size={26} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       {/* Stats and filters are rendered inside FlatList header to prevent overlap while scrolling */}
@@ -1024,6 +1053,169 @@ export const SellerProductsScreen: React.FC = () => {
           }
         }}
       />
+
+      {/* Guide Modal */}
+      <Modal
+        visible={guideModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setGuideModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="book-outline" size={22} color={COLORS.accent} />
+                <Text style={styles.modalTitle}>Guide : Gestion du Catalogue Produits</Text>
+              </View>
+              <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalForm} showsVerticalScrollIndicator={false}>
+              
+              {/* Section 1: Plans d'Abonnement */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(76, 175, 80, 0.1)', 'rgba(76, 175, 80, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(76, 175, 80, 0.15)' }]}>
+                      <Ionicons name="ribbon-outline" size={20} color={COLORS.success} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.success }]}>1. Limite de Produits (Plans d'Abonnement)</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Votre plan d'abonnement actuel détermine le nombre maximal de produits que vous pouvez proposer :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.bulletText}>La limite s'affiche fièrement dans l'en-tête (ex: <Text style={{ fontWeight: '700' }}>3 / 20 produits</Text>).</Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.success} />
+                      <Text style={styles.bulletText}>Les plans Premium débloquent des limites plus élevées allant jusqu'à l'illimité (<Text style={{ fontWeight: '700' }}>∞</Text>) pour les boutiques à grand volume.</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 2: Gestion de Stock */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(33, 150, 243, 0.1)', 'rgba(33, 150, 243, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(33, 150, 243, 0.15)' }]}>
+                      <Ionicons name="cube-outline" size={20} color={COLORS.primary} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.primary }]}>2. Gestion & Alertes de Stock</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    LibreShop surveille en permanence vos niveaux de stock pour éviter toute déconvenue :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.primary} />
+                      <Text style={styles.bulletText}><Text style={{ fontWeight: '700', color: COLORS.success }}>En stock :</Text> Badge vert indiquant que vos articles sont disponibles en quantité suffisante.</Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color="#F59E0B" />
+                      <Text style={styles.bulletText}><Text style={{ fontWeight: '700', color: '#F59E0B' }}>Stock Faible :</Text> Badge orange dès que le stock descend à 3 unités ou moins. Pensez à réapprovisionner !</Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={COLORS.danger} />
+                      <Text style={styles.bulletText}><Text style={{ fontWeight: '700', color: COLORS.danger }}>Rupture de Stock :</Text> Badge rouge (0 unité). Les clients ne peuvent plus commander ce produit en ligne.</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 3: Visibilité & Switch rapide */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(255, 152, 0, 0.1)', 'rgba(255, 152, 0, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(255, 152, 0, 0.15)' }]}>
+                      <Ionicons name="eye-outline" size={20} color={COLORS.warning} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.warning }]}>3. Visibilité & Mode Masqué</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Vous pouvez masquer instantanément un produit sans le supprimer définitivement :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Interrupteur (Switch) :</Text> Activez ou désactivez la visibilité en 1 seconde à droite du produit.
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="radio-button-on" size={12} color={COLORS.warning} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Masqué :</Text> Le produit devient invisible pour vos clients en ligne mais reste accessible dans votre inventaire pour vos modifications futures.
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              {/* Section 4: Statistiques d'Engagement */}
+              <View style={styles.guideCard}>
+                <LinearGradient
+                  colors={['rgba(139, 92, 246, 0.1)', 'rgba(139, 92, 246, 0.02)']}
+                  style={styles.guideCardGradient}
+                >
+                  <View style={styles.guideCardHeader}>
+                    <View style={[styles.guideIconContainer, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
+                      <Ionicons name="analytics-outline" size={20} color={COLORS.accent} />
+                    </View>
+                    <Text style={[styles.guideCardTitle, { color: COLORS.accent }]}>4. Vues & Popularité</Text>
+                  </View>
+                  <Text style={styles.guideCardBody}>
+                    Chaque fiche produit comptabilise le nombre d'affichages uniques par les clients :
+                  </Text>
+                  <View style={styles.bulletList}>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="arrow-forward" size={14} color={COLORS.accent} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Indicateur 👁️ :</Text> Affiche le nombre cumulé de vues. C'est l'outil parfait pour mesurer l'intérêt de vos clients pour chaque article !
+                      </Text>
+                    </View>
+                    <View style={styles.bulletItem}>
+                      <Ionicons name="arrow-forward" size={14} color={COLORS.accent} style={{ marginTop: 2 }} />
+                      <Text style={styles.bulletText}>
+                        <Text style={{ fontWeight: '700' }}>Actions de masse (Appui Long) :</Text> Sélectionnez plusieurs produits à la fois pour les activer, masquer ou supprimer en masse d'un seul coup.
+                      </Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setGuideModalVisible(false)}
+                style={{ 
+                  marginTop: spacing.md, 
+                  backgroundColor: COLORS.accent,
+                  paddingVertical: spacing.md,
+                  borderRadius: RADIUS.lg,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: fontSize.md }}>J'ai compris</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1201,5 +1393,67 @@ const styles = StyleSheet.create({
   paginationPagesText: {
     color: COLORS.textSoft,
     fontSize: FONT_SIZE.xs,
+  },
+  modalContent: {
+    backgroundColor: COLORS.card,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.lg,
+    paddingBottom: 40,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -4 },
+  },
+  modalForm: {
+    padding: SPACING.md,
+  },
+  guideCard: {
+    marginBottom: SPACING.md,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  guideCardGradient: {
+    padding: SPACING.md,
+  },
+  guideCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  guideIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideCardTitle: {
+    fontSize: FONT_SIZE.sm || 14,
+    fontWeight: '700',
+  },
+  guideCardBody: {
+    fontSize: FONT_SIZE.xs || 12,
+    color: COLORS.textSoft,
+    lineHeight: 18,
+    marginBottom: SPACING.sm,
+  },
+  bulletList: {
+    gap: SPACING.xs,
+  },
+  bulletItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.xs,
+  },
+  bulletText: {
+    fontSize: FONT_SIZE.xs || 12,
+    color: COLORS.textSoft,
+    flex: 1,
+    lineHeight: 18,
   },
 });
