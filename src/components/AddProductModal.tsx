@@ -15,6 +15,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
@@ -425,6 +426,57 @@ const getStyles = (theme: any) => {
     toggleTextActive: {
       color: COLORS.card,
     },
+    cameraContainer: {
+      flex: 1,
+      backgroundColor: '#000',
+    },
+    camera: {
+      flex: 1,
+    },
+    cameraOverlay: {
+      flex: 1,
+      backgroundColor: 'transparent',
+      justifyContent: 'space-between',
+      padding: 20,
+    },
+    cameraHeader: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: Platform.OS === 'ios' ? 40 : 20,
+    },
+    closeCameraButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    cameraTargetContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cameraTarget: {
+      width: 250,
+      height: 150,
+      borderWidth: 2,
+      borderColor: '#fff',
+      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+    },
+    cameraFooter: {
+      alignItems: 'center',
+      marginBottom: 40,
+    },
+    cameraHint: {
+      color: '#fff',
+      fontSize: 16,
+      textAlign: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 20,
+    },
   });
 };
 
@@ -458,6 +510,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   });
   const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (!showCameraScanner) return;
+    setNewProduct(prev => ({ ...prev, barcode: data }));
+    setShowCameraScanner(false);
+  };
 
   React.useEffect(() => {
     if (!visible) return;
@@ -761,16 +821,41 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             {/* Code barre */}
             <View style={styles.modalInput}>
               <Text style={styles.inputLabel}>Code barre</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0001234567890"
-                placeholderTextColor={COLORS.textMuted}
-                value={newProduct.barcode || ''}
-                onChangeText={(text) =>
-                  setNewProduct({ ...newProduct, barcode: text })
-                }
-                keyboardType="numeric"
-              />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="0001234567890"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={newProduct.barcode || ''}
+                  onChangeText={(text) =>
+                    setNewProduct({ ...newProduct, barcode: text })
+                  }
+                  keyboardType="numeric"
+                />
+                <TouchableOpacity
+                  style={{
+                    padding: 12,
+                    backgroundColor: COLORS.accent + '15',
+                    borderRadius: 8,
+                    height: 48,
+                    width: 48,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}
+                  onPress={async () => {
+                    if (!cameraPermission?.granted) {
+                      const status = await requestCameraPermission();
+                      if (!status.granted) {
+                        Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
+                        return;
+                      }
+                    }
+                    setShowCameraScanner(true);
+                  }}
+                >
+                  <Ionicons name="barcode-outline" size={24} color={COLORS.accent} />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={[styles.modalInput, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
@@ -965,6 +1050,42 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* MODAL SCANNER CAMÉRA */}
+      <Modal
+        visible={showCameraScanner}
+        animationType="slide"
+        onRequestClose={() => setShowCameraScanner(false)}
+      >
+        <View style={styles.cameraContainer}>
+          <CameraView
+            style={styles.camera}
+            onBarcodeScanned={handleBarcodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+            }}
+          >
+            <View style={styles.cameraOverlay}>
+              <View style={styles.cameraHeader}>
+                <TouchableOpacity 
+                  style={styles.closeCameraButton}
+                  onPress={() => setShowCameraScanner(false)}
+                >
+                  <Ionicons name="close" size={28} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.cameraTargetContainer}>
+                <View style={styles.cameraTarget} />
+              </View>
+
+              <View style={styles.cameraFooter}>
+                <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
+              </View>
+            </View>
+          </CameraView>
         </View>
       </Modal>
     </Modal>

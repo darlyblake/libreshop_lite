@@ -149,7 +149,8 @@ export const productService = {
     }
 
     if (options.search) {
-      query = query.ilike('name', `%${options.search}%`);
+      const searchPattern = `%${options.search}%`;
+      query = query.or(`name.ilike.${searchPattern},reference.ilike.${searchPattern}`);
     }
 
     if (options.isActive !== undefined) {

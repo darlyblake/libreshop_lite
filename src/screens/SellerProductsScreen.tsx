@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { errorHandler } from '../utils/errorHandler';
 import {
   View,
@@ -22,6 +23,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { AddProductModal } from '../components/AddProductModal';
 import { SellerFiltersRow } from '../components/SellerFiltersRow';
@@ -80,6 +83,8 @@ export const SellerProductsScreen: React.FC = () => {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [guideModalVisible, setGuideModalVisible] = useState(false);
+  const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   useEffect(() => {
     const checkFirstTime = async () => {
@@ -98,6 +103,99 @@ export const SellerProductsScreen: React.FC = () => {
     }, 500);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
+    if (!showCameraScanner) return;
+    setSearchQuery(data);
+    setShowCameraScanner(false);
+  }, [showCameraScanner]);
+
+  const exportCatalogueCSV = useCallback(async () => {
+    if (!products || products.length === 0) {
+      Alert.alert('Exportation impossible', 'Votre catalogue est vide.');
+      return;
+    }
+
+    try {
+      // 1. En-têtes du CSV
+      const headers = [
+        'Nom du produit',
+        'Collection',
+        'Référence (Code-barres)',
+        'Prix de vente (FCFA)',
+        'Prix d\'achat (FCFA)',
+        'Bénéfice unitaire (FCFA)',
+        'Quantité en stock',
+        'Valeur totale du stock (FCFA)',
+        'Statut'
+      ];
+
+      // 2. Lignes de données
+      const rows = products.map(product => {
+        const collectionName = collections?.find(c => c.id === product.collection_id)?.name || 'Sans collection';
+        const price = Number(product.price) || 0;
+        const costPrice = Number(product.cost_price || (product as any).costPrice) || 0;
+        const benefit = Math.max(0, price - costPrice);
+        const stock = Number(product.stock) || 0;
+        const totalValue = price * stock;
+        const status = product.is_active ? 'Actif (En ligne)' : 'Masqué';
+
+        return [
+          `"${String(product.name || '').replace(/"/g, '""')}"`,
+          `"${String(collectionName).replace(/"/g, '""')}"`,
+          `"${String(product.reference || '').replace(/"/g, '""')}"`,
+          price,
+          costPrice,
+          benefit,
+          stock,
+          totalValue,
+          status
+        ];
+      });
+
+      // Assembler le contenu CSV
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
+      // 3. Exporter selon la plateforme
+      if (Platform.OS === 'web') {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        
+        // Nom du fichier personnalisé avec la date du jour
+        const dateStr = new Date().toISOString().split('T')[0];
+        const storeName = store?.name ? store.name.replace(/[^a-zA-Z0-9]/g, '_') : 'LibreShop';
+        link.setAttribute('download', `inventaire_${storeName}_${dateStr}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Version Mobile utilisant expo-file-system et expo-sharing
+        const dateStr = new Date().toISOString().split('T')[0];
+        const storeName = store?.name ? store.name.replace(/[^a-zA-Z0-9]/g, '_') : 'LibreShop';
+        const filename = `inventaire_${storeName}_${dateStr}.csv`;
+        const docDir = FileSystem.documentDirectory;
+        if (!docDir) {
+          throw new Error("Dossier de documents introuvable.");
+        }
+        const fileUri = `${docDir}${filename}`;
+
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+        
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(fileUri, { mimeType: 'text/csv', dialogTitle: 'Exporter l\'inventaire' });
+        } else {
+          Alert.alert('Succès', `Le fichier CSV a été enregistré dans : ${fileUri}`);
+        }
+      }
+    } catch (error) {
+      errorHandler.handle(error as Error, 'exportCatalogueCSV');
+      Alert.alert('Erreur', 'Impossible d\'exporter le catalogue au format CSV.');
+    }
+  }, [products, collections, store]);
 
   // Advanced filters
   const [priceRange, setPriceRange] = useState({ min: '', max: '' });
@@ -637,6 +735,13 @@ export const SellerProductsScreen: React.FC = () => {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <TouchableOpacity
             style={[styles.addButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+            onPress={exportCatalogueCSV}
+          >
+            <Ionicons name="download-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
             onPress={() => setGuideModalVisible(true)}
           >
             <Ionicons name="help-circle-outline" size={24} color="#fff" />
@@ -851,9 +956,25 @@ export const SellerProductsScreen: React.FC = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
+          {searchQuery.length > 0 ? (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={{ paddingHorizontal: 4 }}
+              onPress={async () => {
+                if (!cameraPermission?.granted) {
+                  const status = await requestCameraPermission();
+                  if (!status.granted) {
+                    Alert.alert('Permission requise', 'L\'accès à la caméra est nécessaire pour scanner des codes-barres.');
+                    return;
+                  }
+                }
+                setShowCameraScanner(true);
+              }}
+            >
+              <Ionicons name="barcode-outline" size={20} color={COLORS.accent} />
             </TouchableOpacity>
           )}
         </View>
@@ -1216,6 +1337,42 @@ export const SellerProductsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL SCANNER CAMÉRA */}
+      <Modal
+        visible={showCameraScanner}
+        animationType="slide"
+        onRequestClose={() => setShowCameraScanner(false)}
+      >
+        <View style={styles.cameraContainer}>
+          <CameraView
+            style={styles.camera}
+            onBarcodeScanned={handleBarcodeScanned}
+            barcodeScannerSettings={{
+              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+            }}
+          >
+            <View style={styles.cameraOverlay}>
+              <View style={styles.cameraHeader}>
+                <TouchableOpacity 
+                  style={styles.closeCameraButton}
+                  onPress={() => setShowCameraScanner(false)}
+                >
+                  <Ionicons name="close" size={28} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.cameraTargetContainer}>
+                <View style={styles.cameraTarget} />
+              </View>
+
+              <View style={styles.cameraFooter}>
+                <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
+              </View>
+            </View>
+          </CameraView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1455,5 +1612,56 @@ const styles = StyleSheet.create({
     color: COLORS.textSoft,
     flex: 1,
     lineHeight: 18,
+  },
+  cameraContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  camera: {
+    flex: 1,
+  },
+  cameraOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  cameraHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: Platform.OS === 'ios' ? 40 : 20,
+  },
+  closeCameraButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraTargetContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraTarget: {
+    width: 250,
+    height: 150,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  cameraFooter: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  cameraHint: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
 });
