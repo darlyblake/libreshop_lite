@@ -23,6 +23,7 @@ import { authService } from '../services/authService';
 import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
 import { useAuthStore, useCartStore } from '../store';
+import * as Clipboard from 'expo-clipboard';
 
 interface PaymentMethod {
   id: string;
@@ -76,6 +77,9 @@ export const PaymentScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // completed: prevents the user from re-submitting after an order was created
   const [completed, setCompleted] = useState(false);
+  const [orderSuccessModalVisible, setOrderSuccessModalVisible] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const paymentMethods: PaymentMethod[] = [
     {
@@ -231,35 +235,10 @@ export const PaymentScreen: React.FC = () => {
             console.warn('failed to remove items from cart after existing order payment', e);
           }
 
-          const successTitle = 'Paiement réussi';
-          const successMessage = `Votre paiement de ${(amount / 1000).toFixed(0)} KCFA a été traité avec succès.`;
-
           // mark completed to prevent further submissions and keep UI disabled
           setCompleted(true);
-
-          if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
-            (window as any).alert(`${successTitle}\n\n${successMessage}`);
-          }
-
-          Alert.alert(
-            successTitle,
-            successMessage,
-            [
-              {
-                text: 'Continuer',
-                onPress: () => {
-                  navigation.navigate('Confirmation', {
-                    orderId: existingOrderId,
-                    amount,
-                    storeId,
-                    itemsJson: JSON.stringify(items),
-                    customerJson: JSON.stringify(customer || {}),
-                    paymentMethod: selectedMethod,
-                  });
-                },
-              },
-            ]
-          );
+          setCreatedOrderId(existingOrderId);
+          setOrderSuccessModalVisible(true);
         } catch (e: any) {
           throw e;
         }
@@ -355,34 +334,10 @@ export const PaymentScreen: React.FC = () => {
 
         clearCart();
 
-        const successTitle = 'Commande créée';
-        const successMessage = `Votre commande de ${(amount / 1000).toFixed(0)} KCFA a été créée avec succès.`;
         // block further submissions immediately
         setCompleted(true);
-
-        if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof (window as any).alert === 'function') {
-          (window as any).alert(`${successTitle}\n\n${successMessage}`);
-        }
-
-        Alert.alert(
-          successTitle,
-          successMessage,
-          [
-            {
-              text: 'Continuer',
-              onPress: () => {
-                navigation.navigate('Confirmation', {
-                  orderId: created.id,
-                  amount,
-                  storeId,
-                  itemsJson: JSON.stringify(items),
-                  customerJson: JSON.stringify(customer || {}),
-                  paymentMethod: selectedMethod,
-                });
-              },
-            },
-          ]
-        );
+        setCreatedOrderId(created?.id || orderId);
+        setOrderSuccessModalVisible(true);
       }
     } catch (e: any) {
       errorHandler.handle(e, 'payment confirm failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
@@ -643,6 +598,63 @@ export const PaymentScreen: React.FC = () => {
                 </Text>
               </Pressable>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Order Success Modal */}
+      <Modal visible={orderSuccessModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmModal, { alignItems: 'center', padding: SPACING.xl }]}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.success + '20', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md }}>
+              <Ionicons name="checkmark-circle" size={40} color={COLORS.success} />
+            </View>
+            <Text style={[styles.confirmTitle, { marginBottom: SPACING.xs }]}>Commande envoyée avec succès !</Text>
+            <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.textMuted, textAlign: 'center', marginBottom: SPACING.lg }}>
+              Votre commande a bien été enregistrée.
+            </Text>
+
+            <View style={{ backgroundColor: COLORS.bg, padding: SPACING.md, borderRadius: RADIUS.md, width: '100%', marginBottom: SPACING.lg }}>
+              <Text style={{ fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginBottom: 4 }}>Numéro de commande</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: COLORS.text, letterSpacing: 1 }}>
+                  {createdOrderId ? createdOrderId.split('-')[0] : ''}
+                </Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (createdOrderId) {
+                      await Clipboard.setStringAsync(createdOrderId.split('-')[0]);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }
+                  }}
+                  style={{ padding: 6, backgroundColor: COLORS.card, borderRadius: RADIUS.sm, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                >
+                  <Ionicons name={copied ? "checkmark" : "copy-outline"} size={16} color={copied ? COLORS.success : COLORS.accent} />
+                  <Text style={{ fontSize: FONT_SIZE.xs, color: copied ? COLORS.success : COLORS.accent, fontWeight: '600' }}>
+                    {copied ? 'Copié' : 'Copier'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={{ backgroundColor: COLORS.accent + '10', padding: SPACING.md, borderRadius: RADIUS.md, width: '100%', marginBottom: SPACING.xl, flexDirection: 'row', gap: SPACING.sm }}>
+              <Ionicons name="information-circle-outline" size={20} color={COLORS.accent} style={{ marginTop: 2 }} />
+              <Text style={{ flex: 1, fontSize: FONT_SIZE.xs, color: COLORS.textSoft, lineHeight: 18 }}>
+                Pour suivre les étapes de votre commande, rendez-vous dans l'onglet <Text style={{ fontWeight: '700', color: COLORS.accent }}>Commandes</Text> sur la barre de navigation et utilisez ce code.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.payButton, { width: '100%' }]}
+              onPress={() => {
+                setOrderSuccessModalVisible(false);
+                navigation.navigate('ClientTabs');
+              }}
+            >
+              <Text style={styles.payButtonText}>Continuer</Text>
+              <Ionicons name="arrow-forward" size={18} color={COLORS.text} />
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
