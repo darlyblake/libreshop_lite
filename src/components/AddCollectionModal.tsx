@@ -368,7 +368,7 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                                 color={isSelected ? '#fff' : theme.getColor.text}
                               />
                             </View>
-                            <Text style={styles.categoryName} numberOfLines={1}>
+                            <Text style={styles.categoryName} numberOfLines={2}>
                               {cat.name}
                             </Text>
                             {isSelected && (
@@ -429,7 +429,7 @@ export const AddCollectionModal: React.FC<AddCollectionModalProps> = ({
                                 color={isSelected ? '#fff' : theme.getColor.text}
                               />
                             </View>
-                            <Text style={styles.categoryName} numberOfLines={1}>
+                            <Text style={styles.categoryName} numberOfLines={2}>
                               {sub.name}
                             </Text>
                             {isSelected && (
@@ -886,6 +886,8 @@ const getStyles = (theme: any) =>
       position: 'relative',
       marginBottom: theme.spacing.xs,
       alignItems: 'center',
+      minHeight: 110,
+      justifyContent: 'center',
     },
     categoryCardSelected: {
       borderWidth: 2,
@@ -899,10 +901,11 @@ const getStyles = (theme: any) =>
       marginBottom: theme.spacing.sm,
     },
     categoryName: {
-      fontSize: theme.fontSize.sm,
+      fontSize: 12,
       fontWeight: '600',
       color: theme.getColor.text,
       textAlign: 'center',
+      marginTop: 4,
     },
     categoryCheck: {
       position: 'absolute',
