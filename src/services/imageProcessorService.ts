@@ -104,21 +104,34 @@ class ImageProcessorService {
       }
       maskCtx.putImageData(maskData, 0, 0);
 
-      // 4. On redimensionne le masque à la taille originale
+      // 4. Créer un canvas temporaire pour obtenir l'objet détouré transparent
+      const transparentCanvas = document.createElement('canvas');
+      transparentCanvas.width = origW;
+      transparentCanvas.height = origH;
+      const transCtx = transparentCanvas.getContext('2d')!;
+
+      // Dessiner l'image originale
+      transCtx.drawImage(originalImg, 0, 0);
+
+      // Appliquer le masque
+      transCtx.globalCompositeOperation = 'destination-in';
+      transCtx.drawImage(maskCanvas, 0, 0, width, height, 0, 0, origW, origH);
+
+      // 5. Créer le canvas final avec fond blanc studio
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = origW;
       finalCanvas.height = origH;
       const finalCtx = finalCanvas.getContext('2d')!;
 
-      // On dessine l'image originale
-      finalCtx.drawImage(originalImg, 0, 0);
+      // Fond blanc studio parfait
+      finalCtx.fillStyle = '#ffffff';
+      finalCtx.fillRect(0, 0, origW, origH);
 
-      // On utilise le masque pour détourer ("destination-in" garde seulement ce qui est dans le masque)
-      finalCtx.globalCompositeOperation = 'destination-in';
-      finalCtx.drawImage(maskCanvas, 0, 0, width, height, 0, 0, origW, origH);
+      // Dessiner l'objet détouré par-dessus
+      finalCtx.drawImage(transparentCanvas, 0, 0);
 
-      // 5. Retour en base64
-      return finalCanvas.toDataURL('image/png');
+      // 6. Retour en base64 (PNG ou JPEG avec fond blanc)
+      return finalCanvas.toDataURL('image/jpeg', 0.95);
 
     } catch (error) {
       console.error('[ImageProcessor] DeepLab failed:', error);

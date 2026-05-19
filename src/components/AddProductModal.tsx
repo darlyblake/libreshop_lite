@@ -1037,8 +1037,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       setNewProduct(prev => ({ ...prev, images: nextImages }));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      console.error('[AddProductModal] Enhancement failed:', e);
-      Alert.alert('Erreur', "L'amélioration automatique a échoué. Réessayez.");
+      console.error('[AddProductModal] Studio Fond Blanc failed:', e);
+      Alert.alert('Erreur', "Le Studio Fond Blanc a échoué. Réessayez.");
     } finally {
       setEnhancingImages(prev => ({ ...prev, [index]: false }));
     }
@@ -1458,7 +1458,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                             onPress={() => handleEnhanceImage(index)}
                           >
                             <Ionicons name="sparkles" size={10} color="#fff" />
-                            <Text style={styles.enhanceImageText}>Améliorer</Text>
+                            <Text style={styles.enhanceImageText} className="notranslate">Studio Fond Blanc</Text>
                           </TouchableOpacity>
                         )}
                         
