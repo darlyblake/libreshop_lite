@@ -2,20 +2,24 @@ import { Platform } from 'react-native';
 
 /**
  * Service pour le traitement d'image local (IA)
- * Utilise TensorFlow.js avec le modèle DeepLab pour la segmentation d'objets.
- * Fixe : Correction de la résolution et compatibilité Webpack.
+ * Utilise Transformers.js + RMBG-1.4 (U²-Net) en local sans clé API.
+ * Repli automatique sur DeepLab Pascal-VOC double-passe si non connecté ou échec.
  */
 
 declare global {
   interface Window {
     tf: any;
     deeplab: any;
+    transformers: any;
   }
 }
 
 class ImageProcessorService {
   private model: any = null;
   private isInitializing = false;
+  private transformersSegmenter: any = null;
+  private isInitializingTransformers = false;
+
   public lastAnalysisReports: Record<string, {
     brightness: number;
     isTooDark: boolean;
@@ -28,7 +32,6 @@ class ImageProcessorService {
   private async loadScripts(): Promise<void> {
     if (typeof window === 'undefined') return;
     
-    // On utilise des scripts UMD classiques pour une compatibilité maximale avec Webpack/Metro
     const scripts = [
       'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
       'https://cdn.jsdelivr.net/npm/@tensorflow-models/deeplab@0.2.2/dist/deeplab.min.js'
@@ -39,12 +42,29 @@ class ImageProcessorService {
         if (document.querySelector(`script[src="${src}"]`)) return resolve();
         const script = document.createElement('script');
         script.src = src;
-        script.async = false; // Chargement séquentiel
+        script.async = false;
         script.onload = () => resolve();
-        script.onerror = (e) => reject(new Error(`Failed to load script: ${src}`));
+        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
         document.head.appendChild(script);
       });
     }
+  }
+
+  private async loadTransformersScript(): Promise<any> {
+    if (typeof window === 'undefined') return null;
+    if ((window as any).transformers) return (window as any).transformers;
+
+    await new Promise<void>((resolve, reject) => {
+      const src = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+      if (document.querySelector(`script[src="${src}"]`)) return resolve();
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Transformers.js'));
+      document.head.appendChild(script);
+    });
+
+    return (window as any).transformers;
   }
 
   private async initModel() {
@@ -67,8 +87,33 @@ class ImageProcessorService {
     }
   }
 
+  private async initTransformersSegmenter() {
+    if (this.transformersSegmenter) return;
+    if (this.isInitializingTransformers) {
+      while (this.isInitializingTransformers) {
+        await new Promise(res => setTimeout(res, 100));
+        if (this.transformersSegmenter) return;
+      }
+    }
+
+    this.isInitializingTransformers = true;
+    try {
+      const transformers = await this.loadTransformersScript();
+      if (!transformers) throw new Error('Transformers.js failed to load script');
+
+      const { env, pipeline } = transformers;
+      env.allowLocalModels = false;
+
+      console.log('[ImageProcessor] Loading RMBG-1.4 via Transformers.js (runs entirely local)...');
+      this.transformersSegmenter = await pipeline('image-segmentation', 'Xenova/RMBG-1.4');
+      console.log('[ImageProcessor] Transformers.js RMBG-1.4 ready.');
+    } finally {
+      this.isInitializingTransformers = false;
+    }
+  }
+
   /**
-   * Supprime l'arrière-plan avec une gestion précise de la résolution
+   * Supprime l'arrière-plan de manière ultra-qualitative et locale (RMBG-1.4 / U²-Net)
    */
   async removeBackground(imageUri: string): Promise<string> {
     try {
@@ -84,50 +129,31 @@ class ImageProcessorService {
       const origH = originalImg.height;
 
       let transparentCanvas = document.createElement('canvas');
-      let isHfSuccess = false;
+      let isRmbgSuccess = false;
       let secondPassModel: any = null;
 
-      // Tentative via Hugging Face U²-Net / RMBG-1.4 (Qualité Studio Exceptionnelle)
+      // Tentative via Transformers.js + RMBG-1.4 (Qualité Studio Exceptionnelle Locale & Gratuite)
       try {
-        console.log('[ImageProcessor] Tentative de détourage via Hugging Face (U²-Net / RMBG-1.4)...');
-        const hfToken = process.env.EXPO_PUBLIC_HUGGINGFACE_API_KEY || '';
-        
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
+        console.log('[ImageProcessor] Détourage local via Transformers.js + RMBG-1.4...');
+        await this.initTransformersSegmenter();
 
-        const hfResponse = await fetch(
-          'https://api-inference.huggingface.co/models/briaai/RMBG-1.4',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': blob.type || 'image/jpeg',
-              ...(hfToken ? { 'Authorization': `Bearer ${hfToken}` } : {})
-            },
-            body: blob
-          }
-        );
+        const results = await this.transformersSegmenter(imageUri);
+        const maskRawImage = results[0].mask;
+        const maskCanvas = maskRawImage.toCanvas();
 
-        if (hfResponse.ok) {
-          const outputBlob = await hfResponse.blob();
-          const outputUrl = URL.createObjectURL(outputBlob);
-          
-          const hfImg = new Image();
-          hfImg.src = outputUrl;
-          await new Promise(res => hfImg.onload = res);
+        transparentCanvas.width = origW;
+        transparentCanvas.height = origH;
+        const transCtx = transparentCanvas.getContext('2d')!;
+        transCtx.drawImage(originalImg, 0, 0);
 
-          transparentCanvas.width = origW;
-          transparentCanvas.height = origH;
-          const transCtx = transparentCanvas.getContext('2d')!;
-          transCtx.drawImage(hfImg, 0, 0, origW, origH);
-          
-          URL.revokeObjectURL(outputUrl);
-          isHfSuccess = true;
-          console.log('[ImageProcessor] Détourage Hugging Face U²-Net réussi avec succès !');
-        } else {
-          console.warn(`[ImageProcessor] Hugging Face a retourné une erreur : ${hfResponse.status}. Repli sur le modèle local.`);
-        }
-      } catch (hfErr) {
-        console.warn('[ImageProcessor] Échec de la requête Hugging Face, repli local:', hfErr);
+        // Appliquer le masque détouré
+        transCtx.globalCompositeOperation = 'destination-in';
+        transCtx.drawImage(maskCanvas, 0, 0, maskCanvas.width, maskCanvas.height, 0, 0, origW, origH);
+
+        isRmbgSuccess = true;
+        console.log('[ImageProcessor] Détourage local RMBG-1.4 réussi avec succès !');
+      } catch (rmbgErr) {
+        console.warn('[ImageProcessor] Échec de Transformers.js + RMBG-1.4, repli local DeepLab:', rmbgErr);
       }
 
       let cropW = origW;
@@ -139,7 +165,7 @@ class ImageProcessorService {
       let fineHasObject = true;
 
       // Repli local hors-ligne / sans clé (DeepLab double-passe)
-      if (!isHfSuccess) {
+      if (!isRmbgSuccess) {
         await this.initModel();
 
         // PASSE 1 : Détection et localisation d'objet (Object Detection)
@@ -254,7 +280,7 @@ class ImageProcessorService {
         transCtx.globalCompositeOperation = 'destination-in';
         transCtx.drawImage(maskCanvas, 0, 0, width, height, 0, 0, cropW, cropH);
       } else {
-        // Analyse de la Bounding Box du produit détouré par Hugging Face
+        // Analyse de la Bounding Box du produit détouré par RMBG-1.4
         const transCtx = transparentCanvas.getContext('2d')!;
         const imgData = transCtx.getImageData(0, 0, origW, origH);
         
@@ -301,10 +327,10 @@ class ImageProcessorService {
       finalCtx.fillRect(0, 0, canvasSize, canvasSize);
 
       if (fineHasObject) {
-        const srcMinX = isHfSuccess ? fineMinX : Math.max(0, Math.floor((fineMinX / secondPassModel.width) * cropW));
-        const srcMaxX = isHfSuccess ? fineMaxX : Math.min(cropW, Math.ceil((fineMaxX / secondPassModel.width) * cropW));
-        const srcMinY = isHfSuccess ? fineMinY : Math.max(0, Math.floor((fineMinY / secondPassModel.height) * cropH));
-        const srcMaxY = isHfSuccess ? fineMaxY : Math.min(cropH, Math.ceil((fineMaxY / secondPassModel.height) * cropH));
+        const srcMinX = isRmbgSuccess ? fineMinX : Math.max(0, Math.floor((fineMinX / secondPassModel.width) * cropW));
+        const srcMaxX = isRmbgSuccess ? fineMaxX : Math.min(cropW, Math.ceil((fineMaxX / secondPassModel.width) * cropW));
+        const srcMinY = isRmbgSuccess ? fineMinY : Math.max(0, Math.floor((fineMinY / secondPassModel.height) * cropH));
+        const srcMaxY = isRmbgSuccess ? fineMaxY : Math.min(cropH, Math.ceil((fineMaxY / secondPassModel.height) * cropH));
 
         const bboxW = srcMaxX - srcMinX;
         const bboxH = srcMaxY - srcMinY;
@@ -388,9 +414,8 @@ class ImageProcessorService {
       };
 
       return resultUri;
-
     } catch (error) {
-      console.error('[ImageProcessor] DeepLab failed:', error);
+      console.error('[ImageProcessor] Processing failed:', error);
       throw error;
     }
   }
