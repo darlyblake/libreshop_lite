@@ -32,7 +32,15 @@ module.exports = async function (env, argv) {
       : []),
     /react-native-worklets[\s\S]*require\.getModules\(\)/,
     /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
-    /Critical dependency: the request of a dependency is an expression.*react-datepicker/,
+    // Supprime le warning "Critical dependency" de react-datepicker (require() dynamique dans date-fns-tz)
+    (warning) => {
+      const msg = warning.message || '';
+      const file = (warning.module && warning.module.resource) || '';
+      return (
+        msg.includes('Critical dependency') &&
+        (file.includes('react-datepicker') || msg.includes('date-fns-tz'))
+      );
+    },
   ];
 
   // Fix: Victory Native and Skia for web

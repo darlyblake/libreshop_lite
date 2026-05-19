@@ -81,12 +81,35 @@ class ImageProcessorService {
 
     this.isInitializingTransformers = true;
     try {
-      // Transformers.js est un ES Module - on doit utiliser import() dynamique, PAS une balise <script>
-      console.log('[ImageProcessor] Chargement de Transformers.js via import() dynamique ES Module...');
-      const { env, pipeline } = await import(
-        /* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js'
-      ) as any;
+      // Transformers.js est un ES Module.
+      // Webpack ne supporte PAS import() sur des URLs externes directement.
+      // Solution : injecter un <script type="module"> inline via un Blob URL
+      // pour charger le module ES et exposer ses exports sur window.__transformersLib.
+      if (!(window as any).__transformersLib) {
+        await new Promise<void>((resolve, reject) => {
+          const moduleCode = `
+            import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+            window.__transformersLib = { pipeline, env };
+            window.dispatchEvent(new CustomEvent('__transformers_ready__'));
+          `;
+          const blob = new Blob([moduleCode], { type: 'text/javascript' });
+          const blobUrl = URL.createObjectURL(blob);
+          const script = document.createElement('script');
+          script.type = 'module';
+          script.src = blobUrl;
+          script.onerror = (e) => {
+            URL.revokeObjectURL(blobUrl);
+            reject(new Error('Impossible de charger Transformers.js via Blob Module'));
+          };
+          window.addEventListener('__transformers_ready__', () => {
+            URL.revokeObjectURL(blobUrl);
+            resolve();
+          }, { once: true });
+          document.head.appendChild(script);
+        });
+      }
 
+      const { pipeline, env } = (window as any).__transformersLib;
       env.allowLocalModels = false;
 
       console.log('[ImageProcessor] Chargement du modèle RMBG-1.4 (premier usage : ~40Mo, ensuite mis en cache)...');

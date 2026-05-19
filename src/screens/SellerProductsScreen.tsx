@@ -176,13 +176,14 @@ export const SellerProductsScreen: React.FC = () => {
         const dateStr = new Date().toISOString().split('T')[0];
         const storeName = store?.name ? store.name.replace(/[^a-zA-Z0-9]/g, '_') : 'LibreShop';
         const filename = `inventaire_${storeName}_${dateStr}.csv`;
-        const docDir = FileSystem.documentDirectory;
+        // documentDirectory peut être une string ou undefined selon la version d'expo-file-system
+        const docDir = (FileSystem as any).documentDirectory as string | null | undefined;
         if (!docDir) {
           throw new Error("Dossier de documents introuvable.");
         }
         const fileUri = `${docDir}${filename}`;
 
-        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: 'utf8' as any });
         
         const isAvailable = await Sharing.isAvailableAsync();
         if (isAvailable) {
