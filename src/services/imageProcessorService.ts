@@ -50,23 +50,6 @@ class ImageProcessorService {
     }
   }
 
-  private async loadTransformersScript(): Promise<any> {
-    if (typeof window === 'undefined') return null;
-    if ((window as any).transformers) return (window as any).transformers;
-
-    await new Promise<void>((resolve, reject) => {
-      const src = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
-      if (document.querySelector(`script[src="${src}"]`)) return resolve();
-      const script = document.createElement('script');
-      script.src = src;
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Transformers.js'));
-      document.head.appendChild(script);
-    });
-
-    return (window as any).transformers;
-  }
-
   private async initModel() {
     if (this.model) return;
     if (this.isInitializing) {
@@ -98,15 +81,17 @@ class ImageProcessorService {
 
     this.isInitializingTransformers = true;
     try {
-      const transformers = await this.loadTransformersScript();
-      if (!transformers) throw new Error('Transformers.js failed to load script');
+      // Transformers.js est un ES Module - on doit utiliser import() dynamique, PAS une balise <script>
+      console.log('[ImageProcessor] Chargement de Transformers.js via import() dynamique ES Module...');
+      const { env, pipeline } = await import(
+        /* webpackIgnore: true */ 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js'
+      ) as any;
 
-      const { env, pipeline } = transformers;
       env.allowLocalModels = false;
 
-      console.log('[ImageProcessor] Loading RMBG-1.4 via Transformers.js (runs entirely local)...');
-      this.transformersSegmenter = await pipeline('image-segmentation', 'Xenova/RMBG-1.4');
-      console.log('[ImageProcessor] Transformers.js RMBG-1.4 ready.');
+      console.log('[ImageProcessor] Chargement du modèle RMBG-1.4 (premier usage : ~40Mo, ensuite mis en cache)...');
+      this.transformersSegmenter = await pipeline('image-segmentation', 'briaai/RMBG-1.4');
+      console.log('[ImageProcessor] Transformers.js + RMBG-1.4 prêt !');
     } finally {
       this.isInitializingTransformers = false;
     }
@@ -137,21 +122,39 @@ class ImageProcessorService {
         console.log('[ImageProcessor] Détourage local via Transformers.js + RMBG-1.4...');
         await this.initTransformersSegmenter();
 
-        const results = await this.transformersSegmenter(imageUri);
-        const maskRawImage = results[0].mask;
-        const maskCanvas = maskRawImage.toCanvas();
+        // L'API de @xenova/transformers pour image-segmentation retourne un tableau de {label, score, mask}
+        // 'mask' est un objet RawImage avec .width, .height, .data (Uint8ClampedArray grayscale)
+        const results = await this.transformersSegmenter(imageUri, { threshold: 0.5 });
+        
+        if (!results || results.length === 0 || !results[0].mask) {
+          throw new Error('RMBG-1.4 a retourné un masque vide');
+        }
 
+        const maskRaw = results[0].mask; // RawImage : { data: Uint8ClampedArray, width, height }
+
+        // Convertir le masque grayscale en canal alpha sur le canvas original
         transparentCanvas.width = origW;
         transparentCanvas.height = origH;
         const transCtx = transparentCanvas.getContext('2d')!;
         transCtx.drawImage(originalImg, 0, 0);
 
-        // Appliquer le masque détouré
-        transCtx.globalCompositeOperation = 'destination-in';
-        transCtx.drawImage(maskCanvas, 0, 0, maskCanvas.width, maskCanvas.height, 0, 0, origW, origH);
+        const origPixels = transCtx.getImageData(0, 0, origW, origH);
+        const mW = maskRaw.width;
+        const mH = maskRaw.height;
+
+        for (let y = 0; y < origH; y++) {
+          for (let x = 0; x < origW; x++) {
+            // Interpolation bilinéaire simple du masque vers la résolution originale
+            const mx = Math.round((x / origW) * mW);
+            const my = Math.round((y / origH) * mH);
+            const maskValue = maskRaw.data[my * mW + mx]; // valeur 0-255 (blanc = objet, noir = fond)
+            origPixels.data[(y * origW + x) * 4 + 3] = maskValue;
+          }
+        }
+        transCtx.putImageData(origPixels, 0, 0);
 
         isRmbgSuccess = true;
-        console.log('[ImageProcessor] Détourage local RMBG-1.4 réussi avec succès !');
+        console.log('[ImageProcessor] Détourage RMBG-1.4 local réussi avec succès !');
       } catch (rmbgErr) {
         console.warn('[ImageProcessor] Échec de Transformers.js + RMBG-1.4, repli local DeepLab:', rmbgErr);
       }
