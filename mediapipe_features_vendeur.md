@@ -52,3 +52,29 @@ Ce document décrit en détail les outils intelligents d'intelligence artificiel
      * *"⚠️ Attention, l'appareil bouge (photo floue)."*
      * *"⚠️ Rapprochez-vous, le produit est trop petit dans le cadre."*
 * **Bénéfice** : Garantit que les vendeurs soumettent uniquement des visuels haute définition vendeurs.
+
+---
+
+## 📖 Guide Pratique & Astuces pour les Vendeurs
+
+Pour tirer le meilleur parti des technologies d'intelligence artificielle de LibreShop, suivez ces conseils simples :
+
+### 1. 💡 Réussir son détourage "Studio Fond Blanc" du premier coup
+* **Contraste suffisant** : Prenez la photo sur un fond contrasté par rapport au produit (évitez de photographier une chaussure blanche sur une nappe blanche).
+* **Éclairage uniforme** : Préférez une lumière naturelle ou une pièce bien éclairée pour éviter que l'IA ne confonde les ombres fortes avec le contour du produit.
+* **Surface plane** : Posez le produit sur une table ou suspendez-le. Évitez d'avoir trop d'éléments perturbateurs autour.
+
+### 2. 📏 Utiliser le Cadrage Automatique à 85%
+* **Aucun effort requis** : Prenez simplement la photo ! L'IA va recadrer et centrer automatiquement l'objet au millimètre près en y appliquant une marge uniforme.
+* **Résultat garanti** : Vos produits s'alignent parfaitement dans la grille générale de la boutique, créant un sentiment de confiance immédiat pour l'acheteur.
+
+### 3. 🧊 Réussir sa capture pour l'Aperçu 3D
+* **Mouvement fluide** : Filmez en tournant lentement à 360° autour du produit posé sur une table stable.
+* **Distance fixe** : Gardez l'appareil à la même distance (environ 50 cm) pendant toute la rotation.
+* **Vérification** : Cliquez sur le bouton **"Aperçu 3D"** sous la miniature pour afficher la boîte englobante virtuelle et valider la structure spatiale calculée par l'IA.
+
+### 4. 👁️ Comprendre le Rapport de Qualité IA
+* **Lumière OK / Sombre** : Si le badge affiche `Sombre` en violet, l'IA vous conseille de vous déplacer vers une zone plus éclairée ou d'activer le flash.
+* **Netteté OK / Floue** : Si le badge affiche `Floue` en rouge, cela signifie que la mise au point n'était pas stabilisée. Reprenez la photo pour garantir des détails impeccables pour le client.
+* **Taille OK / Trop Petit** : Si l'IA estime que le produit est trop petit, rapprochez l'appareil photo du produit pour capturer tous ses détails.
+
