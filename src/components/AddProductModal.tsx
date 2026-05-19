@@ -1851,36 +1851,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                           </View>
                         )}
 
-                        {/* IA Background Removal & 3D BBox Preview Buttons */}
-                        {!enhancingImages[index] && (
-                          <View style={styles.actionButtonRow}>
-                            <TouchableOpacity
-                              style={[styles.enhanceImageButton, { flex: 1, height: 26, paddingVertical: 0 }]}
-                              onPress={() => handleEnhanceImage(index)}
-                            >
-                              <Ionicons name="sparkles" size={10} color="#fff" />
-                              <Text style={[styles.enhanceImageText, { fontSize: 8 }]} className="notranslate">Studio Blanc</Text>
-                            </TouchableOpacity>
-                            {imageProcessorService.lastAnalysisReports[image] && (
-                              <TouchableOpacity
-                                style={[styles.enhanceImageButton, { flex: 1, backgroundColor: '#0984e3', height: 26, paddingVertical: 0 }]}
-                                onPress={() => {
-                                  setPreviewingImageUri(image);
-                                  setShow3DPreview(true);
-                                }}
-                              >
-                                <Ionicons name="cube-outline" size={10} color="#fff" />
-                                <Text style={[styles.enhanceImageText, { fontSize: 8 }]}>Aperçu 3D</Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        )}
-                        
-                        {enhancingImages[index] && (
-                          <View style={styles.imageLoadingOverlay}>
-                            <ActivityIndicator color="#fff" size="small" />
-                          </View>
-                        )}
+
                       </View>
                     ))}
 
