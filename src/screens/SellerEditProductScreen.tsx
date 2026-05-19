@@ -23,6 +23,7 @@ export const SellerEditProductScreen: React.FC = () => {
   const [isFetching, setIsFetching] = useState(true);
   const [collections, setCollections] = useState<any[]>([]);
   const [initialProduct, setInitialProduct] = useState<any>(null);
+  const [featuredCount, setFeaturedCount] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -34,6 +35,11 @@ export const SellerEditProductScreen: React.FC = () => {
 
       const cols = store?.id ? await collectionService.getByStore(store.id) : [];
       setCollections(cols);
+
+      if (store?.id) {
+        const count = await productService.getFeaturedCount(store.id);
+        setFeaturedCount(count);
+      }
 
       // Mapper le produit Supabase vers le format Product du modal
       setInitialProduct({
@@ -134,7 +140,9 @@ export const SellerEditProductScreen: React.FC = () => {
         title="Modifier le produit"
         initialProduct={initialProduct}
         editProductId={productId}
+        featuredCount={featuredCount}
       />
+
     </View>
   );
 };

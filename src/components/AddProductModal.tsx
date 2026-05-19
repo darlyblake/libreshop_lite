@@ -54,6 +54,7 @@ interface AddProductModalProps {
   title?: string;
   initialProduct?: Partial<Product>;
   editProductId?: string;
+  featuredCount?: number;
 }
 
 const getStyles = (theme: any) => {
@@ -941,6 +942,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   title = 'Ajouter un produit',
   initialProduct,
   editProductId,
+  featuredCount,
 }) => {
   const themeContext = useTheme();
   const theme = themeContext.theme;
@@ -1497,6 +1499,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     <TouchableOpacity 
                       style={[styles.toggleButton, newProduct.featured && styles.toggleButtonActive]}
                       onPress={() => {
+                        // Limite de 20 produits en vedette
+                        if (!newProduct.featured && featuredCount !== undefined && featuredCount >= 20) {
+                          Alert.alert(
+                            'Limite atteinte',
+                            'Vous avez atteint la limite de 20 produits en vedette. Veuillez en retirer depuis votre catalogue avant d\'en ajouter de nouveaux.',
+                            [{ text: 'Compris' }]
+                          );
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                          return;
+                        }
+
                         setNewProduct({ ...newProduct, featured: !newProduct.featured });
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                       }}
@@ -1504,6 +1517,9 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                       <View style={[styles.toggleThumb, newProduct.featured && styles.toggleThumbActive]} />
                     </TouchableOpacity>
                   </View>
+                  <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 4 }}>
+                    {featuredCount !== undefined ? `${featuredCount}/20 produits en vedette` : ''}
+                  </Text>
                 </View>
               </View>
             )}
@@ -1755,45 +1771,44 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     Photos du produit ({newProduct.images.length}/5) <Text style={styles.required}>*</Text>
                   </Text>
 
-                  {/* Pédagogie Photo Studio IA */}
+                  {/* Pédagogie Photo / Studio IA En Dev */}
                   <View style={styles.studioGuideBox}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       <Ionicons name="sparkles" size={16} color={COLORS.accent} />
                       <Text style={styles.studioGuideTitle} className="notranslate">Studio Photo Assisté par IA</Text>
+                      <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 'auto' }}>
+                        <Text style={{ color: '#F59E0B', fontSize: 10, fontWeight: '700' }}>BIENTÔT</Text>
+                      </View>
                     </View>
                     <Text style={styles.studioGuideSubtitle}>
-                      Bénéficiez d'outils d'intelligence artificielle locaux pour sublimer la présentation de vos produits :
+                      Notre Studio IA est actuellement en cours de développement. En attendant, voici quelques conseils pour des photos professionnelles :
                     </Text>
                     <View style={styles.studioGuideCards}>
                       <View style={styles.studioGuideCard}>
                         <View style={styles.studioGuideCardHeader}>
-                          <Ionicons name="color-wand-outline" size={14} color={COLORS.accent} />
-                          <Text style={styles.studioGuideCardTitle}>Studio Blanc</Text>
+                          <Ionicons name="sunny-outline" size={14} color={COLORS.accent} />
+                          <Text style={styles.studioGuideCardTitle}>Lumière naturelle</Text>
                         </View>
-                        <Text style={styles.studioGuideCardText}>Supprime le fond et crée un rendu blanc pur instantané.</Text>
+                        <Text style={styles.studioGuideCardText}>Privilégiez la lumière du jour pour faire ressortir les vraies couleurs du produit.</Text>
                       </View>
                       <View style={styles.studioGuideCard}>
                         <View style={styles.studioGuideCardHeader}>
-                          <Ionicons name="resize-outline" size={14} color={COLORS.accent} />
-                          <Text style={styles.studioGuideCardTitle}>Cadrage Auto</Text>
+                          <Ionicons name="scan-outline" size={14} color={COLORS.accent} />
+                          <Text style={styles.studioGuideCardTitle}>Fond neutre</Text>
                         </View>
-                        <Text style={styles.studioGuideCardText}>Centre et ajuste l'objet à 85% du cadre pour une vitrine harmonieuse.</Text>
+                        <Text style={styles.studioGuideCardText}>Utilisez un mur blanc ou gris uni pour que l'œil se concentre sur l'article.</Text>
                       </View>
                       <View style={styles.studioGuideCard}>
                         <View style={styles.studioGuideCardHeader}>
-                          <Ionicons name="cube-outline" size={14} color={COLORS.accent} />
-                          <Text style={styles.studioGuideCardTitle}>Aperçu 3D</Text>
+                          <Ionicons name="expand-outline" size={14} color={COLORS.accent} />
+                          <Text style={styles.studioGuideCardTitle}>Plusieurs angles</Text>
                         </View>
-                        <Text style={styles.studioGuideCardText}>Générez et visualisez un modèle volumétrique pour l'essayage virtuel client.</Text>
-                      </View>
-                      <View style={styles.studioGuideCard}>
-                        <View style={styles.studioGuideCardHeader}>
-                          <Ionicons name="eye-outline" size={14} color={COLORS.accent} />
-                          <Text style={styles.studioGuideCardTitle}>Qualité IA</Text>
-                        </View>
-                        <Text style={styles.studioGuideCardText}>Vérifie automatiquement la luminosité, la netteté et le cadrage.</Text>
+                        <Text style={styles.studioGuideCardText}>Montrez le produit sous toutes ses coutures et ajoutez une photo des détails.</Text>
                       </View>
                     </View>
+                    <Text style={{ fontSize: 12, color: COLORS.textMuted, marginTop: 12, fontStyle: 'italic' }}>
+                      💡 Des photos nettes et lumineuses augmentent vos chances de vente de plus de 40% !
+                    </Text>
                   </View>
                   
                   <View style={styles.imagesGrid}>

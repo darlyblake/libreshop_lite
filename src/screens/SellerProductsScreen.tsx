@@ -73,6 +73,7 @@ export const SellerProductsScreen: React.FC = () => {
   const [stockFilter, setStockFilter] = useState<StockFilterType>('all');
   const [store, setStore] = useState<Store | null>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [featuredCount, setFeaturedCount] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -269,8 +270,12 @@ export const SellerProductsScreen: React.FC = () => {
       setStore(store);
       setStoreId(store.id);
 
-      const cols = await collectionService.getByStore(store.id);
+      const [cols, featured] = await Promise.all([
+        collectionService.getByStore(store.id),
+        productService.getFeaturedCount(store.id)
+      ]);
       setCollections(cols);
+      setFeaturedCount(featured);
 
       const page = reset ? 0 : currentPage;
 
@@ -1139,6 +1144,7 @@ export const SellerProductsScreen: React.FC = () => {
         visible={showAddProductModal}
         onClose={() => setShowAddProductModal(false)}
         collections={(collections || []).filter(c => c.is_active).map(c => ({ id: c.id, name: c.name, category_id: c.category_id, custom_attributes: (c as any).custom_attributes }))}
+        featuredCount={featuredCount}
         onAdd={async (product) => {
           if (!storeId) { Alert.alert('Erreur', 'Aucune boutique trouvée pour ce compte'); return; }
           if (!product.collectionId) { Alert.alert('Erreur', 'Veuillez sélectionner une collection'); return; }

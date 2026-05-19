@@ -449,6 +449,18 @@ export const productService = {
     return recent || [];
   },
 
+  async getFeaturedCount(storeId: string) {
+    const client = useSupabase();
+    const { count, error } = await client
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('store_id', storeId)
+      .eq('featured', true);
+      
+    if (error) throw error;
+    return count || 0;
+  },
+
   async getStorePromotionProducts(storeId: string) {
     const client = useSupabase();
     
