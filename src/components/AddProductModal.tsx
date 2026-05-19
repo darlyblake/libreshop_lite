@@ -1028,10 +1028,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     setPendingCollectionId(newProduct.collectionId || initialCollectionId);
   }, [newProduct.collectionId, initialCollectionId]);
 
+  const lastFetchedCollectionId = React.useRef<string | null>(null);
+
   React.useEffect(() => {
     const fetchSchema = async () => {
       const selectedCol = collections?.find(c => c.id === newProduct.collectionId);
       if (selectedCol) {
+        const isSameCollection = lastFetchedCollectionId.current === newProduct.collectionId;
+        
         try {
           let schema: any[] = [];
           if (selectedCol.category_id) {
@@ -1055,20 +1059,27 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
           setCategorySchema(schema);
           
-          // Pre-populate with default values/empty values for the schema fields
-          const initialAttrs: Record<string, any> = {};
-          schema.forEach((attr: any) => {
-            initialAttrs[attr.name] = attr.type === 'multiselect' ? [] : '';
-          });
-          setProductAttributes(initialAttrs);
+          if (!isSameCollection) {
+            // Pre-populate with default values/empty values only if it is a NEW collection
+            const initialAttrs: Record<string, any> = {};
+            schema.forEach((attr: any) => {
+              initialAttrs[attr.name] = attr.type === 'multiselect' ? [] : '';
+            });
+            setProductAttributes(initialAttrs);
+            lastFetchedCollectionId.current = newProduct.collectionId;
+          }
         } catch (e) {
           console.warn('Failed to fetch category schema:', e);
           setCategorySchema([]);
-          setProductAttributes({});
+          if (!isSameCollection) {
+            setProductAttributes({});
+            lastFetchedCollectionId.current = newProduct.collectionId;
+          }
         }
       } else {
         setCategorySchema([]);
         setProductAttributes({});
+        lastFetchedCollectionId.current = null;
       }
     };
     fetchSchema();
