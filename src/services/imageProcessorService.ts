@@ -97,8 +97,14 @@ class ImageProcessorService {
 
       for (let y = 0; y < firstPass.height; y++) {
         for (let x = 0; x < firstPass.width; x++) {
-          const classIndex = firstPass.segmentationMap[y * firstPass.width + x];
-          if (classIndex !== 0) {
+          const idx = (y * firstPass.width + x) * 4;
+          const r = firstPass.segmentationMap[idx];
+          const g = firstPass.segmentationMap[idx + 1];
+          const b = firstPass.segmentationMap[idx + 2];
+          // DeepLab Pascal VOC colors: black [0,0,0] is background, everything else is object
+          const isObject = (r > 0 || g > 0 || b > 0);
+          
+          if (isObject) {
             hasObject = true;
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
@@ -161,11 +167,15 @@ class ImageProcessorService {
 
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-          const i = y * width + x;
-          const classIndex = secondPass.segmentationMap[i];
-          const alpha = classIndex === 0 ? 0 : 255;
+          const idx = (y * width + x) * 4;
+          const r = secondPass.segmentationMap[idx];
+          const g = secondPass.segmentationMap[idx + 1];
+          const b = secondPass.segmentationMap[idx + 2];
           
-          if (classIndex !== 0) {
+          const isObject = (r > 0 || g > 0 || b > 0);
+          const alpha = isObject ? 255 : 0;
+          
+          if (isObject) {
             fineHasObject = true;
             if (x < fineMinX) fineMinX = x;
             if (x > fineMaxX) fineMaxX = x;
@@ -173,6 +183,7 @@ class ImageProcessorService {
             if (y > fineMaxY) fineMaxY = y;
           }
 
+          const i = y * width + x;
           maskData.data[i * 4] = 255;
           maskData.data[i * 4 + 1] = 255;
           maskData.data[i * 4 + 2] = 255;
