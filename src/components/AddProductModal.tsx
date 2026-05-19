@@ -619,6 +619,83 @@ const getStyles = (theme: any) => {
       paddingVertical: 10,
       borderRadius: 20,
     },
+    helperText: {
+      fontSize: 12,
+      color: COLORS.textMuted,
+      marginTop: 4,
+      fontStyle: 'italic',
+    },
+    quickPickLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: COLORS.textMuted,
+      marginBottom: 6,
+    },
+    variantMappingSection: {
+      marginTop: SPACING.lg,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderColor: COLORS.border,
+    },
+    variantMappingTitle: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '700',
+      color: COLORS.text,
+      marginBottom: 4,
+    },
+    variantMappingSubtitle: {
+      fontSize: 12,
+      color: COLORS.textMuted,
+      marginBottom: SPACING.md,
+    },
+    variantMappingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: COLORS.card,
+      padding: SPACING.md,
+      borderRadius: 12,
+      marginBottom: SPACING.md,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+    },
+    variantMappingThumb: {
+      width: 50,
+      height: 50,
+      borderRadius: 8,
+    },
+    variantMappingLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: COLORS.text,
+      marginBottom: 6,
+    },
+    variantMappingChips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    variantMappingChip: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      backgroundColor: COLORS.bg,
+    },
+    variantMappingChipActive: {
+      borderColor: COLORS.accent,
+      backgroundColor: COLORS.accent + '15',
+    },
+    variantMappingChipText: {
+      fontSize: 11,
+      color: COLORS.textSoft,
+      fontWeight: '500',
+    },
+    variantMappingChipTextActive: {
+      color: COLORS.accent,
+      fontWeight: '600',
+    },
   });
 };
 
@@ -663,6 +740,44 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
   const [categorySchema, setCategorySchema] = useState<any[]>([]);
   const [productAttributes, setProductAttributes] = useState<Record<string, any>>({});
+
+  const isVariantAttribute = (name: string) => {
+    const lowercase = name.toLowerCase();
+    return lowercase.includes('couleur') || 
+           lowercase.includes('color') || 
+           lowercase.includes('taille') || 
+           lowercase.includes('size') || 
+           lowercase.includes('pointure');
+  };
+
+  const getStepText = () => {
+    if (currentStep === 1) return 'Étape 1 : Informations de base';
+    if (currentStep === 2) return 'Étape 2 : Prix & Stock';
+    if (currentStep === 3) return 'Étape 3 : Spécifications techniques';
+    if (currentStep === 4) {
+      const stepNumber = categorySchema.length > 0 ? 4 : 3;
+      return `Étape ${stepNumber} : Images du produit`;
+    }
+    return '';
+  };
+
+  const getColorsAndSizes = () => {
+    const vals: string[] = [];
+    const colorAttr = productAttributes['couleur'] || productAttributes['color'] || productAttributes['Couleur'] || '';
+    if (typeof colorAttr === 'string' && colorAttr.trim()) {
+      colorAttr.split(',').map(s => s.trim()).filter(Boolean).forEach(c => {
+        if (!vals.includes(c)) vals.push(c);
+      });
+    }
+    const sizeAttr = productAttributes['taille'] || productAttributes['size'] || productAttributes['pointure'] || productAttributes['Taille'] || productAttributes['Pointure'] || '';
+    if (typeof sizeAttr === 'string' && sizeAttr.trim()) {
+      sizeAttr.split(',').map(s => s.trim()).filter(Boolean).forEach(s => {
+        if (!vals.includes(s)) vals.push(s);
+      });
+    }
+    return vals;
+  };
+  const colorsAndSizes = getColorsAndSizes();
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
     if (!showCameraScanner) return;
@@ -788,7 +903,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       categorySchema.forEach((attr) => {
         const val = productAttributes[attr.name];
         if (attr.required) {
-          if (attr.type === 'multiselect') {
+          if (isVariantAttribute(attr.name)) {
+            if (val === undefined || val === null || String(val).trim() === '') {
+              errors[`attr_${attr.name}`] = `${attr.label} requis`;
+            }
+          } else if (attr.type === 'multiselect') {
             if (!Array.isArray(val) || val.length === 0) {
               errors[`attr_${attr.name}`] = `${attr.label} requis`;
             }
@@ -1000,11 +1119,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               </View>
             </View>
 
-            <Text style={styles.stepSubText}>
-              {currentStep === 1 && 'Étape 1 : Informations de base'}
-              {currentStep === 2 && 'Étape 2 : Prix & Stock'}
-              {currentStep === 3 && 'Étape 3 : Spécifications techniques'}
-              {currentStep === 4 && 'Étape 4 : Images du produit'}
+            <Text key={`step-${currentStep}`} style={styles.stepSubText} className="notranslate">
+              {getStepText()}
             </Text>
           </View>
 
@@ -1177,67 +1293,131 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                         {attr.label} {attr.required && <Text style={styles.required}>*</Text>}
                       </Text>
                       
-                      {attr.type === 'text' && (
-                        <TextInput
-                          style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
-                          placeholder={`Saisir ${attr.label.toLowerCase()}`}
-                          placeholderTextColor={COLORS.textMuted}
-                          value={val || ''}
-                          onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
-                        />
-                      )}
+                      {isVariantAttribute(attr.name) ? (
+                        <View>
+                          <TextInput
+                            style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
+                            placeholder={
+                              attr.name.toLowerCase().includes('pointure') 
+                                ? "Ex: 38, 39, 40" 
+                                : attr.name.toLowerCase().includes('couleur') || attr.name.toLowerCase().includes('color')
+                                  ? "Ex: Noir, Rouge, Blanc"
+                                  : "Ex: S, M, L, XL"
+                            }
+                            placeholderTextColor={COLORS.textMuted}
+                            value={
+                              Array.isArray(val) 
+                                ? val.join(', ') 
+                                : val !== undefined && val !== null ? String(val) : ''
+                            }
+                            onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
+                          />
+                          
+                          <Text style={styles.helperText}>
+                            {attr.name.toLowerCase().includes('pointure') && "💡 Saisissez les pointures séparées par des virgules pour votre stock."}
+                            {(attr.name.toLowerCase().includes('taille') || attr.name.toLowerCase().includes('size')) && "💡 Saisissez les tailles séparées par des virgules (ex: S, M, L)."}
+                            {(attr.name.toLowerCase().includes('couleur') || attr.name.toLowerCase().includes('color')) && "💡 Saisissez les couleurs séparées par des virgules."}
+                          </Text>
 
-                      {attr.type === 'number' && (
-                        <TextInput
-                          style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
-                          placeholder={`Saisir ${attr.label.toLowerCase()}`}
-                          placeholderTextColor={COLORS.textMuted}
-                          keyboardType="numeric"
-                          value={val !== undefined && val !== null ? String(val) : ''}
-                          onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
-                        />
-                      )}
-
-                      {attr.type === 'select' && (
-                        <View style={styles.attrChipsRow}>
-                          {attr.options?.map((opt: string) => {
-                            const selected = val === opt;
-                            return (
-                              <TouchableOpacity
-                                key={opt}
-                                style={[styles.attrChip, selected && styles.attrChipActive]}
-                                onPress={() => setProductAttributes(prev => ({ ...prev, [attr.name]: opt }))}
-                              >
-                                <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
-                                  {opt}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
+                          {attr.options && attr.options.length > 0 && (
+                            <View style={{ marginTop: 8 }}>
+                              <Text style={styles.quickPickLabel}>Suggestions rapides (cliquez pour ajouter) :</Text>
+                              <View style={styles.attrChipsRow}>
+                                {attr.options.map((opt: string) => {
+                                  const currentArr = typeof val === 'string' 
+                                    ? val.split(',').map(s => s.trim()) 
+                                    : Array.isArray(val) ? val : [];
+                                  const selected = currentArr.includes(opt);
+                                  
+                                  return (
+                                    <TouchableOpacity
+                                      key={opt}
+                                      style={[styles.attrChip, selected && styles.attrChipActive]}
+                                      onPress={() => {
+                                        let nextVal = '';
+                                        if (selected) {
+                                          nextVal = currentArr.filter(x => x !== opt).join(', ');
+                                        } else {
+                                          nextVal = currentArr.concat(opt).filter(Boolean).join(', ');
+                                        }
+                                        setProductAttributes(prev => ({ ...prev, [attr.name]: nextVal }));
+                                      }}
+                                    >
+                                      <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
+                                        {opt}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          )}
                         </View>
-                      )}
+                      ) : (
+                        <>
+                          {attr.type === 'text' && (
+                            <TextInput
+                              style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
+                              placeholder={`Saisir ${attr.label.toLowerCase()}`}
+                              placeholderTextColor={COLORS.textMuted}
+                              value={val || ''}
+                              onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
+                            />
+                          )}
 
-                      {attr.type === 'multiselect' && (
-                        <View style={styles.attrChipsRow}>
-                          {attr.options?.map((opt: string) => {
-                            const arr = Array.isArray(val) ? val : [];
-                            const selected = arr.includes(opt);
-                            return (
-                              <TouchableOpacity
-                                key={opt}
-                                style={[styles.attrChip, selected && styles.attrChipActive]}
-                                onPress={() => {
-                                  const next = selected ? arr.filter((x: any) => x !== opt) : [...arr, opt];
-                                  setProductAttributes(prev => ({ ...prev, [attr.name]: next }));
-                                }}
-                              >
-                                <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
-                                  {opt}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
+                          {attr.type === 'number' && (
+                            <TextInput
+                              style={[styles.input, fieldErrors[`attr_${attr.name}`] && styles.inputError]}
+                              placeholder={`Saisir ${attr.label.toLowerCase()}`}
+                              placeholderTextColor={COLORS.textMuted}
+                              keyboardType="numeric"
+                              value={val !== undefined && val !== null ? String(val) : ''}
+                              onChangeText={(text) => setProductAttributes(prev => ({ ...prev, [attr.name]: text }))}
+                            />
+                          )}
+
+                          {attr.type === 'select' && (
+                            <View style={styles.attrChipsRow}>
+                              {attr.options?.map((opt: string) => {
+                                const selected = val === opt;
+                                return (
+                                  <TouchableOpacity
+                                    key={opt}
+                                    style={[styles.attrChip, selected && styles.attrChipActive]}
+                                    onPress={() => setProductAttributes(prev => ({ ...prev, [attr.name]: opt }))}
+                                  >
+                                    <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
+                                      {opt}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
+
+                          {attr.type === 'multiselect' && (
+                            <View style={styles.attrChipsRow}>
+                              {attr.options?.map((opt: string) => {
+                                const arr = Array.isArray(val) ? val : [];
+                                const selected = arr.includes(opt);
+                                return (
+                                  <TouchableOpacity
+                                    key={opt}
+                                    style={[styles.attrChip, selected && styles.attrChipActive]}
+                                    onPress={() => {
+                                      const next = selected ? arr.filter((x: any) => x !== opt) : [...arr, opt];
+                                      setProductAttributes(prev => ({ ...prev, [attr.name]: next }));
+                                    }}
+                                  >
+                                    <Text style={[styles.attrChipText, selected && styles.attrChipTextActive]}>
+                                      {opt}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
+                        </>
                       )}
 
                       {fieldErrors[`attr_${attr.name}`] && (
@@ -1298,6 +1478,65 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     )}
                   </View>
                   {fieldErrors.images && <Text style={styles.errorText}>{fieldErrors.images}</Text>}
+
+                  {/* Variant mapping for images */}
+                  {colorsAndSizes.length > 0 && newProduct.images.length > 0 && (
+                    <View style={styles.variantMappingSection}>
+                      <Text style={styles.variantMappingTitle}>🎨 Associer les images aux variantes</Text>
+                      <Text style={styles.variantMappingSubtitle}>
+                        Sélectionnez la couleur ou la taille correspondant à chaque image pour vos clients.
+                      </Text>
+                      {newProduct.images.map((image, index) => {
+                        const selectedVariant = productAttributes.image_variants?.[image] || '';
+                        return (
+                          <View key={index} style={styles.variantMappingRow}>
+                            <Image source={{ uri: cloudinaryService.getOptimizedUrl(image, 150) }} style={styles.variantMappingThumb} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.variantMappingLabel}>Image #{index + 1}</Text>
+                              <View style={styles.variantMappingChips}>
+                                <TouchableOpacity 
+                                  style={[styles.variantMappingChip, !selectedVariant && styles.variantMappingChipActive]}
+                                  onPress={() => {
+                                    setProductAttributes(prev => {
+                                      const nextVariants = { ...(prev.image_variants || {}) };
+                                      delete nextVariants[image];
+                                      return { ...prev, image_variants: nextVariants };
+                                    });
+                                  }}
+                                >
+                                  <Text style={[styles.variantMappingChipText, !selectedVariant && styles.variantMappingChipTextActive]}>
+                                    Toutes
+                                  </Text>
+                                </TouchableOpacity>
+                                {colorsAndSizes.map(val => {
+                                  const active = selectedVariant === val;
+                                  return (
+                                    <TouchableOpacity 
+                                      key={val}
+                                      style={[styles.variantMappingChip, active && styles.variantMappingChipActive]}
+                                      onPress={() => {
+                                        setProductAttributes(prev => ({
+                                          ...prev,
+                                          image_variants: {
+                                            ...(prev.image_variants || {}),
+                                            [image]: val
+                                          }
+                                        }));
+                                      }}
+                                    >
+                                      <Text style={[styles.variantMappingChipText, active && styles.variantMappingChipTextActive]}>
+                                        {val}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
               </View>
             )}
@@ -1411,6 +1650,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         <View style={styles.cameraContainer}>
           <CameraView
             style={styles.camera}
+            facing="back"
             onBarcodeScanned={handleBarcodeScanned}
             barcodeScannerSettings={{
               barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
