@@ -775,13 +775,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         }
       }
 
-      if (newProduct.comparePrice && newProduct.comparePrice.trim()) {
-        if (isNaN(Number(newProduct.comparePrice)) || Number(newProduct.comparePrice) <= 0) {
-          errors.comparePrice = 'Prix comparé invalide';
-        } else if (Number(newProduct.comparePrice) <= Number(newProduct.price)) {
-          errors.comparePrice = 'Doit être > prix de vente';
-        }
-      }
+
 
       if (!newProduct.stock || !newProduct.stock.trim()) {
         errors.stock = 'Stock requis';
@@ -1112,29 +1106,15 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 </View>
 
                 <View style={styles.modalInput}>
-                  <Text style={styles.inputLabel}>Prix comparé (Prix barré - Idéal pour les promotions)</Text>
+                  <Text style={styles.inputLabel}>Stock disponible</Text>
                   <TextInput
-                    style={[styles.input, fieldErrors.comparePrice && styles.inputError]}
-                    placeholder="Ex: 20000"
+                    style={[styles.input, fieldErrors.stock && styles.inputError]}
+                    placeholder="Ex: 50"
                     placeholderTextColor={COLORS.textMuted}
-                    value={newProduct.comparePrice}
-                    onChangeText={(text) => setNewProduct({ ...newProduct, comparePrice: text })}
+                    value={newProduct.stock}
+                    onChangeText={(text) => setNewProduct({ ...newProduct, stock: text })}
                     keyboardType="numeric"
                   />
-                  {fieldErrors.comparePrice && <Text style={styles.errorText}>{fieldErrors.comparePrice}</Text>}
-                </View>
-
-                <View style={styles.modalInput}>
-                  <Text style={styles.inputLabel}>Stock disponible</Text>
-                  <View style={styles.stockRow}>
-                    <TouchableOpacity style={styles.stockButton} onPress={decrementStock}>
-                      <Ionicons name="remove-circle-outline" size={28} color={COLORS.danger} />
-                    </TouchableOpacity>
-                    <Text style={styles.stockValue}>{newProduct.stock || '0'}</Text>
-                    <TouchableOpacity style={styles.stockButton} onPress={incrementStock}>
-                      <Ionicons name="add-circle-outline" size={28} color={COLORS.success} />
-                    </TouchableOpacity>
-                  </View>
                   {fieldErrors.stock && <Text style={styles.errorText}>{fieldErrors.stock}</Text>}
                 </View>
 
