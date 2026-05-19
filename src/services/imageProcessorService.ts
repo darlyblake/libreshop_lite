@@ -186,8 +186,16 @@ class ImageProcessorService {
         finalCtx.drawImage(transparentCanvas, 0, 0, origW, origH, 0, 0, canvasSize, canvasSize);
       }
 
-      // 6. Analyse de la qualité d'image (Luminosité, flou et couverture)
-      const imgData = transCtx.getImageData(0, 0, origW, origH);
+      // 6. Analyse de la qualité d'image (Luminosité, flou et couverture) sur une version réduite (Ultra Rapide)
+      const analysisW = 150;
+      const analysisH = 150;
+      const analysisCanvas = document.createElement('canvas');
+      analysisCanvas.width = analysisW;
+      analysisCanvas.height = analysisH;
+      const analysisCtx = analysisCanvas.getContext('2d')!;
+      analysisCtx.drawImage(transparentCanvas, 0, 0, origW, origH, 0, 0, analysisW, analysisH);
+
+      const imgData = analysisCtx.getImageData(0, 0, analysisW, analysisH);
       let totalBrightness = 0;
       let activePixels = 0;
       for (let j = 0; j < imgData.data.length; j += 4) {
@@ -204,14 +212,14 @@ class ImageProcessorService {
       const avgBrightness = activePixels > 0 ? totalBrightness / activePixels : 128;
       const isTooDark = avgBrightness < 50;
 
-      const coverage = activePixels / (origW * origH);
+      const coverage = activePixels / (analysisW * analysisH);
       const isTooSmall = coverage < 0.08;
 
       let contrastSum = 0;
       let samplesCount = 0;
-      for (let y = 10; y < origH - 10; y += 15) {
-        for (let x = 10; x < origW - 10; x += 15) {
-          const idx = (y * origW + x) * 4;
+      for (let y = 5; y < analysisH - 5; y += 4) {
+        for (let x = 5; x < analysisW - 5; x += 4) {
+          const idx = (y * analysisW + x) * 4;
           const leftIdx = idx - 4;
           if (imgData.data[idx+3] > 50 && imgData.data[leftIdx+3] > 50) {
             const val = imgData.data[idx];
