@@ -62,10 +62,18 @@ interface StoreState {
   setStore: (store: Store | null) => void;
 }
 
-export const useStoreStore = create<StoreState>((set) => ({
-  store: null,
-  setStore: (store) => set({ store }),
-}));
+export const useStoreStore = create<StoreState>()(
+  persist(
+    (set) => ({
+      store: null,
+      setStore: (store) => set({ store }),
+    }),
+    {
+      name: '@libreshop_selected_store',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);
 
 // Cart Store
 interface CartItem {

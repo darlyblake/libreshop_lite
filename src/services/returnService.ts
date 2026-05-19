@@ -50,7 +50,7 @@ export const returnService = {
   async getUserReturns(userId: string) {
     const { data, error } = await useSupabase()
       .from('returns')
-      .select('*, products(name, images), orders(id, customer_name)')
+      .select('*, products(name, images), orders(id, customer_name, notes, payment_method)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -61,12 +61,30 @@ export const returnService = {
   // --- Actions Vendeur ---
 
   /**
+   * Créer un retour directement depuis la caisse (déjà remboursé)
+   */
+  async createPosReturn(returnRow: Partial<ProductReturn>) {
+    const { data, error } = await useSupabase()
+      .from('returns')
+      .insert({
+        ...returnRow,
+        status: 'completed',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as ProductReturn;
+  },
+
+  /**
    * Récupérer tous les retours d'une boutique
    */
   async getStoreReturns(storeId: string) {
     const { data, error } = await useSupabase()
       .from('returns')
-      .select('*, products(name, images), orders(id, customer_name, customer_phone)')
+      .select('*, products(name, images), orders(id, customer_name, customer_phone, notes, payment_method)')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false });
     

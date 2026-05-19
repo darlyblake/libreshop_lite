@@ -32,6 +32,7 @@ export interface Refund {
   customerId?: string;
   customerName?: string;
   customerPhone?: string;
+  orderNotes?: string;
   amount: number;
   reason: string;
   type: 'full' | 'partial';
@@ -219,7 +220,7 @@ export const refundService = {
     try {
       let query = supabase
         .from('refunds')
-        .select('*, orders(customer_name, customer_phone)')
+        .select('*, orders(customer_name, customer_phone, notes)')
         .eq('store_id', storeId)
         .order('created_at', { ascending: false });
 
@@ -244,7 +245,7 @@ export const refundService = {
     try {
       const { data, error } = await supabase
         .from('refunds')
-        .select('*, orders(customer_name, customer_phone)')
+        .select('*, orders(customer_name, customer_phone, notes)')
         .eq('order_id', orderId)
         .order('created_at', { ascending: false });
 
@@ -263,7 +264,7 @@ export const refundService = {
     try {
       const { data, error } = await supabase
         .from('refunds')
-        .select('*, orders(customer_name, customer_phone)')
+        .select('*, orders(customer_name, customer_phone, notes)')
         .eq('id', refundId)
         .single();
 
@@ -479,6 +480,7 @@ export const refundService = {
       customerId: data.customer_id,
       customerName: data.orders?.customer_name,
       customerPhone: data.orders?.customer_phone,
+      orderNotes: data.orders?.notes,
       amount: data.amount,
       reason: data.reason,
       type: data.type,

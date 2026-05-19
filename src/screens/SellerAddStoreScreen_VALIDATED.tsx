@@ -196,7 +196,7 @@ export const SellerAddStoreScreen: React.FC = () => {
         // Logique de soumission existante
         await submitStoreData(formData);
         Alert.alert('Succès', 'Boutique créée avec succès!');
-        navigation.navigate('SellerTabs');
+        navigation.navigate('SellerHub' as any);
       } catch (error) {
         errorHandler.handleDatabaseError(error as Error, 'StoreCreation');
       }

@@ -225,11 +225,20 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xl,
     padding: SPACING.xl,
     position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-    elevation: 10,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 15,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '0px 10px 15px rgba(0, 0, 0, 0.25)',
+      },
+    }),
   },
   closeBtn: {
     position: 'absolute',
@@ -254,10 +263,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.md,
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.accent,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      web: {
+        boxShadow: `0px 4px 8px ${COLORS.accent}4d`,
+      },
+    }),
   },
   title: {
     fontSize: 20,
@@ -284,11 +300,20 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: RADIUS.lg,
     gap: SPACING.md,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+      },
+    }),
   },
   disabledBtn: {
     opacity: 0.7,

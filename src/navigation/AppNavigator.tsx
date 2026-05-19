@@ -95,6 +95,9 @@ const SellerRefundsScreen = lazyLoad(() => import('../screens/SellerRefundsScree
 const SellerAccountingScreen = lazyLoad(() => import('../screens/SellerAccountingScreen'), 'SellerAccountingScreen');
 const SellerReturnsScreen = lazyLoad(() => import('../screens/SellerReturnsScreen'), 'SellerReturnsScreen');
 const SellerCouponsScreen = lazyLoad(() => import('../screens/SellerCouponsScreen'), 'SellerCouponsScreen');
+const SellerFinanceScreen = lazyLoad(() => import('../screens/SellerFinanceScreen'), 'SellerFinanceScreen');
+const SellerKYCScreen = lazyLoad(() => import('../screens/SellerKYCScreen'), 'SellerKYCScreen');
+const SellerHubScreen = lazyLoad(() => import('../screens/SellerHubScreen'), 'SellerHubScreen');
 
 // Lazy loaded Admin screens
 const AdminDashboardScreen = lazyLoad(() => import('../screens/AdminDashboardScreen'), 'AdminDashboardScreen');
@@ -699,7 +702,22 @@ export const AppNavigator: React.FC = () => {
 
     switch (role) {
       case 'seller':
-        return 'SellerTabs';
+        if (userId && supabase) {
+          try {
+            const { data: store } = await supabase
+              .from('stores')
+              .select('id')
+              .eq('user_id', userId)
+              .maybeSingle();
+            
+            if (!store) {
+              return 'SellerAddStore';
+            }
+          } catch (error) {
+            console.error('Error checking store in getInitialRouteForRole:', error);
+          }
+        }
+        return 'SellerHub';
       case 'admin':
         return 'AdminDashboard';
       case 'client':
@@ -782,6 +800,9 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerAccounting" component={SellerAccountingScreen} />
         <Stack.Screen name="SellerReturns" component={SellerReturnsScreen} />
         <Stack.Screen name="SellerCoupons" component={SellerCouponsScreen} />
+        <Stack.Screen name="SellerFinance" component={SellerFinanceScreen} />
+        <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
+        <Stack.Screen name="SellerHub" component={SellerHubScreen} />
         
         {/* Routes admin */}
         <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />

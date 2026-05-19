@@ -25,7 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { AddProductModal } from '../components/AddProductModal';
 import { SellerFiltersRow } from '../components/SellerFiltersRow';
 import { useResponsive } from '../utils/useResponsive';
@@ -57,6 +57,14 @@ export const SellerProductsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const { width, isMobile, isTablet, isDesktop, spacing, fontSize, grid } = useResponsive();
+
+  const themeContext = useTheme();
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+
+  const styles = useMemo(() => getStyles(themeContext), [themeContext]);
 
   // Core state
   const [searchQuery, setSearchQuery] = useState('');
@@ -1386,8 +1394,13 @@ export const SellerProductsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: COLORS.bg },
 
   // Header
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.lg, gap: SPACING.md },
@@ -1673,4 +1686,5 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
   },
-});
+  });
+};

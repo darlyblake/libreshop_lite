@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
 import { returnService, ProductReturn, ReturnStatus } from '../services/returnService';
+import { PosReturnModal } from '../components/PosReturnModal';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 
 export default function SellerReturnsScreen() {
@@ -24,6 +25,7 @@ export default function SellerReturnsScreen() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<ProductReturn | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [showPosReturn, setShowPosReturn] = useState(false);
 
   useEffect(() => {
     loadStoreAndReturns();
@@ -98,6 +100,12 @@ export default function SellerReturnsScreen() {
     });
   };
 
+  const isPosReturn = (item: ProductReturn) => {
+    const isCaisseReason = item.reason?.toLowerCase().includes('caisse');
+    const isPosMethod = (item as any).orders?.payment_method === 'cash_on_delivery' && (item as any).orders?.notes?.includes('caisse');
+    return isCaisseReason || isPosMethod;
+  };
+
   const renderReturnItem = ({ item }: { item: ProductReturn }) => (
     <TouchableOpacity 
       style={styles.card}
@@ -107,7 +115,14 @@ export default function SellerReturnsScreen() {
       }}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.orderId}>Commande #{item.order_id.slice(0, 8)}</Text>
+        <View>
+          <Text style={styles.orderId}>Commande #{item.order_id.slice(0, 8)}</Text>
+          <View style={[styles.sourceBadge, { backgroundColor: isPosReturn(item) ? COLORS.accent + '20' : COLORS.primary + '20' }]}>
+            <Text style={[styles.sourceText, { color: isPosReturn(item) ? COLORS.accent : COLORS.primary }]}>
+              {isPosReturn(item) ? 'En boutique' : 'En ligne'}
+            </Text>
+          </View>
+        </View>
         <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
           <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
             {getStatusLabel(item.status)}
@@ -151,8 +166,17 @@ export default function SellerReturnsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Gestion des Retours</Text>
-        <Text style={styles.subtitle}>{returns.length} demande(s) enregistrée(s)</Text>
+        <View>
+          <Text style={styles.title}>Gestion des Retours</Text>
+          <Text style={styles.subtitle}>{returns.length} demande(s) enregistrée(s)</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.posReturnBtn}
+          onPress={() => setShowPosReturn(true)}
+        >
+          <Ionicons name="scan" size={20} color="#fff" />
+          <Text style={styles.posReturnBtnText}>Scanner un retour</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -246,6 +270,18 @@ export default function SellerReturnsScreen() {
           </View>
         </View>
       </Modal>
+
+      {showPosReturn && storeId && user?.id && (
+        <PosReturnModal
+          visible={showPosReturn}
+          onClose={() => {
+            setShowPosReturn(false);
+            loadStoreAndReturns(); // Recharger pour voir les nouveaux retours
+          }}
+          storeId={storeId}
+          userId={user.id}
+        />
+      )}
     </View>
   );
 }
@@ -261,10 +297,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: SPACING.lg,
     backgroundColor: COLORS.card,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  posReturnBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.info,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    gap: 6,
+  },
+  posReturnBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 12,
   },
   title: {
     fontSize: FONT_SIZE.xl,
@@ -298,6 +351,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
+    marginBottom: 4,
+  },
+  sourceBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    alignSelf: 'flex-start',
+  },
+  sourceText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   statusBadge: {
     paddingHorizontal: 8,

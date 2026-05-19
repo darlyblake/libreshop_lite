@@ -34,6 +34,7 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { SearchBar } from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
+import { PosReturnModal } from '../components/PosReturnModal';
 
 type Product = {
   id: string;
@@ -81,6 +82,7 @@ export const SellerCaisseScreen = () => {
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+  const [showReturnModal, setShowReturnModal] = useState(false);
 
   // Initialiser le client si passé en paramètre
   useEffect(() => {
@@ -790,6 +792,12 @@ export const SellerCaisseScreen = () => {
         </View>
         
         <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => setShowReturnModal(true)}
+          >
+            <Ionicons name="receipt" size={22} color={COLORS.textMuted} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton}>
             <Ionicons name="stats-chart" size={22} color={COLORS.textMuted} />
           </TouchableOpacity>
@@ -1297,6 +1305,16 @@ export const SellerCaisseScreen = () => {
           </CameraView>
         </View>
       </Modal>
+
+      {/* Modal de Retour Caisse (POS Return) */}
+      {showReturnModal && storeId && user?.id && (
+        <PosReturnModal
+          visible={showReturnModal}
+          onClose={() => setShowReturnModal(false)}
+          storeId={storeId}
+          userId={user.id}
+        />
+      )}
         </>
       )}
     </SafeAreaView>

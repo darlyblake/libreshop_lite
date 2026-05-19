@@ -221,7 +221,7 @@ export const SellerAuthScreen: React.FC = () => {
                 });
                 navigation.replace('SubscriptionExpired', { storeName: store.name });
               } else {
-                navigation.replace('SellerTabs');
+                navigation.replace('SellerHub');
               }
             } catch {
               navigation.replace('SellerAddStore');
@@ -437,7 +437,7 @@ export const SellerAuthScreen: React.FC = () => {
                 if (!storeService.isSubscriptionActive(store)) {
                   navigation.replace('SubscriptionExpired', { storeName: store.name });
                 } else {
-                  navigation.replace('SellerTabs');
+                  navigation.replace('SellerHub');
                 }
               } catch {
                 navigation.replace('SellerAddStore');

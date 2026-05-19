@@ -33,8 +33,9 @@ import { productLikesService } from '../services/productLikesService';
 import { notificationService } from '../services/notificationService';
 import { analyticsService, TimelineDataPoint, TopProductData } from '../services/analyticsService';
 import { lowStockAlertService } from '../services/lowStockAlertService';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { cacheService } from '../services/cacheService';
+import { financeService } from '../services/financeService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Card, LoadingSpinner } from '../components';
 import { useResponsive } from '../utils/useResponsive';
@@ -135,6 +136,14 @@ export const SellerDashboardScreen: React.FC = () => {
     component,
   } = useResponsive();
 
+  const themeContext = useTheme();
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+
+  const styles = useMemo(() => getStyles(themeContext), [themeContext]);
+
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
@@ -153,6 +162,8 @@ export const SellerDashboardScreen: React.FC = () => {
   }, []);
 
   const [summary, setSummary] = useState({ totalRevenue: 0, pendingOrders: 0, deliveredOrders: 0, lowStockCount: 0 });
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [showDashboardBalance, setShowDashboardBalance] = useState(true);
 
   const sellerName = React.useMemo(() => {
     const fullName = String(user?.full_name || '').trim();
@@ -328,13 +339,18 @@ export const SellerDashboardScreen: React.FC = () => {
 
       const { start, prevStart, prevEnd } = getRangeBounds(timeRange);
 
-      const [ordersResponse, products, totalLikes, storeStats, lowStockProducts] = await Promise.all([
+      const [ordersResponse, products, totalLikes, storeStats, lowStockProducts, walletStats] = await Promise.all([
         orderService.getByStore(store.id),
         productService.getByStoreAll(store.id),
         productLikesService.getStoreLikesCount(store.id).catch(() => 0),
         storeStatsService.getByStore(store.id).catch(() => null),
         lowStockAlertService.getLowStockProducts(store.id).catch(() => []),
+        financeService.getWalletStats(store.id).catch(() => ({ availableBalance: 0 })),
       ]);
+
+      if (walletStats) {
+        setAvailableBalance(walletStats.availableBalance);
+      }
       
       const orders = ordersResponse.orders || [];
       const ordersCount = ordersResponse.count || orders.length;
@@ -1140,6 +1156,74 @@ export const SellerDashboardScreen: React.FC = () => {
     );
   }
 
+  const renderLibrePayCard = () => {
+    return (
+      <View style={[styles.section, { marginBottom: spacing.xl }]}>
+        <LinearGradient
+          colors={['#1e293b', '#0f172a']}
+          style={{
+            borderRadius: component.cardBorderRadius,
+            padding: spacing.xl,
+          }}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="wallet-outline" size={20} color="#fff" />
+              <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#fff' }}>
+                LibrePay - Gestion Financière
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowDashboardBalance(!showDashboardBalance)}>
+              <Ionicons name={showDashboardBalance ? "eye-outline" : "eye-off-outline"} size={22} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={{ fontSize: fontSize.xxl, fontWeight: '800', color: '#fff', marginVertical: spacing.md }}>
+            {showDashboardBalance ? formatAmount(availableBalance) : '•••••••• FCFA'}
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
+            <TouchableOpacity 
+              style={{
+                flex: 1,
+                backgroundColor: COLORS.primary,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                borderRadius: RADIUS.md,
+                gap: 6,
+              }}
+              onPress={() => navigation.navigate('SellerFinance')}
+            >
+              <Ionicons name="cash-outline" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: fontSize.sm, fontWeight: '700' }}>Retirer maintenant</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={{
+                flex: 1,
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 12,
+                borderRadius: RADIUS.md,
+                gap: 6,
+              }}
+              onPress={() => navigation.navigate('SellerFinance')}
+            >
+              <Text style={{ color: '#fff', fontSize: fontSize.sm, fontWeight: '700' }}>Historique / KYC</Text>
+              <Ionicons name="chevron-forward" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+    );
+  };
+
   const renderAnalyticsButton = () => {
     const isAnalyticsActive = store?.analytics_active !== false && !isExpired;
 
@@ -1212,6 +1296,16 @@ export const SellerDashboardScreen: React.FC = () => {
             paddingBottom: spacing.lg,
           }]}>
             <View style={styles.headerLeft}>
+              <TouchableOpacity 
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}
+                onPress={() => navigation.navigate('SellerHub')}
+              >
+                <Ionicons name="storefront-outline" size={16} color={COLORS.primary} />
+                <Text style={{ fontSize: fontSize.sm, fontWeight: '700', color: COLORS.primary }}>
+                  {store?.name || 'Ma Boutique'}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color={COLORS.primary} />
+              </TouchableOpacity>
               <Text style={[styles.greeting, { fontSize: fontSize.titleLarge }]}>
                 Bonjour, {sellerName.split(' ')[0]} 👋
               </Text>
@@ -1289,6 +1383,7 @@ export const SellerDashboardScreen: React.FC = () => {
         <View style={[styles.contentWrapper, { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%', paddingHorizontal: spacing.lg }]}>
           {renderSubscriptionPlan()}
           {renderStats()}
+          {renderLibrePayCard()}
           {renderAnalyticsButton()}
           {renderAlerts()}
           {renderQuickActions()}
@@ -1369,11 +1464,16 @@ export const SellerDashboardScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
   scrollContent: {
     flexGrow: 1,
   },
@@ -1442,7 +1542,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileInitials: {
-    color: COLORS.text,
+    color: '#ffffff',
     fontWeight: '600',
   },
   trialBanner: {
@@ -1886,4 +1986,5 @@ const styles = StyleSheet.create({
           elevation: 8,
         }),
   },
-});
+  });
+};

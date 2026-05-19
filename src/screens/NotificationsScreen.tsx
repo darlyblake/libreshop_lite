@@ -17,7 +17,7 @@ import { notificationService } from '../services/notificationService';
 import { useAuthStore, useStoreStore } from '../store';
 import { NotificationItem } from '../components/NotificationItem';
 import { EmptyState } from '../components/EmptyState';
-import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { RootStackParamList } from '../navigation/types';
 
@@ -28,6 +28,13 @@ export const NotificationsScreen: React.FC = () => {
   const { user } = useAuthStore();
   const { store } = useStoreStore();
   const [refreshing, setRefreshing] = useState(false);
+  const themeContext = useTheme();
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const FONT_SIZE = themeContext.fontSize;
+
+  const styles = useMemo(() => getStyles(themeContext), [themeContext]);
+
   const {
     notifications,
     unreadCount,
@@ -215,59 +222,65 @@ export const NotificationsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.lg,
-  },
-  backButton: {
-    marginRight: SPACING.md,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  markAllButton: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  markAllText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
-    fontWeight: '600',
-  },
-  badgeContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-  },
-  badge: {
-    backgroundColor: COLORS.accent + '20',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.accent,
-    fontWeight: '600',
-  },
-  listContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xxl,
-  },
-});
+const getStyles = (theme: any) => {
+  const COLORS = theme.getColor;
+  const SPACING = theme.spacing;
+  const RADIUS = theme.radius;
+  const FONT_SIZE = theme.fontSize;
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.xxl,
+      paddingBottom: SPACING.lg,
+    },
+    backButton: {
+      marginRight: SPACING.md,
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '700',
+      color: COLORS.text,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    markAllButton: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+    },
+    markAllText: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.accent,
+      fontWeight: '600',
+    },
+    badgeContainer: {
+      paddingHorizontal: SPACING.lg,
+      marginBottom: SPACING.md,
+    },
+    badge: {
+      backgroundColor: COLORS.accent + '20',
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: 20,
+      alignSelf: 'flex-start',
+    },
+    badgeText: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.accent,
+      fontWeight: '600',
+    },
+    listContent: {
+      paddingHorizontal: SPACING.lg,
+      paddingBottom: SPACING.xxl,
+    },
+  });
+};
 

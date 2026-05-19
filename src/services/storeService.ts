@@ -4,6 +4,7 @@ import { planService } from './planService';
 import { errorHandler } from '../utils/errorHandler';
 import { notificationService } from '../services/notificationService';
 import { locationService } from './locationService';
+import { useStoreStore } from '../store';
 
 export interface StoreFollower {
   id: string;
@@ -35,7 +36,24 @@ export const storeService = {
     return data;
   },
 
+  async getStoresByUser(userId: string) {
+    const client = useSupabase();
+    const { data, error } = await client
+      .from('stores')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
   async getByUser(userId: string) {
+    const activeStore = useStoreStore.getState().store;
+    if (activeStore && activeStore.user_id === userId) {
+      return activeStore;
+    }
+
     const client = useSupabase();
     const { data: store, error } = await client
       .from('stores')
@@ -59,13 +77,10 @@ export const storeService = {
 
         if (plan) {
           // Sync store flags with plan. Plan features take precedence if they are enabled.
-          // This ensures that when an admin enables a feature on a plan, it's immediately 
-          // available to all stores on that plan.
           if (plan.has_caisse) store.cashier_active = true;
           if (plan.has_online_store) store.online_store_active = true;
           if (plan.has_analytics) store.analytics_active = true;
           
-          // Fallback cases for when features are NOT in the plan
           if (plan.has_caisse === false) store.cashier_active = false;
           if (plan.has_online_store === false) store.online_store_active = false;
           if (plan.has_analytics === false) store.analytics_active = false;
@@ -73,6 +88,11 @@ export const storeService = {
       } catch (err) {
         console.warn('[storeService] Failed to sync plan features:', err);
       }
+    }
+
+    // Set the store as active if none is set yet
+    if (!activeStore) {
+      useStoreStore.getState().setStore(store);
     }
 
     return store;

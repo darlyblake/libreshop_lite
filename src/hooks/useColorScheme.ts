@@ -100,6 +100,26 @@ export const useColorScheme = () => {
     }
   }, [deviceScheme, mode]);
 
+  // Synchroniser l'état entre toutes les instances du hook via les écouteurs globaux
+  useEffect(() => {
+    const handleGlobalThemeChange = async () => {
+      try {
+        const savedMode = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'system') {
+          setMode(savedMode as ThemeMode);
+          setTheme(resolveTheme(savedMode as ThemeMode));
+        }
+      } catch (error) {
+        // ignore
+      }
+    };
+
+    const unsubscribe = addThemeChangeListener(handleGlobalThemeChange);
+    return () => {
+      unsubscribe();
+    };
+  }, [deviceScheme]);
+
   return {
     theme,
     colorScheme: deviceScheme,

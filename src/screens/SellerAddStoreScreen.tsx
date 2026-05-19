@@ -205,7 +205,7 @@ const SellerAddStoreScreen: React.FC = () => {
   const loadCategories = async () => {
     setLoadingCategories(true);
     try {
-      const data = await categoryService.getAll();
+      const data = await categoryService.getByParent(null);
       const CATEGORY_COLORS = [
         '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', 
         '#ec4899', '#6366f1', '#06b6d4', '#84cc16', '#f97316'
@@ -285,12 +285,12 @@ const SellerAddStoreScreen: React.FC = () => {
 
       if (Platform.OS === 'web') {
         alert('Succès 🎉\nVotre boutique a été créée avec succès ! Un essai de 7 jours est activé.');
-        navigation.replace('SellerTabs' as never);
+        (navigation as any).replace('SellerHub');
       } else {
         Alert.alert(
           'Succès 🎉',
           'Votre boutique a été créée avec succès ! Un essai de 7 jours est activé.',
-          [{ text: 'Accéder à mon tableau de bord', onPress: () => navigation.replace('SellerTabs' as never) }]
+          [{ text: 'Accéder à mon tableau de bord', onPress: () => (navigation as any).replace('SellerHub') }]
         );
       }
     } catch (error: any) {
