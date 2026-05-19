@@ -20,9 +20,10 @@ class ImageProcessorService {
   }> = {};
 
   /**
-   * Initialise le pipeline RMBG-1.4 (U²-Net) via @xenova/transformers.
-   * Chargement paresseux : déclenché uniquement au premier usage.
-   * Le modèle (~40 Mo) est mis en cache automatiquement par le navigateur.
+   * Initialise RMBG-1.4 (U²-Net) via AutoModel + AutoProcessor.
+   * IMPORTANT : briaai/RMBG-1.4 ne supporte PAS pipeline() car son architecture
+   * SegformerForSemanticSegmentation n'est pas reconnue par le système de tâches.
+   * On utilise l'approche bas-niveau officielle des démos HuggingFace.
    */
   private async initSegmenter(): Promise<void> {
     if (this.segmenter) return;
@@ -38,23 +39,40 @@ class ImageProcessorService {
     try {
       console.log('[ImageProcessor] Chargement du pipeline Transformers.js + RMBG-1.4...');
 
-      // Import dynamique avec code-splitting Webpack : le bundle @xenova/transformers
-      // est chargé à la demande dans un chunk séparé, sans bloquer le démarrage de l'app.
-      const { pipeline, env } = await import(
+      const { env, AutoModel, AutoProcessor } = await import(
         /* webpackChunkName: "transformers-rmbg" */
-        '@xenova/transformers'
+        '@huggingface/transformers'
       );
 
-      // Forcer l'exécution locale (WASM / WebGL) — pas de serveur externe
       env.allowLocalModels = false;
-      env.backends.onnx.wasm.numThreads = 1;
 
       console.log('[ImageProcessor] Téléchargement du modèle RMBG-1.4 (mis en cache après le premier usage)...');
-      this.segmenter = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
-        device: 'webgpu', // Utilise WebGPU si disponible, repli sur WASM sinon
-        dtype: 'fp32',
-      });
 
+      // Chargement en parallel : modèle et processor
+      const [model, processor] = await Promise.all([
+        AutoModel.from_pretrained('briaai/RMBG-1.4', {
+          // Bypass obligatoire : le config.json déclare SegformerForSemanticSegmentation
+          // mais le modèle est une IS-Net custom — on force 'custom' pour l'AutoModel
+          config: { model_type: 'custom' },
+          dtype: 'fp32',
+        }),
+        AutoProcessor.from_pretrained('briaai/RMBG-1.4', {
+          config: {
+            do_normalize: true,
+            do_pad: false,
+            do_rescale: true,
+            do_resize: true,
+            image_mean: [0.5, 0.5, 0.5],
+            feature_extractor_type: 'ImageFeatureExtractor',
+            image_std: [1.0, 1.0, 1.0],
+            resample: 2,
+            rescale_factor: 0.00392156862745098,
+            size: { width: 1024, height: 1024 },
+          },
+        }),
+      ]);
+
+      this.segmenter = { model, processor };
       console.log('[ImageProcessor] ✅ Transformers.js + RMBG-1.4 prêt !');
     } finally {
       this.isInitializing = false;
@@ -69,49 +87,60 @@ class ImageProcessorService {
     if (Platform.OS !== 'web') return imageUri;
 
     try {
-      // 1. Charger l'image originale
-      const originalImg = new Image();
-      originalImg.crossOrigin = 'anonymous';
-      originalImg.src = imageUri;
-      await new Promise<void>((res, rej) => {
-        originalImg.onload = () => res();
-        originalImg.onerror = () => rej(new Error('Impossible de charger l\'image source'));
-      });
-
-      const origW = originalImg.width;
-      const origH = originalImg.height;
-
-      // 2. Initialiser RMBG-1.4
+      // 1. Initialiser RMBG-1.4 (AutoModel + AutoProcessor)
       await this.initSegmenter();
 
-      // 3. Lancer la segmentation RMBG-1.4
+      const { model, processor } = this.segmenter;
+
+      // 2. Charger l'image via RawImage (API HuggingFace transformers.js)
       console.log('[ImageProcessor] Détourage via RMBG-1.4 en cours...');
-      const results = await this.segmenter(imageUri, { threshold: 0.5 });
+      const { RawImage } = await import(
+        /* webpackChunkName: "transformers-rmbg" */
+        '@huggingface/transformers'
+      );
 
-      if (!results || results.length === 0 || !results[0].mask) {
-        throw new Error('RMBG-1.4 n\'a retourné aucun masque');
-      }
+      const image = await RawImage.fromURL(imageUri);
+      const origW = image.width;
+      const origH = image.height;
 
-      const maskRaw = results[0].mask; // RawImage : { data: Uint8ClampedArray, width, height }
-      const mW = maskRaw.width;
-      const mH = maskRaw.height;
+      // 3. Préparer les pixels via le processor (resize 1024×1024, normalize)
+      const { pixel_values } = await processor(image);
+
+      // 4. Inférence IS-Net : produit un tenseur de saillance [0, 1]
+      const { output } = await model({ input: pixel_values });
+
+      // 5. Post-traitement : convertir le tenseur en masque 8-bit et redimensionner
+      const maskTensor = output[0].mul(255).to('uint8');
+      const maskImage = await RawImage.fromTensor(maskTensor);
+      const maskResized = await maskImage.resize(origW, origH);
+
+      const mW = maskResized.width;
+      const mH = maskResized.height;
+
 
       // 4. Appliquer le masque pixel par pixel comme canal alpha sur l'image originale
       const transparentCanvas = document.createElement('canvas');
       transparentCanvas.width = origW;
       transparentCanvas.height = origH;
       const transCtx = transparentCanvas.getContext('2d')!;
-      transCtx.drawImage(originalImg, 0, 0);
+
+      // Dessiner l'image originale depuis RawImage (converti en canvas HTML)
+      const originalCanvas = document.createElement('canvas');
+      originalCanvas.width = origW;
+      originalCanvas.height = origH;
+      const origCtx = originalCanvas.getContext('2d')!;
+      const origImgData = origCtx.createImageData(origW, origH);
+      const rgbaData = image.toRGBA8();
+      origImgData.data.set(rgbaData);
+      origCtx.putImageData(origImgData, 0, 0);
+
+      transCtx.drawImage(originalCanvas, 0, 0);
 
       const origPixels = transCtx.getImageData(0, 0, origW, origH);
-      for (let y = 0; y < origH; y++) {
-        for (let x = 0; x < origW; x++) {
-          // Interpolation nearest-neighbor du masque vers la résolution d'origine
-          const mx = Math.min(mW - 1, Math.round((x / origW) * mW));
-          const my = Math.min(mH - 1, Math.round((y / origH) * mH));
-          const maskValue = maskRaw.data[my * mW + mx]; // 0-255 : blanc = objet, noir = fond
-          origPixels.data[(y * origW + x) * 4 + 3] = maskValue;
-        }
+      // Appliquer le masque IS-Net directement pixel par pixel
+      // maskResized.data contient des valeurs 0-255 (canal unique grayscale)
+      for (let i = 0; i < origW * origH; i++) {
+        origPixels.data[i * 4 + 3] = maskResized.data[i];
       }
       transCtx.putImageData(origPixels, 0, 0);
 

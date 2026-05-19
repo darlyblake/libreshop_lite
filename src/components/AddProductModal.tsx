@@ -42,14 +42,18 @@ interface Product {
   collectionId: string;
   featured?: boolean;
   attributes?: Record<string, any>;
+  condition?: 'new' | 'used';
 }
 
 interface AddProductModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (product: Product) => void;
+  onUpdate?: (product: Product) => void;
   collections: CollectionOption[];
   title?: string;
+  initialProduct?: Partial<Product>;
+  editProductId?: string;
 }
 
 const getStyles = (theme: any) => {
@@ -932,15 +936,20 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   visible,
   onClose,
   onAdd,
+  onUpdate,
   collections,
   title = 'Ajouter un produit',
+  initialProduct,
+  editProductId,
 }) => {
   const themeContext = useTheme();
   const theme = themeContext.theme;
   const COLORS = themeContext.getColor;
   const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
-  const initialCollectionId = collections && collections.length > 0 ? collections[0]!.id : '';
+  const isEditMode = !!editProductId;
+  const initialCollectionId = initialProduct?.collectionId ||
+    (collections && collections.length > 0 ? collections[0]!.id : '');
   const [currentStep, setCurrentStep] = useState(1);
 
   // Picker States
@@ -949,18 +958,40 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [pendingCollectionId, setPendingCollectionId] = useState(initialCollectionId);
 
   // Form States
-  const [newProduct, setNewProduct] = useState<Product>({
-    name: '',
-    price: '',
-    costPrice: '',
-    comparePrice: '',
-    stock: '1',
-    barcode: undefined,
-    description: '',
-    images: [],
+  const [newProduct, setNewProduct] = useState<Product>(() => ({
+    name: initialProduct?.name || '',
+    price: initialProduct?.price || '',
+    costPrice: initialProduct?.costPrice || '',
+    comparePrice: initialProduct?.comparePrice || '',
+    stock: initialProduct?.stock || '1',
+    barcode: initialProduct?.barcode,
+    description: initialProduct?.description || '',
+    images: initialProduct?.images || [],
     collectionId: initialCollectionId,
-    featured: false,
-  });
+    featured: initialProduct?.featured || false,
+    condition: initialProduct?.condition || 'new',
+  }));
+
+  // Sync with initialProduct when modal opens for edit
+  React.useEffect(() => {
+    if (visible && initialProduct) {
+      setNewProduct({
+        name: initialProduct.name || '',
+        price: initialProduct.price || '',
+        costPrice: initialProduct.costPrice || '',
+        comparePrice: initialProduct.comparePrice || '',
+        stock: initialProduct.stock || '1',
+        barcode: initialProduct.barcode,
+        description: initialProduct.description || '',
+        images: initialProduct.images || [],
+        collectionId: initialProduct.collectionId || initialCollectionId,
+        featured: initialProduct.featured || false,
+        condition: initialProduct.condition || 'new',
+      });
+      setProductAttributes(initialProduct.attributes || {});
+      setCurrentStep(1);
+    }
+  }, [visible, editProductId]);
 
   const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
   const [show3DPreview, setShow3DPreview] = useState(false);
@@ -1204,24 +1235,33 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       return;
     }
 
-    onAdd({ ...newProduct, attributes: productAttributes });
+    const productWithAttrs = { ...newProduct, attributes: productAttributes };
+
+    if (isEditMode && onUpdate) {
+      onUpdate(productWithAttrs);
+    } else {
+      onAdd(productWithAttrs);
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Reset Form
-    setNewProduct({
-      name: '',
-      price: '',
-      costPrice: '',
-      comparePrice: '',
-      stock: '1',
-      barcode: undefined,
-      description: '',
-      images: [],
-      collectionId: initialCollectionId,
-      featured: false,
-    });
-    setProductAttributes({});
-    setCurrentStep(1);
+    // Reset form only in add mode
+    if (!isEditMode) {
+      setNewProduct({
+        name: '',
+        price: '',
+        costPrice: '',
+        comparePrice: '',
+        stock: '1',
+        barcode: undefined,
+        description: '',
+        images: [],
+        collectionId: initialCollectionId,
+        featured: false,
+        condition: 'new',
+      });
+      setProductAttributes({});
+      setCurrentStep(1);
+    }
   };
 
   const handleAddImage = () => {
@@ -1413,6 +1453,42 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                     textAlignVertical="top"
                   />
                   {fieldErrors.description && <Text style={styles.errorText}>{fieldErrors.description}</Text>}
+                </View>
+
+                {/* Condition : Neuf / Occasion */}
+                <View style={styles.modalInput}>
+                  <Text style={styles.inputLabel}>État du produit</Text>
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                    {(['new', 'used'] as const).map((cond) => {
+                      const isSelected = (newProduct.condition || 'new') === cond;
+                      const label = cond === 'new' ? '✨ Neuf' : '♻️ Occasion';
+                      const accent = cond === 'new' ? COLORS.accent : '#F59E0B';
+                      return (
+                        <TouchableOpacity
+                          key={cond}
+                          onPress={() => setNewProduct({ ...newProduct, condition: cond })}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 12,
+                            paddingHorizontal: 16,
+                            borderRadius: 10,
+                            borderWidth: 2,
+                            borderColor: isSelected ? accent : COLORS.border,
+                            backgroundColor: isSelected ? accent + '15' : COLORS.card,
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text style={{
+                            fontSize: 14,
+                            fontWeight: isSelected ? '700' : '500',
+                            color: isSelected ? accent : COLORS.textMuted,
+                          }}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
 
                 <View style={styles.modalInput}>
