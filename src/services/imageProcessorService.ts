@@ -74,8 +74,6 @@ class ImageProcessorService {
     try {
       if (Platform.OS !== 'web') return imageUri;
 
-      await this.initModel();
-
       // 1. Charger l'image originale
       const originalImg = new Image();
       originalImg.crossOrigin = 'anonymous';
@@ -85,121 +83,212 @@ class ImageProcessorService {
       const origW = originalImg.width;
       const origH = originalImg.height;
 
-      // PASSE 1 : Détection et localisation d'objet (Object Detection)
-      console.log('[ImageProcessor] Passe 1 : Détection d\'objet...');
-      const firstPass = await this.model.segment(originalImg);
-      
-      let minX = firstPass.width;
-      let maxX = 0;
-      let minY = firstPass.height;
-      let maxY = 0;
-      let hasObject = false;
+      let transparentCanvas = document.createElement('canvas');
+      let isHfSuccess = false;
+      let secondPassModel: any = null;
 
-      for (let y = 0; y < firstPass.height; y++) {
-        for (let x = 0; x < firstPass.width; x++) {
-          const idx = (y * firstPass.width + x) * 4;
-          const r = firstPass.segmentationMap[idx];
-          const g = firstPass.segmentationMap[idx + 1];
-          const b = firstPass.segmentationMap[idx + 2];
-          // DeepLab Pascal VOC colors: black [0,0,0] is background, everything else is object
-          const isObject = (r > 0 || g > 0 || b > 0);
-          
-          if (isObject) {
-            hasObject = true;
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
+      // Tentative via Hugging Face U²-Net / RMBG-1.4 (Qualité Studio Exceptionnelle)
+      try {
+        console.log('[ImageProcessor] Tentative de détourage via Hugging Face (U²-Net / RMBG-1.4)...');
+        const hfToken = process.env.EXPO_PUBLIC_HUGGINGFACE_API_KEY || '';
+        
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+
+        const hfResponse = await fetch(
+          'https://api-inference.huggingface.co/models/briaai/RMBG-1.4',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': blob.type || 'image/jpeg',
+              ...(hfToken ? { 'Authorization': `Bearer ${hfToken}` } : {})
+            },
+            body: blob
           }
+        );
+
+        if (hfResponse.ok) {
+          const outputBlob = await hfResponse.blob();
+          const outputUrl = URL.createObjectURL(outputBlob);
+          
+          const hfImg = new Image();
+          hfImg.src = outputUrl;
+          await new Promise(res => hfImg.onload = res);
+
+          transparentCanvas.width = origW;
+          transparentCanvas.height = origH;
+          const transCtx = transparentCanvas.getContext('2d')!;
+          transCtx.drawImage(hfImg, 0, 0, origW, origH);
+          
+          URL.revokeObjectURL(outputUrl);
+          isHfSuccess = true;
+          console.log('[ImageProcessor] Détourage Hugging Face U²-Net réussi avec succès !');
+        } else {
+          console.warn(`[ImageProcessor] Hugging Face a retourné une erreur : ${hfResponse.status}. Repli sur le modèle local.`);
         }
+      } catch (hfErr) {
+        console.warn('[ImageProcessor] Échec de la requête Hugging Face, repli local:', hfErr);
       }
 
-      let croppedImg: HTMLImageElement | HTMLCanvasElement = originalImg;
-      let cropX = 0;
-      let cropY = 0;
       let cropW = origW;
       let cropH = origH;
+      let fineMinX = 0;
+      let fineMaxX = origW;
+      let fineMinY = 0;
+      let fineMaxY = origH;
+      let fineHasObject = true;
 
-      if (hasObject) {
-        const origMinX = Math.max(0, Math.floor((minX / firstPass.width) * origW));
-        const origMaxX = Math.min(origW, Math.ceil((maxX / firstPass.width) * origW));
-        const origMinY = Math.max(0, Math.floor((minY / firstPass.height) * origH));
-        const origMaxY = Math.min(origH, Math.ceil((maxY / firstPass.height) * origH));
+      // Repli local hors-ligne / sans clé (DeepLab double-passe)
+      if (!isHfSuccess) {
+        await this.initModel();
 
-        cropW = origMaxX - origMinX;
-        cropH = origMaxY - origMinY;
+        // PASSE 1 : Détection et localisation d'objet (Object Detection)
+        console.log('[ImageProcessor] Passe 1 : Détection d\'objet locale...');
+        const firstPass = await this.model.segment(originalImg);
+        
+        let minX = firstPass.width;
+        let maxX = 0;
+        let minY = firstPass.height;
+        let maxY = 0;
+        let hasObject = false;
 
-        if (cropW > 10 && cropH > 10) {
-          cropX = origMinX;
-          cropY = origMinY;
-
-          const cropCanvas = document.createElement('canvas');
-          cropCanvas.width = cropW;
-          cropCanvas.height = cropH;
-          const cropCtx = cropCanvas.getContext('2d')!;
-          cropCtx.drawImage(originalImg, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-          
-          const cropImg = new Image();
-          cropImg.src = cropCanvas.toDataURL();
-          await new Promise(res => cropImg.onload = res);
-          croppedImg = cropImg;
-          console.log(`[ImageProcessor] Objet localisé et cadré : ${cropW}x${cropH} à (${cropX}, ${cropY})`);
-        }
-      }
-
-      // PASSE 2 : Détourage Studio Blanc Ultra-Précis sur l'objet cadré
-      console.log('[ImageProcessor] Passe 2 : Détourage ciblé (Studio Blanc)...');
-      const secondPass = await this.model.segment(croppedImg);
-      const width = secondPass.width;
-      const height = secondPass.height;
-
-      const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = width;
-      maskCanvas.height = height;
-      const maskCtx = maskCanvas.getContext('2d')!;
-      const maskData = maskCtx.createImageData(width, height);
-
-      let fineMinX = width;
-      let fineMaxX = 0;
-      let fineMinY = height;
-      let fineMaxY = 0;
-      let fineHasObject = false;
-
-      for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-          const idx = (y * width + x) * 4;
-          const r = secondPass.segmentationMap[idx];
-          const g = secondPass.segmentationMap[idx + 1];
-          const b = secondPass.segmentationMap[idx + 2];
-          
-          const isObject = (r > 0 || g > 0 || b > 0);
-          const alpha = isObject ? 255 : 0;
-          
-          if (isObject) {
-            fineHasObject = true;
-            if (x < fineMinX) fineMinX = x;
-            if (x > fineMaxX) fineMaxX = x;
-            if (y < fineMinY) fineMinY = y;
-            if (y > fineMaxY) fineMaxY = y;
+        for (let y = 0; y < firstPass.height; y++) {
+          for (let x = 0; x < firstPass.width; x++) {
+            const idx = (y * firstPass.width + x) * 4;
+            const r = firstPass.segmentationMap[idx];
+            const g = firstPass.segmentationMap[idx + 1];
+            const b = firstPass.segmentationMap[idx + 2];
+            const isObject = (r > 0 || g > 0 || b > 0);
+            
+            if (isObject) {
+              hasObject = true;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
           }
+        }
 
-          const i = y * width + x;
-          maskData.data[i * 4] = 255;
-          maskData.data[i * 4 + 1] = 255;
-          maskData.data[i * 4 + 2] = 255;
-          maskData.data[i * 4 + 3] = alpha;
+        let croppedImg: HTMLImageElement | HTMLCanvasElement = originalImg;
+        let cropX = 0;
+        let cropY = 0;
+
+        if (hasObject) {
+          const origMinX = Math.max(0, Math.floor((minX / firstPass.width) * origW));
+          const origMaxX = Math.min(origW, Math.ceil((maxX / firstPass.width) * origW));
+          const origMinY = Math.max(0, Math.floor((minY / firstPass.height) * origH));
+          const origMaxY = Math.min(origH, Math.ceil((maxY / firstPass.height) * origH));
+
+          cropW = origMaxX - origMinX;
+          cropH = origMaxY - origMinY;
+
+          if (cropW > 10 && cropH > 10) {
+            cropX = origMinX;
+            cropY = origMinY;
+
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = cropW;
+            cropCanvas.height = cropH;
+            const cropCtx = cropCanvas.getContext('2d')!;
+            cropCtx.drawImage(originalImg, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+            
+            const cropImg = new Image();
+            cropImg.src = cropCanvas.toDataURL();
+            await new Promise(res => cropImg.onload = res);
+            croppedImg = cropImg;
+          }
+        }
+
+        // PASSE 2 : Détourage local
+        console.log('[ImageProcessor] Passe 2 : Détourage local...');
+        const secondPass = await this.model.segment(croppedImg);
+        secondPassModel = secondPass;
+        const width = secondPass.width;
+        const height = secondPass.height;
+
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = width;
+        maskCanvas.height = height;
+        const maskCtx = maskCanvas.getContext('2d')!;
+        const maskData = maskCtx.createImageData(width, height);
+
+        fineMinX = width;
+        fineMaxX = 0;
+        fineMinY = height;
+        fineMaxY = 0;
+        fineHasObject = false;
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            const r = secondPass.segmentationMap[idx];
+            const g = secondPass.segmentationMap[idx + 1];
+            const b = secondPass.segmentationMap[idx + 2];
+            
+            const isObject = (r > 0 || g > 0 || b > 0);
+            const alpha = isObject ? 255 : 0;
+            
+            if (isObject) {
+              fineHasObject = true;
+              if (x < fineMinX) fineMinX = x;
+              if (x > fineMaxX) fineMaxX = x;
+              if (y < fineMinY) fineMinY = y;
+              if (y > fineMaxY) fineMaxY = y;
+            }
+
+            const i = y * width + x;
+            maskData.data[i * 4] = 255;
+            maskData.data[i * 4 + 1] = 255;
+            maskData.data[i * 4 + 2] = 255;
+            maskData.data[i * 4 + 3] = alpha;
+          }
+        }
+        maskCtx.putImageData(maskData, 0, 0);
+
+        transparentCanvas.width = cropW;
+        transparentCanvas.height = cropH;
+        const transCtx = transparentCanvas.getContext('2d')!;
+        transCtx.drawImage(croppedImg, 0, 0);
+
+        transCtx.globalCompositeOperation = 'destination-in';
+        transCtx.drawImage(maskCanvas, 0, 0, width, height, 0, 0, cropW, cropH);
+      } else {
+        // Analyse de la Bounding Box du produit détouré par Hugging Face
+        const transCtx = transparentCanvas.getContext('2d')!;
+        const imgData = transCtx.getImageData(0, 0, origW, origH);
+        
+        let minX = origW;
+        let maxX = 0;
+        let minY = origH;
+        let maxY = 0;
+        let hasObj = false;
+
+        for (let y = 0; y < origH; y++) {
+          for (let x = 0; x < origW; x++) {
+            const alpha = imgData.data[(y * origW + x) * 4 + 3];
+            if (alpha > 30) {
+              hasObj = true;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        if (hasObj) {
+          fineMinX = minX;
+          fineMaxX = maxX;
+          fineMinY = minY;
+          fineMaxY = maxY;
+          fineHasObject = true;
+          cropW = origW;
+          cropH = origH;
+        } else {
+          fineHasObject = false;
         }
       }
-      maskCtx.putImageData(maskData, 0, 0);
-
-      const transparentCanvas = document.createElement('canvas');
-      transparentCanvas.width = cropW;
-      transparentCanvas.height = cropH;
-      const transCtx = transparentCanvas.getContext('2d')!;
-      transCtx.drawImage(croppedImg, 0, 0);
-
-      transCtx.globalCompositeOperation = 'destination-in';
-      transCtx.drawImage(maskCanvas, 0, 0, width, height, 0, 0, cropW, cropH);
 
       // Cadrage final parfait à 85% de la surface du canvas carré
       const finalCanvas = document.createElement('canvas');
@@ -212,13 +301,13 @@ class ImageProcessorService {
       finalCtx.fillRect(0, 0, canvasSize, canvasSize);
 
       if (fineHasObject) {
-        const origMinX = Math.max(0, Math.floor((fineMinX / width) * cropW));
-        const origMaxX = Math.min(cropW, Math.ceil((fineMaxX / width) * cropW));
-        const origMinY = Math.max(0, Math.floor((fineMinY / height) * cropH));
-        const origMaxY = Math.min(cropH, Math.ceil((fineMaxY / height) * cropH));
+        const srcMinX = isHfSuccess ? fineMinX : Math.max(0, Math.floor((fineMinX / secondPassModel.width) * cropW));
+        const srcMaxX = isHfSuccess ? fineMaxX : Math.min(cropW, Math.ceil((fineMaxX / secondPassModel.width) * cropW));
+        const srcMinY = isHfSuccess ? fineMinY : Math.max(0, Math.floor((fineMinY / secondPassModel.height) * cropH));
+        const srcMaxY = isHfSuccess ? fineMaxY : Math.min(cropH, Math.ceil((fineMaxY / secondPassModel.height) * cropH));
 
-        const bboxW = origMaxX - origMinX;
-        const bboxH = origMaxY - origMinY;
+        const bboxW = srcMaxX - srcMinX;
+        const bboxH = srcMaxY - srcMinY;
 
         if (bboxW > 0 && bboxH > 0) {
           const targetSize = canvasSize * 0.85;
@@ -232,7 +321,7 @@ class ImageProcessorService {
 
           finalCtx.drawImage(
             transparentCanvas,
-            origMinX, origMinY, bboxW, bboxH,
+            srcMinX, srcMinY, bboxW, bboxH,
             dx, dy, sw, sh
           );
         } else {
