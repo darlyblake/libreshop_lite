@@ -85,6 +85,18 @@ module.exports = async function (env, argv) {
     path: false,
   };
 
+  // Support WASM pour @xenova/transformers (runtime ONNX)
+  config.experiments = {
+    ...config.experiments,
+    asyncWebAssembly: true,
+  };
+
+  // Servir les fichiers .wasm comme assets binaires
+  config.module.rules.push({
+    test: /\.wasm$/,
+    type: 'asset/resource',
+  });
+
   // Force WebSocket HMR configuration to avoid "WebSocket connection failed"
   if (config.devServer) {
     config.devServer.allowedHosts = 'all';
