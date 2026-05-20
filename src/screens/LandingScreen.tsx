@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { Button } from '../components';
 
 const { width, height } = Dimensions.get('window');
@@ -65,10 +65,17 @@ const PRICING = [
 export const LandingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  
+  const themeContext = useTheme();
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const isDark = themeContext.isDark;
+  
+  const styles = React.useMemo(() => getStyles(themeContext), [themeContext]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={COLORS.bg} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + SPACING.xl }}>
         {/* Header */}
         <View style={styles.header}>
@@ -208,195 +215,202 @@ export const LandingScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.lg,
-  },
-  logo: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
-  logoText: {
-    fontSize: FONT_SIZE.xl,
-    fontWeight: '800',
-    color: COLORS.accent,
-    letterSpacing: 0.5,
-  },
-  headerNav: {
-    flexDirection: 'row',
-    gap: SPACING.xl,
-  },
-  navText: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '500',
-    color: COLORS.textSoft,
-  },
-  hero: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
-  },
-  tagContainer: {
-    marginBottom: SPACING.lg,
-  },
-  tag: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: COLORS.accent,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  heroTitle: {
-    fontSize: width < 500 ? FONT_SIZE.xl : FONT_SIZE.title,
-    fontWeight: '800',
-    color: COLORS.text,
-    textAlign: 'center',
-    lineHeight: width < 500 ? 32 : 48,
-    marginBottom: SPACING.lg,
-  },
-  heroTitleAccent: {
-    color: COLORS.accent2,
-  },
-  heroSubtitle: {
-    fontSize: width < 500 ? FONT_SIZE.sm : FONT_SIZE.md,
-    color: COLORS.textSoft,
-    textAlign: 'center',
-    maxWidth: 500,
-    marginBottom: SPACING.xl,
-    lineHeight: 20,
-  },
-  heroButtons: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  section: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
-  },
-  sectionTitle: {
-    fontSize: width < 500 ? FONT_SIZE.lg : FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-  },
-  featuresGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: SPACING.lg,
-  },
-  featureCard: {
-    width: width < 500 ? '100%' : (width - SPACING.lg * 2 - SPACING.lg) / 2 - SPACING.sm,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.lg,
-  },
-  featureTitle: {
-    fontSize: FONT_SIZE.md,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-    textAlign: 'center',
-  },
-  featureDescription: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  pricingGrid: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.lg,
-    flexWrap: 'wrap',
-  },
-  pricingCard: {
-    width: width < 500 ? '100%' : width < 900 ? (width - SPACING.lg * 2 - SPACING.lg) / 2 : (width - SPACING.lg * 2 - SPACING.lg * 2) / 3,
-    backgroundColor: COLORS.card,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.lg,
-  },
-  pricingCardHighlighted: {
-    borderColor: COLORS.accent,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-  },
-  pricingTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-  },
-  pricingPrice: {
-    fontSize: FONT_SIZE.xxxl,
-    fontWeight: '800',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-    textAlign: 'center',
-  },
-  pricingDescription: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSoft,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  pricingBadge: {
-    position: 'absolute',
-    top: -10,
-    backgroundColor: COLORS.accent,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.full,
-  },
-  pricingBadgeText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.textInverse,
-  },
-  ctaSection: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.05)',
-  },
-  ctaTitle: {
-    fontSize: width < 500 ? FONT_SIZE.lg : FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.lg,
-  },
-  footer: {
-    padding: SPACING.xxxl,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textMuted,
-  },
-});
+const getStyles = (themeContext: any) => {
+  const COLORS = themeContext.getColor;
+  const SPACING = themeContext.spacing;
+  const RADIUS = themeContext.radius;
+  const FONT_SIZE = themeContext.fontSize;
+
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.bg,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.xl,
+      paddingBottom: SPACING.lg,
+    },
+    logo: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '800',
+      color: COLORS.text,
+    },
+    logoText: {
+      fontSize: FONT_SIZE.xl,
+      fontWeight: '800',
+      color: COLORS.accent,
+      letterSpacing: 0.5,
+    },
+    headerNav: {
+      flexDirection: 'row',
+      gap: SPACING.xl,
+    },
+    navText: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '500',
+      color: COLORS.textSoft,
+    },
+    hero: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.xl,
+      alignItems: 'center',
+    },
+    tagContainer: {
+      marginBottom: SPACING.lg,
+    },
+    tag: {
+      fontSize: FONT_SIZE.sm,
+      fontWeight: '600',
+      color: COLORS.accent,
+      backgroundColor: 'rgba(139, 92, 246, 0.15)',
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADIUS.full,
+      borderWidth: 1,
+      borderColor: 'rgba(139, 92, 246, 0.3)',
+    },
+    heroTitle: {
+      fontSize: width < 500 ? FONT_SIZE.xl : FONT_SIZE.title,
+      fontWeight: '800',
+      color: COLORS.text,
+      textAlign: 'center',
+      lineHeight: width < 500 ? 32 : 48,
+      marginBottom: SPACING.lg,
+    },
+    heroTitleAccent: {
+      color: COLORS.accent2,
+    },
+    heroSubtitle: {
+      fontSize: width < 500 ? FONT_SIZE.sm : FONT_SIZE.md,
+      color: COLORS.textSoft,
+      textAlign: 'center',
+      maxWidth: 500,
+      marginBottom: SPACING.xl,
+      lineHeight: 20,
+    },
+    heroButtons: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+    },
+    section: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.xl,
+    },
+    sectionTitle: {
+      fontSize: width < 500 ? FONT_SIZE.lg : FONT_SIZE.xxl,
+      fontWeight: '700',
+      color: COLORS.text,
+      textAlign: 'center',
+      marginBottom: SPACING.lg,
+    },
+    featuresGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: SPACING.lg,
+    },
+    featureCard: {
+      width: width < 500 ? '100%' : (width - SPACING.lg * 2 - SPACING.lg) / 2 - SPACING.sm,
+      backgroundColor: COLORS.card,
+      borderRadius: RADIUS.xl,
+      padding: SPACING.lg,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginBottom: SPACING.lg,
+    },
+    featureTitle: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '700',
+      color: COLORS.text,
+      marginTop: SPACING.md,
+      marginBottom: SPACING.sm,
+      textAlign: 'center',
+    },
+    featureDescription: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.textSoft,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    pricingGrid: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: SPACING.lg,
+      flexWrap: 'wrap',
+    },
+    pricingCard: {
+      width: width < 500 ? '100%' : width < 900 ? (width - SPACING.lg * 2 - SPACING.lg) / 2 : (width - SPACING.lg * 2 - SPACING.lg * 2) / 3,
+      backgroundColor: COLORS.card,
+      borderRadius: RADIUS.xl,
+      padding: SPACING.lg,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: COLORS.border,
+      marginBottom: SPACING.lg,
+    },
+    pricingCardHighlighted: {
+      borderColor: COLORS.accent,
+      backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    },
+    pricingTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '700',
+      color: COLORS.text,
+      marginBottom: SPACING.sm,
+    },
+    pricingPrice: {
+      fontSize: FONT_SIZE.xxxl,
+      fontWeight: '800',
+      color: COLORS.text,
+      marginBottom: SPACING.sm,
+      textAlign: 'center',
+    },
+    pricingDescription: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.textSoft,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    pricingBadge: {
+      position: 'absolute',
+      top: -10,
+      backgroundColor: COLORS.accent,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: RADIUS.full,
+    },
+    pricingBadgeText: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '600',
+      color: COLORS.textInverse,
+    },
+    ctaSection: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.xl,
+      alignItems: 'center',
+      backgroundColor: 'rgba(139, 92, 246, 0.05)',
+    },
+    ctaTitle: {
+      fontSize: width < 500 ? FONT_SIZE.lg : FONT_SIZE.xxl,
+      fontWeight: '700',
+      color: COLORS.text,
+      marginBottom: SPACING.lg,
+    },
+    footer: {
+      padding: SPACING.xxxl,
+      alignItems: 'center',
+    },
+    footerText: {
+      fontSize: FONT_SIZE.sm,
+      color: COLORS.textMuted,
+    },
+  });
+};
 

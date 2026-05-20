@@ -13,6 +13,7 @@ import {
   TextInput,
   Switch,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -85,6 +86,7 @@ export const SellerHubScreen: React.FC = () => {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   useEffect(() => {
     loadStoresAndData();
@@ -265,29 +267,25 @@ export const SellerHubScreen: React.FC = () => {
     navigation.navigate('SellerTabs', { screen: 'SellerDashboard' });
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnecter',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await authService.signOut();
-              setUser(null);
-              setSession(null);
-              setStore(null);
-              navigation.replace('Landing');
-            } catch (e) {
-              Alert.alert('Erreur', 'Impossible de se déconnecter');
-            }
-          }
-        }
-      ]
-    );
+  const handleLogout = () => {
+    setLogoutModalVisible(true);
+  };
+
+  const performLogout = async () => {
+    setLogoutModalVisible(false);
+    try {
+      await authService.signOut();
+      setUser(null);
+      setSession(null);
+      setStore(null);
+      navigation.replace('Landing');
+    } catch (e) {
+      if (Platform.OS === 'web') {
+        alert('Impossible de se déconnecter');
+      } else {
+        Alert.alert('Erreur', 'Impossible de se déconnecter');
+      }
+    }
   };
 
   const handleSaveSettings = async () => {
@@ -849,6 +847,40 @@ export const SellerHubScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      {/* CUSTOM LOGOUT CONFIRMATION MODAL */}
+      <Modal
+        visible={logoutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: COLORS.card, borderColor: COLORS.border }]}>
+            <View style={[styles.modalHeaderIcon, { backgroundColor: COLORS.danger + '15' }]}>
+              <Ionicons name="log-out-outline" size={28} color={COLORS.danger} />
+            </View>
+            <Text style={[styles.modalTitle, { color: COLORS.text }]}>Déconnexion</Text>
+            <Text style={[styles.modalMessage, { color: COLORS.textSoft }]}>
+              Êtes-vous sûr de vouloir vous déconnecter de votre compte professionnel ?
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton, { borderColor: COLORS.border }]}
+                onPress={() => setLogoutModalVisible(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: COLORS.text }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: COLORS.danger }]}
+                onPress={performLogout}
+              >
+                <Text style={styles.modalConfirmText}>Déconnexion</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1247,5 +1279,79 @@ const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any, is
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '800',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+  },
+  modalCard: {
+    width: '90%',
+    maxWidth: 380,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+      },
+    }),
+  },
+  modalHeaderIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: SPACING.lg,
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    width: '100%',
+    gap: SPACING.md,
+  },
+  modalButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelButton: {
+    borderWidth: 1,
+  },
+  modalCancelText: {
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  modalConfirmButton: {},
+  modalConfirmText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });

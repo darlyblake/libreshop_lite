@@ -25,6 +25,7 @@ import { orderService } from '../services/orderService';
 import { userService } from '../services/userService';
 import { notificationService } from '../services/notificationService';
 import { cloudinaryService } from '../services/cloudinaryService';
+import { useAlertModal } from '../components/AlertModal';
 
 const EmptyCartAnimation = ({ color }: { color: string }) => {
   const translateY = useSharedValue(0);
@@ -63,6 +64,7 @@ export const CartScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const clearCart = useCartStore((s) => s.clearCart);
   const [processingBulk, setProcessingBulk] = useState(false);
+  const { show: showAlert, AlertModalComponent } = useAlertModal();
 
   const palette = useLegacyPalette();
   const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
@@ -124,19 +126,36 @@ export const CartScreen: React.FC = () => {
   }, [storeId, items]);
 
   const stockCheckKey = useMemo(
-    () => items.map((i) => `${i.product.id}:${i.product.stock ?? 0}`).join('|'),
+    () => items.map((i) => `${i.product.id}:${i.product.stock ?? 0}:${i.quantity}`).join('|'),
     [items]
   );
 
-  /** Retirer du panier les produits en rupture (données embarquées). */
+  /** Retirer/ajuster les articles dont le stock est insuffisant (données embarquées). */
   useEffect(() => {
-    const out = items.filter((it) => (it.product.stock ?? 0) <= 0);
-    if (out.length === 0) return;
-    out.forEach((it) => removeItem(it.product.id));
-    Alert.alert(
-      'Rupture de stock',
-      `${out.length} article(s) indisponible(s) ${out.length > 1 ? 'ont été retirés' : 'a été retiré'} du panier.`,
+    // 1. Articles en rupture totale → retirer
+    const outOfStock = items.filter((it) => (it.product.stock ?? 0) <= 0);
+    outOfStock.forEach((it) => removeItem(it.product.id));
+
+    // 2. Articles dont la quantité dépasse le stock → ajuster la quantité
+    const overStock = items.filter(
+      (it) => (it.product.stock ?? 0) > 0 && it.quantity > (it.product.stock ?? 0),
     );
+    overStock.forEach((it) => updateQuantity(it.product.id, it.product.stock ?? 1));
+
+    if (outOfStock.length > 0 || overStock.length > 0) {
+      const messages: string[] = [];
+      if (outOfStock.length > 0) {
+        messages.push(`❌ ${outOfStock.length} article(s) en rupture totale ${outOfStock.length > 1 ? 'ont été retirés' : 'a été retiré'} du panier.`);
+      }
+      if (overStock.length > 0) {
+        messages.push(`⚠️ La quantité de ${overStock.length} article(s) a été limitée au stock disponible.`);
+      }
+      showAlert({
+        type: 'warning',
+        title: 'Mise à jour du panier',
+        message: messages.join('\n'),
+      });
+    }
   }, [stockCheckKey]);
 
   if (!user) {
@@ -154,46 +173,75 @@ export const CartScreen: React.FC = () => {
   // For display and totals we compute aggregated values in-place when rendering
   const total = subtotal; // will add taxes/shipping in UI per-store or aggregated
 
-  const renderCartItem = (item: (typeof items)[number]) => (
-    <View key={item.product.id} style={styles.cartItem}>
-      {item.product.images?.[0] ? (
-        <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 300) }} style={styles.itemImage} />
-      ) : (
-        <View style={styles.itemImagePlaceholder}>
-          <Ionicons name="image-outline" size={28} color={palette.textMuted} />
-        </View>
-      )}
-      <View style={styles.itemInfo}>
-        <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
-        <Text style={styles.itemStore}>{((item.product as any)?.store_name) || ''}</Text>
-        <View style={styles.itemBottom}>
-          <Text style={styles.itemPrice}>{item.product.price.toLocaleString()} FCA</Text>
-          <View style={styles.quantityControls}>
-            <Pressable
-              style={[styles.quantityBadge, { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border }]}
-              onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
-              hitSlop={10}
-            >
-              <Text style={[styles.quantityText, { color: palette.text }]}>-</Text>
-            </Pressable>
-            <View style={[styles.quantityBadge, styles.quantityMiddle]}>
-              <Text style={styles.quantityText}>×{item.quantity}</Text>
+  const renderCartItem = (item: (typeof items)[number]) => {
+    const availableStock = item.product.stock ?? 9999;
+    const isAtMaxStock = item.quantity >= availableStock;
+    const isLowStock = availableStock > 0 && availableStock <= 3;
+
+    const handleIncrease = () => {
+      if (isAtMaxStock) {
+        showAlert({
+          type: 'warning',
+          title: 'Stock maximum atteint',
+          message: `Il ne reste que ${availableStock} exemplaire(s) de "${item.product.name}" en stock.`,
+        });
+        return;
+      }
+      updateQuantity(item.product.id, item.quantity + 1);
+    };
+
+    return (
+      <View key={item.product.id} style={styles.cartItem}>
+        {item.product.images?.[0] ? (
+          <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 300) }} style={styles.itemImage} />
+        ) : (
+          <View style={styles.itemImagePlaceholder}>
+            <Ionicons name="image-outline" size={28} color={palette.textMuted} />
+          </View>
+        )}
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
+          <Text style={styles.itemStore}>{((item.product as any)?.store_name) || ''}</Text>
+
+          {/* Low stock warning badge */}
+          {isLowStock && (
+            <View style={styles.lowStockBadge}>
+              <Ionicons name="warning-outline" size={12} color="#ea580c" />
+              <Text style={styles.lowStockText}>
+                Plus que {availableStock} en stock
+              </Text>
             </View>
-            <Pressable
-              style={styles.quantityBadge}
-              onPress={() => updateQuantity(item.product.id, item.quantity + 1)}
-              hitSlop={10}
-            >
-              <Text style={styles.quantityText}>+</Text>
-            </Pressable>
+          )}
+
+          <View style={styles.itemBottom}>
+            <Text style={styles.itemPrice}>{item.product.price.toLocaleString()} FCA</Text>
+            <View style={styles.quantityControls}>
+              <Pressable
+                style={[styles.quantityBadge, { backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border }]}
+                onPress={() => updateQuantity(item.product.id, item.quantity - 1)}
+                hitSlop={10}
+              >
+                <Text style={[styles.quantityText, { color: palette.text }]}>-</Text>
+              </Pressable>
+              <View style={[styles.quantityBadge, styles.quantityMiddle]}>
+                <Text style={styles.quantityText}>×{item.quantity}</Text>
+              </View>
+              <Pressable
+                style={[styles.quantityBadge, isAtMaxStock && { opacity: 0.4 }]}
+                onPress={handleIncrease}
+                hitSlop={10}
+              >
+                <Text style={styles.quantityText}>+</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
+        <Pressable style={styles.removeButton} onPress={() => removeItem(item.product.id)} hitSlop={10}>
+          <Ionicons name="trash-outline" size={20} color={palette.danger} />
+        </Pressable>
       </View>
-      <Pressable style={styles.removeButton} onPress={() => removeItem(item.product.id)} hitSlop={10}>
-        <Ionicons name="trash-outline" size={20} color={palette.danger} />
-      </Pressable>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -359,7 +407,11 @@ export const CartScreen: React.FC = () => {
               if (!multiStore) {
                 const [sid, group] = groups[0];
                 if (sid === 'unknown') {
-                  Alert.alert('Panier', 'Impossible de finaliser : boutique inconnue pour certains articles.');
+                  showAlert({
+                    type: 'error',
+                    title: 'Panier',
+                    message: 'Impossible de finaliser : boutique inconnue pour certains articles.',
+                  });
                   return;
                 }
                 navigation.navigate('Checkout', {
@@ -404,7 +456,11 @@ export const CartScreen: React.FC = () => {
                 });
               } catch (e: any) {
                 errorHandler.handle(e, 'bulk create orders failed', ErrorCategory.SYSTEM, ErrorSeverity.HIGH);
-                Alert.alert('Erreur', 'La création des commandes a échoué. Réessayez.');
+                showAlert({
+                  type: 'error',
+                  title: 'Erreur',
+                  message: 'La création des commandes a échoué. Réessayez.',
+                });
               } finally {
                 setProcessingBulk(false);
               }
@@ -424,6 +480,7 @@ export const CartScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+      {AlertModalComponent}
     </View>
   );
 };
@@ -722,6 +779,24 @@ function createCartStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FON
     fontWeight: '600',
     fontSize: FONT_SIZE.md,
     marginRight: SPACING.sm,
+  },
+  lowStockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#fff7ed',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: '#ffedd5',
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  lowStockText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ea580c',
   },
 });
 }

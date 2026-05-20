@@ -15,6 +15,7 @@ import {
   Linking,
   StatusBar,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store';
@@ -164,6 +165,7 @@ export const SellerDashboardScreen: React.FC = () => {
   const [summary, setSummary] = useState({ totalRevenue: 0, pendingOrders: 0, deliveredOrders: 0, lowStockCount: 0 });
   const [availableBalance, setAvailableBalance] = useState(0);
   const [showDashboardBalance, setShowDashboardBalance] = useState(true);
+  const [logoutModalVisible, setLogoutModalVisible] = React.useState(false);
 
   const sellerName = React.useMemo(() => {
     const fullName = String(user?.full_name || '').trim();
@@ -542,31 +544,23 @@ export const SellerDashboardScreen: React.FC = () => {
     }
   }, [effectiveSubscriptionEnd]);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setLogoutModalVisible(true);
+  };
+
+  const performLogout = async () => {
+    setLogoutModalVisible(false);
     try {
-      Alert.alert(
-        'Déconnexion',
-        'Êtes-vous sûr de vouloir vous déconnecter ?',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          {
-            text: 'Déconnecter',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await authService.signOut();
-                setUser(null);
-                setSession(null);
-                navigation.replace('Landing');
-              } catch (e) {
-                Alert.alert('Erreur', 'Impossible de se déconnecter');
-              }
-            }
-          }
-        ]
-      );
+      await authService.signOut();
+      setUser(null);
+      setSession(null);
+      navigation.replace('Landing');
     } catch (e) {
-      errorHandler.handleDatabaseError(e as any, 'Logout error:');
+      if (Platform.OS === 'web') {
+        alert('Impossible de se déconnecter');
+      } else {
+        Alert.alert('Erreur', 'Impossible de se déconnecter');
+      }
     }
   };
 
@@ -1460,6 +1454,40 @@ export const SellerDashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </>
       )}
+
+      {/* CUSTOM LOGOUT CONFIRMATION MODAL */}
+      <Modal
+        visible={logoutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: COLORS.card, borderColor: COLORS.border }]}>
+            <View style={[styles.modalHeaderIcon, { backgroundColor: COLORS.danger + '15' }]}>
+              <Ionicons name="log-out-outline" size={28} color={COLORS.danger} />
+            </View>
+            <Text style={[styles.modalTitle, { color: COLORS.text }]}>Déconnexion</Text>
+            <Text style={[styles.modalMessage, { color: COLORS.textSoft }]}>
+              Êtes-vous sûr de vouloir vous déconnecter de votre compte professionnel ?
+            </Text>
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton, { borderColor: COLORS.border }]}
+                onPress={() => setLogoutModalVisible(false)}
+              >
+                <Text style={[styles.modalCancelText, { color: COLORS.text }]}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton, { backgroundColor: COLORS.danger }]}
+                onPress={performLogout}
+              >
+                <Text style={styles.modalConfirmText}>Déconnexion</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1971,20 +1999,94 @@ const getStyles = (theme: any) => {
     alignItems: 'center',
     gap: 4,
   },
-  fab: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    ...(Platform.OS === 'web'
-      ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
-      : {
-          shadowColor: COLORS.accent,
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 8,
-        }),
-  },
+    fab: {
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      ...(Platform.OS === 'web'
+        ? { boxShadow: `0px 4px 8px ${COLORS.accent}4D` }
+        : {
+            shadowColor: COLORS.accent,
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 8,
+          }),
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.xl,
+    },
+    modalCard: {
+      width: '90%',
+      maxWidth: 380,
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: SPACING.xl,
+      alignItems: 'center',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.15,
+          shadowRadius: 20,
+        },
+        android: {
+          elevation: 10,
+        },
+        web: {
+          boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+        },
+      }),
+    },
+    modalHeaderIcon: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.md,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: SPACING.sm,
+      textAlign: 'center',
+    },
+    modalMessage: {
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
+      marginBottom: SPACING.lg,
+    },
+    modalButtonsRow: {
+      flexDirection: 'row',
+      width: '100%',
+      gap: SPACING.md,
+    },
+    modalButton: {
+      flex: 1,
+      height: 44,
+      borderRadius: RADIUS.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalCancelButton: {
+      borderWidth: 1,
+    },
+    modalCancelText: {
+      fontWeight: '700',
+      fontSize: 13,
+    },
+    modalConfirmButton: {},
+    modalConfirmText: {
+      color: '#ffffff',
+      fontWeight: '800',
+      fontSize: 13,
+    },
   });
 };

@@ -523,6 +523,7 @@ export const orderService = {
 
   async createBulkOrders(userId: string, groups: Record<string, any[]>, userMetadata: any) {
     const createdOrders: any[] = [];
+    const client = useSupabase();
     
     for (const [sid, group] of Object.entries(groups)) {
       const storeIdForOrder = sid === 'unknown' ? null : sid;
@@ -548,28 +549,44 @@ export const orderService = {
         tax_amount: tax,
       };
 
+      const itemsPayload = group.map((it: any) => ({
+        product_id: it.product.id,
+        quantity: it.quantity,
+        price: it.product.price,
+      }));
+
       let created: any;
       try {
-        created = await this.create(baseOrderPayload);
+        // Tentative d'insertion atomique avec verrouillage des stocks
+        const { data, error } = await client.rpc('create_order_atomic', {
+          p_order_payload: baseOrderPayload,
+          p_items_payload: itemsPayload
+        });
+        
+        if (error) throw error;
+        created = data;
       } catch (e: any) {
-        // Fallback for missing columns if schema is not updated
-        const msg = String(e?.message || '').toLowerCase();
-        if (msg.includes('customer_name') || msg.includes('column')) {
-          const { customer_name, ...payloadWithoutName } = baseOrderPayload;
-          created = await this.create(payloadWithoutName);
-        } else {
-          throw e;
+        // Fallback pour les environnements de dev ou si la RPC n'est pas dispo
+        console.warn('create_order_atomic RPC failed or not found, falling back to legacy insert', e?.message || e);
+        try {
+          created = await this.create(baseOrderPayload);
+        } catch (e2: any) {
+          const msg = String(e2?.message || '').toLowerCase();
+          if (msg.includes('customer_name') || msg.includes('column')) {
+            const { customer_name, ...payloadWithoutName } = baseOrderPayload;
+            created = await this.create(payloadWithoutName);
+          } else {
+            throw e2;
+          }
+        }
+
+        if (created?.id) {
+          const rows = itemsPayload.map((item: any) => ({ ...item, order_id: created.id }));
+          await this.createItems(rows);
         }
       }
 
       if (created?.id) {
-        const rows = group.map((it: any) => ({
-          order_id: created.id,
-          product_id: it.product.id,
-          quantity: it.quantity,
-          price: it.product.price,
-        }));
-        await this.createItems(rows);
         createdOrders.push(created);
         
         // Notify seller and customer

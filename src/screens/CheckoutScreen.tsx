@@ -28,12 +28,14 @@ import { locationService, LocationCoords } from '../services/locationService';
 import { couponService } from '../services/couponService';
 import { getStoreStatus } from '../utils/storeStatus';
 import { addressService } from '../services/addressService';
+import { useAlertModal } from '../components/AlertModal';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, showAuthModal } = useAuthStore();
   const { items: globalItems, getTotal, storeId: storeIdFromStore, clearCart } = useCartStore();
   const route = useRoute<any>();
+  const { show: showAlert, AlertModalComponent } = useAlertModal();
 
   // allow passing `itemsJson` or `items` in navigation to checkout a subset (per-store)
   const paramItems = (() => {
@@ -365,7 +367,11 @@ export const CheckoutScreen: React.FC = () => {
   const handleCompleteOnboarding = async () => {
     if (!user) return;
     if (!onboardingAddress.label.trim() || !onboardingAddress.city.trim() || !onboardingAddress.address.trim()) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires (*)');
+      showAlert({
+        type: 'error',
+        title: 'Erreur',
+        message: 'Veuillez remplir tous les champs obligatoires (*)'
+      });
       return;
     }
 
@@ -405,10 +411,10 @@ export const CheckoutScreen: React.FC = () => {
       }
 
       setIsOnboardingVisible(false);
-      Alert.alert('Succès', 'Votre profil de livraison a été créé avec succès !');
+      showAlert({ type: 'success', title: 'Succès', message: 'Votre profil de livraison a été créé avec succès !' });
     } catch (e) {
       errorHandler.handle(e, 'Complete onboarding failed');
-      Alert.alert('Erreur', 'Impossible de terminer la configuration de votre profil.');
+      showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de terminer la configuration de votre profil.' });
     } finally {
       setProcessing(false);
     }
@@ -470,10 +476,15 @@ export const CheckoutScreen: React.FC = () => {
           const ok = window.confirm('Connexion requise: veuillez vous connecter pour passer commande. Voulez-vous vous connecter maintenant ?');
           if (ok) showAuthModal({ type: 'CHECKOUT', payload: { params: route.params } });
         } else {
-          Alert.alert('Connexion requise', 'Veuillez vous connecter pour passer commande', [
-            { text: 'Se connecter', onPress: () => showAuthModal({ type: 'CHECKOUT', payload: { params: route.params } }) },
-            { text: 'Annuler', style: 'cancel' },
-          ]);
+          showAlert({
+            type: 'warning',
+            title: 'Connexion requise',
+            message: 'Veuillez vous connecter pour passer commande',
+            buttons: [
+              { text: 'Se connecter', onPress: () => showAuthModal({ type: 'CHECKOUT', payload: { params: route.params } }) },
+              { text: 'Annuler', style: 'cancel' },
+            ]
+          });
         }
         return;
       }
@@ -542,11 +553,7 @@ export const CheckoutScreen: React.FC = () => {
       setOrderSuccessModalVisible(true);
     } catch (e: any) {
       errorHandler.handle(e, 'place order failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        window.alert('Erreur: ' + (e?.message || 'Impossible de créer la commande'));
-      } else {
-        Alert.alert('Erreur', e?.message || 'Impossible de créer la commande');
-      }
+      showAlert({ type: 'error', title: 'Erreur', message: e?.message || 'Impossible de créer la commande' });
     } finally {
       if (!completed) setProcessing(false);
     }
@@ -665,10 +672,10 @@ export const CheckoutScreen: React.FC = () => {
                       if (addr.city) handleInputChange('city', addr.city);
                     }
                   } else {
-                    Alert.alert('Erreur', 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.');
+                    showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de récupérer votre position. Vérifiez vos paramètres GPS.' });
                   }
                 } catch(e) {
-                  Alert.alert('Erreur', 'Impossible de récupérer votre position.');
+                  showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de récupérer votre position.' });
                 } finally {
                   setProcessing(false);
                 }
@@ -931,10 +938,11 @@ export const CheckoutScreen: React.FC = () => {
               if (s) {
                 const status = getStoreStatus(s);
                 if (!status.isOpen) {
-                  Alert.alert(
-                    "Boutique fermée",
-                    `La boutique "${s.name}" est actuellement fermée${status.reason === 'paused' ? ' (en pause)' : ''}. Impossible de passer commande pour le moment.`
-                  );
+                  showAlert({
+                    type: 'error',
+                    title: 'Boutique fermée',
+                    message: `La boutique "${s.name}" est actuellement fermée${status.reason === 'paused' ? ' (en pause)' : ''}. Impossible de passer commande pour le moment.`
+                  });
                   return;
                 }
               }
@@ -947,33 +955,21 @@ export const CheckoutScreen: React.FC = () => {
                 const params = new URLSearchParams(window.location.search);
                 const raw = params.get('itemsJson') || params.get('items');
                 if (!raw || raw === '[object Object]') {
-                  if (typeof window !== 'undefined' && Platform.OS === 'web') {
-                    window.alert('Erreur: Impossible de lire le panier depuis l’URL. Retournez au panier et recommencez.');
-                  } else {
-                    Alert.alert('Erreur', 'Impossible de lire le panier depuis l’URL. Retournez au panier et recommencez.');
-                  }
+                  showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de lire le panier depuis l’URL. Retournez au panier et recommencez.' });
                   return;
                 }
                 try {
                   const recovered = JSON.parse(decodeURIComponent(raw));
                   if (!Array.isArray(recovered) || recovered.length === 0) {
-                    if (typeof window !== 'undefined' && Platform.OS === 'web') {
-                      window.alert('Erreur: Le panier est vide ou mal formé.');
-                    } else {
-                      Alert.alert('Erreur', 'Le panier est vide ou mal formé.');
-                    }
+                    showAlert({ type: 'error', title: 'Erreur', message: 'Le panier est vide ou mal formé.' });
                     return;
                   }
                 } catch (e) {
-                  if (typeof window !== 'undefined' && Platform.OS === 'web') {
-                    window.alert('Erreur: Impossible de décoder les articles de la commande.');
-                  } else {
-                    Alert.alert('Erreur', 'Impossible de décoder les articles de la commande.');
-                  }
+                  showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de décoder les articles de la commande.' });
                   return;
                 }
               } else {
-                Alert.alert('Erreur', 'Panier introuvable.');
+                showAlert({ type: 'error', title: 'Erreur', message: 'Panier introuvable.' });
                 return;
               }
             }
@@ -998,11 +994,7 @@ export const CheckoutScreen: React.FC = () => {
 
             if (Object.keys(newErrors).length > 0) {
               setErrors(newErrors);
-              if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                window.alert('Erreur: Veuillez corriger les champs marqués.');
-              } else {
-                Alert.alert('Erreur', 'Veuillez corriger les champs marqués.');
-              }
+              showAlert({ type: 'error', title: 'Erreur', message: 'Veuillez corriger les champs marqués.' });
               return;
             }
 
@@ -1011,6 +1003,49 @@ export const CheckoutScreen: React.FC = () => {
               setLocationConfirmVisible(true);
               return;
             }
+
+            // ─── Vérification finale du stock en temps réel ───────────────
+            try {
+              const activeItems: any[] = paramItems ?? items;
+              const stockIssues: string[] = [];
+
+              // Re-fetch stock pour chaque produit depuis Supabase
+              await Promise.all(
+                activeItems.map(async (it: any) => {
+                  try {
+                    const { productService } = await import('../services/productService');
+                    const latest = await productService.getById(String(it.product.id));
+                    const liveStock = typeof (latest as any)?.stock === 'number' ? (latest as any).stock : 9999;
+
+                    if (liveStock <= 0) {
+                      stockIssues.push(`❌ "${it.product.name}" est en rupture de stock.`);
+                    } else if (it.quantity > liveStock) {
+                      stockIssues.push(`⚠️ "${it.product.name}" : demandé ${it.quantity}, disponible ${liveStock}.`);
+                    }
+                  } catch (e) {
+                    // En cas d'erreur réseau, on laisse passer (best-effort)
+                    console.warn('stock check failed for product', it.product.id, e);
+                  }
+                })
+              );
+
+              if (stockIssues.length > 0) {
+                showAlert({
+                  type: 'warning',
+                  title: 'Stock insuffisant',
+                  message: `Impossible de valider votre commande :\n\n${stockIssues.join('\n')}\n\nVeuillez retourner au panier et ajuster les quantités.`,
+                  buttons: [
+                    { text: 'Retour au panier', onPress: () => navigation.navigate('Cart') },
+                    { text: 'OK', style: 'cancel' },
+                  ],
+                });
+                return;
+              }
+            } catch (e) {
+              // Si la vérif globale plante, on laisse executeOrder gérer
+              console.warn('global stock pre-check failed', e);
+            }
+            // ─────────────────────────────────────────────────────────────
 
             await executeOrder();
           }}
@@ -1060,7 +1095,7 @@ export const CheckoutScreen: React.FC = () => {
                   style={styles.onboardingNextBtn}
                   onPress={() => {
                     if (onboardingPhone.trim().length < 6) {
-                      Alert.alert('Erreur', 'Veuillez saisir un numéro de téléphone WhatsApp valide.');
+                      showAlert({ type: 'error', title: 'Erreur', message: 'Veuillez saisir un numéro de téléphone WhatsApp valide.' });
                       return;
                     }
                     setOnboardingStep(2);
@@ -1127,12 +1162,12 @@ export const CheckoutScreen: React.FC = () => {
                                 city: addr.city || prev.city || '',
                               }));
                             }
-                            Alert.alert('Succès', 'Votre position GPS a été enregistrée !');
+                            showAlert({ type: 'success', title: 'Succès', message: 'Votre position GPS a été enregistrée !' });
                           } else {
-                            Alert.alert('Erreur', 'Impossible de récupérer votre position GPS.');
+                            showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de récupérer votre position GPS.' });
                           }
                         } catch (e) {
-                          Alert.alert('Erreur', 'Impossible de récupérer votre position GPS.');
+                          showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de récupérer votre position GPS.' });
                         } finally {
                           setProcessing(false);
                         }
@@ -1273,6 +1308,7 @@ export const CheckoutScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {AlertModalComponent}
     </View>
   );
 };

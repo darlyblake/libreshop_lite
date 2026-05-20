@@ -361,6 +361,14 @@ export const AdminDashboardScreen: React.FC = () => {
       color: COLORS.textMuted,
       description: 'Configuration de la plateforme',
     },
+    { 
+      id: 'interfaces',
+      title: 'Gestion des interfaces', 
+      icon: 'shapes-outline' as const, 
+      screen: 'AdminInterfaces' as const,
+      color: COLORS.primary,
+      description: 'Activer, désactiver ou ajouter des types de boutiques',
+    },
   ];
 
   const onRefresh = useCallback(async () => {

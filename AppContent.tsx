@@ -6,6 +6,7 @@ import { ThemeProvider } from './src/components/ThemeProvider';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AppNavigator from './src/navigation/AppNavigator';
+import { GlobalAlertManager } from './src/components/GlobalAlertManager';
 
 export default function AppContent() {
   return (
@@ -13,6 +14,7 @@ export default function AppContent() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <ThemeProvider>
+            <GlobalAlertManager />
             <View style={{ flex: 1 }}>
               <AppNavigator />
             </View>

@@ -1049,7 +1049,6 @@ export const StoreDetailScreen: React.FC = () => {
                 {/* Welcome section */}
                 <View style={styles.welcomeSection}>
                   <Text style={styles.sectionTitle}>Bienvenue</Text>
-                  <Text style={styles.descriptionText}>{storeData.description}</Text>
                 </View>
 
                 {/* Featured/Recent Products */}

@@ -122,6 +122,7 @@ const AdminCitiesScreen = lazyLoad(() => import('../screens/AdminCitiesScreen'),
 const AdminBannersScreen = lazyLoad(() => import('../screens/AdminBannersScreen'), 'AdminBannersScreen');
 const AdminBannerFormScreen = lazyLoad(() => import('../screens/AdminBannerFormScreen'), 'AdminBannerFormScreen');
 const AdminAgentScreen = lazyLoad(() => import('../screens/AdminAgentScreen'), 'AdminAgentScreen');
+const AdminInterfacesScreen = lazyLoad(() => import('../screens/AdminInterfacesScreen'), 'AdminInterfacesScreen');
 
 // Other Lazy loaded screens
 const FeaturesScreen = lazyLoad(() => import('../screens/FeaturesScreen'), 'FeaturesScreen');
@@ -806,6 +807,7 @@ export const AppNavigator: React.FC = () => {
         
         {/* Routes admin */}
         <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />
+        <Stack.Screen name="AdminInterfaces" component={AdminInterfacesScreen} />
         <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
         <Stack.Screen name="AdminStores" component={AdminStoresScreen} />
         <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />

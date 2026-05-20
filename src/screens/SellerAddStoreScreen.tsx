@@ -30,6 +30,7 @@ import { countryService, type Country } from '../services/countryService';
 import { cityService, type City } from '../services/cityService';
 import { useAuthStore } from '../store';
 import { storeCreationDraftStorage } from '../lib/storage';
+import { settingsService } from '../services/settingsService';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { LocationPicker } from '../components/LocationPicker';
@@ -44,7 +45,7 @@ interface Category {
   slug: string;
   icon?: string;
   color?: string;
-  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
+  store_type?: string;
   subcategories?: Category[];
 }
 
@@ -52,7 +53,7 @@ interface FormData {
   name: string;
   slug: string;
   description: string;
-  store_type: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
+  store_type: string;
   category: string;
   email: string;
   phone: string;
@@ -76,19 +77,20 @@ const STORE_VALIDATION_RULES = {
   city_id: { required: true },
 };
 
-const STORE_TYPES = [
-  { id: 'general', title: '🛍️ Boutique', icon: 'storefront-outline' },
-  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline' },
-  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline' },
-  { id: 'hotel', title: '🏨 Hôtel', icon: 'bed-outline' },
-  { id: 'logement', title: '🏠 Logement', icon: 'home-outline' },
-] as const;
+const DEFAULT_STORE_TYPES = [
+  { id: 'general', title: '🛍️ Boutique', icon: 'storefront-outline', status: 'active' },
+  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline', status: 'avenir' },
+  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline', status: 'avenir' },
+  { id: 'hotel', title: '🏨 Hôtel', icon: 'bed-outline', status: 'avenir' },
+  { id: 'logement', title: '🏠 Logement', icon: 'home-outline', status: 'avenir' },
+];
 
 const SellerAddStoreScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { user } = useAuthStore();
   const scrollViewRef = useRef<ScrollView>(null);
   
+  const [storeTypes, setStoreTypes] = useState<any[]>(DEFAULT_STORE_TYPES);
   const [currentStep, setCurrentStep] = useState(1);
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [bannerUri, setBannerUri] = useState<string | null>(null);
@@ -189,9 +191,21 @@ const SellerAddStoreScreen: React.FC = () => {
   }, [values.slug]);
 
   useEffect(() => {
+    void loadStoreTypes();
     loadCategories();
     void loadCountries();
   }, []);
+
+  const loadStoreTypes = async () => {
+    try {
+      const types = await settingsService.getSetting('store_types', DEFAULT_STORE_TYPES);
+      const visibleTypes = types.filter((t: any) => t.status !== 'inactive');
+      setStoreTypes(visibleTypes);
+    } catch (e) {
+      console.error('Error loading dynamic store types:', e);
+      setStoreTypes(DEFAULT_STORE_TYPES.filter((t: any) => t.status !== 'inactive'));
+    }
+  };
 
   const loadCountries = async () => {
     try {
@@ -450,7 +464,7 @@ const SellerAddStoreScreen: React.FC = () => {
 
       <Text style={styles.inputLabel}>Type d'activité de la boutique</Text>
       <View style={styles.storeTypeContainer}>
-        {STORE_TYPES.map(type => (
+        {storeTypes.map(type => (
           <TouchableOpacity 
             key={type.id} 
             style={[
@@ -459,6 +473,13 @@ const SellerAddStoreScreen: React.FC = () => {
             ]}
             onPress={() => {
               void Haptics.selectionAsync();
+              if (type.status === 'avenir') {
+                Alert.alert(
+                  'Service indisponible',
+                  'Ce service est encore indisponible sur LibreShop. Il sera activé très prochainement !'
+                );
+                return;
+              }
               setFieldValue('store_type', type.id);
               setFieldValue('category', ''); // Reset category on type change
               setSelectedSubcategory('');

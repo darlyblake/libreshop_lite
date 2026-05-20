@@ -32,8 +32,9 @@ const getStyles = (theme: any) => {
       borderColor: COLORS.border,
       padding: SPACING.xl,
       alignItems: 'center',
-      minHeight: 200,
-      justifyContent: 'space-between',
+      height: 235,
+      width: '10%',
+      justifyContent: 'flex-start',
     },
     storeImageContainer: {
       marginBottom: SPACING.md,
@@ -229,8 +230,16 @@ export const StoreCard: React.FC<StoreCardProps> = React.memo(({
       </View>
       <Text style={styles.storeName}>{name}</Text>
       <Text style={styles.storeCategory}>{category}</Text>
-      {description && <Text style={styles.storeDescription}>{description}</Text>}
-      <View style={styles.statsContainer}>
+      <View style={{ height: 48, marginVertical: 8, width: '100%' }}>
+        <Text
+          style={styles.storeDescription}
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {description || ' '}
+        </Text>
+      </View>
+      <View style={[styles.statsContainer, { marginTop: 'auto' }]}>
         {orderCount !== undefined && orderCount > 0 && (
           <View style={[styles.statBadge, { backgroundColor: COLORS.success + '20' }]}>
             <Text style={[styles.statBadgeText, { color: COLORS.success }]}>📦 {orderCount}</Text>

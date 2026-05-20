@@ -33,6 +33,7 @@ export type RootStackParamList = {
   AdminBannerForm: { bannerId?: string };
   AgentChat: undefined;
   AdminAgentChat: undefined;
+  AdminInterfaces: undefined;
   Payment: { amount?: number; orderId?: string };
   BulkPayment: { orders?: any[] };
   ClientTabs: NavigatorScreenParams<ClientTabParamList>;

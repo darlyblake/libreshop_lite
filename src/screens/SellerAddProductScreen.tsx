@@ -16,8 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
-import { type Collection } from '../lib/supabase';
+import { type Category, type Collection } from '../lib/supabase';
 import { collectionService } from '../services/collectionService';
+import { categoryService } from '../services/categoryService';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
@@ -36,6 +37,7 @@ interface FormData {
   lowStockThreshold: string;
   reference: string;
   category: string;
+  subcategory: string;
   isActive: boolean;
   isOnlineSale: boolean;
   isPhysicalSale: boolean;
@@ -57,6 +59,10 @@ export const SellerAddProductScreen: React.FC = () => {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [collectionId, setCollectionId] = useState<string>('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
+  const [selectedSubcategoryId, setSelectedSubcategoryId] = useState<string>('');
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
@@ -66,6 +72,7 @@ export const SellerAddProductScreen: React.FC = () => {
     lowStockThreshold: '5',
     reference: '',
     category: '',
+    subcategory: '',
     isActive: true,
     isOnlineSale: true,
     isPhysicalSale: true,
@@ -132,7 +139,18 @@ export const SellerAddProductScreen: React.FC = () => {
         errorHandler.handleDatabaseError(e, 'loadStoreAndCollections');
       }
     };
+
+    const loadCategories = async () => {
+      try {
+        const cats = await categoryService.getByParent(null);
+        setCategories(cats || []);
+      } catch (e) {
+        errorHandler.handleDatabaseError(e, 'loadTopCategories');
+      }
+    };
+
     loadStoreAndCollections();
+    loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -156,6 +174,100 @@ export const SellerAddProductScreen: React.FC = () => {
       ]
     );
   };
+
+  const pickCategory = () => {
+    if (categories.length === 0) {
+      Alert.alert('Catégories non disponibles', 'Chargement des catégories en cours. Réessayez dans un instant.');
+      return;
+    }
+    Alert.alert(
+      'Choisir une catégorie',
+      undefined,
+      [
+        ...categories.slice(0, 8).map((cat) => ({
+          text: cat.name,
+          onPress: () => {
+            setSelectedCategoryId(cat.id);
+            setSelectedSubcategoryId('');
+            updateField('category', cat.name);
+            updateField('subcategory', '');
+          },
+        })),
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
+  };
+
+  const pickSubcategory = () => {
+    if (!selectedCategoryId) {
+      Alert.alert('Sélectionnez une catégorie d’abord', 'Choisissez d’abord une catégorie mère pour voir les sous-catégories.');
+      return;
+    }
+    if (subcategories.length === 0) {
+      Alert.alert('Aucune sous-catégorie', 'Cette catégorie ne contient pas de sous-catégories.');
+      return;
+    }
+    Alert.alert(
+      'Choisir une sous-catégorie',
+      undefined,
+      [
+        ...subcategories.slice(0, 8).map((sub) => ({
+          text: sub.name,
+          onPress: () => {
+            setSelectedSubcategoryId(sub.id);
+            updateField('subcategory', sub.name);
+          },
+        })),
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    );
+  };
+
+  useEffect(() => {
+    const loadSubcategories = async () => {
+      if (!selectedCategoryId) {
+        setSubcategories([]);
+        setSelectedSubcategoryId('');
+        updateField('subcategory', '');
+        return;
+      }
+      try {
+        const subs = await categoryService.getByParent(selectedCategoryId);
+        setSubcategories(subs || []);
+      } catch (e) {
+        errorHandler.handleDatabaseError(e, 'loadSubcategories');
+        setSubcategories([]);
+      }
+    };
+    loadSubcategories();
+  }, [selectedCategoryId]);
+
+  useEffect(() => {
+    const syncCollectionCategory = async () => {
+      if (!collectionId) return;
+      const selectedCol = collections.find((c) => c.id === collectionId);
+      if (!selectedCol?.category_id) return;
+
+      try {
+        const category = await categoryService.getById(selectedCol.category_id);
+        if (category.parent_id) {
+          const parent = await categoryService.getById(category.parent_id);
+          setSelectedCategoryId(parent.id);
+          updateField('category', parent.name);
+          setSelectedSubcategoryId(category.id);
+          updateField('subcategory', category.name);
+        } else {
+          setSelectedCategoryId(category.id);
+          updateField('category', category.name);
+          setSelectedSubcategoryId('');
+          updateField('subcategory', '');
+        }
+      } catch (e) {
+        console.warn('Failed to sync category from collection', e);
+      }
+    };
+    syncCollectionCategory();
+  }, [collectionId, collections]);
 
   const pickImages = async () => {
     try {
@@ -220,6 +332,7 @@ export const SellerAddProductScreen: React.FC = () => {
         low_stock_threshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : 5,
         reference: formData.reference,
         category: formData.category,
+        subcategory: formData.subcategory,
         is_active: formData.isActive,
         is_online_sale: formData.isOnlineSale,
         is_physical_sale: formData.isPhysicalSale,
@@ -287,6 +400,14 @@ export const SellerAddProductScreen: React.FC = () => {
           multiline
           numberOfLines={4}
         />
+        <TouchableOpacity onPress={pickCategory} style={[styles.collectionSelect, { marginBottom: SPACING.md }]} activeOpacity={0.8}>
+          <Text style={styles.collectionSelectLabel}>Catégorie *</Text>
+          <Text style={styles.collectionSelectValue}>{formData.category || 'Choisir une catégorie'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={pickSubcategory} style={[styles.collectionSelect, { marginBottom: SPACING.md }]} activeOpacity={0.8}>
+          <Text style={styles.collectionSelectLabel}>Sous-catégorie</Text>
+          <Text style={styles.collectionSelectValue}>{formData.subcategory || 'Choisir une sous-catégorie'}</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -365,7 +486,7 @@ export const SellerAddProductScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         <Input
-          label="Catégorie"
+          label="Catégorie (optionnel)"
           value={formData.category}
           onChangeText={(value) => updateField('category', value)}
           placeholder="Ex: Vêtements"

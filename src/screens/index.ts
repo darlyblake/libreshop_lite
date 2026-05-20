@@ -66,6 +66,7 @@ export { AdminCitiesScreen } from './AdminCitiesScreen';
 export { AdminBannersScreen } from './AdminBannersScreen';
 export { AdminBannerFormScreen } from './AdminBannerFormScreen';
 export { AdminAgentScreen } from './AdminAgentScreen';
+export { AdminInterfacesScreen } from './AdminInterfacesScreen';
 export { SellerChangePlanScreen } from './SellerChangePlanScreen';
 export { SellerAgentChatScreen } from './SellerAgentChatScreen';
 export { SellerReportsScreen } from './SellerReportsScreen';

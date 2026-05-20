@@ -27,7 +27,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useThemeRefresh } from '../hooks/useThemeRefresh';
 import { navigateToClientTab } from '../navigation/clientNavigation';
 import { errorHandler } from '../utils/errorHandler';
-import { StoreCard, ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase, SearchBar } from '../components';
+import { ProductCard, StoreCardSkeleton, ProductCardSkeleton, CategoryShowcase, SearchBar } from '../components';
 import { PWAInstallButton } from '../components/PWAInstallButton';
 import { PWAUpdateBanner } from '../components/PWAUpdateBanner';
 import { SortTabs } from '../components/SortTabs';
@@ -35,6 +35,7 @@ import { useResponsive } from '../utils/responsive';
 import { useClientHomeState } from '../hooks/useClientHomeState';
 import { Store, Product, HomeBanner, Collection } from '../lib/supabase';
 import { storeService } from '../services/storeService';
+import { storeStatsService } from '../services/storeStatsService';
 import { productService } from '../services/productService';
 import { homeBannerService } from '../services/homeBannerService';
 import { collectionService } from '../services/collectionService';
@@ -72,6 +73,16 @@ const normalizeHexColor = (value?: string | null) => {
   const v = String(value).trim();
   if (!v) return undefined;
   return v.startsWith('#') ? v : `#${v}`;
+};
+
+const mergeStoreStats = (store: Store, stats: any) => {
+  if (!stats) return store;
+  return {
+    ...store,
+    store_stats: [stats],
+    rating_avg: stats.rating_avg,
+    rating_count: stats.rating_count,
+  };
 };
 
 export const ClientHomeScreen: React.FC = () => {
@@ -278,9 +289,22 @@ export const ClientHomeScreen: React.FC = () => {
             } else {
               data = await storeService.getFeatured();
             }
-            if (data) {
-              dispatch({ type: 'SET_STORES', payload: data });
-              cacheService.set(CACHE_KEYS.STORES, data, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+            if (data && data.length > 0) {
+              const storeIds = data.map((store) => store.id).filter(Boolean);
+              let stats: any[] = [];
+              try {
+                stats = await storeStatsService.getByStores(storeIds);
+              } catch (err) {
+                console.warn('[ClientHome] Error loading store stats:', err);
+              }
+              const statsById = (stats || []).reduce((acc, stat) => {
+                acc[stat.store_id] = stat;
+                return acc;
+              }, {} as Record<string, any>);
+
+              const enrichedStores = (data || []).map((store) => mergeStoreStats(store, statsById[store.id]));
+              dispatch({ type: 'SET_STORES', payload: enrichedStores });
+              cacheService.set(CACHE_KEYS.STORES, enrichedStores, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
             }
             return data;
           })(),
@@ -459,8 +483,21 @@ export const ClientHomeScreen: React.FC = () => {
           data = await categoryService.getStoresByCategory(category, 5);
         }
         if (data && data.length > 0) {
-          dispatch({ type: 'SET_STORES', payload: data });
-          cacheService.set(CACHE_KEYS.STORES, data, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+          const storeIds = data.map((store) => store.id).filter(Boolean);
+          let stats: any[] = [];
+          try {
+            stats = await storeStatsService.getByStores(storeIds);
+          } catch (err) {
+            console.warn('[ClientHome] Error loading store stats:', err);
+          }
+          const statsById = (stats || []).reduce((acc, stat) => {
+            acc[stat.store_id] = stat;
+            return acc;
+          }, {} as Record<string, any>);
+
+          const enrichedStores = data.map((store) => mergeStoreStats(store, statsById[store.id]));
+          dispatch({ type: 'SET_STORES', payload: enrichedStores });
+          cacheService.set(CACHE_KEYS.STORES, enrichedStores, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
         }
       } catch (e) {
         console.error('Error filtering stores by category:', e);
@@ -544,15 +581,124 @@ export const ClientHomeScreen: React.FC = () => {
     );
   }, [selectedCollection, styles.categoryChip, styles.categoryChipActive, styles.categoryChipText, styles.categoryChipTextActive, handleCategoryPress]);
 
-  const renderStoreCard = useCallback(({ item }: { item: Store }) => (
-    <StoreCard
-      name={item.name}
-      category={item.category}
-      description={item.description}
-      logoUrl={item.logo_url}
-      onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
-    />
-  ), [navigation]);
+  const renderStars = useCallback((rating: number) => {
+    const filledStars = Math.floor(rating);
+    return (
+      <View style={styles.starsRow}>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Ionicons
+            key={index}
+            name={index < filledStars ? 'star' : 'star-outline'}
+            size={13}
+            color={palette.accent}
+          />
+        ))}
+      </View>
+    );
+  }, [palette.accent, styles.starsRow]);
+
+  // Calcul des dimensions responsive
+  const storeCardWidth = isDesktop ? 220 : isTablet ? 200 : 180;
+
+  const renderStoreCard = useCallback(({ item, index }: { item: Store; index: number }) => {
+    const stats = Array.isArray(item.store_stats) ? item.store_stats[0] : item.store_stats;
+    const ratingAvg = item.rating_avg ?? stats?.rating_avg ?? 0;
+    const ratingCount = item.rating_count ?? stats?.rating_count ?? 0;
+    const productsCount = item.products_count ?? stats?.products_count ?? 0;
+    const logoUrl = item.logo_url;
+    const bannerUrl = item.banner_url;
+    const createdAt = (item as any).created_at || (item as any).inserted_at || null;
+    const isNew = createdAt ? (Date.now() - new Date(createdAt).getTime()) < 1000 * 60 * 60 * 24 * 30 : false;
+    const isPopular = (ratingCount || 0) > 30 || (stats?.followers_count || 0) > 100;
+    return (
+      <View key={item.id} style={[styles.storeCardOuter, { width: storeCardWidth }]}> 
+        <TouchableOpacity
+          activeOpacity={0.87}
+          style={styles.storeCard}
+          onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
+        >
+          <View style={styles.storeMedia}>
+            {bannerUrl ? (
+              <Image
+                source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }}
+                style={styles.storeBanner}
+                resizeMode="cover"
+              />
+            ) : (
+              <LinearGradient
+                colors={[palette.accent + '30', palette.accent + '08']}
+                style={styles.storeBannerPlaceholder}
+              />
+            )}
+
+            <View style={styles.storeLogoWrap}>
+              {logoUrl ? (
+                <Image
+                  source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }}
+                  style={styles.storeLogo}
+                />
+              ) : (
+                <View style={styles.storeLogoPlaceholder}>
+                  <Ionicons name="storefront" size={22} color={palette.accent} />
+                </View>
+              )}
+            </View>
+
+            {item.verified && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={16} color={palette.success} />
+              </View>
+            )}
+
+            {/* Rating badge overlay */}
+            <View style={styles.bannerRatingBadge}>
+              <Ionicons name="star" size={12} color="white" />
+              <Text style={styles.bannerRatingText}>{ratingAvg ? ratingAvg.toFixed(1) : '0.0'}</Text>
+              <Text style={styles.bannerRatingCount}>({ratingCount})</Text>
+            </View>
+          </View>
+
+          <View style={styles.storeBody}>
+            <View style={styles.storeTopRow}>
+              <Text numberOfLines={1} style={styles.storeName}>{item.name}</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <View style={[styles.categoryPill, isPopular ? styles.popularBadge : isNew ? styles.newBadge : {}]}>
+                <Text numberOfLines={1} style={[styles.categoryPillText, isPopular || isNew ? { color: 'white' } : {}]}>
+                  {isPopular ? 'Populaire' : isNew ? 'Nouveau' : (item.category ?? 'Boutique')}
+                </Text>
+              </View>
+              {stats?.followers_count ? (
+                <View style={styles.followerPill}>
+                  <Ionicons name="people" size={12} color={palette.textMuted} />
+                  <Text style={styles.followerText}>{stats.followers_count}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {item.description ? (
+              <Text numberOfLines={2} style={styles.storeDesc}>{item.description}</Text>
+            ) : null}
+
+            <View style={styles.statsRow}>
+              <View style={styles.ratingContainer}>
+                {renderStars(ratingAvg)}
+                <Text style={styles.ratingText}>{ratingAvg ? ratingAvg.toFixed(1) : '0.0'}</Text>
+                <Text style={styles.ratingCount}>({ratingCount})</Text>
+              </View>
+              {productsCount > 0 && (
+                <View style={styles.productsCount}>
+                  <Ionicons name="cube-outline" size={12} color={palette.textMuted} />
+                  <Text style={styles.productsCountText}>{productsCount}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  }, [navigation, palette.accent, palette.success, palette.textMuted, renderStars, storeCardWidth, styles]);
 
   const renderProductCard = useCallback(({ item }: { item: any }) => (
     <View style={[styles.productCardWrapper, { width: responsiveProductCardWidth }]}>
@@ -568,9 +714,6 @@ export const ClientHomeScreen: React.FC = () => {
       </Text>
     </View>
   ), [responsiveProductCardWidth, styles.productCardWrapper, styles.storeNameLabel, navigation]);
-
-  // Calcul des dimensions responsive
-  const storeCardWidth = isDesktop ? 220 : isTablet ? 200 : 180;
 
   // Header Component de la FlatList (regroupe tout sauf la grille de produits principale)
   const renderHeader = useCallback(() => {
@@ -747,7 +890,17 @@ export const ClientHomeScreen: React.FC = () => {
         {/* Categories */}
         <View style={styles.categoriesSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Catégories populaires</Text>
+            <View style={styles.sectionTitleContainer}>
+              <LinearGradient
+                colors={[palette.accent, palette.accent2 || palette.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.sectionIconBackground}
+              >
+                <Ionicons name="grid" size={20} color="white" />
+              </LinearGradient>
+              <Text style={styles.sectionTitle}>Catégories populaires</Text>
+            </View>
             <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
               <Text style={styles.seeAll}>Voir tout</Text>
             </TouchableOpacity>
@@ -764,13 +917,23 @@ export const ClientHomeScreen: React.FC = () => {
         {/* Featured Stores */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Boutiques populaires</Text>
-              <Text style={styles.sectionSubtitle}>
-                {selectedCategory && selectedCategory !== 'Toutes' 
-                  ? `Dans ${selectedCategory}`
-                  : 'Le meilleur du commerce local'}
-              </Text>
+            <View style={styles.sectionTitleWrapper}>
+              <LinearGradient
+                colors={[palette.accent, palette.accent2 || palette.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.sectionIconBackground}
+              >
+                <Ionicons name="storefront" size={20} color="white" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.sectionTitle}>Boutiques les plus visitées</Text>
+                <Text style={styles.sectionSubtitle}>
+                  {selectedCategory && selectedCategory !== 'Toutes' 
+                    ? `Dans ${selectedCategory}`
+                    : 'Le meilleur du commerce local'}
+                </Text>
+              </View>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
               <Text style={styles.seeAll}>Tout voir</Text>
@@ -792,18 +955,7 @@ export const ClientHomeScreen: React.FC = () => {
                 <Text style={styles.emptyText}>Aucune boutique pour cette catégorie</Text>
               </View>
             ) : (
-              stores.slice(0, 5).map((item) => (
-                <StoreCard
-                  key={item.id}
-                  name={item.name}
-                  category={item.category}
-                  description={item.description}
-                  logoUrl={item.logo_url}
-                  orderCount={item.total_orders || (Array.isArray(item.store_stats) ? item.store_stats[0]?.customers_count : item.store_stats?.customers_count) || 0}
-                  followersCount={(Array.isArray(item.store_stats) ? item.store_stats[0]?.followers_count : item.store_stats?.followers_count) || 0}
-                  onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
-                />
-              ))
+              stores.slice(0, 5).map((item, index) => renderStoreCard({ item, index }))
             )}
           </ScrollView>
         </View>
@@ -911,9 +1063,19 @@ export const ClientHomeScreen: React.FC = () => {
         {/* Featured Products Header */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Produits</Text>
-              <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
+            <View style={styles.sectionTitleWrapper}>
+              <LinearGradient
+                colors={[palette.accent, palette.accent2 || palette.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.sectionIconBackground}
+              >
+                <Ionicons name="pricetag" size={20} color="white" />
+              </LinearGradient>
+              <View>
+                <Text style={styles.sectionTitle}>Les plus vendus</Text>
+                <Text style={styles.sectionSubtitle}>Les tendances du moment</Text>
+              </View>
             </View>
             <TouchableOpacity onPress={() => navigation.navigate('ClientAllProducts')}>
               <Text style={styles.seeAll}>Voir tout</Text>
@@ -1341,12 +1503,34 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: SPACING.xl,
-      marginBottom: SPACING.md,
+      marginBottom: SPACING.lg,
+    },
+    sectionTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+    },
+    sectionTitleWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      flex: 1,
+    },
+    sectionIconBackground: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0px 4px 12px rgba(0,0,0,0.15)' }
+        : { elevation: 5 }),
     },
     sectionTitle: {
       fontSize: FONT_SIZE.lg,
-      fontWeight: '700',
+      fontWeight: '800',
       color: palette.text,
+      letterSpacing: 0.5,
     },
     sectionSubtitle: {
       fontSize: FONT_SIZE.xs,
@@ -1356,7 +1540,7 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
     seeAll: {
       fontSize: FONT_SIZE.sm,
       color: palette.accent,
-      fontWeight: '600',
+      fontWeight: '700',
     },
     categoriesList: {
       paddingHorizontal: SPACING.xl,
@@ -1385,11 +1569,12 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
 
     // Sections
     section: {
-      marginBottom: SPACING.xl,
+      marginBottom: SPACING.xl * 1.2,
     },
     storesList: {
       paddingHorizontal: SPACING.xl,
-      gap: SPACING.md,
+      gap: SPACING.lg,
+      paddingVertical: SPACING.sm,
     },
     productsList: {
       paddingHorizontal: SPACING.xl,
@@ -1397,6 +1582,7 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       flexWrap: 'wrap',
       justifyContent: 'space-between',
       gap: SPACING.md,
+      paddingVertical: SPACING.md,
       ...(Platform.OS === 'web' && {
         WebkitOverflowScrolling: 'touch',
         overflow: 'visible',
@@ -1415,15 +1601,212 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       marginTop: 4,
       paddingHorizontal: 2,
     },
+    storeCardOuter: {
+      marginRight: SPACING.md,
+      marginBottom: SPACING.md,
+    },
+    storeCard: {
+      backgroundColor: palette.card,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: palette.border,
+      overflow: 'hidden',
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0px 6px 20px rgba(0,0,0,0.12)' }
+        : { boxShadow: '0px 6px 20px rgba(0, 0, 0, 0.12)', elevation: 6 }),
+    },
+    storeMedia: {
+      height: 110,
+      width: '100%',
+      position: 'relative',
+      backgroundColor: palette.bg,
+    },
+    storeBanner: {
+      width: '100%',
+      height: '100%',
+    },
+    storeBannerPlaceholder: {
+      width: '100%',
+      height: '100%',
+    },
+    storeLogoWrap: {
+      position: 'absolute',
+      left: SPACING.md,
+      bottom: -24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      borderWidth: 3,
+      borderColor: palette.card,
+      backgroundColor: palette.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0px 4px 12px rgba(0,0,0,0.15)' }
+        : { boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)', elevation: 5 }),
+    },
+    storeLogo: {
+      width: '100%',
+      height: '100%',
+    },
+    storeLogoPlaceholder: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: palette.bg,
+    },
+    verifiedBadge: {
+      position: 'absolute',
+      top: SPACING.sm,
+      right: SPACING.sm,
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      padding: 2,
+    },
+    storeBody: {
+      paddingHorizontal: SPACING.md,
+      paddingTop: 36,
+      paddingBottom: SPACING.md,
+    },
+    storeTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+    },
+    storeName: {
+      flex: 1,
+      fontSize: FONT_SIZE.md,
+      fontWeight: '800',
+      color: palette.text,
+      letterSpacing: 0.3,
+    },
+    categoryPill: {
+      alignSelf: 'flex-start',
+      marginBottom: SPACING.sm,
+      backgroundColor: 'rgba(0,0,0,0.05)',
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+      borderRadius: RADIUS.sm,
+    },
+    categoryPillText: {
+      fontSize: FONT_SIZE.xs,
+      color: palette.accent,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    storeDesc: {
+      fontSize: FONT_SIZE.xs,
+      color: palette.textSoft,
+      lineHeight: 16,
+      marginBottom: SPACING.sm,
+      fontWeight: '400',
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: SPACING.sm,
+      paddingTop: SPACING.sm,
+      borderTopWidth: 1,
+      borderTopColor: palette.border,
+    },
+    ratingContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    starsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 1,
+    },
+    ratingText: {
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '700',
+      color: palette.text,
+      marginLeft: 3,
+    },
+    bannerRatingBadge: {
+      position: 'absolute',
+      right: SPACING.md,
+      bottom: SPACING.md,
+      backgroundColor: palette.accent,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+      borderRadius: RADIUS.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      ...(Platform.OS === 'web' ? { boxShadow: '0 6px 18px rgba(0,0,0,0.12)' } : { elevation: 6 }),
+    },
+    bannerRatingText: {
+      color: 'white',
+      fontWeight: '800',
+      fontSize: FONT_SIZE.xs,
+      marginLeft: 4,
+    },
+    bannerRatingCount: {
+      color: 'rgba(255,255,255,0.9)',
+      fontSize: FONT_SIZE.xs - 2,
+      marginLeft: 4,
+    },
+    popularBadge: {
+      backgroundColor: palette.danger, // warm color
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+    },
+    newBadge: {
+      backgroundColor: palette.success,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+    },
+    followerPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: palette.card,
+      borderRadius: RADIUS.sm,
+      paddingHorizontal: SPACING.xs,
+      paddingVertical: SPACING.xs,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    followerText: {
+      marginLeft: SPACING.xs / 2,
+      color: palette.textMuted,
+      fontSize: FONT_SIZE.xs,
+      fontWeight: '600',
+    },
+    ratingCount: {
+      fontSize: FONT_SIZE.xs,
+      color: palette.textMuted,
+    },
+    productsCount: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    productsCountText: {
+      fontSize: FONT_SIZE.xs,
+      color: palette.textMuted,
+    },
 
     // Promo Banner
     promoBanner: {
       flexDirection: 'row',
       marginHorizontal: SPACING.xl,
       marginBottom: SPACING.xl,
+      marginTop: SPACING.lg,
       borderRadius: RADIUS.lg,
       overflow: 'hidden',
-      height: 140,
+      height: 160,
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0px 8px 24px rgba(0,0,0,0.15)' }
+        : { elevation: 8 }),
     },
     promoContent: {
       flex: 1,
@@ -1434,30 +1817,35 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
       fontSize: FONT_SIZE.lg,
       fontWeight: '800',
       color: palette.text,
-      marginBottom: 4,
+      marginBottom: 6,
+      letterSpacing: 0.3,
     },
     promoSubtitle: {
       fontSize: FONT_SIZE.sm,
-      color: 'rgba(255,255,255,0.9)',
+      color: 'rgba(255,255,255,0.95)',
       marginBottom: SPACING.md,
+      fontWeight: '500',
     },
     promoButton: {
       flexDirection: 'row',
       alignItems: 'center',
       alignSelf: 'flex-start',
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      paddingHorizontal: SPACING.md,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      paddingHorizontal: SPACING.lg,
       paddingVertical: SPACING.sm,
       borderRadius: RADIUS.full,
       gap: SPACING.xs,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.4)',
     },
     promoButtonText: {
       fontSize: FONT_SIZE.sm,
-      fontWeight: '600',
-      color: palette.text,
+      fontWeight: '700',
+      color: 'white',
+      letterSpacing: 0.3,
     },
     promoImage: {
-      width: 120,
+      width: 140,
       height: '100%',
     },
 
@@ -1614,35 +2002,45 @@ function createClientHomeStyles(palette: LegacyPalette, SPACING: any, RADIUS: an
 
     // AI Recommendations
     recommendationsSection: {
-      marginBottom: SPACING.xl,
+      marginBottom: SPACING.xl * 1.2,
+      backgroundColor: 'rgba(0,0,0,0.02)',
+      paddingVertical: SPACING.lg,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderTopColor: palette.border,
+      borderBottomColor: palette.border,
     },
     recommendationsList: {
       paddingLeft: SPACING.xl,
       paddingRight: SPACING.md,
       gap: SPACING.md,
-      paddingBottom: SPACING.xs,
+      paddingBottom: SPACING.md,
     },
     recommendedCardWrapper: {
       width: 170,
       gap: SPACING.xs,
     },
     aiBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
       borderRadius: RADIUS.sm,
       justifyContent: 'center',
       alignItems: 'center',
+      ...(Platform.OS === 'web'
+        ? { boxShadow: '0px 2px 8px rgba(0,0,0,0.1)' }
+        : { elevation: 2 }),
     },
     aiBadgeText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: '#ffffff',
+      letterSpacing: 0.3,
     },
     aiReasonContainer: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: 4,
-      marginTop: 2,
+      gap: 5,
+      marginTop: 3,
       paddingHorizontal: SPACING.xs,
     },
     aiReasonText: {

@@ -4,7 +4,7 @@ const IGNORED_PATTERNS: RegExp[] = [
   /translate\.google\.com/, // blocked translate requests
   /gen204/, // translate gen204 pings
   /net::ERR_BLOCKED_BY_CLIENT/, // adblock-type errors
-  /cacheMonitor/, // our cache monitor verbose logs
+  /^\[SkiaLoader\]/, // non-critical Skia loader messages
   /WebSocket connection to 'ws:\/\/localhost:\d+\/(hot|message)' failed/, // HMR websocket noise
   /AuthApiError/, // supabase refresh token expiry
   /Invalid Refresh Token/,
