@@ -110,21 +110,28 @@ export const ClientHomeScreen: React.FC = () => {
   const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
+  // Stabilized recommendations loading - only changes when user changes
+  const userIdRef = useRef(user?.id);
+  useEffect(() => {
+    userIdRef.current = user?.id;
+  }, [user?.id]);
+
   const loadRecommendations = useCallback(async () => {
     try {
       setLoadingRecommendations(true);
-      const data = await recommendationService.getRecommendations(user?.id || null);
+      const data = await recommendationService.getRecommendations(userIdRef.current || null);
       setRecommendations(data || []);
     } catch (e) {
       console.warn("[ClientHome] Failed to load recommendations:", e);
     } finally {
       setLoadingRecommendations(false);
     }
-  }, [user?.id]);
+  }, []);
 
+  // Load recommendations when user changes
   useEffect(() => {
     loadRecommendations();
-  }, [loadRecommendations]);
+  }, [user?.id, loadRecommendations]);
 
   // Destructure state for easier reading
   const {
@@ -233,43 +240,42 @@ export const ClientHomeScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [carouselBanners.length, isPaused]);
 
-  // Cache loading logic
-  const loadCachedData = useCallback(async () => {
-    try {
-      const [cachedCarousel, cachedPromo, cachedStores, cachedProducts, cachedCats, cachedColls] = await Promise.all([
-        cacheService.get<HomeBanner[]>(CACHE_KEYS.CAROUSEL),
-        cacheService.get<HomeBanner[]>(CACHE_KEYS.PROMO),
-        cacheService.get<Store[]>(CACHE_KEYS.STORES),
-        cacheService.get<Product[]>(CACHE_KEYS.PRODUCTS),
-        cacheService.get<string[]>(CACHE_KEYS.CATEGORIES),
-        cacheService.get<Collection[]>(CACHE_KEYS.COLLECTIONS),
-      ]);
-
-      if (cachedCarousel || cachedPromo) {
-        dispatch({
-          type: 'SET_BANNERS',
-          payload: {
-            carousel: cachedCarousel || [],
-            promo: cachedPromo || [],
-          },
-        });
-      }
-      if (cachedStores) dispatch({ type: 'SET_STORES', payload: cachedStores });
-      if (cachedProducts) dispatch({ type: 'SET_PRODUCTS', payload: cachedProducts });
-      if (cachedCats) dispatch({ type: 'SET_CATEGORIES', payload: cachedCats });
-      if (cachedColls) dispatch({ type: 'SET_COLLECTIONS', payload: cachedColls });
-
-      if (cachedProducts || cachedStores) {
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    } catch (e) {
-      console.warn('[ClientHome] Failed to load cached data:', e);
-    }
-  }, [dispatch]);
-
+  // Cache loading logic - only on mount
   useEffect(() => {
+    const loadCachedData = async () => {
+      try {
+        const [cachedCarousel, cachedPromo, cachedStores, cachedProducts, cachedCats, cachedColls] = await Promise.all([
+          cacheService.get<HomeBanner[]>(CACHE_KEYS.CAROUSEL),
+          cacheService.get<HomeBanner[]>(CACHE_KEYS.PROMO),
+          cacheService.get<Store[]>(CACHE_KEYS.STORES),
+          cacheService.get<Product[]>(CACHE_KEYS.PRODUCTS),
+          cacheService.get<string[]>(CACHE_KEYS.CATEGORIES),
+          cacheService.get<Collection[]>(CACHE_KEYS.COLLECTIONS),
+        ]);
+
+        if (cachedCarousel || cachedPromo) {
+          dispatch({
+            type: 'SET_BANNERS',
+            payload: {
+              carousel: cachedCarousel || [],
+              promo: cachedPromo || [],
+            },
+          });
+        }
+        if (cachedStores) dispatch({ type: 'SET_STORES', payload: cachedStores });
+        if (cachedProducts) dispatch({ type: 'SET_PRODUCTS', payload: cachedProducts });
+        if (cachedCats) dispatch({ type: 'SET_CATEGORIES', payload: cachedCats });
+        if (cachedColls) dispatch({ type: 'SET_COLLECTIONS', payload: cachedColls });
+
+        if (cachedProducts || cachedStores) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      } catch (e) {
+        console.warn('[ClientHome] Failed to load cached data:', e);
+      }
+    };
     loadCachedData();
-  }, [loadCachedData]);
+  }, []);
 
   // Load data from Supabase with high resilience
   const loadData = useCallback(
@@ -375,7 +381,7 @@ export const ClientHomeScreen: React.FC = () => {
         dispatch({ type: 'SET_REFRESHING', payload: false });
       }
     },
-    [dispatch, productSort, selectedCategory, products.length, stores.length, loadRecommendations]
+    [dispatch, productSort, selectedCategory, loadRecommendations]
   );
 
   useEffect(() => {
@@ -1232,11 +1238,11 @@ export const ClientHomeScreen: React.FC = () => {
         </View>
       ) : (
         <FlatList
-          key={`products-grid-${numProductColumns}`}
           data={products}
           renderItem={renderProductCard}
           keyExtractor={(item) => item.id}
           numColumns={numProductColumns}
+          key={numProductColumns}
           ListHeaderComponent={renderHeader}
           ListFooterComponent={renderFooter}
           refreshing={refreshing}
@@ -1251,7 +1257,7 @@ export const ClientHomeScreen: React.FC = () => {
           
           // Performance Tuning Options:
           initialNumToRender={6}
-          maxToRenderPerBatch={8}
+          maxToRenderPerBatch={3}
           windowSize={5}
           removeClippedSubviews={Platform.OS !== 'web'}
           updateCellsBatchingPeriod={50}

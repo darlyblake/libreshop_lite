@@ -773,6 +773,35 @@ export const StoreDetailScreen: React.FC = () => {
     return [...products].reverse().slice(0, 4);
   }, [products]);
 
+  const productsGrid = useMemo(
+    () => (
+      <View style={styles.productsGrid}>
+        {paginatedProducts.map((p) => {
+          const product = mapProductToCard(p);
+          return (
+            <View
+              key={product.id}
+              style={[styles.productCardWrapper, { width: cardWidth }]}
+            >
+              <ProductCard
+                name={product.name}
+                price={product.price}
+                comparePrice={product.comparePrice}
+                imageUrl={product.imageUrl}
+                onPress={() =>
+                  navigation.navigate("ProductDetail", {
+                    productId: product.id,
+                  })
+                }
+              />
+            </View>
+          );
+        })}
+      </View>
+    ),
+    [paginatedProducts, cardWidth, navigation],
+  );
+
   const ratingAvg =
     typeof storeStats?.rating_avg === "number" ? storeStats.rating_avg : 0;
   const ratingCount =
@@ -1198,31 +1227,7 @@ export const StoreDetailScreen: React.FC = () => {
                   </View>
                 )}
 
-              {useMemo(() => (
-                <View style={styles.productsGrid}>
-                  {paginatedProducts.map((p) => {
-                    const product = mapProductToCard(p);
-                    return (
-                      <View
-                        key={product.id}
-                        style={[styles.productCardWrapper, { width: cardWidth }]}
-                      >
-                        <ProductCard
-                          name={product.name}
-                          price={product.price}
-                          comparePrice={product.comparePrice}
-                          imageUrl={product.imageUrl}
-                          onPress={() =>
-                            navigation.navigate("ProductDetail", {
-                              productId: product.id,
-                            })
-                          }
-                        />
-                      </View>
-                    );
-                  })}
-                </View>
-              ), [paginatedProducts, cardWidth, navigation])}
+              {productsGrid}
             </View>
 
             {/* Load More */}
