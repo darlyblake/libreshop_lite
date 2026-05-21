@@ -277,6 +277,47 @@ export const ClientHomeScreen: React.FC = () => {
     loadCachedData();
   }, []);
 
+  // Load banners independently - only once on mount, never refresh
+  useEffect(() => {
+    const loadBanners = async () => {
+      try {
+        const [carousel, promo] = await Promise.all([
+          homeBannerService.getActiveByPlacement('carousel').catch(() => []),
+          homeBannerService.getActiveByPlacement('promo').catch(() => []),
+        ]);
+
+        if (carousel?.length) {
+          // Prefetch carousel images to avoid reloads during scroll
+          try {
+            const urls = (carousel || []).map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
+            try {
+              await (OptimizedImage as any).preload(urls);
+            } catch (e) {
+              // ignore prefetch errors
+            }
+          } catch (e) {
+            // ignore prefetch errors
+          }
+
+          dispatch({
+            type: 'SET_BANNERS',
+            payload: {
+              carousel,
+              promo: promo || [],
+            },
+          });
+          cacheService.set(CACHE_KEYS.CAROUSEL, carousel, CACHE_TTL.CAROUSEL.duration, CACHE_TTL.CAROUSEL.stale);
+        }
+        if (promo?.length) {
+          cacheService.set(CACHE_KEYS.PROMO, promo, CACHE_TTL.PROMO.duration, CACHE_TTL.PROMO.stale);
+        }
+      } catch (e) {
+        console.warn('[ClientHome] Failed to load banners:', e);
+      }
+    };
+    loadBanners();
+  }, []); // Only run once on mount
+
   // Load data from Supabase with high resilience
   const loadData = useCallback(
     async (refresh = false) => {
@@ -286,7 +327,7 @@ export const ClientHomeScreen: React.FC = () => {
         loadRecommendations();
 
         // Parallel data loading with individual error handling
-        const [storesResult, productsResult, bannersResult] = await Promise.allSettled([
+        const [storesResult, productsResult] = await Promise.allSettled([
           // Load stores based on selected category
           (async () => {
             let data;
@@ -328,44 +369,19 @@ export const ClientHomeScreen: React.FC = () => {
             }
             return result;
           }),
-          Promise.all([
-            homeBannerService.getActiveByPlacement('carousel').catch(() => []),
-            homeBannerService.getActiveByPlacement('promo').catch(() => []),
-            categoryService.getPopularCategories(6).catch(() => []),
-          ]).then(async ([carousel, promo, cats]) => {
-            if (carousel?.length) {
-              // Prefetch carousel images to avoid reloads during scroll
-              try {
-                const urls = (carousel || []).map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
-                // Try FastImage.preload when available, else Image.prefetch
-                try {
-                  await (OptimizedImage as any).preload(urls);
-                } catch (e) {
-                  // ignore prefetch errors
-                }
-              } catch (e) {
-                // ignore prefetch errors
-              }
-
-              dispatch({
-                type: 'SET_BANNERS',
-                payload: {
-                  carousel,
-                  promo: promo || [],
-                },
-              });
-              cacheService.set(CACHE_KEYS.CAROUSEL, carousel, CACHE_TTL.CAROUSEL.duration, CACHE_TTL.CAROUSEL.stale);
-            }
-            if (promo?.length) {
-              cacheService.set(CACHE_KEYS.PROMO, promo, CACHE_TTL.PROMO.duration, CACHE_TTL.PROMO.stale);
-            }
-            if (cats?.length) {
-              const catNames = ['Toutes', ...cats.map(c => c.name)];
-              dispatch({ type: 'SET_CATEGORIES', payload: catNames });
-              cacheService.set(CACHE_KEYS.CATEGORIES, catNames, CACHE_TTL.CATEGORIES.duration, CACHE_TTL.CATEGORIES.stale);
-            }
-          }),
         ]);
+
+        // Load categories separately (not dependent on anything, load once)
+        try {
+          const cats = await categoryService.getPopularCategories(6).catch(() => []);
+          if (cats?.length) {
+            const catNames = ['Toutes', ...cats.map(c => c.name)];
+            dispatch({ type: 'SET_CATEGORIES', payload: catNames });
+            cacheService.set(CACHE_KEYS.CATEGORIES, catNames, CACHE_TTL.CATEGORIES.duration, CACHE_TTL.CATEGORIES.stale);
+          }
+        } catch (e) {
+          console.warn('[ClientHome] Error loading categories:', e);
+        }
 
         // Check for critical failures
         if (productsResult.status === 'rejected' && products.length === 0) {
