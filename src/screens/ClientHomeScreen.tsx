@@ -225,13 +225,28 @@ export const ClientHomeScreen: React.FC = () => {
   useEffect(() => {
     if (carouselBanners.length <= 1 || isPaused) return;
 
+    // We want: 1,2,3,... then back: 3,2,1, and loop.
+    let direction: 1 | -1 = 1;
+
     const interval = setInterval(() => {
-      const nextIndex = (currentBannerIndexRef.current + 1) % carouselBanners.length;
+      const current = currentBannerIndexRef.current;
+      const max = carouselBanners.length - 1;
+
+      let next = current + direction;
+
+      if (next > max) {
+        direction = -1;
+        next = max - 1 >= 0 ? max - 1 : 0;
+      } else if (next < 0) {
+        direction = 1;
+        next = 1 <= max ? 1 : 0;
+      }
+
+      // IMPORTANT: do not dispatch here. Let onMomentumScrollEnd update the index.
+      // This prevents UI desync (dots change but list doesn't move on web).
       try {
-        flatListRef.current?.scrollToIndex({
-          index: nextIndex,
-          animated: true,
-        });
+        flatListRef.current?.scrollToIndex({ index: next, animated: true });
+        currentBannerIndexRef.current = next;
       } catch (err) {
         // Silent fail - index out of bounds on initial render
       }
@@ -239,6 +254,8 @@ export const ClientHomeScreen: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [carouselBanners.length, isPaused]);
+
+
 
   // Cache loading logic - only on mount
   useEffect(() => {
@@ -537,33 +554,36 @@ export const ClientHomeScreen: React.FC = () => {
     navigation.navigate(screen, banner.link_params || undefined);
   }, [navigation]);
 
-  const renderBannerItem = useCallback(({ item, index }: { item: HomeBanner; index: number }) => {
-    const bannerWidth = SCREEN_WIDTH - SPACING.xl * 2;
-    const inputRange = [
-      (index - 1) * bannerWidth,
-      index * bannerWidth,
-      (index + 1) * bannerWidth,
-    ];
+  const bannerWidth = SCREEN_WIDTH - SPACING.xl * 2;
 
-    const scale = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.8, 1, 0.8],
-      extrapolate: 'clamp',
-    });
+  const renderBannerItem = useCallback(
+    ({ item, index }: { item: HomeBanner; index: number }) => {
+      const inputRange = [
+        (index - 1) * bannerWidth,
+        index * bannerWidth,
+        (index + 1) * bannerWidth,
+      ];
 
-    const opacity = scrollX.interpolate({
-      inputRange,
-      outputRange: [0.6, 1, 0.6],
-      extrapolate: 'clamp',
-    });
+      const scale = scrollX.interpolate({
+        inputRange,
+        outputRange: [0.8, 1, 0.8],
+        extrapolate: 'clamp',
+      });
 
-    return (
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => handleBannerPress(item)}
-        style={{ width: bannerWidth }}
-      >
-        <Animated.View style={[styles.bannerCard, { transform: [{ scale }], opacity }]}>
+      const opacity = scrollX.interpolate({
+        inputRange,
+        outputRange: [0.6, 1, 0.6],
+        extrapolate: 'clamp',
+      });
+
+      return (
+        <TouchableOpacity
+          key={item.id}
+          activeOpacity={0.9}
+          onPress={() => handleBannerPress(item)}
+          style={{ width: bannerWidth }}
+        >
+          <Animated.View style={[styles.bannerCard, { transform: [{ scale }], opacity }]}>
             {item.image_url ? (
               <OptimizedImage
                 uri={cloudinaryService.getOptimizedUrl(item.image_url, 800)}
@@ -571,22 +591,26 @@ export const ClientHomeScreen: React.FC = () => {
                 resizeMode="cover"
               />
             ) : null}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)']}
-            style={styles.bannerGradient}
-          />
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>{item.title}</Text>
-            {item.subtitle ? <Text style={styles.bannerSubtitle}>{item.subtitle}</Text> : null}
-            <View style={styles.bannerButton}>
-              <Text style={styles.bannerButtonText}>Découvrir</Text>
-              <Ionicons name="arrow-forward" size={16} color="white" />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              style={styles.bannerGradient}
+            />
+            <View style={styles.bannerContent}>
+              <Text style={styles.bannerTitle}>{item.title}</Text>
+              {item.subtitle ? <Text style={styles.bannerSubtitle}>{item.subtitle}</Text> : null}
+              <View style={styles.bannerButton}>
+                <Text style={styles.bannerButtonText}>Découvrir</Text>
+                <Ionicons name="arrow-forward" size={16} color="white" />
+              </View>
             </View>
-          </View>
-        </Animated.View>
-      </TouchableOpacity>
-    );
-  }, [SPACING.xl, scrollX, styles, handleBannerPress]);
+          </Animated.View>
+        </TouchableOpacity>
+      );
+    },
+    // Important: do NOT depend on `styles` to avoid remount/reload of images on web.
+    [bannerWidth, scrollX, handleBannerPress, SPACING.xl, styles.bannerCard, styles.bannerImage, styles.bannerGradient, styles.bannerContent, styles.bannerTitle, styles.bannerSubtitle, styles.bannerButton, styles.bannerButtonText]
+  );
+
 
   const renderCategoryChip = useCallback((category: string) => {
     const isActive = selectedCollection === category;
