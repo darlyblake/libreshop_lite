@@ -25,8 +25,14 @@ import { userService } from '../services/userService';
 import { sessionStorage } from '../lib/storage';
 import { useAuthStore } from '../store';
 import { settingsService } from '../services/settingsService';
+import { useLegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 
 export const SellerAuthScreen: React.FC = () => {
+  const COLORS = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = React.useMemo(() => createSellerAuthStyles(COLORS, SPACING, RADIUS, FONT_SIZE), [COLORS, SPACING, RADIUS, FONT_SIZE]);
+
   const navigation = useNavigation<any>();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -855,7 +861,7 @@ export const SellerAuthScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createSellerAuthStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
