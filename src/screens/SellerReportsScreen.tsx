@@ -39,7 +39,7 @@ const REPORTS = [
   { id: 'return', title: 'Retours', icon: 'refresh-outline', description: 'Rapport des retours' },
   { id: 'inventory', title: 'Inventaire', icon: 'cube-outline', description: 'État du stock' },
   { id: 'client', title: 'Clients', icon: 'people-outline', description: 'Top clients et fidélité' },
-];
+] as const;
 
 const webInputStyle = {
   padding: 8,
@@ -656,7 +656,7 @@ export const SellerReportsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bg,
   },
   header: {
     flexDirection: 'row',

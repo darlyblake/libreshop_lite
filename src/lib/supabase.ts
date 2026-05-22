@@ -370,6 +370,36 @@ export interface Plan {
   created_at?: string;
 }
 
+export type WithdrawalStatus = 'pending' | 'completed' | 'failed' | 'rejected';
+
+export interface WithdrawalRequest {
+  id: string;
+  store_id: string;
+  amount: number;
+  method: string;
+  details: any;
+  status: WithdrawalStatus;
+  created_at: string;
+  processed_at?: string;
+}
+
+export type KYCStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+
+export interface KYCDocument {
+  id: string;
+  store_id: string;
+  full_name: string;
+  phone: string;
+  id_type: string;
+  id_number: string;
+  id_front_url: string;
+  id_back_url: string;
+  video_selfie_url: string;
+  status: KYCStatus;
+  created_at: string;
+}
+
 // All services moved to src/services/
+
 
 

@@ -19,6 +19,7 @@ import { authService } from '../services/authService';
 import { useAuthStore, useCartStore } from '../store';
 import { productLikesService } from '../services/productLikesService';
 import { storeService } from '../services/storeService';
+import { reviewService } from '../services/reviewService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -39,7 +40,9 @@ export const ClientAuthModal: React.FC = () => {
         await AsyncStorage.setItem('@libreshop_pending_action', JSON.stringify(pendingAction));
       }
 
-      const redirectUrl = Linking.createURL('auth/callback');
+      const redirectUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.location.origin + window.location.pathname + window.location.search
+        : Linking.createURL('auth/callback');
       
       await authService.signInWithOAuth({
         provider: 'google',
@@ -83,10 +86,8 @@ export const ClientAuthModal: React.FC = () => {
             if (savedActionStr) {
               const action = JSON.parse(savedActionStr);
               
-              // Exécuter l'action en attente
               if (action.type === 'ADD_TO_CART') {
                 addItem(action.payload.product, action.payload.quantity);
-                Alert.alert('Succès', 'Produit ajouté au panier !');
               } else if (action.type === 'BUY_NOW') {
                 addItem(action.payload.product, action.payload.quantity);
                 navigation.navigate('Checkout', { 
@@ -99,6 +100,16 @@ export const ClientAuthModal: React.FC = () => {
                 await productLikesService.toggleLike(currentUser.id, action.payload.productId);
               } else if (action.type === 'FOLLOW_STORE') {
                 await storeService.toggleFollow(currentUser.id, action.payload.storeId);
+              } else if (action.type === 'LEAVE_REVIEW') {
+                if (action.payload.comment && action.payload.rating) {
+                  await reviewService.create({
+                    product_id: action.payload.productId,
+                    user_id: currentUser.id,
+                    rating: action.payload.rating,
+                    comment: action.payload.comment,
+                    user_name: currentUser.full_name || currentUser.email || 'Utilisateur',
+                  });
+                }
               }
             }
             
@@ -132,7 +143,6 @@ export const ClientAuthModal: React.FC = () => {
           // Execute the pending action
           if (action.type === 'ADD_TO_CART') {
             addItem(action.payload.product, action.payload.quantity);
-            Alert.alert('Succès', 'Produit ajouté au panier !');
           } else if (action.type === 'BUY_NOW') {
             addItem(action.payload.product, action.payload.quantity);
             // Navigate to checkout instantly
@@ -148,10 +158,18 @@ export const ClientAuthModal: React.FC = () => {
             }, 500);
           } else if (action.type === 'LIKE_PRODUCT') {
             await productLikesService.toggleLike(user.id, action.payload.productId);
-            Alert.alert('Succès', 'Produit ajouté à vos favoris !');
           } else if (action.type === 'FOLLOW_STORE') {
             await storeService.toggleFollow(user.id, action.payload.storeId);
-            Alert.alert('Succès', 'Vous suivez maintenant cette boutique !');
+          } else if (action.type === 'LEAVE_REVIEW') {
+            if (action.payload.comment && action.payload.rating) {
+              await reviewService.create({
+                product_id: action.payload.productId,
+                user_id: user.id,
+                rating: action.payload.rating,
+                comment: action.payload.comment,
+                user_name: user.full_name || user.email || 'Utilisateur',
+              });
+            }
           }
         }
       } catch (error) {

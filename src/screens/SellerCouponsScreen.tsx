@@ -348,7 +348,7 @@ export const SellerCouponsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

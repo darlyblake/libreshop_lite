@@ -159,7 +159,7 @@ export const SellerRefundsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.bg },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SPACING.md, backgroundColor: COLORS.card },
   title: { fontSize: FONT_SIZE.lg, fontWeight: '600', color: COLORS.text },
   stats: { flexDirection: 'row', padding: SPACING.md, gap: SPACING.md },

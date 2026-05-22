@@ -451,6 +451,16 @@ export const SellerDashboardScreen: React.FC = () => {
         },
       ];
 
+      const mappedOrders: DashboardOrder[] = orders.slice(0, 5).map((o: any) => ({
+        id: o.id,
+        customer: o.customer_name || 'Client Anonyme',
+        amount: Number(o.total_amount || 0),
+        status: o.status,
+        time: formatTimeAgo(o.created_at),
+        items: Array.isArray(o.order_items) ? o.order_items.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 0), 0) : 0,
+      }));
+
+      setRecentOrders(mappedOrders);
       setStats(dashboardStats);
       
       const dashboardSummary = { totalRevenue, pendingOrders, deliveredOrders, lowStockCount: lowStockProducts.length };

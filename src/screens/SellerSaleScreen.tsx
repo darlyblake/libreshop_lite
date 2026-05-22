@@ -79,7 +79,7 @@ export const SellerSaleScreen: React.FC = () => {
   };
 
   const calculateDiscountPercent = (price: string) => {
-    const original = parseFloat(product?.price || '0');
+    const original = product?.price || 0;
     const sale = parseFloat(price);
     if (original && sale) {
       const percent = Math.round(((original - sale) / original) * 100);

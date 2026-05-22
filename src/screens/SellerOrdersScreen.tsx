@@ -679,7 +679,7 @@ Pouvez-vous me confirmer votre disponibilité pour la livraison ?
 Merci.`;
     
     contactStore({ rawPhone: formattedPhone, message }).catch(() => {
-      Alert.alert('Contacter', `Appeler le ${phone}`);
+      Alert.alert('Contacter', `Appeler le ${order.phone}`);
     });
   };
 
@@ -826,7 +826,7 @@ Merci.`;
                   <Ionicons name="alert-circle" size={fontSize.lg} color={COLORS.danger} style={{ marginRight: spacing.sm }} />
                   <View>
                     <Text style={{ fontSize: fontSize.sm, fontWeight: '600', color: COLORS.danger }}>
-                      ⏱️ Bloquée depuis {order.daysInStatus} {order.daysInStatus > 1 ? 'jours' : 'jour'}
+                      ⏱️ Bloquée depuis {order.daysInStatus || 0} {(order.daysInStatus || 0) > 1 ? 'jours' : 'jour'}
                     </Text>
                     <Text style={{ fontSize: fontSize.xs, color: COLORS.textMuted, marginTop: 2 }}>
                       Action requise pour avancer

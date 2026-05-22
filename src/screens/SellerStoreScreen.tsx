@@ -411,7 +411,7 @@ export const SellerStoreScreen: React.FC = () => {
       }
 
       const fileExt = 'png';
-      const baseDir = FileSystem.Paths.cacheDirectory;
+      const baseDir = FileSystem.cacheDirectory;
       if (!baseDir) throw new Error("Répertoire cache indisponible");
       const localUri = `${baseDir}qr-boutique-${store.slug}-${Date.now()}.${fileExt}`;
 

@@ -256,11 +256,22 @@ export const productService = {
 
       const categoryId = categoryData.id;
 
-      // Step 2: Get all collections for this category
+      // Find all subcategories (including the category itself)
+      const { data: subCategories } = await client
+        .from('categories')
+        .select('id')
+        .eq('parent_id', categoryId);
+        
+      const categoryIds = [categoryId];
+      if (subCategories && subCategories.length > 0) {
+        categoryIds.push(...subCategories.map(c => c.id));
+      }
+
+      // Step 2: Get all collections for these categories
       const { data: collections, error: collError } = await client
         .from('collections')
         .select('id, name')
-        .eq('category_id', categoryId)
+        .in('category_id', categoryIds)
         .eq('is_active', true);
       
       if (collError) throw collError;
@@ -661,6 +672,7 @@ export const productService = {
           .eq('collection_id', (product as any).collection_id)
           .eq('is_active', true)
           .neq('id', product.id)
+          .order('view_count', { ascending: false })
           .limit(limit);
 
         if (collError) throw collError;
@@ -677,6 +689,7 @@ export const productService = {
           .eq('is_active', true)
           .neq('id', product.id)
           .eq('store_id', product.store_id)
+          .order('view_count', { ascending: false })
           .limit(remaining);
 
         if (storeError) throw storeError;

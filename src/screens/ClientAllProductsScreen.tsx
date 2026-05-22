@@ -32,8 +32,10 @@ export const ClientAllProductsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
   const [searchQuery, setSearchQuery] = useState('');
-  const [categories, setCategories] = useState<any[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('Toutes');
+  const [generalCategories, setGeneralCategories] = useState<any[]>([]);
+  const [selectedGeneralCategory, setSelectedGeneralCategory] = useState<any>(null);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
+  const [selectedSubCategory, setSelectedSubCategory] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -52,20 +54,39 @@ export const ClientAllProductsScreen: React.FC = () => {
     return (contentWidth - totalPadding - gap) / numColumns;
   }, [contentWidth, numColumns]);
 
-  // Load categories from database
+  // Load general categories from database
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const categoryData = await categoryService.getAll();
-        const categoryNames = categoryData.map((cat: any) => cat.name);
-        setCategories(['Toutes', ...categoryNames]);
+        const categoryData = await categoryService.getByParent(null);
+        setGeneralCategories([{ id: 'all', name: 'Toutes' }, ...categoryData]);
       } catch (err) {
         console.error('Failed to load categories:', err);
-        setCategories(['Toutes']);
+        setGeneralCategories([{ id: 'all', name: 'Toutes' }]);
       }
     };
     loadCategories();
   }, []);
+
+  // Load subcategories when general category changes
+  useEffect(() => {
+    const loadSubCategories = async () => {
+      try {
+        if (!selectedGeneralCategory || selectedGeneralCategory.id === 'all') {
+          const allCats = await categoryService.getAll();
+          const subCats = allCats.filter((c: any) => c.parent_id !== null);
+          setSubCategories([{ id: 'all_sub', name: 'Toutes les sous-catégories' }, ...subCats]);
+        } else {
+          const subCatData = await categoryService.getByParent(selectedGeneralCategory.id);
+          setSubCategories([{ id: 'all_sub', name: 'Toutes les sous-catégories' }, ...subCatData]);
+        }
+      } catch (err) {
+        console.error('Failed to load subcategories:', err);
+        setSubCategories([]);
+      }
+    };
+    loadSubCategories();
+  }, [selectedGeneralCategory]);
 
   useEffect(() => {
     loadData(true);
@@ -88,10 +109,14 @@ export const ClientAllProductsScreen: React.FC = () => {
 
       // Fetch products based on selected category
       let productsData;
-      if (selectedCategory === 'Toutes') {
+      const targetCategoryName = selectedSubCategory && selectedSubCategory.id !== 'all_sub'
+        ? selectedSubCategory.name
+        : (selectedGeneralCategory && selectedGeneralCategory.id !== 'all' ? selectedGeneralCategory.name : 'Toutes');
+
+      if (targetCategoryName === 'Toutes') {
         productsData = await productService.getAll(currentPage, pageSize, sort);
       } else {
-        productsData = await productService.getAllByCategory(selectedCategory, currentPage, pageSize, sort);
+        productsData = await productService.getAllByCategory(targetCategoryName, currentPage, pageSize, sort);
       }
 
       if (productsData) {
@@ -127,7 +152,7 @@ export const ClientAllProductsScreen: React.FC = () => {
   useEffect(() => {
     loadData(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory]);
+  }, [selectedGeneralCategory, selectedSubCategory]);
 
   const handleLoadMore = () => {
     if (!loading && !loadingMore && hasMore) {
@@ -171,49 +196,6 @@ export const ClientAllProductsScreen: React.FC = () => {
     </View>
   ), [itemWidth, styles.productCardWrapper, styles.storeName, navigation]);
 
-  if (loading) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}> 
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Produits</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, padding: SPACING.lg }}>
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <View key={`product-sk-${idx}`} style={{ width: itemWidth, marginBottom: SPACING.md }}>
-              <ProductCardSkeleton />
-            </View>
-          ))}
-        </View>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}> 
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Produits</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color={COLORS.danger} />
-          <Text style={styles.errorTitle}>Erreur de chargement</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => loadData(true)}>
-            <Text style={styles.retryButtonText}>Réessayer</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.maxWidthContainer}>
       <View style={[styles.container, { paddingTop: insets.top }]}> 
@@ -249,23 +231,68 @@ export const ClientAllProductsScreen: React.FC = () => {
 
         <View style={styles.categoriesContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category}
-                style={[styles.categoryChip, selectedCategory === category && styles.categoryChipActive]}
-                onPress={() => setSelectedCategory(category)}
-              >
-                <Text style={[styles.categoryText, selectedCategory === category && styles.categoryTextActive]}>{category}</Text>
-              </TouchableOpacity>
-            ))}
+            {generalCategories.map((category) => {
+              const isActive = (!selectedGeneralCategory && category.id === 'all') || selectedGeneralCategory?.id === category.id;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                  onPress={() => {
+                    setSelectedGeneralCategory(category.id === 'all' ? null : category);
+                    setSelectedSubCategory(null);
+                  }}
+                >
+                  <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>{category.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsCount}>{filteredProducts.length} produits trouvés</Text>
-        </View>
+        <View style={styles.mainContentRow}>
+          {subCategories.length > 0 && (
+            <View style={[styles.sidebar, { width: isMobile ? 130 : 200 }]}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarContent}>
+                {subCategories.map((subCat) => {
+                  const isActive = (!selectedSubCategory && subCat.id === 'all_sub') || selectedSubCategory?.id === subCat.id;
+                  return (
+                    <TouchableOpacity
+                      key={subCat.id}
+                      style={[styles.subCategoryItem, isActive && styles.subCategoryItemActive]}
+                      onPress={() => setSelectedSubCategory(subCat.id === 'all_sub' ? null : subCat)}
+                    >
+                      <Text style={[styles.subCategoryText, isActive && styles.subCategoryTextActive]}>{subCat.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
-        <FlatList
+          <View style={styles.flex1}>
+            <View style={styles.resultsHeader}>
+              <Text style={styles.resultsCount}>{filteredProducts.length} produits trouvés</Text>
+            </View>
+
+            {loading ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, padding: SPACING.lg }}>
+                {Array.from({ length: numColumns * 2 }).map((_, idx) => (
+                  <View key={`product-sk-${idx}`} style={{ width: itemWidth, marginBottom: SPACING.md }}>
+                    <ProductCardSkeleton />
+                  </View>
+                ))}
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color={COLORS.danger} />
+                <Text style={styles.errorTitle}>Erreur de chargement</Text>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={() => loadData(true)}>
+                  <Text style={styles.retryButtonText}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
           data={filteredProducts}
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
@@ -295,6 +322,9 @@ export const ClientAllProductsScreen: React.FC = () => {
           removeClippedSubviews={Platform.OS !== 'web'}
           updateCellsBatchingPeriod={50}
         />
+            )}
+          </View>
+        </View>
 
       </View>
     </View>
@@ -323,6 +353,14 @@ const styles = StyleSheet.create({
   categoryChipActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
   categoryText: { fontSize: FONT_SIZE.sm, fontWeight: '500', color: COLORS.textSoft },
   categoryTextActive: { color: COLORS.text },
+  mainContentRow: { flex: 1, flexDirection: 'row' },
+  sidebar: { borderRightWidth: 1, borderRightColor: COLORS.border, paddingRight: SPACING.sm },
+  sidebarContent: { paddingHorizontal: SPACING.sm, paddingBottom: SPACING.xxl, gap: SPACING.sm },
+  subCategoryItem: { paddingVertical: SPACING.md, paddingHorizontal: SPACING.sm, borderRadius: RADIUS.md },
+  subCategoryItemActive: { backgroundColor: COLORS.card },
+  subCategoryText: { fontSize: FONT_SIZE.sm, fontWeight: '500', color: COLORS.textSoft },
+  subCategoryTextActive: { color: COLORS.primary, fontWeight: '700' },
+  flex1: { flex: 1 },
   resultsHeader: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
   resultsCount: { fontSize: FONT_SIZE.sm, color: COLORS.textMuted },
   listContent: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xxl },

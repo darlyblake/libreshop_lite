@@ -204,7 +204,7 @@ export default function SellerReturnsScreen() {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Text style={styles.modalTitle}>Détails du Retour</Text>
-                <TouchableOpacity onPress={() => contactClient(selectedReturn)}>
+                <TouchableOpacity onPress={() => selectedReturn && contactClient(selectedReturn)}>
                   <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                 </TouchableOpacity>
               </View>

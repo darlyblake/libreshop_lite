@@ -32,21 +32,60 @@ import { cloudinaryService } from '../services/cloudinaryService';
 import { storeService } from '../services/storeService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from "../utils/errorHandler";
 import { contactStore } from '../services/contactService';
+import { shareContent } from "../components/ShareButton";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 type TabType = 'description' | 'characteristics' | 'reviews' | 'similar';
+
+const COLOR_MAP: Record<string, string> = {
+  'rouge': '#FF3B30',
+  'bleu': '#007AFF',
+  'vert': '#34C759',
+  'jaune': '#FFCC00',
+  'noir': '#000000',
+  'blanc': '#FFFFFF',
+  'gris': '#8E8E93',
+  'rose': '#FF2D55',
+  'violet': '#AF52DE',
+  'orange': '#FF9500',
+  'marron': '#A2845E',
+  'cyan': '#32ADE6',
+  'magenta': '#FF2D55',
+  'or': '#FFD700',
+  'argent': '#C0C0C0',
+  'red': '#FF3B30',
+  'blue': '#007AFF',
+  'green': '#34C759',
+  'yellow': '#FFCC00',
+  'black': '#000000',
+  'white': '#FFFFFF',
+  'grey': '#8E8E93',
+  'gray': '#8E8E93',
+  'pink': '#FF2D55',
+  'purple': '#AF52DE',
+  'brown': '#A2845E',
+  'gold': '#FFD700',
+  'silver': '#C0C0C0',
+};
+
+const getColorHex = (colorName: string): string | null => {
+  const normalized = colorName.toLowerCase().trim();
+  return COLOR_MAP[normalized] || null;
+};
 
 export const ProductDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
   const { width, isDesktop } = useResponsive();
-  const { theme, getColor: COLORS, spacing: SPACING, radius: RADIUS } = useTheme();
+  const themeContext = useTheme();
+  const { theme, getColor: COLORS, spacing: SPACING, radius: RADIUS } = themeContext;
+  const styles = useMemo(() => getStyles(themeContext), [themeContext]);
   const { addItem, items } = useCartStore();
   const { user, showAuthModal } = useAuthStore();
 
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const imageOpacity = useRef(new Animated.Value(0)).current;
   const { productId } = route.params || {};
 
   // State
@@ -59,6 +98,7 @@ export const ProductDetailScreen: React.FC = () => {
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [selectedVariantLabel, setSelectedVariantLabel] = useState<string | null>(null);
   const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
+  const [showAllCities, setShowAllCities] = useState(false);
 
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -90,6 +130,7 @@ export const ProductDetailScreen: React.FC = () => {
         : null,
       inStock: (product.stock ?? 0) > 0,
       category: product.category || "",
+      attributes: (product as any).attributes || {},
     };
   }, [product, store]);
 
@@ -248,7 +289,7 @@ export const ProductDetailScreen: React.FC = () => {
       if (!product) return;
 
       if (!user?.id) {
-        showAuthModal({ type: 'LEAVE_REVIEW', payload: { productId: product.id } });
+        showAuthModal({ type: 'LEAVE_REVIEW', payload: { productId: product.id, comment: reviewComment.trim(), rating: reviewRating } });
         return;
       }
 
@@ -347,6 +388,23 @@ export const ProductDetailScreen: React.FC = () => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
+            onPress={() => {
+              if (productData) {
+                shareContent({
+                  title: productData.name,
+                  description: productData.description || '',
+                  url: `https://libreshop.shop/product/${productData.id}`,
+                  imageUrl: productData.images?.[0] ? cloudinaryService.getOptimizedUrl(productData.images[0], 500) : undefined,
+                  price: `${productData.price} FCFA`,
+                  type: 'product'
+                });
+              }
+            }}
+          >
+            <Ionicons name="share-social-outline" size={24} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={() => navigation.navigate('Cart')}
           >
             <View style={styles.cartIconContainer}>
@@ -436,11 +494,18 @@ export const ProductDetailScreen: React.FC = () => {
         </View>
       ) : galleryImages?.[selectedImageIndex] ? (
         <>
-          <Image
-            source={{ uri: cloudinaryService.getOptimizedUrl(galleryImages[selectedImageIndex], 800) }}
-            style={styles.mainImage}
-            resizeMode="contain"
-          />
+                      <Animated.Image
+              source={{ uri: cloudinaryService.getOptimizedUrl(galleryImages[selectedImageIndex], 800) }}
+              style={[styles.mainImage, { opacity: imageOpacity }]}
+              resizeMode="contain"
+              onLoad={() => {
+                Animated.timing(imageOpacity, {
+                  toValue: 1,
+                  duration: 300,
+                  useNativeDriver: true,
+                }).start();
+              }}
+            />
           {!!productData?.comparePrice && productData.comparePrice > (productData.price || 0) && (
             <View style={[styles.discountBadge, { backgroundColor: COLORS.danger }]}>
               <Text style={styles.discountText}>
@@ -570,26 +635,42 @@ export const ProductDetailScreen: React.FC = () => {
             <View key={option.id} style={styles.optionContainer}>
               <Text style={styles.optionName}>{option.name}</Text>
               <View style={styles.optionValuesRow}>
-                {option.values?.map((value) => (
-                  <TouchableOpacity
-                    key={value}
-                    onPress={() => handleOptionChange(option.name, value)}
-                    style={[
-                      styles.optionValue,
-                      selectedOptions[option.name] === value && styles.optionValueSelected,
-                    ]}
-                    activeOpacity={0.7}
-                  >
-                    <Text
+                {option.values?.map((value) => {
+                  const isColorOption = option.name.toLowerCase().includes('couleur') || option.name.toLowerCase().includes('color');
+                  const colorHex = isColorOption ? getColorHex(value) : null;
+                  const isSelected = selectedOptions[option.name] === value;
+
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      onPress={() => handleOptionChange(option.name, value)}
                       style={[
-                        styles.optionValueText,
-                        selectedOptions[option.name] === value && styles.optionValueTextSelected,
+                        styles.optionValue,
+                        isSelected && styles.optionValueSelected,
+                        isColorOption && styles.optionColorValue,
+                        isColorOption && isSelected && styles.optionColorValueSelected,
                       ]}
+                      activeOpacity={0.7}
                     >
-                      {value}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      {colorHex && (
+                        <View style={[
+                          styles.colorCircle, 
+                          { backgroundColor: colorHex }, 
+                          colorHex === '#FFFFFF' && { borderWidth: 1, borderColor: '#DDD' }
+                        ]} />
+                      )}
+                      <Text
+                        style={[
+                          styles.optionValueText,
+                          isSelected && styles.optionValueTextSelected,
+                          isColorOption && { marginLeft: 6 }
+                        ]}
+                      >
+                        {value}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           ))}
@@ -626,6 +707,68 @@ export const ProductDetailScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Delivery Info */}
+      {store && store.delivery_mode && (
+        <View style={styles.deliverySection}>
+          <Text style={styles.sectionLabel}>Livraison</Text>
+          <View style={styles.deliveryCard}>
+            <View style={styles.deliveryIconBox}>
+              <Ionicons name="bicycle-outline" size={24} color={COLORS.accent} />
+            </View>
+            <View style={styles.deliveryTextContainer}>
+              {store.delivery_mode === 'fixed' && (
+                <>
+                  <Text style={styles.deliveryTitle}>Frais de livraison fixe</Text>
+                  <Text style={styles.deliveryPrice}>
+                    {store.shipping_price ? `${store.shipping_price.toLocaleString()} FCFA` : 'Gratuite'}
+                  </Text>
+                </>
+              )}
+              {store.delivery_mode === 'km' && (
+                <>
+                  <Text style={styles.deliveryTitle}>Livraison par distance</Text>
+                  <Text style={styles.deliverySubtitle}>
+                    {store.delivery_price_km ? `${store.delivery_price_km.toLocaleString()} FCFA / km` : 'Sur devis'}
+                  </Text>
+                </>
+              )}
+              {store.delivery_mode === 'city' && (
+                <>
+                  <Text style={styles.deliveryTitle}>Livraison par ville</Text>
+                  {store.delivery_city_fees && Object.keys(store.delivery_city_fees).length > 0 ? (
+                    <View style={styles.cityFeesList}>
+                      {Object.entries(store.delivery_city_fees)
+                        .slice(0, showAllCities ? undefined : 3)
+                        .map(([city, fee]) => (
+                        <View key={city} style={styles.cityFeeItem}>
+                          <Text style={styles.cityFeeName}>• {city}</Text>
+                          <Text style={styles.cityFeePrice}>{(fee as number).toLocaleString()} FCFA</Text>
+                        </View>
+                      ))}
+                      {Object.keys(store.delivery_city_fees).length > 3 && (
+                        <TouchableOpacity 
+                          onPress={() => setShowAllCities(!showAllCities)}
+                          style={{ marginTop: 4, paddingVertical: 4 }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={{ color: COLORS.accent, fontSize: FONT_SIZE.sm, fontWeight: '600' }}>
+                            {showAllCities 
+                              ? "Voir moins" 
+                              : `+ ${Object.keys(store.delivery_city_fees).length - 3} autres villes`}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ) : (
+                    <Text style={styles.deliverySubtitle}>Tarifs selon la ville</Text>
+                  )}
+                </>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Action Buttons */}
       <View style={styles.actionsRow}>
         <TouchableOpacity
@@ -641,18 +784,17 @@ export const ProductDetailScreen: React.FC = () => {
           <Text style={styles.chatButtonText}>Contacter</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.followButton,
-            !productData?.inStock && styles.followButtonDisabled,
-          ]}
-          onPress={() => Alert.alert("Suivre", "Fonctionnalité à venir")}
-          disabled={!productData?.inStock}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="heart-outline" size={18} color={COLORS.text} />
-          <Text style={styles.followButtonText}>Suivre</Text>
-        </TouchableOpacity>
+        <View style={[styles.followButton, !productData?.inStock && styles.followButtonDisabled]}>
+          <LikeButton
+            productId={String(productId || "")}
+            userId={user?.id ? String(user.id) : undefined}
+            showCount={true}
+            size="medium"
+            showLabel={true}
+            variant="default"
+            disabled={!productData?.inStock}
+          />
+        </View>
       </View>
     </View>
   );
@@ -679,14 +821,26 @@ export const ProductDetailScreen: React.FC = () => {
           </View>
         );
 
-      case 'characteristics':
+      case 'characteristics': {
+        const attributes = (productData as any)?.attributes || {};
+        // Filter out internal attributes like image_variants
+        const attributeKeys = Object.keys(attributes).filter(key => key !== 'image_variants');
+        
         return (
           <View style={styles.tabContent}>
             <Text style={styles.tabSectionLabel}>Caractéristiques</Text>
-            {options.length > 0 ? (
+            {attributeKeys.length > 0 || options.length > 0 ? (
               <View style={styles.characteristicsGrid}>
+                {attributeKeys.map((key) => (
+                  <View key={`attr-${key}`} style={styles.characteristicItem}>
+                    <Text style={styles.characteristicName}>{key}</Text>
+                    <Text style={styles.characteristicValues}>
+                      {Array.isArray(attributes[key]) ? attributes[key].join(", ") : String(attributes[key])}
+                    </Text>
+                  </View>
+                ))}
                 {options.map((opt) => (
-                  <View key={opt.id} style={styles.characteristicItem}>
+                  <View key={`opt-${opt.id}`} style={styles.characteristicItem}>
                     <Text style={styles.characteristicName}>{opt.name}</Text>
                     <Text style={styles.characteristicValues}>
                       {opt.values?.join(", ") || "N/A"}
@@ -699,6 +853,7 @@ export const ProductDetailScreen: React.FC = () => {
             )}
           </View>
         );
+      }
 
       case 'reviews':
         return (
@@ -863,33 +1018,39 @@ export const ProductDetailScreen: React.FC = () => {
   };
 
   const renderTabs = () => (
-    <View style={styles.tabsContainer}>
-      {(['description', 'characteristics', 'reviews', 'similar'] as TabType[]).map((tab) => (
-        <TouchableOpacity
-          key={tab}
-          onPress={() => {
-            setActiveTab(tab);
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          }}
-          style={[
-            styles.tabButton,
-            activeTab === tab && styles.tabButtonActive,
-          ]}
-          activeOpacity={0.7}
-        >
-          <Text
+    <View style={styles.tabsWrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabsContainer}
+      >
+        {(['description', 'characteristics', 'reviews', 'similar'] as TabType[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            onPress={() => {
+              setActiveTab(tab);
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            }}
             style={[
-              styles.tabButtonText,
-              activeTab === tab && styles.tabButtonTextActive,
+              styles.tabButton,
+              activeTab === tab && styles.tabButtonActive,
             ]}
+            activeOpacity={0.7}
           >
-            {tab === 'description' && 'Description'}
-            {tab === 'characteristics' && 'Caractéristiques'}
-            {tab === 'reviews' && 'Avis'}
-            {tab === 'similar' && 'Similaires'}
-          </Text>
-        </TouchableOpacity>
-      ))}
+            <Text
+              style={[
+                styles.tabButtonText,
+                activeTab === tab && styles.tabButtonTextActive,
+              ]}
+            >
+              {tab === 'description' && 'Description'}
+              {tab === 'characteristics' && 'Caractéristiques'}
+              {tab === 'reviews' && 'Avis'}
+              {tab === 'similar' && 'Similaires'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </View>
   );
 
@@ -950,7 +1111,6 @@ export const ProductDetailScreen: React.FC = () => {
             }
             addItem(product, quantity);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert("Succès", "Produit ajouté au panier !");
           }}
           disabled={!productData?.inStock}
           activeOpacity={0.85}
@@ -1081,7 +1241,9 @@ export const ProductDetailScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (themeContext: any) => {
+  const { getColor: COLORS, spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = themeContext;
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -1152,6 +1314,9 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 120,
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
   },
   loadingContentContainer: {
     flexGrow: 1,
@@ -1169,16 +1334,22 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
 
-  // Image Gallery
   imageGallery: {
     width: '100%',
     aspectRatio: 1,
+    maxHeight: 600,
     backgroundColor: 'rgba(255,255,255,0.02)',
     position: 'relative',
+    alignSelf: 'center',
   },
   mainImage: {
     width: '100%',
     height: '100%',
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+    // subtle depth for web
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    elevation: 3,
   },
   loaderContainer: {
     alignItems: 'center',
@@ -1497,13 +1668,15 @@ const styles = StyleSheet.create({
   },
 
   // Tabs
+  tabsWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     gap: SPACING.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   tabButton: {
     paddingHorizontal: SPACING.md,
@@ -1771,8 +1944,8 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   bottomPriceCol: {
-    flexShrink: 0,
-    marginRight: SPACING.lg,
+    flex: 1,
+    marginRight: SPACING.sm,
   },
   bottomPriceLabel: {
     fontSize: FONT_SIZE.xs,
@@ -1792,22 +1965,22 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   bottomButtonsRow: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: SPACING.sm,
+    flexShrink: 1,
   },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     backgroundColor: COLORS.accent,
     borderRadius: RADIUS.full,
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    flex: 0.6,
+    paddingHorizontal: SPACING.md,
+    minWidth: 100,
   },
   primaryButtonDisabled: {
     opacity: 0.6,
@@ -1821,14 +1994,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.full,
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    flex: 0.4,
+    paddingHorizontal: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
+    minWidth: 90,
   },
   secondaryButtonDisabled: {
     opacity: 0.6,
@@ -1911,4 +2084,80 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '700',
   },
+  
+  // Option Color overrides
+  optionColorValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  optionColorValueSelected: {
+    borderColor: COLORS.accent,
+  },
+  colorCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  
+  // Delivery Section
+  deliverySection: {
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  deliveryCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    gap: SPACING.md,
+    alignItems: 'center',
+  },
+  deliveryIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.accent + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deliveryTextContainer: {
+    flex: 1,
+  },
+  deliveryTitle: {
+    color: COLORS.text,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  deliverySubtitle: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+  },
+  deliveryPrice: {
+    color: COLORS.accent,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '800',
+  },
+  cityFeesList: {
+    gap: 4,
+  },
+  cityFeeItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cityFeeName: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.sm,
+  },
+  cityFeePrice: {
+    color: COLORS.accent,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+  },
 });
+};
