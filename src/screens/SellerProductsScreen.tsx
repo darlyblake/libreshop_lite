@@ -1202,11 +1202,11 @@ export const SellerProductsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="book-outline" size={22} color={COLORS.accent} />
-                <Text style={styles.modalTitle}>Guide : Gestion du Catalogue Produits</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, paddingRight: 16 }}>
+                <Ionicons name="book-outline" size={22} color={COLORS.accent} style={{ marginBottom: SPACING.lg }} />
+                <Text style={[styles.modalTitle, { flexShrink: 1 }]}>Guide : Gestion du Catalogue Produits</Text>
               </View>
-              <TouchableOpacity onPress={() => setGuideModalVisible(false)}>
+              <TouchableOpacity onPress={() => setGuideModalVisible(false)} style={{ padding: 4, marginBottom: SPACING.lg }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
@@ -1584,6 +1584,9 @@ const getStyles = (theme: any) => {
     shadowOpacity: 0.15,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: -4 },
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   modalForm: {
     padding: SPACING.md,

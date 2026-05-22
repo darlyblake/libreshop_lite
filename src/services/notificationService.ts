@@ -1,207 +1,194 @@
-import { supabase } from '../lib/supabase';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-export interface Notification {
-  id: string;
-  user_id: string;
-  title: string;
-  body: string;
-  type: 'order' | 'payment' | 'promo' | 'system' | 'comment' | 'like' | 'admin';
-  read: boolean;
-  created_at: string;
-  data?: Record<string, any>;
+import { supabase } from '../lib/supabase';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+
+// Configuration du comportement des notifications quand l'application est au premier plan
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
 }
 
-// Notification Service
-export const notificationService = {
-  async getByUser(userId: string): Promise<Notification[]> {
-    const { data, error } = await supabase!
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  },
+class NotificationService {
+  private expoPushToken: string | null = null;
 
-  async getUnreadCount(userId: string): Promise<number> {
-    const { count, error } = await supabase!
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('read', false);
-    if (error) throw error;
-    return count || 0;
-  },
-
-  async markAsRead(notificationId: string): Promise<void> {
-    const { error } = await supabase!
-      .from('notifications')
-      .update({ read: true })
-      .eq('id', notificationId);
-    if (error) throw error;
-  },
-
-  async markAllAsRead(userId: string): Promise<void> {
-    const { error } = await supabase!
-      .from('notifications')
-      .update({ read: true })
-      .eq('user_id', userId)
-      .eq('read', false);
-    if (error) throw error;
-  },
-
-  async delete(notificationId: string): Promise<void> {
-    const { error } = await supabase!
-      .from('notifications')
-      .delete()
-      .eq('id', notificationId);
-    if (error) throw error;
-  },
-
-  async deleteAllByUser(userId: string): Promise<void> {
-    const { error } = await supabase!
-      .from('notifications')
-      .delete()
-      .eq('user_id', userId);
-    if (error) throw error;
-  },
-
-  async create(notification: Partial<Notification>): Promise<Notification> {
-    const { error } = await supabase!
-      .from('notifications')
-      .insert(notification);
-    if (error) throw error;
-
-    // Tentative d'envoi de notification push en arrière-plan
-    if (notification.user_id) {
-      this.sendPushNotification(notification.user_id, {
-        title: notification.title || 'Nouvelle notification',
-        body: notification.body || '',
-        data: notification.data,
-      }).catch(console.error);
-    }
-
-    return notification as Notification;
-  },
-
-  // Service interne pour envoyer au serveur Expo
-  async sendPushNotification(userId: string, pushData: { title: string, body: string, data?: any }) {
+  async registerForPushNotificationsAsync() {
     if (Platform.OS === 'web') {
-      return;
+      console.log('[Notifications] Push notifications non supportées sur le web pour le moment.');
+      return null;
     }
 
-    try {
-      // Récupérer le token du destinataire
-      const { data: user, error } = await supabase!
-        .from('users')
-        .select('expo_push_token')
-        .eq('id', userId)
-        .maybeSingle();
+    let token;
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
       
-      if (error || !user?.expo_push_token) return;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') {
+        console.warn('Failed to get push token for push notification!');
+        return;
+      }
+      
+      try {
+        const projectId = 'votre-project-id'; // Normalement récupéré depuis Constants.expoConfig.extra.eas.projectId
+        // On récupère le token d'appareil
+        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+        this.expoPushToken = token;
+        
+        // Enregistrer le token dans Supabase si l'utilisateur est connecté
+        this.saveTokenToDatabase(token);
+      } catch (error: any) {
+        errorHandler.handle(error, 'Notification token error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+      }
+    } else {
+      console.warn('Must use physical device for Push Notifications');
+    }
 
-      const message = {
-        to: user.expo_push_token,
-        sound: 'default',
-        title: pushData.title,
-        body: pushData.body,
-        data: pushData.data,
-      };
+    return token;
+  }
 
-      await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Accept-encoding': 'gzip, deflate',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(message),
-      });
+  private async saveTokenToDatabase(token: string) {
+    try {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // En théorie, vous auriez une table `push_tokens` dans Supabase
+        // await supabase.from('push_tokens').upsert({ user_id: user.id, token });
+        console.log('Push token prêt pour l\'utilisateur:', user.id, token);
+      }
     } catch (e) {
-      console.error('Error sending push notification:', e);
+      console.warn('Could not save push token to db', e);
     }
-  },
+  }
 
-  // Create notification for multiple users
-  async createBulk(
-    userIds: string[],
-    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
-  ): Promise<void> {
-    const notifications = userIds.map((user_id) => ({
-      ...notification,
-      user_id,
-    }));
-    const { error } = await supabase!
-      .from('notifications')
-      .insert(notifications);
-    if (error) throw error;
+  // ==========================================
+  // NOTIFICATIONS CLIENT
+  // ==========================================
 
-    // Push notifications pour tout le monde
-    userIds.forEach(uid => {
-        this.sendPushNotification(uid, {
-            title: notification.title,
-            body: notification.body,
-            data: notification.data
-        }).catch(() => {});
+  // Planifie un rappel de panier abandonné (ex: dans 2 heures)
+  async scheduleCartReminder() {
+    if (Platform.OS === 'web') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🛒 Vous avez oublié quelque chose ?",
+        body: "Votre panier LibreShop vous attend ! Finalisez votre commande avant la rupture de stock.",
+        data: { screen: 'Cart' },
+      },
+      trigger: {
+        seconds: 2 * 60 * 60, // 2 heures (pour le test on pourrait mettre 10 secondes)
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      },
     });
-  },
+  }
 
-  // Send broadcast notification to all users of a specific role
-  async sendBroadcastToRole(
-    role: 'client' | 'seller' | 'admin',
-    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
-  ): Promise<void> {
-    const { data: users, error } = await supabase!
-      .from('users')
-      .select('id')
-      .eq('role', role);
-    
-    if (error) throw error;
-    
-    const userIds = users?.map((u: any) => u.id) || [];
-    if (userIds.length > 0) {
-      await this.createBulk(userIds, notification);
-    }
-  },
+  // Notifie quand une boutique suivie publie un nouveau produit
+  async notifyNewProductFromFollowedStore(storeName: string, productName: string) {
+    if (Platform.OS === 'web') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `Nouveauté chez ${storeName} ! 🎉`,
+        body: `Découvrez leur nouvel article : ${productName}.`,
+        data: { type: 'new_product' },
+      },
+      trigger: null, // null = immédiat
+    });
+  }
 
-  // Send broadcast notification to all sellers
-  async sendBroadcastToSellers(
-    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
-  ): Promise<void> {
-    await this.sendBroadcastToRole('seller', notification);
-  },
+  // Notification d'engagement programmée (pour inciter le client à revenir)
+  async scheduleEngagementNotification() {
+    if (Platform.OS === 'web') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🌟 Découvrez les nouveautés locales",
+        body: "De nouvelles boutiques et produits sont arrivés sur LibreShop. Venez explorer votre marché local !",
+        data: { screen: 'ClientHome' },
+      },
+      trigger: {
+        seconds: 3 * 24 * 60 * 60, // 3 jours après
+        repeats: true, // Si supporté
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      },
+    });
+  }
 
-  // Send broadcast notification to all clients
-  async sendBroadcastToClients(
-    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
-  ): Promise<void> {
-    await this.sendBroadcastToRole('client', notification);
-  },
+  // ==========================================
+  // NOTIFICATIONS VENDEUR
+  // ==========================================
 
-  // Send broadcast notification to all admins
-  async sendBroadcastToAdmins(
-    notification: Omit<Notification, 'id' | 'user_id' | 'created_at'>
-  ): Promise<void> {
-    await this.sendBroadcastToRole('admin', notification);
-  },
+  async notifyNewOrder(orderId: string, amount: string) {
+    if (Platform.OS === 'web') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "💸 Nouvelle commande !",
+        body: `Vous avez reçu une nouvelle commande (ID: ${orderId}) d'un montant de ${amount}. Préparez-la vite !`,
+        data: { screen: 'SellerOrders' },
+        sound: true,
+      },
+      trigger: null,
+    });
+  }
 
-  // Register device token
-  async registerDeviceToken(
-    userId: string,
-    token: string,
-    platform: 'ios' | 'android' | 'web',
-    deviceInfo?: Record<string, any>
-  ): Promise<void> {
-    const { error } = await supabase!
-      .from('device_tokens')
-      .upsert({
-        user_id: userId,
-        token,
-        platform,
-        device_info: deviceInfo,
-        last_used_at: new Date().toISOString(),
-      });
-    if (error) throw error;
-  },
-};
+  async notifyLowStock(productName: string) {
+    if (Platform.OS === 'web') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "⚠️ Rupture de stock imminente",
+        body: `Le produit "${productName}" est presque épuisé. Pensez à réapprovisionner !`,
+        data: { screen: 'SellerProducts' },
+      },
+      trigger: null,
+    });
+  }
 
+  async notifyNewInteraction(type: 'like' | 'comment', productName: string) {
+    if (Platform.OS === 'web') return;
+    const actionText = type === 'like' ? 'a aimé' : 'a commenté';
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Nouvelle interaction ❤️",
+        body: `Quelqu'un ${actionText} votre produit "${productName}".`,
+      },
+      trigger: null,
+    });
+  }
+
+  // ==========================================
+  // NOTIFICATIONS ADMINISTRATEUR
+  // ==========================================
+
+  async notifyAdminActionRequired(actionType: string) {
+    if (Platform.OS === 'web') return;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🛡️ Action Administrateur Requise",
+        body: `Une nouvelle tâche nécessite votre attention : ${actionType}`,
+        data: { screen: 'AdminDashboard' },
+      },
+      trigger: null,
+    });
+  }
+}
+
+export const notificationService = new NotificationService();

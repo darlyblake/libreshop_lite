@@ -1110,6 +1110,8 @@ export const ProductDetailScreen: React.FC = () => {
               return;
             }
             addItem(product, quantity);
+            const { notificationService } = require('../services/notificationService');
+            notificationService.scheduleCartReminder();
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
           disabled={!productData?.inStock}

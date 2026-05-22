@@ -70,11 +70,11 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 4,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.05, shadowRadius: 15 },
+      android: { elevation: 4 },
+      web: { boxShadow: '0px 10px 15px rgba(0,0,0,0.05)' }
+    }),
   },
   iconWrapper: {
     width: 90,
@@ -101,11 +101,11 @@ const styles = StyleSheet.create({
     gap: 12,
     width: '100%',
     paddingVertical: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 6 },
+      android: { elevation: 2 },
+      web: { boxShadow: '0px 4px 6px rgba(0,0,0,0.1)' }
+    }),
   },
   buttonText: {
     color: '#fff',

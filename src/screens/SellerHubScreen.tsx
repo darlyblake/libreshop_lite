@@ -31,17 +31,18 @@ import { sessionStorage } from '../lib/storage';
 import { Store, WithdrawalRequest, KYCStatus } from '../lib/supabase';
 import { financeService, WalletStats, Transaction } from '../services/financeService';
 
-const formatAbbreviatedAmount = (value: number) => {
-  if (value >= 1_000_000_000) {
-    return (value / 1_000_000_000).toFixed(1).replace('.', ',') + ' Md';
+const formatAbbreviatedAmount = (value: number | undefined | null) => {
+  const safeValue = value || 0;
+  if (safeValue >= 1_000_000_000) {
+    return (safeValue / 1_000_000_000).toFixed(1).replace('.', ',') + ' Md';
   }
-  if (value >= 1_000_000) {
-    return (value / 1_000_000).toFixed(1).replace('.', ',') + ' M';
+  if (safeValue >= 1_000_000) {
+    return (safeValue / 1_000_000).toFixed(1).replace('.', ',') + ' M';
   }
-  if (value >= 1_000) {
-    return (value / 1_000).toFixed(0) + ' k';
+  if (safeValue >= 1_000) {
+    return (safeValue / 1_000).toFixed(0) + ' k';
   }
-  return value.toString();
+  return safeValue.toString();
 };
 
 export const SellerHubScreen: React.FC = () => {
@@ -110,7 +111,7 @@ export const SellerHubScreen: React.FC = () => {
   }, [user?.id]);
 
   const loadStoresAndData = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !supabase) return;
     try {
       setLoading(true);
 
@@ -894,103 +895,95 @@ export const SellerHubScreen: React.FC = () => {
           )}
         </ScrollView>
       ) : activeTab === 'finance' ? (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* SOLDE CARD */}
-          <LinearGradient
-            colors={['#1e293b', '#0f172a']}
-            style={styles.balanceCard}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.balanceHeader}>
-              <Text style={styles.balanceLabel}>Solde Global Disponible</Text>
-              <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
-                <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={22} color="rgba(255,255,255,0.7)" />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.balanceAmount}>
-              {showBalance ? formatAbbreviatedAmount(walletStats.availableBalance) + ' FCFA' : '•••••••• FCFA'}
-            </Text>
-
-            <View style={styles.pendingRow}>
-              <Ionicons name="time-outline" size={16} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.pendingText}>
-                En attente : {showBalance ? formatAbbreviatedAmount(walletStats.pendingBalance) + ' FCFA' : '••••'}
-              </Text>
-            </View>
-
-            <TouchableOpacity 
-              style={styles.withdrawMainBtn}
-              onPress={() => setWithdrawModalVisible(true)}
+        <View style={{ flex: 1 }}>
+          <ScrollView contentContainerStyle={[styles.scrollContent, { opacity: 0.2 }]} showsVerticalScrollIndicator={false} scrollEnabled={false}>
+            {/* SOLDE CARD */}
+            <LinearGradient
+              colors={['#1e293b', '#0f172a']}
+              style={styles.balanceCard}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
-              <Ionicons name="cash-outline" size={20} color="#0f172a" />
-              <Text style={styles.withdrawMainBtnText}>Retirer maintenant</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+              <View style={styles.balanceHeader}>
+                <Text style={styles.balanceLabel}>Solde Global Disponible</Text>
+                <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
+                  <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={22} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.balanceAmount}>
+                {showBalance ? `${formatAbbreviatedAmount(walletStats.availableBalance)} F` : '••••••••'}
+              </Text>
+              
+              <View style={styles.balanceDetails}>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>En attente</Text>
+                  <Text style={styles.detailValue}>{formatAbbreviatedAmount(walletStats.pendingBalance)} F</Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Revenus Totaux</Text>
+                  <Text style={[styles.detailValue, { color: '#10b981' }]}>{formatAbbreviatedAmount(walletStats.totalWithdrawn)} F</Text>
+                </View>
+              </View>
 
-          {/* KYC BANNER */}
-          {getKycBanner()}
+              <TouchableOpacity 
+                style={[styles.withdrawBtn, (kycStatus !== 'verified' || walletStats.availableBalance <= 0) && { opacity: 0.5 }]} 
+                onPress={() => kycStatus === 'verified' && walletStats.availableBalance > 0 && setWithdrawModalVisible(true)}
+                disabled={kycStatus !== 'verified' || walletStats.availableBalance <= 0}
+              >
+                <Ionicons name="cash-outline" size={20} color="#fff" />
+                <Text style={styles.withdrawBtnText}>Demander un Retrait</Text>
+              </TouchableOpacity>
+            </LinearGradient>
 
-          {/* REVENUE PAR BOUTIQUE */}
-          <View style={styles.section}>
+            {/* KYC BANNER */}
+            {getKycBanner()}
+
+            {/* WITHDRAWALS HISTORY */}
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Revenus par Boutique</Text>
-            </View>
-            {stores.length === 0 ? (
-              <Text style={styles.emptyText}>Aucune boutique trouvée.</Text>
-            ) : (
-              stores.map(s => {
-                const sSales = stats.salesPerStore[s.id] || 0;
-                return (
-                  <View key={s.id} style={styles.txRow}>
-                    <View style={[styles.txIcon, { backgroundColor: COLORS.primary + '20' }]}>
-                      <Ionicons name="storefront-outline" size={20} color={COLORS.primary} />
-                    </View>
-                    <View style={styles.txDetails}>
-                      <Text style={styles.txDesc}>{s.name}</Text>
-                      <Text style={styles.txDate}>Ventes générées en ligne</Text>
-                    </View>
-                    <Text style={[styles.txAmount, { color: COLORS.text }]}>
-                      {formatAbbreviatedAmount(sSales)} F
-                    </Text>
-                  </View>
-                );
-              })
-            )}
-          </View>
-
-          {/* WITHDRAWAL HISTORY */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Historique des Retraits</Text>
+              <Text style={[styles.sectionTitle, { color: COLORS.text }]}>Historique des Retraits</Text>
             </View>
             
-            {withdrawals.length === 0 ? (
-              <Text style={styles.emptyText}>Aucun retrait effectué.</Text>
-            ) : (
-              withdrawals.slice(0, 5).map(w => {
-                let statusColor = COLORS.textMuted;
-                let statusText = 'En cours';
-                if (w.status === 'completed') { statusColor = COLORS.success; statusText = 'Effectué'; }
-                else if (w.status === 'rejected') { statusColor = COLORS.danger; statusText = 'Rejeté'; }
-                
-                return (
-                  <View key={w.id} style={styles.wdRow}>
-                    <View style={styles.wdInfo}>
-                      <Text style={styles.wdMethod}>{w.method}</Text>
-                      <Text style={styles.wdDate}>{new Date(w.created_at).toLocaleDateString('fr-FR')}</Text>
+            <View style={[styles.historyCard, { backgroundColor: COLORS.card, borderColor: COLORS.border }]}>
+              {withdrawals.length === 0 ? (
+                <Text style={[styles.emptyText, { color: COLORS.textMuted }]}>Aucun retrait pour le moment.</Text>
+              ) : (
+                withdrawals.map((w, index) => {
+                  let statusColor = COLORS.warning;
+                  let statusText = 'En cours';
+                  if (w.status === 'completed') { statusColor = COLORS.success; statusText = 'Terminé'; }
+                  if (w.status === 'rejected') { statusColor = COLORS.danger; statusText = 'Rejeté'; }
+                  
+                  return (
+                    <View key={w.id} style={[styles.wdItem, index < withdrawals.length - 1 && { borderBottomWidth: 1, borderBottomColor: COLORS.border }]}>
+                      <View style={styles.wdInfo}>
+                        <Text style={styles.wdMethod}>{w.method}</Text>
+                        <Text style={styles.wdDate}>{new Date(w.created_at).toLocaleDateString('fr-FR')}</Text>
+                      </View>
+                      <View style={styles.wdStatusContainer}>
+                        <Text style={styles.wdAmount}>{formatAbbreviatedAmount(w.amount)} F</Text>
+                        <Text style={[styles.wdStatus, { color: statusColor }]}>{statusText}</Text>
+                      </View>
                     </View>
-                    <View style={styles.wdStatusContainer}>
-                      <Text style={styles.wdAmount}>{formatAbbreviatedAmount(w.amount)} F</Text>
-                      <Text style={[styles.wdStatus, { color: statusColor }]}>{statusText}</Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
+          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10 }]}>
+            <View style={{ backgroundColor: 'rgba(30, 41, 59, 0.95)', padding: 32, borderRadius: 24, alignItems: 'center', maxWidth: 320, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20 }}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(99, 102, 241, 0.2)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+                <Ionicons name="wallet" size={32} color="#818cf8" />
+              </View>
+              <Text style={{ color: '#fff', fontSize: 24, fontWeight: '800', marginBottom: 12, textAlign: 'center' }}>LibrePay</Text>
+              <Text style={{ color: '#cbd5e1', fontSize: 15, textAlign: 'center', lineHeight: 22 }}>
+                La gestion de vos revenus centralisée et les paiements en ligne arrivent très prochainement sur LibreShop.
+              </Text>
+              <View style={{ marginTop: 24, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}>
+                <Text style={{ color: '#a5b4fc', fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Fonctionnalité à venir</Text>
+              </View>
+            </View>
           </View>
-        </ScrollView>
+        </View>
       ) : (
         /* PROFESSIONAL ACCOUNT SETTINGS MANAGEMENT TAB */
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -1696,27 +1689,25 @@ const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any, is
   balanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
   balanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
   balanceAmount: { color: '#fff', fontSize: 32, fontWeight: '800', marginBottom: SPACING.md },
-  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.lg },
-  pendingText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '500' },
-  withdrawMainBtn: { backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: RADIUS.lg, gap: 8 },
-  withdrawMainBtnText: { color: '#0f172a', fontSize: 14, fontWeight: '700' },
+  balanceDetails: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', padding: SPACING.md, borderRadius: RADIUS.md, marginBottom: SPACING.lg },
+  detailItem: { alignItems: 'center', flex: 1 },
+  detailLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
+  detailValue: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  detailDivider: { width: 1, height: '80%', backgroundColor: 'rgba(255,255,255,0.1)' },
+  withdrawBtn: { backgroundColor: 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: RADIUS.lg, gap: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  withdrawBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   kycBanner: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, borderWidth: 1, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
   kycTextContainer: { flex: 1, marginLeft: SPACING.sm },
   kycTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
   kycDescription: { fontSize: 12, color: COLORS.textMuted },
   kycBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm },
   kycBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  txIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
-  txDetails: { flex: 1 },
-  txDesc: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
-  txDate: { fontSize: 12, color: COLORS.textMuted },
-  txAmount: { fontSize: 14, fontWeight: '700' },
-  wdRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  historyCard: { borderRadius: RADIUS.lg, borderWidth: 1, paddingHorizontal: SPACING.md },
+  wdItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.md },
   wdInfo: { flex: 1 },
-  wdMethod: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  wdMethod: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 4 },
   wdDate: { fontSize: 12, color: COLORS.textMuted },
   wdStatusContainer: { alignItems: 'flex-end' },
-  wdAmount: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
-  wdStatus: { fontSize: 12, fontWeight: '600' }
+  wdAmount: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
+  wdStatus: { fontSize: 12, fontWeight: '700', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' }
 });
