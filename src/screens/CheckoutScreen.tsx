@@ -702,7 +702,7 @@ export const CheckoutScreen: React.FC = () => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Ville</Text>
             <TextInput
-              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null, { backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
+              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null, { backgroundColor: COLORS.bg, color: COLORS.textSoft, opacity: 0.8 }]}
               placeholder="Cliquez sur 'Obtenir ma position' ci-dessus"
               placeholderTextColor={COLORS.textMuted}
               value={formData.city}
@@ -716,7 +716,7 @@ export const CheckoutScreen: React.FC = () => {
               <Text style={styles.label}>Adresse précise</Text>
             </View>
             <TextInput
-              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null, { backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
+              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null, { backgroundColor: COLORS.bg, color: COLORS.textSoft, opacity: 0.8 }]}
               placeholder="Cliquez sur 'Obtenir ma position' ci-dessus"
               placeholderTextColor={COLORS.textMuted}
               multiline
