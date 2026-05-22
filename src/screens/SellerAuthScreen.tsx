@@ -9,6 +9,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
@@ -136,8 +137,37 @@ export const SellerAuthScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const authHook = useAuthStore ? useAuthStore() : { setUser: () => {}, setSession: () => {} };
-  const { setUser, setSession } = authHook;
+  const authHook = useAuthStore ? useAuthStore() : { setUser: () => {}, setSession: () => {}, user: null };
+  const { setUser, setSession, user } = authHook as any;
+
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Redirection automatique si l'utilisateur est déjà connecté
+  useEffect(() => {
+    const checkExistingUser = async () => {
+      try {
+        // Toujours vérifier la session la plus fraîche côté DB plutôt que le store seul
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser?.id) {
+          // Vérifier si l'utilisateur a déjà une boutique
+          const stores = await storeService.getStoresByUser(currentUser.id);
+          if (stores && stores.length > 0) {
+             await sessionStorage.saveUserRole('seller');
+             navigation.replace('SellerTabs');
+          } else {
+             // Connecté mais pas de boutique
+             await sessionStorage.saveUserRole('seller');
+             navigation.replace('SellerAddStore');
+          }
+        } else {
+          setIsCheckingAuth(false);
+        }
+      } catch (e) {
+        setIsCheckingAuth(false);
+      }
+    };
+    checkExistingUser();
+  }, [navigation]);
 
   const normalizedEmail = (formData.email || '').trim().toLowerCase();
 
@@ -465,6 +495,18 @@ export const SellerAuthScreen: React.FC = () => {
       subscription.remove();
     };
   }, []);
+
+  // Afficher un loader pendant la vérification d'authentification
+  if (isCheckingAuth) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ color: COLORS.textMuted, marginTop: 16, fontSize: 14 }}>
+          Vérification de votre session...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

@@ -124,6 +124,7 @@ export interface User {
   role: UserRole;
   avatar_url?: string;
   address?: string;
+  theme_preference?: 'light' | 'dark' | 'system';
   created_at: string;
 }
 

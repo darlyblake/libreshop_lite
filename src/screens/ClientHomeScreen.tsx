@@ -784,7 +784,32 @@ export const ClientHomeScreen: React.FC = () => {
             </Animated.View>
             <TouchableOpacity
               style={styles.openShopButton}
-              onPress={() => navigation.navigate('SellerAuth')}
+              onPress={async () => {
+                try {
+                  let currentUserId = user?.id;
+                  if (!currentUserId) {
+                    const { supabase } = require('../lib/supabase');
+                    const { data } = await supabase.auth.getUser();
+                    currentUserId = data?.user?.id;
+                  }
+
+                  if (currentUserId) {
+                    const { storeService } = require('../services/storeService');
+                    const { sessionStorage } = require('../lib/storage');
+                    const stores = await storeService.getStoresByUser(currentUserId);
+                    await sessionStorage.saveUserRole('seller');
+                    if (stores && stores.length > 0) {
+                      navigation.reset({ index: 0, routes: [{ name: 'SellerTabs' }] });
+                    } else {
+                      navigation.reset({ index: 0, routes: [{ name: 'SellerAddStore' }] });
+                    }
+                  } else {
+                    navigation.navigate('SellerAuth');
+                  }
+                } catch (e) {
+                  navigation.navigate('SellerAuth');
+                }
+              }}
             >
               <Animated.View style={{ transform: [{ scale: pulseAnim }], flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Ionicons name="storefront" size={16} color="white" />

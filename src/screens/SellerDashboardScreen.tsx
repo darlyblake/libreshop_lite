@@ -1160,73 +1160,6 @@ export const SellerDashboardScreen: React.FC = () => {
     );
   }
 
-  const renderLibrePayCard = () => {
-    return (
-      <View style={[styles.section, { marginBottom: spacing.xl }]}>
-        <LinearGradient
-          colors={['#1e293b', '#0f172a']}
-          style={{
-            borderRadius: component.cardBorderRadius,
-            padding: spacing.xl,
-          }}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="wallet-outline" size={20} color="#fff" />
-              <Text style={{ fontSize: fontSize.md, fontWeight: '700', color: '#fff' }}>
-                LibrePay - Gestion Financière
-              </Text>
-            </View>
-            <TouchableOpacity onPress={() => setShowDashboardBalance(!showDashboardBalance)}>
-              <Ionicons name={showDashboardBalance ? "eye-outline" : "eye-off-outline"} size={22} color="rgba(255,255,255,0.7)" />
-            </TouchableOpacity>
-          </View>
-          
-          <Text style={{ fontSize: fontSize.xxl, fontWeight: '800', color: '#fff', marginVertical: spacing.md }}>
-            {showDashboardBalance ? formatAmount(availableBalance) : '•••••••• FCFA'}
-          </Text>
-
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm }}>
-            <TouchableOpacity 
-              style={{
-                flex: 1,
-                backgroundColor: COLORS.primary,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                borderRadius: RADIUS.md,
-                gap: 6,
-              }}
-              onPress={() => navigation.navigate('SellerFinance')}
-            >
-              <Ionicons name="cash-outline" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: fontSize.sm, fontWeight: '700' }}>Retirer maintenant</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={{
-                flex: 1,
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                borderRadius: RADIUS.md,
-                gap: 6,
-              }}
-              onPress={() => navigation.navigate('SellerFinance')}
-            >
-              <Text style={{ color: '#fff', fontSize: fontSize.sm, fontWeight: '700' }}>Historique / KYC</Text>
-              <Ionicons name="chevron-forward" size={16} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  };
 
   const renderAnalyticsButton = () => {
     const isAnalyticsActive = store?.analytics_active !== false && !isExpired;
@@ -1387,7 +1320,6 @@ export const SellerDashboardScreen: React.FC = () => {
         <View style={[styles.contentWrapper, { maxWidth: contentMaxWidth, alignSelf: 'center', width: '100%', paddingHorizontal: spacing.lg }]}>
           {renderSubscriptionPlan()}
           {renderStats()}
-          {renderLibrePayCard()}
           {renderAnalyticsButton()}
           {renderAlerts()}
           {renderQuickActions()}

@@ -232,17 +232,34 @@ export const ClientProfileScreen: React.FC = () => {
 
   const handleMenuPress = (item: (typeof MENU_ITEMS)[number]) => {
     if (item.label === 'Ouvrir ma boutique') {
-      if (user) {
-        // Switch to seller role in sessionStorage and navigate
-        sessionStorage.saveUserRole('seller').then(() => {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'SellerTabs' }],
-          });
-        });
-      } else {
-        navigation.navigate('SellerAuth');
-      }
+      const navigateToSeller = async () => {
+        try {
+          // Vérifier d'abord le store local, puis la session Supabase en fallback
+          let currentUserId = user?.id;
+          if (!currentUserId) {
+            const { supabase } = require('../lib/supabase');
+            const { data } = await supabase.auth.getUser();
+            currentUserId = data?.user?.id;
+          }
+
+          if (currentUserId) {
+            const { storeService } = require('../services/storeService');
+            const stores = await storeService.getStoresByUser(currentUserId);
+            await sessionStorage.saveUserRole('seller');
+            if (stores && stores.length > 0) {
+              navigation.reset({ index: 0, routes: [{ name: 'SellerTabs' }] });
+            } else {
+              navigation.reset({ index: 0, routes: [{ name: 'SellerAddStore' }] });
+            }
+          } else {
+            // Pas de session du tout → page de connexion vendeur
+            navigation.navigate('SellerAuth');
+          }
+        } catch (e) {
+          navigation.navigate('SellerAuth');
+        }
+      };
+      navigateToSeller();
       return;
     }
     if (item.action === 'restore') {

@@ -27,7 +27,9 @@ import { authService } from '../services/authService';
 import { userService } from '../services/userService';
 import { errorHandler } from '../utils/errorHandler';
 import { supabase } from '../lib/supabase';
-import { Store } from '../lib/supabase';
+import { sessionStorage } from '../lib/storage';
+import { Store, WithdrawalRequest, KYCStatus } from '../lib/supabase';
+import { financeService, WalletStats, Transaction } from '../services/financeService';
 
 const formatAbbreviatedAmount = (value: number) => {
   if (value >= 1_000_000_000) {
@@ -54,10 +56,25 @@ export const SellerHubScreen: React.FC = () => {
 
   const styles = createStyles(COLORS, SPACING, RADIUS, FONT_SIZE, isMobileWidth);
 
-  // Tabs: 'stores' | 'settings'
-  const [activeTab, setActiveTab] = useState<'stores' | 'settings'>('stores');
+  // Tabs: 'stores' | 'finance' | 'settings'
+  const [activeTab, setActiveTab] = useState<'stores' | 'finance' | 'settings'>('stores');
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<Store[]>([]);
+  
+  // Finance states
+  const [walletStats, setWalletStats] = useState<WalletStats>({ availableBalance: 0, pendingBalance: 0, totalWithdrawn: 0 });
+  const [kycStatus, setKycStatus] = useState<KYCStatus>('unverified');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequest[]>([]);
+  const [showBalance, setShowBalance] = useState(true);
+
+  // Withdraw Modal State
+  const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawMethod, setWithdrawMethod] = useState('Orange Money');
+  const [withdrawPhone, setWithdrawPhone] = useState('');
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
+  const withdrawMethods = ['Orange Money', 'MTN MoMo', 'Wave', 'Virement Bancaire'];
   
   // Real-time calculated stats
   const [stats, setStats] = useState({
@@ -255,6 +272,35 @@ export const SellerHubScreen: React.FC = () => {
       });
       setActivityBreakdown(activityStats);
 
+      // 6. Fetch Finance Data
+      if (storeIds.length > 0) {
+        const mainStoreId = storeIds[0];
+        try {
+          const [kyc, txs, wds] = await Promise.all([
+            financeService.getKYCStatus(mainStoreId),
+            financeService.getRecentTransactions(mainStoreId),
+            financeService.getWithdrawals(mainStoreId),
+          ]);
+          setKycStatus(kyc);
+          setTransactions(txs);
+          setWithdrawals(wds);
+          
+          let totalAvail = 0;
+          let totalPend = 0;
+          let totalWithd = 0;
+          
+          for (const sid of storeIds) {
+             const ws = await financeService.getWalletStats(sid);
+             totalAvail += ws.availableBalance;
+             totalPend += ws.pendingBalance;
+             totalWithd += ws.totalWithdrawn;
+          }
+          setWalletStats({ availableBalance: totalAvail, pendingBalance: totalPend, totalWithdrawn: totalWithd });
+        } catch (err) {
+          console.error('Failed to load finance data in Hub', err);
+        }
+      }
+
     } catch (error) {
       errorHandler.handleDatabaseError(error as Error, 'Error loading stores in Hub');
     } finally {
@@ -286,6 +332,82 @@ export const SellerHubScreen: React.FC = () => {
         Alert.alert('Erreur', 'Impossible de se déconnecter');
       }
     }
+  };
+
+  const handleWithdrawRequest = async () => {
+    if (kycStatus !== 'verified') {
+      Alert.alert(
+        'Vérification requise',
+        'Vous devez faire vérifier votre compte (KYC) avant de pouvoir effectuer un retrait.',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Vérifier mon compte', onPress: () => navigation.navigate('SellerKYC') }
+        ]
+      );
+      return;
+    }
+
+    const amountNum = parseInt(withdrawAmount.replace(/\s/g, ''), 10);
+    
+    if (!amountNum || amountNum < 5000) {
+      Alert.alert('Erreur', 'Le montant minimum de retrait est de 5000 FCFA.');
+      return;
+    }
+    
+    if (amountNum > walletStats.availableBalance) {
+      Alert.alert('Erreur', 'Solde insuffisant pour ce montant.');
+      return;
+    }
+
+    if (!withdrawPhone || withdrawPhone.length < 8) {
+      Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide pour la réception.');
+      return;
+    }
+
+    try {
+      setIsSubmittingWithdraw(true);
+      const mainStoreId = stores[0].id; // using first store for withdrawal logic
+      await financeService.requestWithdrawal(mainStoreId, amountNum, withdrawMethod, { phone: withdrawPhone });
+      setWithdrawModalVisible(false);
+      setWithdrawAmount('');
+      Alert.alert('Succès', 'Votre demande de retrait a été soumise avec succès.');
+      loadStoresAndData();
+    } catch (error) {
+      Alert.alert('Erreur', 'Impossible de soumettre la demande de retrait.');
+    } finally {
+      setIsSubmittingWithdraw(false);
+    }
+  };
+
+  const getKycBanner = () => {
+    if (kycStatus === 'verified') return null;
+    
+    const isPending = kycStatus === 'pending';
+    const color = isPending ? COLORS.warning : COLORS.danger;
+    
+    return (
+      <View style={[styles.kycBanner, { backgroundColor: color + '15', borderColor: color }]}>
+        <Ionicons name={isPending ? 'time' : 'alert-circle'} size={24} color={color} />
+        <View style={styles.kycTextContainer}>
+          <Text style={[styles.kycTitle, { color }]}>
+            {isPending ? 'Vérification en cours' : 'Compte non vérifié'}
+          </Text>
+          <Text style={styles.kycDescription}>
+            {isPending 
+              ? 'Vos documents sont en cours de vérification par notre équipe.' 
+              : 'Vérifiez votre identité pour débloquer les retraits LibrePay.'}
+          </Text>
+        </View>
+        {!isPending && (
+          <TouchableOpacity 
+            style={[styles.kycBtn, { backgroundColor: color }]}
+            onPress={() => navigation.navigate('SellerKYC')}
+          >
+            <Text style={styles.kycBtnText}>Vérifier</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
   const handleSaveSettings = async () => {
@@ -418,9 +540,21 @@ export const SellerHubScreen: React.FC = () => {
               <Text style={styles.bannerBrand}>LibreShop Business</Text>
               <Text style={styles.bannerSubtitle}>Espace Client Multi-Boutiques</Text>
             </View>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity 
+                style={[styles.logoutBtn, { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }]} 
+                onPress={async () => {
+                  await sessionStorage.saveUserRole('client');
+                  navigation.reset({ index: 0, routes: [{ name: 'ClientTabs' }] });
+                }}
+              >
+                <Ionicons name="cart-outline" size={16} color="#ffffff" />
+                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Mode Acheteur</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                <Ionicons name="log-out-outline" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* User profile resume inside banner */}
@@ -450,7 +584,21 @@ export const SellerHubScreen: React.FC = () => {
             color={activeTab === 'stores' ? COLORS.primary : COLORS.textMuted} 
           />
           <Text style={[styles.tabText, { color: activeTab === 'stores' ? COLORS.primary : COLORS.textMuted }]}>
-            Mes Boutiques
+            Boutiques
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'finance' && styles.tabItemActive]}
+          onPress={() => setActiveTab('finance')}
+        >
+          <Ionicons 
+            name="wallet-outline" 
+            size={18} 
+            color={activeTab === 'finance' ? COLORS.primary : COLORS.textMuted} 
+          />
+          <Text style={[styles.tabText, { color: activeTab === 'finance' ? COLORS.primary : COLORS.textMuted }]}>
+            LibrePay
           </Text>
         </TouchableOpacity>
 
@@ -745,6 +893,104 @@ export const SellerHubScreen: React.FC = () => {
             </View>
           )}
         </ScrollView>
+      ) : activeTab === 'finance' ? (
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* SOLDE CARD */}
+          <LinearGradient
+            colors={['#1e293b', '#0f172a']}
+            style={styles.balanceCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.balanceHeader}>
+              <Text style={styles.balanceLabel}>Solde Global Disponible</Text>
+              <TouchableOpacity onPress={() => setShowBalance(!showBalance)}>
+                <Ionicons name={showBalance ? "eye-outline" : "eye-off-outline"} size={22} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.balanceAmount}>
+              {showBalance ? formatAbbreviatedAmount(walletStats.availableBalance) + ' FCFA' : '•••••••• FCFA'}
+            </Text>
+
+            <View style={styles.pendingRow}>
+              <Ionicons name="time-outline" size={16} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.pendingText}>
+                En attente : {showBalance ? formatAbbreviatedAmount(walletStats.pendingBalance) + ' FCFA' : '••••'}
+              </Text>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.withdrawMainBtn}
+              onPress={() => setWithdrawModalVisible(true)}
+            >
+              <Ionicons name="cash-outline" size={20} color="#0f172a" />
+              <Text style={styles.withdrawMainBtnText}>Retirer maintenant</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+
+          {/* KYC BANNER */}
+          {getKycBanner()}
+
+          {/* REVENUE PAR BOUTIQUE */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Revenus par Boutique</Text>
+            </View>
+            {stores.length === 0 ? (
+              <Text style={styles.emptyText}>Aucune boutique trouvée.</Text>
+            ) : (
+              stores.map(s => {
+                const sSales = stats.salesPerStore[s.id] || 0;
+                return (
+                  <View key={s.id} style={styles.txRow}>
+                    <View style={[styles.txIcon, { backgroundColor: COLORS.primary + '20' }]}>
+                      <Ionicons name="storefront-outline" size={20} color={COLORS.primary} />
+                    </View>
+                    <View style={styles.txDetails}>
+                      <Text style={styles.txDesc}>{s.name}</Text>
+                      <Text style={styles.txDate}>Ventes générées en ligne</Text>
+                    </View>
+                    <Text style={[styles.txAmount, { color: COLORS.text }]}>
+                      {formatAbbreviatedAmount(sSales)} F
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* WITHDRAWAL HISTORY */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Historique des Retraits</Text>
+            </View>
+            
+            {withdrawals.length === 0 ? (
+              <Text style={styles.emptyText}>Aucun retrait effectué.</Text>
+            ) : (
+              withdrawals.slice(0, 5).map(w => {
+                let statusColor = COLORS.textMuted;
+                let statusText = 'En cours';
+                if (w.status === 'completed') { statusColor = COLORS.success; statusText = 'Effectué'; }
+                else if (w.status === 'rejected') { statusColor = COLORS.danger; statusText = 'Rejeté'; }
+                
+                return (
+                  <View key={w.id} style={styles.wdRow}>
+                    <View style={styles.wdInfo}>
+                      <Text style={styles.wdMethod}>{w.method}</Text>
+                      <Text style={styles.wdDate}>{new Date(w.created_at).toLocaleDateString('fr-FR')}</Text>
+                    </View>
+                    <View style={styles.wdStatusContainer}>
+                      <Text style={styles.wdAmount}>{formatAbbreviatedAmount(w.amount)} F</Text>
+                      <Text style={[styles.wdStatus, { color: statusColor }]}>{statusText}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </ScrollView>
       ) : (
         /* PROFESSIONAL ACCOUNT SETTINGS MANAGEMENT TAB */
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -876,6 +1122,78 @@ export const SellerHubScreen: React.FC = () => {
                 onPress={performLogout}
               >
                 <Text style={styles.modalConfirmText}>Déconnexion</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* WITHDRAW MODAL */}
+      <Modal
+        visible={withdrawModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setWithdrawModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: COLORS.bg }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.lg, width: '100%' }}>
+              <Text style={styles.modalTitle}>Demande de retrait</Text>
+              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ width: '100%' }}>
+              <Text style={[styles.modalLabel, { color: COLORS.textMuted }]}>Méthode de retrait</Text>
+              <View style={styles.methodContainer}>
+                {withdrawMethods.map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.methodBtn, withdrawMethod === m && styles.methodBtnActive, { backgroundColor: COLORS.card, borderColor: COLORS.border }]}
+                    onPress={() => setWithdrawMethod(m)}
+                  >
+                    <Text style={[styles.methodBtnText, withdrawMethod === m ? styles.methodBtnTextActive : { color: COLORS.text }]}>
+                      {m}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.modalLabel, { color: COLORS.textMuted }]}>Numéro de réception</Text>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: COLORS.card, borderColor: COLORS.border, color: COLORS.text }]}
+                placeholder="Ex: 0700000000"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="phone-pad"
+                value={withdrawPhone}
+                onChangeText={setWithdrawPhone}
+              />
+
+              <Text style={[styles.modalLabel, { color: COLORS.textMuted }]}>Montant (FCFA)</Text>
+              <TextInput
+                style={[styles.modalInput, { backgroundColor: COLORS.card, borderColor: COLORS.border, color: COLORS.text }]}
+                placeholder="Ex: 15000"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="numeric"
+                value={withdrawAmount}
+                onChangeText={setWithdrawAmount}
+              />
+              
+              <Text style={styles.modalHelper}>
+                Solde global disponible : {walletStats.availableBalance.toLocaleString('fr-FR')} F
+              </Text>
+
+              <TouchableOpacity 
+                style={[{ backgroundColor: COLORS.primary, padding: SPACING.md, borderRadius: RADIUS.md, alignItems: 'center', marginTop: SPACING.xl, marginBottom: SPACING.sm }, isSubmittingWithdraw && { opacity: 0.7 }]}
+                onPress={handleWithdrawRequest}
+                disabled={isSubmittingWithdraw}
+              >
+                {isSubmittingWithdraw ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Confirmer le retrait</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1354,4 +1672,51 @@ const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any, is
     fontWeight: '800',
     fontSize: 13,
   },
+  modalLabel: { fontSize: 13, fontWeight: '700', marginBottom: 8, marginTop: SPACING.sm },
+  methodContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  methodBtn: { padding: 10, borderRadius: RADIUS.md, borderWidth: 1 },
+  methodBtnActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '15' },
+  methodBtnText: { fontSize: 12, fontWeight: '600' },
+  methodBtnTextActive: { color: COLORS.primary },
+  modalInput: { height: 44, borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, marginTop: 4, fontSize: 14 },
+  modalHelper: { fontSize: 11, textAlign: 'right', marginTop: 4, color: COLORS.textMuted },
+
+  // Finance styles
+  balanceCard: { 
+    borderRadius: RADIUS.xl, 
+    padding: SPACING.xl, 
+    marginBottom: SPACING.lg, 
+    elevation: 8, 
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.15, shadowRadius: 15 },
+      android: { shadowColor: '#000', shadowOffset: {width: 0, height: 10}, shadowOpacity: 0.15, shadowRadius: 15 },
+      web: { boxShadow: '0px 10px 15px rgba(0,0,0,0.15)' }
+    })
+  },
+  balanceHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xs },
+  balanceLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' },
+  balanceAmount: { color: '#fff', fontSize: 32, fontWeight: '800', marginBottom: SPACING.md },
+  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.lg },
+  pendingText: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '500' },
+  withdrawMainBtn: { backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: RADIUS.lg, gap: 8 },
+  withdrawMainBtnText: { color: '#0f172a', fontSize: 14, fontWeight: '700' },
+  kycBanner: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, borderWidth: 1, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
+  kycTextContainer: { flex: 1, marginLeft: SPACING.sm },
+  kycTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  kycDescription: { fontSize: 12, color: COLORS.textMuted },
+  kycBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.sm },
+  kycBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  txIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+  txDetails: { flex: 1 },
+  txDesc: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  txDate: { fontSize: 12, color: COLORS.textMuted },
+  txAmount: { fontSize: 14, fontWeight: '700' },
+  wdRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  wdInfo: { flex: 1 },
+  wdMethod: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  wdDate: { fontSize: 12, color: COLORS.textMuted },
+  wdStatusContainer: { alignItems: 'flex-end' },
+  wdAmount: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 2 },
+  wdStatus: { fontSize: 12, fontWeight: '600' }
 });
