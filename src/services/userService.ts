@@ -103,6 +103,17 @@ export const userService = {
       return await this.upsertProfile(userId, {});
     }
 
+    // Check if full_name is missing or just the email prefix, and if we have better in OAuth metadata
+    const authRes = await supabase!.auth.getUser();
+    const user = authRes.data.user;
+    const metadataFullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+    
+    if (metadataFullName && (!data.full_name || data.full_name === data.email?.split('@')[0] || data.full_name === 'Acheteur' || data.full_name === 'Vendeur')) {
+      // Background update to not block login
+      this.updateProfile(userId, { full_name: metadataFullName }).catch(console.error);
+      return { ...data, full_name: metadataFullName };
+    }
+
     return data;
   },
 
@@ -114,15 +125,25 @@ export const userService = {
     }
 
     const authRes = await supabase!.auth.getUser();
-    const email = authRes.data.user?.email;
+    const user = authRes.data.user;
+    const email = user?.email;
     // Anonymous users do not have an email. Our `public.users.email` column is NOT NULL,
     // and `orders.user_id` has a FK to `public.users(id)`, so we must create a profile row
     // with a deterministic placeholder email.
     const resolvedEmail = email || `guest-${userId}@anon.local`;
 
+    const metadataFullName = user?.user_metadata?.full_name || user?.user_metadata?.name;
+    let fallbackFullName = '';
+    if (email) {
+      fallbackFullName = email.split('@')[0];
+    }
+    
+    const resolvedFullName = updates.full_name || metadataFullName || fallbackFullName;
+
     const payload: any = {
       id: userId,
       email: resolvedEmail,
+      full_name: resolvedFullName,
       ...updates,
     };
 
