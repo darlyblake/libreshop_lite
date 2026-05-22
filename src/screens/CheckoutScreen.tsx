@@ -29,6 +29,8 @@ import { couponService } from '../services/couponService';
 import { getStoreStatus } from '../utils/storeStatus';
 import { addressService } from '../services/addressService';
 import { useAlertModal } from '../components/AlertModal';
+import { useLegacyPalette } from '../hooks/useLegacyPalette';
+import { useTheme } from '../hooks/useTheme';
 
 export const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -36,6 +38,10 @@ export const CheckoutScreen: React.FC = () => {
   const { items: globalItems, getTotal, storeId: storeIdFromStore, clearCart } = useCartStore();
   const route = useRoute<any>();
   const { show: showAlert, AlertModalComponent } = useAlertModal();
+  
+  const COLORS = useLegacyPalette();
+  const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = React.useMemo(() => createCheckoutStyles(COLORS, SPACING, RADIUS, FONT_SIZE), [COLORS, SPACING, RADIUS, FONT_SIZE]);
 
   // allow passing `itemsJson` or `items` in navigation to checkout a subset (per-store)
   const paramItems = (() => {
@@ -1313,7 +1319,7 @@ export const CheckoutScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createCheckoutStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,

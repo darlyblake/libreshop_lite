@@ -502,7 +502,7 @@ export const ProductDetailScreen: React.FC = () => {
                 Animated.timing(imageOpacity, {
                   toValue: 1,
                   duration: 300,
-                  useNativeDriver: true,
+                  useNativeDriver: Platform.OS !== 'web',
                 }).start();
               }}
             />

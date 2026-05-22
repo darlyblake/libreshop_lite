@@ -535,21 +535,27 @@ export const productService = {
     if (error) throw error;
   },
 
-  async search(query: string, page = 0, pageSize = 20) {
+  async search(query: string, page = 0, pageSize = 20, options?: { category?: string, sub_category?: string, collection_id?: string }) {
     const client = useSupabase();
     const normalizedQuery = query.trim();
     const from = page * pageSize;
     const to = from + pageSize - 1;
     const searchPattern = `%${normalizedQuery}%`;
 
-    const { data, error } = await client
+    let dbQuery = client
       .from('products')
       .select('*, stores(name, logo_url)')
       .or(
-        `name.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern},reference.ilike.${searchPattern}`
+        `name.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern},sub_category.ilike.${searchPattern},reference.ilike.${searchPattern}`
       )
       .eq('is_active', true)
-      .gt('stock', 0)
+      .gt('stock', 0);
+
+    if (options?.category) dbQuery = dbQuery.eq('category', options.category);
+    if (options?.sub_category) dbQuery = dbQuery.eq('sub_category', options.sub_category);
+    if (options?.collection_id) dbQuery = dbQuery.eq('collection_id', options.collection_id);
+
+    const { data, error } = await dbQuery
       .order('created_at', { ascending: false })
       .range(from, to);
     if (error) throw error;
