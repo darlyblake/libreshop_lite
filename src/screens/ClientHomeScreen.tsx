@@ -257,19 +257,20 @@ export const ClientHomeScreen: React.FC = () => {
 
 
 
-  // Cache loading logic - only on mount
+  // Cache loading logic - only on mount, load each component independently
   useEffect(() => {
     const loadCachedData = async () => {
       try {
-        const [cachedCarousel, cachedPromo, cachedStores, cachedProducts, cachedCats, cachedColls] = await Promise.all([
-          cacheService.get<HomeBanner[]>(CACHE_KEYS.CAROUSEL),
-          cacheService.get<HomeBanner[]>(CACHE_KEYS.PROMO),
-          cacheService.get<Store[]>(CACHE_KEYS.STORES),
-          cacheService.get<Product[]>(CACHE_KEYS.PRODUCTS),
-          cacheService.get<string[]>(CACHE_KEYS.CATEGORIES),
-          cacheService.get<Collection[]>(CACHE_KEYS.COLLECTIONS),
+        // Load each component independently to avoid blocking
+        const [cachedCarousel, cachedPromo, cachedStores, cachedProducts, cachedCats] = await Promise.all([
+          cacheService.get<HomeBanner[]>(CACHE_KEYS.CAROUSEL).catch(() => null),
+          cacheService.get<HomeBanner[]>(CACHE_KEYS.PROMO).catch(() => null),
+          cacheService.get<Store[]>(CACHE_KEYS.STORES).catch(() => null),
+          cacheService.get<Product[]>(CACHE_KEYS.PRODUCTS).catch(() => null),
+          cacheService.get<string[]>(CACHE_KEYS.CATEGORIES).catch(() => null),
         ]);
 
+        // Set banners immediately if cached
         if (cachedCarousel || cachedPromo) {
           dispatch({
             type: 'SET_BANNERS',
@@ -279,16 +280,32 @@ export const ClientHomeScreen: React.FC = () => {
             },
           });
         }
-        if (cachedStores) dispatch({ type: 'SET_STORES', payload: cachedStores });
-        if (cachedProducts) dispatch({ type: 'SET_PRODUCTS', payload: cachedProducts });
-        if (cachedCats) dispatch({ type: 'SET_CATEGORIES', payload: cachedCats });
-        if (cachedColls) dispatch({ type: 'SET_COLLECTIONS', payload: cachedColls });
 
-        if (cachedProducts || cachedStores) {
+        // Set stores immediately if cached
+        if (cachedStores && Array.isArray(cachedStores)) {
+          dispatch({ type: 'SET_STORES', payload: cachedStores });
+          dispatch({ type: 'SET_LOADING_STORES', payload: false });
+        }
+
+        // Set products immediately if cached
+        if (cachedProducts && Array.isArray(cachedProducts)) {
+          dispatch({ type: 'SET_PRODUCTS', payload: cachedProducts });
+          dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
+        }
+
+        // Set categories immediately if cached
+        if (cachedCats && Array.isArray(cachedCats)) {
+          dispatch({ type: 'SET_CATEGORIES', payload: cachedCats });
+        }
+
+        // Only set global loading to false if we have at least some cached data
+        if (cachedProducts || cachedStores || cachedCarousel || cachedPromo) {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       } catch (e) {
         console.warn('[ClientHome] Failed to load cached data:', e);
+        // Don't block the UI if cache fails
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
     loadCachedData();
@@ -303,10 +320,14 @@ export const ClientHomeScreen: React.FC = () => {
           homeBannerService.getActiveByPlacement('promo').catch(() => []),
         ]);
 
-        if (carousel?.length) {
+        // Validate and sanitize banner data
+        const validCarousel = Array.isArray(carousel) ? carousel.filter((b: any) => b && b.id && b.image_url) : [];
+        const validPromo = Array.isArray(promo) ? promo.filter((b: any) => b && b.id && b.image_url) : [];
+
+        if (validCarousel.length > 0) {
           // Prefetch carousel images to avoid reloads during scroll
           try {
-            const urls = (carousel || []).map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
+            const urls = validCarousel.map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
             try {
               await (OptimizedImage as any).preload(urls);
             } catch (e) {
@@ -319,23 +340,24 @@ export const ClientHomeScreen: React.FC = () => {
           dispatch({
             type: 'SET_BANNERS',
             payload: {
-              carousel,
-              promo: promo || [],
+              carousel: validCarousel,
+              promo: validPromo,
             },
           });
-          cacheService.set(CACHE_KEYS.CAROUSEL, carousel, CACHE_TTL.CAROUSEL.duration, CACHE_TTL.CAROUSEL.stale);
+          cacheService.set(CACHE_KEYS.CAROUSEL, validCarousel, CACHE_TTL.CAROUSEL.duration, CACHE_TTL.CAROUSEL.stale);
         }
-        if (promo?.length) {
-          cacheService.set(CACHE_KEYS.PROMO, promo, CACHE_TTL.PROMO.duration, CACHE_TTL.PROMO.stale);
+        if (validPromo.length > 0) {
+          cacheService.set(CACHE_KEYS.PROMO, validPromo, CACHE_TTL.PROMO.duration, CACHE_TTL.PROMO.stale);
         }
       } catch (e) {
         console.warn('[ClientHome] Failed to load banners:', e);
+        // Don't block the UI if banners fail to load
       }
     };
     loadBanners();
   }, []); // Only run once on mount
 
-  // Load data from Supabase with high resilience
+  // Load data from Supabase with high resilience - each component independent
   const loadData = useCallback(
     async (refresh = false) => {
       try {
@@ -343,68 +365,108 @@ export const ClientHomeScreen: React.FC = () => {
         const hasData = products.length > 0 || stores.length > 0;
         if (!refresh && !hasData) dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        loadRecommendations();
 
-        // Parallel data loading with individual error handling
-        const [storesResult, productsResult] = await Promise.allSettled([
-          // Load stores based on selected category
-          (async () => {
+        // Load recommendations only if user is connected
+        if (user?.id) {
+          loadRecommendations();
+        }
+
+        // Load each component independently to avoid blocking
+        const loadStores = async () => {
+          try {
+            dispatch({ type: 'SET_LOADING_STORES', payload: true });
             let data;
             if (selectedCategory) {
               data = await categoryService.getStoresByCategory(selectedCategory, 5);
             } else {
               data = await storeService.getFeatured();
             }
-            if (data && data.length > 0) {
-              const storeIds = data.map((store) => store.id).filter(Boolean);
+
+            // Validate and sanitize store data
+            if (Array.isArray(data) && data.length > 0) {
+              const validStores = data.filter((store: any) => store && store.id);
+              const storeIds = validStores.map((store: any) => store.id).filter(Boolean);
+
+              // Try to load stats from cache first
+              const statsCacheKey = `STORE_STATS_${storeIds.join('_')}`;
               let stats: any[] = [];
               try {
-                stats = await storeStatsService.getByStores(storeIds);
+                const cachedStats = await cacheService.get<any[]>(statsCacheKey);
+                if (cachedStats) {
+                  stats = cachedStats;
+                } else {
+                  stats = await storeStatsService.getByStores(storeIds);
+                  cacheService.set(statsCacheKey, stats, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+                }
               } catch (err) {
                 console.warn('[ClientHome] Error loading store stats:', err);
               }
-              const statsById = (stats || []).reduce((acc, stat) => {
-                acc[stat.store_id] = stat;
+
+              const statsById = (stats || []).reduce((acc: Record<string, any>, stat: any) => {
+                if (stat && stat.store_id) acc[stat.store_id] = stat;
                 return acc;
               }, {} as Record<string, any>);
 
-              const enrichedStores = (data || []).map((store) => mergeStoreStats(store, statsById[store.id]));
+              const enrichedStores = validStores.map((store: any) => mergeStoreStats(store, statsById[store.id]));
               dispatch({ type: 'SET_STORES', payload: enrichedStores });
               cacheService.set(CACHE_KEYS.STORES, enrichedStores, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
             }
-            return data;
-          })(),
-          productService.getAllWithCursor(null, 8, productSort as any).then(result => {
-            if (result.data && result.data.length > 0) {
+          } catch (e) {
+            console.warn('[ClientHome] Error loading stores:', e);
+          } finally {
+            dispatch({ type: 'SET_LOADING_STORES', payload: false });
+          }
+        };
+
+        const loadProducts = async () => {
+          try {
+            dispatch({ type: 'SET_LOADING_PRODUCTS', payload: true });
+            const result = await productService.getAllWithCursor(null, 8, productSort as any);
+
+            // Validate and sanitize product data
+            if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+              const validProducts = result.data.filter((product: any) => product && product.id);
               dispatch({
                 type: 'SET_PRODUCTS_WITH_CURSOR',
                 payload: {
-                  data: result.data,
+                  data: validProducts,
                   cursor: result.nextCursor,
                   hasMore: result.hasMore,
                 },
               });
-              cacheService.set(CACHE_KEYS.PRODUCTS, result.data, CACHE_TTL.PRODUCTS.duration, CACHE_TTL.PRODUCTS.stale);
+              cacheService.set(CACHE_KEYS.PRODUCTS, validProducts, CACHE_TTL.PRODUCTS.duration, CACHE_TTL.PRODUCTS.stale);
             }
-            return result;
-          }),
+          } catch (e) {
+            console.warn('[ClientHome] Error loading products:', e);
+          } finally {
+            dispatch({ type: 'SET_LOADING_PRODUCTS', payload: false });
+          }
+        };
+
+        const loadCategories = async () => {
+          try {
+            const cats = await categoryService.getPopularCategories(6).catch(() => []);
+            if (cats && Array.isArray(cats) && cats.length > 0) {
+              const validCats = cats.filter((cat: any) => cat && cat.name);
+              const catNames = ['Toutes', ...validCats.map((c: any) => c.name)];
+              dispatch({ type: 'SET_CATEGORIES', payload: catNames });
+              cacheService.set(CACHE_KEYS.CATEGORIES, catNames, CACHE_TTL.CATEGORIES.duration, CACHE_TTL.CATEGORIES.stale);
+            }
+          } catch (e) {
+            console.warn('[ClientHome] Error loading categories:', e);
+          }
+        };
+
+        // Load all components in parallel but independently
+        await Promise.allSettled([
+          loadStores(),
+          loadProducts(),
+          loadCategories(),
         ]);
 
-        // Load categories separately (not dependent on anything, load once)
-        try {
-          const cats = await categoryService.getPopularCategories(6).catch(() => []);
-          if (cats?.length) {
-            const catNames = ['Toutes', ...cats.map(c => c.name)];
-            dispatch({ type: 'SET_CATEGORIES', payload: catNames });
-            cacheService.set(CACHE_KEYS.CATEGORIES, catNames, CACHE_TTL.CATEGORIES.duration, CACHE_TTL.CATEGORIES.stale);
-          }
-        } catch (e) {
-          console.warn('[ClientHome] Error loading categories:', e);
-        }
-
         // Check for critical failures
-        if (productsResult.status === 'rejected' && products.length === 0) {
-          dispatch({ type: 'SET_ERROR', payload: 'Impossible de charger les produits' });
+        if (products.length === 0 && stores.length === 0 && !refresh) {
+          dispatch({ type: 'SET_ERROR', payload: 'Impossible de charger les données' });
         }
       } catch (e) {
         errorHandler.handleDatabaseError(e, 'ClientHomeScreen loadData error');
@@ -416,7 +478,7 @@ export const ClientHomeScreen: React.FC = () => {
         dispatch({ type: 'SET_REFRESHING', payload: false });
       }
     },
-    [dispatch, productSort, selectedCategory, loadRecommendations]
+    [dispatch, productSort, selectedCategory, loadRecommendations, user?.id, products.length, stores.length]
   );
 
   useEffect(() => {
@@ -518,26 +580,57 @@ export const ClientHomeScreen: React.FC = () => {
 
       try {
         let data;
-        if (category === 'Toutes') {
-          data = await categoryService.getFeaturedStores(5);
-        } else {
-          data = await categoryService.getStoresByCategory(category, 5);
+        const categoryCacheKey = `CATEGORY_STORES_${category}`;
+
+        // Try to load from cache first
+        try {
+          const cachedData = await cacheService.get<Store[]>(categoryCacheKey);
+          if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
+            data = cachedData;
+          }
+        } catch (e) {
+          // Cache miss, continue with API call
         }
-        if (data && data.length > 0) {
-          const storeIds = data.map((store) => store.id).filter(Boolean);
+
+        // If no cache, load from API
+        if (!data) {
+          if (category === 'Toutes') {
+            data = await categoryService.getFeaturedStores(5);
+          } else {
+            data = await categoryService.getStoresByCategory(category, 5);
+          }
+        }
+
+        // Validate and sanitize store data
+        if (Array.isArray(data) && data.length > 0) {
+          const validStores = data.filter((store: any) => store && store.id);
+          const storeIds = validStores.map((store: any) => store.id).filter(Boolean);
+
+          // Try to load stats from cache first
+          const statsCacheKey = `STORE_STATS_${storeIds.join('_')}`;
           let stats: any[] = [];
           try {
-            stats = await storeStatsService.getByStores(storeIds);
+            const cachedStats = await cacheService.get<any[]>(statsCacheKey);
+            if (cachedStats) {
+              stats = cachedStats;
+            } else {
+              stats = await storeStatsService.getByStores(storeIds);
+              cacheService.set(statsCacheKey, stats, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+            }
           } catch (err) {
             console.warn('[ClientHome] Error loading store stats:', err);
           }
-          const statsById = (stats || []).reduce((acc, stat) => {
-            acc[stat.store_id] = stat;
+
+          const statsById = (stats || []).reduce((acc: Record<string, any>, stat: any) => {
+            if (stat && stat.store_id) acc[stat.store_id] = stat;
             return acc;
           }, {} as Record<string, any>);
 
-          const enrichedStores = data.map((store) => mergeStoreStats(store, statsById[store.id]));
+          const enrichedStores = validStores.map((store: any) => mergeStoreStats(store, statsById[store.id]));
           dispatch({ type: 'SET_STORES', payload: enrichedStores });
+
+          // Cache the result
+          cacheService.set(categoryCacheKey, enrichedStores, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
           cacheService.set(CACHE_KEYS.STORES, enrichedStores, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
         }
       } catch (e) {
@@ -918,6 +1011,10 @@ export const ClientHomeScreen: React.FC = () => {
               ))}
             </View>
           </View>
+        ) : loading && carouselBanners.length === 0 ? (
+          <View style={styles.bannerSection}>
+            <SkeletonLoader width="100%" height={200} borderRadius={RADIUS.lg} />
+          </View>
         ) : null}
 
         {/* Quick Actions */}
@@ -983,7 +1080,15 @@ export const ClientHomeScreen: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesList}
           >
-            {categoriesList.map(renderCategoryChip)}
+            {categoriesList.length > 0 ? (
+              categoriesList.map(renderCategoryChip)
+            ) : loading ? (
+              [1, 2, 3, 4, 5, 6].map((i) => (
+                <View key={i} style={{ marginRight: SPACING.md }}>
+                  <SkeletonLoader width={80} height={32} borderRadius={RADIUS.md} />
+                </View>
+              ))
+            ) : null}
           </ScrollView>
         </View>
 
