@@ -52,7 +52,6 @@ export const lowStockAlertService = {
           title: '⚠️ Stock faible',
           body: `${product.product_name} n'a plus que ${product.current_stock} unités en stock (seuil: ${product.low_stock_threshold})`,
           type: 'system',
-          read: false,
           data: {
             productId: product.product_id,
             storeId: product.store_id,

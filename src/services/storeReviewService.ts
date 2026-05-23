@@ -37,7 +37,6 @@ export const storeReviewService = {
           title: '💬 Nouveau commentaire sur votre boutique',
           body: `${review.user_name} a laissé un avis de ${review.rating} étoiles${review.comment ? ': "' + review.comment.substring(0, 50) + (review.comment.length > 50 ? '...' : '') + '"' : ''}`,
           type: 'comment',
-          read: false,
           data: {
             storeId: review.store_id,
             reviewId: data.id,

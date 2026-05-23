@@ -89,6 +89,8 @@ export const reportsService = {
 
   async calculateDailySalesManually(storeId: string, startDate: Date, endDate: Date): Promise<DailySalesReport[]> {
     try {
+      if (!supabase) return [];
+      
       const { data: orders, error } = await supabase
         .from('orders')
         .select('created_at, total_amount, order_items(quantity)')
@@ -129,6 +131,8 @@ export const reportsService = {
   // Rapport des ventes par mois
   async getMonthlySalesReport(storeId: string, year: number): Promise<MonthlySalesReport[]> {
     try {
+      if (!supabase) return [];
+      
       const startDate = new Date(year, 0, 1);
       const endDate = new Date(year, 11, 31);
 
@@ -178,6 +182,8 @@ export const reportsService = {
   // Rapport des ventes par collection
   async getCollectionSalesReport(storeId: string, startDate: Date, endDate: Date): Promise<CollectionSalesReport[]> {
     try {
+      if (!supabase) return [];
+      
       const { data: orders, error } = await supabase
         .from('orders')
         .select('total_amount, order_items(quantity, price, products(collection_id, collections(name)))')
@@ -230,6 +236,8 @@ export const reportsService = {
   // Rapport des marges
   async getMarginReport(storeId: string, startDate: Date, endDate: Date): Promise<MarginReport[]> {
     try {
+      if (!supabase) return [];
+      
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('id, name, cost_price, price')
@@ -291,6 +299,8 @@ export const reportsService = {
   // Rapport des retours
   async getReturnReport(storeId: string, startDate: Date, endDate: Date): Promise<ReturnReport[]> {
     try {
+      if (!supabase) return [];
+      
       const { data, error } = await supabase
         .from('returns')
         .select('id, order_id, created_at, reason, refund_amount, status, products(name), quantity')
@@ -320,6 +330,8 @@ export const reportsService = {
   // Rapport de l'inventaire
   async getInventoryReport(storeId: string): Promise<InventoryReport[]> {
     try {
+      if (!supabase) return [];
+      
       const { data: products, error } = await supabase
         .from('products')
         .select('id, name, category, stock, low_stock_threshold, price, updated_at')
@@ -362,6 +374,8 @@ export const reportsService = {
   // Rapport des clients
   async getClientReport(storeId: string): Promise<ClientReport[]> {
     try {
+      if (!supabase) return [];
+      
       const { data: orders, error } = await supabase
         .from('orders')
         .select('customer_name, customer_phone, total_amount, created_at')

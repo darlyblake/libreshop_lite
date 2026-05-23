@@ -2,7 +2,6 @@ import React from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   ViewStyle,
@@ -10,6 +9,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { cloudinaryService } from '../services/cloudinaryService';
+import OptimizedImage from './OptimizedImage';
 
 const getStyles = (theme: any) => {
   const COLORS = theme.getColor;
@@ -219,7 +219,7 @@ export const StoreCard: React.FC<StoreCardProps> = React.memo(({
     <TouchableOpacity style={styles.storeCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.storeImageContainer}>
         {logoUrl ? (
-          <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={styles.storeImage} />
+          <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={styles.storeImage} />
         ) : (
           <View style={styles.storeImagePlaceholder}>
             <Text style={styles.storeImagePlaceholderText}>
@@ -288,7 +288,7 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({
     >
       <View style={styles.productImageContainer}>
         {imageUrl ? (
-          <Image source={{ uri: cloudinaryService.getOptimizedUrl(imageUrl, 400) }} style={styles.productImage} resizeMode="cover" />
+          <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(imageUrl, 400) }} style={styles.productImage} />
         ) : (
           <View style={styles.productImagePlaceholder}>
             <Text style={styles.productImagePlaceholderText}>📦</Text>

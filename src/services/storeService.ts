@@ -5,6 +5,7 @@ import { errorHandler } from '../utils/errorHandler';
 import { notificationService } from '../services/notificationService';
 import { locationService } from './locationService';
 import { useStoreStore } from '../store';
+import { cacheManager } from '../utils/cacheManager';
 
 export interface StoreFollower {
   id: string;
@@ -134,131 +135,155 @@ export const storeService = {
   },
 
   async getAll(page = 0, pageSize = 20, sort: 'newest' | 'top' | 'smart' | 'score' = 'newest') {
-    const client = useSupabase();
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    try {
-      const { data, error } = await client
-        .from('stores')
-        .select('*')
-        .eq('status', 'active')
-        .eq('visible', true)
-        // Note: columns like 'store_score' and 'view_count' are currently missing from the DB
-        // Falling back to standard columns to avoid 400 errors.
-        .order('created_at', { ascending: false })
-        .order('verified', { ascending: false })
-        .range(from, to);
-      if (error) throw error;
-      return data;
-    } catch (e: any) {
+    const cacheKey = `stores_all_${page}_${pageSize}_${sort}`;
+    
+    // SWR: Return cached data immediately, then fetch fresh data in background
+    const fetcher = async () => {
+      const client = useSupabase();
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       try {
-        const { data: data2, error: error2 } = await client
+        const { data, error } = await client
           .from('stores')
           .select('*')
           .eq('status', 'active')
           .eq('visible', true)
+          // Note: columns like 'store_score' and 'view_count' are currently missing from the DB
+          // Falling back to standard columns to avoid 400 errors.
           .order('created_at', { ascending: false })
           .order('verified', { ascending: false })
           .range(from, to);
-        if (error2) throw error2;
-        return data2;
-      } catch (e2) {
-        throw e;
+        if (error) throw error;
+        return data;
+      } catch (e: any) {
+        try {
+          const { data: data2, error: error2 } = await client
+            .from('stores')
+            .select('*')
+            .eq('status', 'active')
+            .eq('visible', true)
+            .order('created_at', { ascending: false })
+            .order('verified', { ascending: false })
+            .range(from, to);
+          if (error2) throw error2;
+          return data2;
+        } catch (e2) {
+          throw e;
+        }
       }
-    }
+    };
+
+    const result = await cacheManager.swr(cacheKey, fetcher, { ttl: 5 * 60 * 1000 });
+    return result.data;
   },
 
   async getFeatured() {
-    const client = useSupabase();
-    const { data, error } = await client
-      .from('stores')
-      .select('*, store_stats(followers_count, customers_count, rating_avg)')
-      .eq('status', 'active')
-      .eq('visible', true)
-      .limit(50); // Fetch mehr to sort client-side
-    if (error) throw error;
+    const cacheKey = 'stores_featured';
     
-    // Robust ranking: verified → sales → followers → rating → date
-    return (data || [])
-      .sort((a, b) => {
-        // 1️⃣ Verified first
-        if (a.verified !== b.verified) {
-          return a.verified ? -1 : 1;
-        }
-        
-        // Get stats (handle array or object format)
-        const statsA = Array.isArray(a.store_stats) ? a.store_stats[0] : a.store_stats;
-        const statsB = Array.isArray(b.store_stats) ? b.store_stats[0] : b.store_stats;
-        
-        // 2️⃣ By sales (customers_count) - higher = first
-        const customersA = Number(statsA?.customers_count || 0);
-        const customersB = Number(statsB?.customers_count || 0);
-        if (customersB !== customersA) {
-          return customersB - customersA;
-        }
-        
-        // 3️⃣ By followers (popularity) - higher = first
-        const followersA = Number(statsA?.followers_count || 0);
-        const followersB = Number(statsB?.followers_count || 0);
-        if (followersB !== followersA) {
-          return followersB - followersA;
-        }
-        
-        // 4️⃣ By rating - higher = first
-        const ratingA = Number(statsA?.rating_avg || 0);
-        const ratingB = Number(statsB?.rating_avg || 0);
-        if (ratingB !== ratingA) {
-          return ratingB - ratingA;
-        }
-        
-        // 5️⃣ By creation date - newer = first
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      })
-      .slice(0, 10);
+    // SWR: Return cached data immediately, then fetch fresh data in background
+    const fetcher = async () => {
+      const client = useSupabase();
+      const { data, error } = await client
+        .from('stores')
+        .select('*, store_stats(followers_count, customers_count, rating_avg)')
+        .eq('status', 'active')
+        .eq('visible', true)
+        .limit(50); // Fetch mehr to sort client-side
+      if (error) throw error;
+      
+      // Robust ranking: verified → sales → followers → rating → date
+      return (data || [])
+        .sort((a, b) => {
+          // 1️⃣ Verified first
+          if (a.verified !== b.verified) {
+            return a.verified ? -1 : 1;
+          }
+          
+          // Get stats (handle array or object format)
+          const statsA = Array.isArray(a.store_stats) ? a.store_stats[0] : a.store_stats;
+          const statsB = Array.isArray(b.store_stats) ? b.store_stats[0] : b.store_stats;
+          
+          // 2️⃣ By sales (customers_count) - higher = first
+          const customersA = Number(statsA?.customers_count || 0);
+          const customersB = Number(statsB?.customers_count || 0);
+          if (customersB !== customersA) {
+            return customersB - customersA;
+          }
+          
+          // 3️⃣ By followers (popularity) - higher = first
+          const followersA = Number(statsA?.followers_count || 0);
+          const followersB = Number(statsB?.followers_count || 0);
+          if (followersB !== followersA) {
+            return followersB - followersA;
+          }
+          
+          // 4️⃣ By rating - higher = first
+          const ratingA = Number(statsA?.rating_avg || 0);
+          const ratingB = Number(statsB?.rating_avg || 0);
+          if (ratingB !== ratingA) {
+            return ratingB - ratingA;
+          }
+          
+          // 5️⃣ By creation date - newer = first
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        })
+        .slice(0, 10);
+    };
+
+    const result = await cacheManager.swr(cacheKey, fetcher, { ttl: 10 * 60 * 1000 });
+    return result.data;
   },
 
   async getPopularStores(limit: number = 4) {
-    const client = useSupabase();
-    try {
-      // Pour éviter une erreur 400 sur la colonne 'total_orders' manquante,
-      // on récupère les boutiques avec leurs followers, puis on trie en mémoire
-      const { data: stores, error } = await client
-        .from('stores')
-        .select('*')
-        .eq('status', 'active')
-        .eq('visible', true)
-        .order('verified', { ascending: false })
-        .limit(20);
+    const cacheKey = `stores_popular_${limit}`;
+    
+    // SWR: Return cached data immediately, then fetch fresh data in background
+    const fetcher = async () => {
+      const client = useSupabase();
+      try {
+        // Pour éviter une erreur 400 sur la colonne 'total_orders' manquante,
+        // on récupère les boutiques avec leurs followers, puis on trie en mémoire
+        const { data: stores, error } = await client
+          .from('stores')
+          .select('*')
+          .eq('status', 'active')
+          .eq('visible', true)
+          .order('verified', { ascending: false })
+          .limit(20);
 
-      if (error) throw error;
-      if (!stores || stores.length === 0) return [];
+        if (error) throw error;
+        if (!stores || stores.length === 0) return [];
 
-      const storeIds = stores.map((s: any) => s.id);
-      const { data: stats } = await client
-        .from('store_stats')
-        .select('store_id, followers_count, customers_count')
-        .in('store_id', storeIds);
+        const storeIds = stores.map((s: any) => s.id);
+        const { data: stats } = await client
+          .from('store_stats')
+          .select('store_id, followers_count, customers_count')
+          .in('store_id', storeIds);
 
-      const statsMap: Record<string, any> = {};
-      (stats || []).forEach((st: any) => {
-        statsMap[st.store_id] = st;
-      });
+        const statsMap: Record<string, any> = {};
+        (stats || []).forEach((st: any) => {
+          statsMap[st.store_id] = st;
+        });
 
-      const scoredStores = stores.map((s: any) => {
-        const foll = Number(statsMap[s.id]?.followers_count || 0);
-        const cust = Number(statsMap[s.id]?.customers_count || 0);
-        return { ...s, _score: foll * 2 + cust };
-      });
+        const scoredStores = stores.map((s: any) => {
+          const foll = Number(statsMap[s.id]?.followers_count || 0);
+          const cust = Number(statsMap[s.id]?.customers_count || 0);
+          return { ...s, _score: foll * 2 + cust };
+        });
 
-      scoredStores.sort((a: any, b: any) => b._score - a._score);
-      return scoredStores.slice(0, limit).map((s: any) => {
-        delete s._score;
-        return s;
-      });
-    } catch (e) {
-      console.error('getPopularStores error:', e);
-      return [];
-    }
+        scoredStores.sort((a: any, b: any) => b._score - a._score);
+        return scoredStores.slice(0, limit).map((s: any) => {
+          delete s._score;
+          return s;
+        });
+      } catch (e) {
+        console.error('getPopularStores error:', e);
+        return [];
+      }
+    };
+
+    const result = await cacheManager.swr(cacheKey, fetcher, { ttl: 10 * 60 * 1000 });
+    return result.data;
   },
 
   async getNewStores(limit: number = 4) {
@@ -561,7 +586,6 @@ export const storeService = {
           title: '👥 Nouveau follower!',
           body: `Quelqu'un a suivi votre boutique "${store.name}"`,
           type: 'system',
-          read: false,
           data: {
             storeId: storeId,
             followedBy: userId,

@@ -345,13 +345,7 @@ export const LikeButton: React.FC<LikeButtonProps> = memo(({
           </Text>
         )}
 
-        {loading && (
-          <ActivityIndicator 
-            size="small" 
-            color={liked ? COLORS.danger : COLORS.textSecondary} 
-            style={styles.loader}
-          />
-        )}
+        {/* Removed loading spinner for true Optimistic UI feel */}
       </TouchableOpacity>
     </Animated.View>
   );

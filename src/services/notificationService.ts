@@ -189,6 +189,45 @@ class NotificationService {
       trigger: null,
     });
   }
+
+  // ==========================================
+  // NOTIFICATIONS BASE DE DONNÉES
+  // ==========================================
+
+  async create(notification: {
+    user_id: string;
+    title: string;
+    body: string;
+    data?: Record<string, any>;
+    type?: string;
+  }) {
+    try {
+      if (!supabase) {
+        console.warn('[NotificationService] Supabase not available');
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: notification.user_id,
+          title: notification.title,
+          body: notification.body,
+          data: notification.data || {},
+          type: notification.type || 'info',
+          read: false,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (e) {
+      errorHandler.handle(e, 'Failed to create notification', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+      return null;
+    }
+  }
 }
 
 export const notificationService = new NotificationService();

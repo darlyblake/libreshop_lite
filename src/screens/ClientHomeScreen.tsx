@@ -339,7 +339,9 @@ export const ClientHomeScreen: React.FC = () => {
   const loadData = useCallback(
     async (refresh = false) => {
       try {
-        if (!refresh) dispatch({ type: 'SET_LOADING', payload: true });
+        // Don't show full-screen loader if we already have data (e.g. from cache)
+        const hasData = products.length > 0 || stores.length > 0;
+        if (!refresh && !hasData) dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
         loadRecommendations();
 
@@ -665,10 +667,10 @@ export const ClientHomeScreen: React.FC = () => {
         >
           <View style={styles.storeMedia}>
             {bannerUrl ? (
-              <Image
+              <OptimizedImage
                 source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }}
                 style={styles.storeBanner}
-                resizeMode="cover"
+                contentFit="cover"
               />
             ) : (
               <LinearGradient
@@ -679,7 +681,7 @@ export const ClientHomeScreen: React.FC = () => {
 
             <View style={styles.storeLogoWrap}>
               {logoUrl ? (
-                <Image
+                <OptimizedImage
                   source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }}
                   style={styles.storeLogo}
                 />
@@ -1017,7 +1019,7 @@ export const ClientHomeScreen: React.FC = () => {
             snapToInterval={storeCardWidth + SPACING.md}
             decelerationRate="fast"
           >
-            {loadingStores ? (
+            {(loadingStores || loading) && stores.length === 0 ? (
               [1, 2, 3].map((i) => (
                 <StoreCardSkeleton key={i} />
               ))
@@ -1161,7 +1163,7 @@ export const ClientHomeScreen: React.FC = () => {
         </View>
 
         {/* Mapped loading skeleton loaders if products list is currently loading products */}
-        {loadingProducts && products.length === 0 && (
+        {(loading || loadingProducts) && products.length === 0 && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, paddingHorizontal: SPACING.xl }}>
             {[1, 2, 3, 4].map((i) => (
               <View key={i} style={{ width: responsiveProductCardWidth }}>
@@ -1249,23 +1251,15 @@ export const ClientHomeScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Load More */}
-        {hasMoreProducts && (
+        {/* Auto-loaded — no manual button needed; FlatList's onEndReached handles this */}
+        {loadingMoreProducts && (
           <View style={styles.loadMoreContainer}>
-            <TouchableOpacity
-              style={styles.loadMoreButton}
-              onPress={handleLoadMoreProducts}
-              disabled={loadingMoreProducts}
-            >
-              {loadingMoreProducts ? (
-                <ActivityIndicator size="small" color={palette.accent} />
-              ) : (
-                <>
-                  <Ionicons name="refresh" size={16} color={palette.accent} />
-                  <Text style={styles.loadMoreText}>Charger plus de produits</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            <ActivityIndicator size="small" color={palette.accent} />
+          </View>
+        )}
+        {!hasMoreProducts && products.length > 0 && (
+          <View style={styles.loadMoreContainer}>
+            <Text style={[styles.loadMoreText, { color: palette.textMuted, fontWeight: '400' }]}>Tous les produits sont affichés ✓</Text>
           </View>
         )}
       </View>
@@ -1287,12 +1281,7 @@ export const ClientHomeScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={palette.bg} />
       
-      {loading && products.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={palette.accent} />
-          <Text style={styles.loadingText}>Chargement des meilleures offres...</Text>
-        </View>
-      ) : error && products.length === 0 ? (
+      {error && products.length === 0 ? (
         <View style={styles.errorContainer}>
           <Ionicons name="warning-outline" size={64} color={palette.danger} />
           <Text style={styles.errorTitle}>Oups !</Text>
@@ -1326,6 +1315,8 @@ export const ClientHomeScreen: React.FC = () => {
           windowSize={5}
           removeClippedSubviews={Platform.OS !== 'web'}
           updateCellsBatchingPeriod={50}
+          onEndReached={handleLoadMoreProducts}
+          onEndReachedThreshold={0.5}
         />
       )}
 

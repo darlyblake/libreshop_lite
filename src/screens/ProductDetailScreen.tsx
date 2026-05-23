@@ -25,6 +25,7 @@ import { useResponsive } from "../utils/responsive";
 import { useCartStore, useAuthStore } from "../store";
 import { useTheme } from "../hooks/useTheme";
 import { LikeButton, SkeletonLoader } from "../components";
+import OptimizedImage from "../components/OptimizedImage";
 import { type Product, type ProductReview, type ProductOption, type Store } from '../lib/supabase';
 import { productService } from '../services/productService';
 import { reviewService } from '../services/reviewService';
@@ -490,21 +491,13 @@ export const ProductDetailScreen: React.FC = () => {
       )}
       {loading ? (
         <View style={[styles.mainImage, styles.loaderContainer]}>
-          <ActivityIndicator size="large" color={COLORS.accent} />
+          <SkeletonLoader width="100%" height="100%" borderRadius={RADIUS.lg} />
         </View>
       ) : galleryImages?.[selectedImageIndex] ? (
         <>
-                      <Animated.Image
+            <OptimizedImage
               source={{ uri: cloudinaryService.getOptimizedUrl(galleryImages[selectedImageIndex], 800) }}
-              style={[styles.mainImage, { opacity: imageOpacity }]}
-              resizeMode="contain"
-              onLoad={() => {
-                Animated.timing(imageOpacity, {
-                  toValue: 1,
-                  duration: 300,
-                  useNativeDriver: Platform.OS !== 'web',
-                }).start();
-              }}
+              style={styles.mainImage}
             />
           {!!productData?.comparePrice && productData.comparePrice > (productData.price || 0) && (
             <View style={[styles.discountBadge, { backgroundColor: COLORS.danger }]}>
@@ -544,10 +537,9 @@ export const ProductDetailScreen: React.FC = () => {
               ]}
               activeOpacity={0.85}
             >
-              <Image
+              <OptimizedImage
                 source={{ uri: cloudinaryService.getOptimizedUrl(image, 200) }}
                 style={styles.thumbImage}
-                resizeMode="cover"
               />
             </TouchableOpacity>
           ))}
@@ -567,7 +559,7 @@ export const ProductDetailScreen: React.FC = () => {
         activeOpacity={0.85}
       >
         {productData.store.logoUrl ? (
-          <Image
+          <OptimizedImage
             source={{ uri: cloudinaryService.getOptimizedUrl(productData.store.logoUrl, 100) }}
             style={styles.storeLogo}
           />

@@ -1,5 +1,6 @@
 import { useSupabase } from '../lib/supabase';
 import { Product, ProductReview } from '../lib/supabase';
+import { cacheManager } from '../utils/cacheManager';
 
 export type SortOption = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc' | 'date_asc' | 'date_desc';
 
@@ -192,42 +193,50 @@ export const productService = {
   },
 
   async getAll(page = 0, pageSize = 20, sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'newest') {
-    const client = useSupabase();
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-
-    // For simple sorts (newest, popular), let Supabase do the sorting server-side
-    // — no need to over-fetch. For composite ranking sorts, fetch 3× for quality.
-    const needsClientRanking = ['trending', 'ranked', 'sales', 'top'].includes(sort);
+    const cacheKey = `products_all_${page}_${pageSize}_${sort}`;
     
-    if (!needsClientRanking) {
-      const orderCol = sort === 'popular' ? 'view_count' : 'created_at';
+    // SWR: Return cached data immediately, then fetch fresh data in background
+    const fetcher = async () => {
+      const client = useSupabase();
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      // For simple sorts (newest, popular), let Supabase do the sorting server-side
+      // — no need to over-fetch. For composite ranking sorts, fetch 3× for quality.
+      const needsClientRanking = ['trending', 'ranked', 'sales', 'top'].includes(sort);
+      
+      if (!needsClientRanking) {
+        const orderCol = sort === 'popular' ? 'view_count' : 'created_at';
+        const { data, error } = await client
+          .from('products')
+          .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
+          .eq('is_active', true)
+          .gt('stock', 0)
+          .order(orderCol, { ascending: false })
+          .range(from, to);
+        if (error) throw error;
+        return data || [];
+      }
+
+      // Composite sorts: fetch 3× pageSize for ranking quality (down from 10-200×)
+      const fetchSize = Math.min(pageSize * 3, 60);
       const { data, error } = await client
         .from('products')
         .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
         .eq('is_active', true)
         .gt('stock', 0)
-        .order(orderCol, { ascending: false })
-        .range(from, to);
+        .order('created_at', { ascending: false })
+        .range(from, from + fetchSize - 1);
+
       if (error) throw error;
-      return data || [];
-    }
 
-    // Composite sorts: fetch 3× pageSize for ranking quality (down from 10-200×)
-    const fetchSize = Math.min(pageSize * 3, 60);
-    const { data, error } = await client
-      .from('products')
-      .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
-      .eq('is_active', true)
-      .gt('stock', 0)
-      .order('created_at', { ascending: false })
-      .range(from, from + fetchSize - 1);
+      // Apply unified ranking system on the smaller fetch
+      const ranked = rankProducts(data || [], sort);
+      return ranked.slice(0, pageSize);
+    };
 
-    if (error) throw error;
-
-    // Apply unified ranking system on the smaller fetch
-    const ranked = rankProducts(data || [], sort);
-    return ranked.slice(0, pageSize);
+    const result = await cacheManager.swr(cacheKey, fetcher, { ttl: 5 * 60 * 1000 });
+    return result.data;
   },
 
   /**
@@ -317,70 +326,78 @@ export const productService = {
     pageSize = 8,
     sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'newest'
   ) {
-    const client = useSupabase();
+    const cacheKey = `products_cursor_${cursor}_${pageSize}_${sort}`;
     
-    // For cursor-based ranking, we fetch a larger batch to ensure quality rankings
-    const batchSize = Math.max(pageSize * 15, 120);
-    
-    let query = client
-      .from('products')
-      .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
-      .eq('is_active', true)
-      .gt('stock', 0)
-      .order('created_at', { ascending: false });
+    // SWR: Return cached data immediately, then fetch fresh data in background
+    const fetcher = async () => {
+      const client = useSupabase();
+      
+      // For cursor-based ranking, we fetch a larger batch to ensure quality rankings
+      const batchSize = Math.max(pageSize * 15, 120);
+      
+      let query = client
+        .from('products')
+        .select('id, name, description, price, compare_price, images, view_count, created_at, is_active, stock, stores(name, logo_url, category)')
+        .eq('is_active', true)
+        .gt('stock', 0)
+        .order('created_at', { ascending: false });
 
-    let allData: any[] = [];
-    
-    // Fetch initial batch
-    if (!cursor) {
-      const { data, error } = await query.limit(batchSize);
-      if (error) throw error;
-      allData = data || [];
-    } else {
-      // With cursor, we still need to fetch fresh batch from start for proper ranking
-      // This ensures ranking consistency across page loads
-      try {
-        const decodedCursor = JSON.parse(Buffer.from(cursor, 'base64').toString());
-        const offset = decodedCursor.offset || 0;
-        
-        const { data, error } = await query.range(offset, offset + batchSize - 1);
-        if (error) throw error;
-        allData = data || [];
-      } catch (e) {
-        console.warn('[ProductService] Invalid cursor, fetching from start:', e);
+      let allData: any[] = [];
+      
+      // Fetch initial batch
+      if (!cursor) {
         const { data, error } = await query.limit(batchSize);
         if (error) throw error;
         allData = data || [];
+      } else {
+        // With cursor, we still need to fetch fresh batch from start for proper ranking
+        // This ensures ranking consistency across page loads
+        try {
+          const decodedCursor = JSON.parse(Buffer.from(cursor, 'base64').toString());
+          const offset = decodedCursor.offset || 0;
+          
+          const { data, error } = await query.range(offset, offset + batchSize - 1);
+          if (error) throw error;
+          allData = data || [];
+        } catch (e) {
+          console.warn('[ProductService] Invalid cursor, fetching from start:', e);
+          const { data, error } = await query.limit(batchSize);
+          if (error) throw error;
+          allData = data || [];
+        }
       }
-    }
 
-    // Apply unified ranking to the batch
-    const rankedData = rankProducts(allData, sort);
-    
-    // Take pageSize items from ranked data
-    const items = rankedData.slice(0, pageSize);
-    const hasMore = rankedData.length > pageSize;
-
-    let nextCursor = null;
-    if (hasMore && items.length > 0) {
-      // Calculate next offset based on cursor position
-      const currentOffset = cursor ? 
-        JSON.parse(Buffer.from(cursor, 'base64').toString()).offset || 0 : 0;
-      const nextOffset = currentOffset + pageSize;
+      // Apply unified ranking to the batch
+      const rankedData = rankProducts(allData, sort);
       
-      nextCursor = Buffer.from(
-        JSON.stringify({
-          offset: nextOffset,
-          sort
-        })
-      ).toString('base64');
-    }
+      // Take pageSize items from ranked data
+      const items = rankedData.slice(0, pageSize);
+      const hasMore = rankedData.length > pageSize;
 
-    return {
-      data: items,
-      nextCursor,
-      hasMore
+      let nextCursor = null;
+      if (hasMore && items.length > 0) {
+        // Calculate next offset based on cursor position
+        const currentOffset = cursor ? 
+          JSON.parse(Buffer.from(cursor, 'base64').toString()).offset || 0 : 0;
+        const nextOffset = currentOffset + pageSize;
+        
+        nextCursor = Buffer.from(
+          JSON.stringify({
+            offset: nextOffset,
+            sort
+          })
+        ).toString('base64');
+      }
+
+      return {
+        data: items,
+        nextCursor,
+        hasMore
+      };
     };
+
+    const result = await cacheManager.swr(cacheKey, fetcher, { ttl: 3 * 60 * 1000 });
+    return result.data;
   },
 
   async getById(id: string) {

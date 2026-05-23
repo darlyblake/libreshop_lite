@@ -1,60 +1,43 @@
 import React from 'react';
-import { Image, ImageProps, Platform } from 'react-native';
+import { Image, ImageProps } from 'expo-image';
+import { Platform } from 'react-native';
 
+// Use a nice blurhash as the placeholder while images load
+const BLURHASH =
+  '|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXofj[ayj[j[fQayWCoeoeaya}j[ayfQa{oLj?j[WVj[ayayj[fQoff7azayj[ayj[j[ayofayayayj[fQj[ayayj[ayfjj[j[ayjuayj[';
+
+// Extend ImageProps if we need to support legacy 'uri' prop passed by old code
 type Props = ImageProps & { uri?: string };
 
-let FastImage: any = null;
-try {
-  if (Platform.OS !== 'web') {
-    // try to require fast-image if installed
-    // Use concatenation to avoid static bundler resolution warnings when the
-    // native module isn't installed for web builds.
-    // eslint-disable-next-line global-require, import/no-extraneous-dependencies
-    try {
-      // Use eval('require') to avoid static analysis by webpack or other bundlers.
-      // This prevents build-time resolution errors when `react-native-fast-image`
-      // is not installed for web builds.
-      // eslint-disable-next-line no-eval, @typescript-eslint/no-explicit-any
-      const req: any = eval('require');
-      FastImage = req('react-native-fast-image');
-    } catch (e) {
-      FastImage = null;
-    }
-  }
-} catch (e) {
-  FastImage = null;
-}
+const OptimizedImage = (props: Props) => {
+  const { source, uri, style, placeholder, ...rest } = props;
 
-const OptimizedImage: React.FC<Props> = (props) => {
-  const { source, uri, ...rest } = props as any;
+  // Resolve source backward compatibility
+  const resolvedSource = source || (uri ? { uri } : undefined);
 
-  if (FastImage && Platform.OS !== 'web') {
-    const src = source || (uri ? { uri } : undefined);
-    return <FastImage.default source={src} {...rest} />;
-  }
-
-  // Fallback to RN Image (works on web and native if fast-image not installed)
-  const imgSrc = source || (uri ? { uri } : undefined);
-  return <Image source={imgSrc} {...rest} />;
+  return (
+    <Image
+      style={style}
+      source={resolvedSource}
+      placeholder={placeholder || BLURHASH}
+      contentFit="cover"
+      transition={300}
+      cachePolicy="disk"
+      {...rest}
+    />
+  );
 };
 
-// expose preload if FastImage is available
-OptimizedImage['preload'] = async (urls: string[] = []) => {
-  if (FastImage && FastImage.preload && Platform.OS !== 'web') {
-    try {
-      const items = urls.filter(Boolean).map((u) => ({ uri: u }));
-      FastImage.preload(items);
-      return Promise.resolve(true);
-    } catch (e) {
-      return Promise.resolve(false);
-    }
-  }
-
-  // Fallback to Image.prefetch for web/native
+// Add static preload method for compatibility
+OptimizedImage.preload = async (urls: string[] = []) => {
   try {
-    await Promise.all(urls.map((u) => Image.prefetch(u)));
+    const validUrls = urls.filter(Boolean);
+    if (validUrls.length > 0) {
+      await Image.prefetch(validUrls);
+    }
     return true;
   } catch (e) {
+    console.warn('Failed to preload images', e);
     return false;
   }
 };

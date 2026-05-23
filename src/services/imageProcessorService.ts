@@ -53,7 +53,7 @@ class ImageProcessorService {
         AutoModel.from_pretrained('briaai/RMBG-1.4', {
           // Bypass obligatoire : le config.json déclare SegformerForSemanticSegmentation
           // mais le modèle est une IS-Net custom — on force 'custom' pour l'AutoModel
-          config: { model_type: 'custom' },
+          config: { model_type: 'custom' } as any,
           dtype: 'fp32',
         }),
         AutoProcessor.from_pretrained('briaai/RMBG-1.4', {
@@ -130,7 +130,7 @@ class ImageProcessorService {
       originalCanvas.height = origH;
       const origCtx = originalCanvas.getContext('2d')!;
       const origImgData = origCtx.createImageData(origW, origH);
-      const rgbaData = image.toRGBA8();
+      const rgbaData = (image as any).toRGBA8();
       origImgData.data.set(rgbaData);
       origCtx.putImageData(origImgData, 0, 0);
 

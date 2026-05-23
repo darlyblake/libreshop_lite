@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 import { useTheme } from '../hooks/useTheme';
 import { useLegacyPalette } from '../hooks/useLegacyPalette';
 import { SkeletonLoader } from './SkeletonLoader';
+import OptimizedImage from './OptimizedImage';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { useNavigation } from '@react-navigation/native';
@@ -63,7 +63,7 @@ const CategoryShowcaseSectionCard: React.FC<CategoryShowcaseSectionCardProps> = 
             >
               <View style={[styles.gridItem, { backgroundColor: item?.imageUrl ? 'transparent' : PLACEHOLDER_COLORS[idx % PLACEHOLDER_COLORS.length] }]}>
                 {item?.imageUrl ? (
-                  <Image source={{ uri: item.imageUrl }} style={styles.gridItemImage} resizeMode="contain" />
+                  <OptimizedImage source={{ uri: item.imageUrl }} style={styles.gridItemImage} />
                 ) : (
                   <Text style={styles.gridItemEmoji}>🛍️</Text>
                 )}
@@ -94,7 +94,7 @@ const CategoryShowcaseSectionCard: React.FC<CategoryShowcaseSectionCardProps> = 
             >
               <View style={[styles.gridItem, { backgroundColor: item?.imageUrl ? 'transparent' : PLACEHOLDER_COLORS[idx % PLACEHOLDER_COLORS.length] }]}>
                 {item?.imageUrl ? (
-                  <Image source={{ uri: item.imageUrl }} style={styles.gridItemImage} resizeMode="contain" />
+                  <OptimizedImage source={{ uri: item.imageUrl }} style={styles.gridItemImage} />
                 ) : (
                   <Text style={styles.gridItemEmoji}>🛍️</Text>
                 )}

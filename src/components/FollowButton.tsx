@@ -401,13 +401,7 @@ export const FollowButton: React.FC<FollowButtonProps> = memo(({
         </Animated.Text>
       )}
 
-      {loading && (
-        <ActivityIndicator
-          size="small"
-          color={getTextColor()}
-          style={styles.loader}
-        />
-      )}
+      {/* Removed loading spinner for true Optimistic UI feel */}
     </Animated.View>
   );
 
