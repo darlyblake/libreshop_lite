@@ -215,7 +215,6 @@ export const PaymentScreen: React.FC = () => {
                   title: 'Nouvelle commande 🛍️',
                   body: `Vous avez reçu une nouvelle commande de ${customer?.name || 'un client'} pour un montant de ${(amount / 1000).toFixed(0)} KCFA.`,
                   type: 'order',
-                  read: false,
                   data: { orderId: existingOrderId, storeId },
                 });
               }
@@ -320,7 +319,6 @@ export const PaymentScreen: React.FC = () => {
                 title: 'Nouvelle commande 🛍️',
                 body: `Vous avez reçu une nouvelle commande de ${customer?.name || 'un client'} pour un montant de ${(amount / 1000).toFixed(0)} KCFA.`,
                 type: 'order',
-                read: false,
                 data: {
                   orderId: created?.id,
                   storeId: storeId,

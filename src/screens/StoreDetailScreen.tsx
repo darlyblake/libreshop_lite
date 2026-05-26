@@ -934,7 +934,7 @@ export const StoreDetailScreen: React.FC = () => {
                   <Ionicons 
                     name="call" 
                     size={18} 
-                    color={COLORS.white}
+                    color={'#ffffff'}
                   />
                   <Text style={styles.contactButtonText}>Contacter</Text>
                 </TouchableOpacity>
@@ -1016,7 +1016,7 @@ export const StoreDetailScreen: React.FC = () => {
                   <Ionicons 
                     name="navigate" 
                     size={18} 
-                    color={COLORS.white}
+                    color={'#ffffff'}
                   />
                   <Text style={styles.directionButtonText}>Itinéraire</Text>
                 </TouchableOpacity>
@@ -1560,7 +1560,7 @@ export const StoreDetailScreen: React.FC = () => {
                         
                         setSubmittingReview(true);
                         try {
-                          const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client LibreShop';
+                          const userName = (user as any).user_metadata?.full_name || user.full_name || user.email?.split('@')[0] || 'Client LibreShop';
                           
                           await storeReviewService.create({
                             store_id: store.id,

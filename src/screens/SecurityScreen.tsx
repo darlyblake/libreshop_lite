@@ -339,7 +339,7 @@ export const SecurityScreen: React.FC = () => {
       justifyContent: 'center',
       marginRight: spacing.md,
     },
-    deviceInfo: {
+    deviceInfoText: {
       flex: 1,
     },
     deviceName: {
@@ -430,7 +430,7 @@ export const SecurityScreen: React.FC = () => {
             <View style={styles.deviceIcon}>
               <Ionicons name="phone-portrait-outline" size={20} color={getColor.accent} />
             </View>
-            <View style={styles.deviceInfo}>
+            <View style={styles.deviceInfoText}>
               <Text style={styles.deviceName}>Appareil actuel</Text>
               <Text style={styles.deviceDetails}>
                 {user?.email} • Maintenant

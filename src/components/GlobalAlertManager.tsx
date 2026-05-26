@@ -37,7 +37,7 @@ export const GlobalAlertManager: React.FC = () => {
         type,
         title: title || 'Alerte',
         message: message || '',
-        buttons: mappedButtons,
+        buttons: mappedButtons as any,
       });
     };
 

@@ -900,14 +900,15 @@ export const ClientSearchScreen: React.FC = () => {
 
     if (error) {
       return (
-        <EmptyState
-          title="Oups ! Une erreur est survenue"
-          description={error}
-          icon="alert-circle-outline"
-          actionLabel="Réessayer"
-          onAction={() => debouncedSearch(searchQuery)}
-          style={styles.emptyStateImage}
-        />
+        <View style={styles.emptyStateWrapper}>
+          <EmptyState
+            title="Aucun résultat"
+            description="Nous n'avons pas pu trouver de produits correspondants. Vérifiez votre connexion ou essayez d'autres mots-clés."
+            icon="cloud-offline-outline"
+            actionLabel="Réessayer"
+            onAction={() => debouncedSearch(searchQuery)}
+          />
+        </View>
       );
     }
 
@@ -939,14 +940,18 @@ export const ClientSearchScreen: React.FC = () => {
 
     if (!hasResults && hasSearched) {
       return (
-        <EmptyState
-          title="Aucun résultat trouvé"
-          description={`Désolé, nous n'avons rien trouvé pour "${searchQuery}". Essayez avec d'autres mots-clés.`}
-          icon="search-outline"
-          actionLabel="Voir les catégories"
-          onAction={() => setSelectedCategory(null)}
-          style={styles.emptyStateImage}
-        />
+        <View style={styles.emptyStateWrapper}>
+          <EmptyState
+            title="Aucun résultat trouvé"
+            description={`Désolé, nous n'avons rien trouvé pour "${searchQuery}". Essayez avec d'autres mots-clés.`}
+            icon="search-outline"
+            actionLabel="Effacer la recherche"
+            onAction={() => {
+              setSearchQuery('');
+              setSelectedCategory(null);
+            }}
+          />
+        </View>
       );
     }
 
@@ -1567,9 +1572,15 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     fontSize: FONT_SIZE.md,
     color: palette.text,
   },
-  emptyStateImage: {
-    width: 200,
-    height: 200,
+  emptyStateWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl * 2,
+    width: '100%',
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: 'center',
   },
   suggestionsDropdown: {
     position: 'absolute',

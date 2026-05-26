@@ -803,22 +803,22 @@ export const AdminSubscriptionsScreen: React.FC = () => {
 
             <View style={styles.subscriptionStats}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{subscription.userCount}</Text>
-                <Text style={styles.statLabel}>Utilisateurs</Text>
+                <Text style={styles.cardStatValue}>{subscription.userCount}</Text>
+                <Text style={styles.cardStatLabel}>Utilisateurs</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>
+                <Text style={styles.cardStatValue}>
                   {subscription.price > 0 
                     ? `${(subscription.price * subscription.userCount / 1000000).toFixed(1)}M` 
                     : 'GRATUIT'}
                 </Text>
-                <Text style={styles.statLabel}>Revenus</Text>
+                <Text style={styles.cardStatLabel}>Revenus</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>
+                <Text style={styles.cardStatValue}>
                   {subscription.createdAt ? subscription.createdAt.split('T')[0] : '-'}
                 </Text>
-                <Text style={styles.statLabel}>Créé</Text>
+                <Text style={styles.cardStatLabel}>Créé</Text>
               </View>
             </View>
 
@@ -1123,13 +1123,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  statValue: {
+  cardStatValue: {
     fontSize: FONT_SIZE.md,
     fontWeight: '700',
     color: COLORS.text,
     marginBottom: 2,
   },
-  statLabel: {
+  cardStatLabel: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
   },

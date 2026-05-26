@@ -210,6 +210,7 @@ export interface Product {
   is_online_sale: boolean;
   is_physical_sale: boolean;
   category?: string;
+  subcategory?: string;
   sale_active?: boolean;
   sale_price?: number;
   discount_percent?: number;

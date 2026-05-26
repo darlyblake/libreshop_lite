@@ -141,7 +141,7 @@ export const ClientHomeScreen: React.FC = () => {
   const [loadingStores, setLoadingStores] = useState(true);
   const [loadingMoreStores, setLoadingMoreStores] = useState(false);
   
-  const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const clientUnreadCount = useNotificationStore((state) => state.clientUnreadCount);
 
   const [hasMoreStores, setHasMoreStores] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -265,11 +265,11 @@ export const ClientHomeScreen: React.FC = () => {
               <Ionicons name="location-outline" size={24} color={palette.textMuted} />
             </TouchableOpacity>
             {user && (
-              <TouchableOpacity style={{ padding: SPACING.xs, position: 'relative' }} onPress={() => navigation.navigate('Notifications')}>
+              <TouchableOpacity style={{ padding: SPACING.xs, position: 'relative' }} onPress={() => navigation.navigate('Notifications', { context: 'client' })}>
                 <Ionicons name="notifications-outline" size={24} color={palette.textMuted} />
-                {unreadCount > 0 && (
+                {clientUnreadCount > 0 && (
                   <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: palette.accent, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: palette.bg, paddingHorizontal: 2 }}>
-                    <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                    <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{clientUnreadCount > 99 ? '99+' : clientUnreadCount}</Text>
                   </View>
                 )}
               </TouchableOpacity>

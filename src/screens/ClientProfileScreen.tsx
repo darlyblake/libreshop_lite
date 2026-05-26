@@ -279,7 +279,7 @@ export const ClientProfileScreen: React.FC = () => {
       return;
     }
     if (item.screen === 'Notifications') {
-      navigation.navigate('Notifications');
+      navigation.navigate('Notifications', { context: 'client' });
       return;
     }
     if (item.screen && CLIENT_TAB_NAMES.includes(item.screen as keyof ClientTabParamList)) {

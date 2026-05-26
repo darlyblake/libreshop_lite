@@ -245,6 +245,22 @@ class NotificationService {
     }
   }
 
+  async getUnreadCount(userId: string): Promise<number> {
+    if (!supabase) return 0;
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('read', false);
+      if (error) throw error;
+      return count || 0;
+    } catch (e) {
+      console.error(e);
+      return 0;
+    }
+  }
+
   async markAsRead(notificationId: string) {
     if (!supabase) return;
     try {
@@ -283,6 +299,51 @@ class NotificationService {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  async sendBroadcastToRole(role: string, notificationData: any) {
+    if (!supabase) return;
+    try {
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', role);
+        
+      if (usersError) throw usersError;
+      
+      if (users && users.length > 0) {
+        const notifications = users.map(u => ({
+          user_id: u.id,
+          title: notificationData.title,
+          body: notificationData.body,
+          type: notificationData.type || 'admin',
+          data: notificationData.data || {},
+          read: false,
+        }));
+        
+        // Bulk insert notifications
+        const { error: insertError } = await supabase
+          .from('notifications')
+          .insert(notifications);
+          
+        if (insertError) throw insertError;
+      }
+    } catch (e) {
+      console.error(`Failed to broadcast to ${role}:`, e);
+      throw e;
+    }
+  }
+
+  async sendBroadcastToClients(notification: any) {
+    return this.sendBroadcastToRole('client', notification);
+  }
+
+  async sendBroadcastToSellers(notification: any) {
+    return this.sendBroadcastToRole('seller', notification);
+  }
+
+  async sendBroadcastToAdmins(notification: any) {
+    return this.sendBroadcastToRole('admin', notification);
   }
 }
 

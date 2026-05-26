@@ -30,7 +30,7 @@ export type RootStackParamList = {
   AdminCountries: undefined;
   AdminCities: { countryId?: string };
   AdminBanners: undefined;
-  AdminBannerForm: { bannerId?: string };
+  AdminBannerForm: { bannerId?: string } | undefined;
   AgentChat: undefined;
   AdminAgentChat: undefined;
   AdminInterfaces: undefined;
@@ -76,7 +76,7 @@ export type RootStackParamList = {
   SellerFinance: undefined;
   SellerKYC: undefined;
   SellerHub: undefined;
-  Notifications: undefined;
+  Notifications: { context?: 'client' | 'seller' } | undefined;
   Features: undefined;
   Pricing: undefined;
   SellerChangePlan: undefined;
@@ -86,6 +86,8 @@ export type RootStackParamList = {
   Help: undefined;
   AccountSuspended: undefined;
   ResetPassword: undefined;
+  ClientMap: undefined;
+  ClientProfile: undefined;
 };
 
 export type ClientTabParamList = {

@@ -17,6 +17,7 @@ export const AccountSuspendedScreen: React.FC = () => {
   }, []);
 
   const loadSuspensionInfo = async () => {
+    if (!supabase) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -30,6 +31,10 @@ export const AccountSuspendedScreen: React.FC = () => {
   };
 
   const handleSubmitAppeal = async () => {
+    if (!supabase) {
+      Alert.alert('Erreur', 'Service non disponible');
+      return;
+    }
     if (!appealText.trim()) {
       Alert.alert('Erreur', 'Veuillez écrire votre recours');
       return;

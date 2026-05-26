@@ -557,9 +557,9 @@ export const ClientAllStoresScreen: React.FC = () => {
             </View>
           ) : error ? (
             <View style={styles.errorContainer}>
-              <Ionicons name="warning-outline" size={64} color={COLORS.danger} />
-              <Text style={styles.errorTitle}>Oups !</Text>
-              <Text style={styles.errorText}>{error}</Text>
+              <Ionicons name="cloud-offline-outline" size={64} color={COLORS.textMuted} />
+              <Text style={styles.errorTitle}>Connexion interrompue</Text>
+              <Text style={styles.errorText}>Impossible de charger les boutiques. Vérifiez votre connexion et réessayez.</Text>
               <TouchableOpacity style={styles.retryButton} onPress={() => loadStores(true)}>
                 <Text style={styles.retryButtonText}>Réessayer</Text>
               </TouchableOpacity>

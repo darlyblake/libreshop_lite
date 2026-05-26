@@ -110,7 +110,7 @@ export const ClientAuthModal: React.FC = () => {
                     user_id: currentUser.id,
                     rating: action.payload.rating,
                     comment: action.payload.comment,
-                    user_name: currentUser.full_name || currentUser.email || 'Utilisateur',
+                    user_name: (currentUser as any).full_name || currentUser.email || 'Utilisateur',
                   });
                 }
               }

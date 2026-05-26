@@ -572,7 +572,7 @@ export const SellerOrdersScreen: React.FC = () => {
 
   // 🔔 Notifier vendeur des commandes bloquées tous les 15 min
   React.useEffect(() => {
-    if (!storeId || orders.length === 0) return;
+    if (!storeId || orders.length === 0 || !user?.id) return;
 
     const notifyStuckOrders = async () => {
       try {
@@ -583,13 +583,11 @@ export const SellerOrdersScreen: React.FC = () => {
         for (const order of stuckOrders) {
           try {
             await notificationService.create({
-              user_id: user?.id,
+              user_id: user.id,
               type: 'stuck_order',
               title: `Commande bloquée depuis ${order.daysInStatus}j`,
-              message: `Commande #${order.id.slice(0, 8)} bloquée en ${order.status}. Action requise.`,
-              order_id: order.id,
-              store_id: storeId,
-              data: { orderId: order.id, status: order.status },
+              body: `Commande #${order.id.slice(0, 8)} bloquée en ${order.status}. Action requise.`,
+              data: { orderId: order.id, status: order.status, store_id: storeId },
             });
           } catch (e) {
             console.warn('Failed to notify stuck order', e);

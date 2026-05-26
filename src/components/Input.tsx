@@ -15,8 +15,9 @@ interface InputProps {
   placeholder?: string;
   value: string;
   onChangeText: (text: string) => void;
+  onBlur?: () => void;
   secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad' | 'url' | 'number-pad' | 'decimal-pad';
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   error?: string;
   icon?: keyof typeof Ionicons.glyphMap;
@@ -87,6 +88,7 @@ export const Input: React.FC<InputProps> = ({
   placeholder,
   value,
   onChangeText,
+  onBlur,
   secureTextEntry = false,
   keyboardType = 'default',
   autoCapitalize = 'none',
@@ -139,7 +141,10 @@ export const Input: React.FC<InputProps> = ({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          onBlur={() => {
+            setIsFocused(false);
+            if (onBlur) onBlur();
+          }}
           multiline={multiline}
           numberOfLines={numberOfLines}
           editable={editable}

@@ -463,7 +463,7 @@ export const AdminStoresScreen: React.FC = () => {
 
             <Badge
               label={getStatusLabel(item.status)}
-              variant={item.status === 'active' ? 'success' : item.status === 'pending' ? 'warning' : 'danger'}
+              variant={item.status === 'active' ? 'success' : item.status === 'pending' ? 'warning' : 'error'}
               size="medium"
             />
           </View>

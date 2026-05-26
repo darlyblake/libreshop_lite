@@ -8,7 +8,8 @@ import { useTheme } from '../hooks/useTheme';
  * Les moteurs de recherche peuvent maintenant voir le contenu sans exécuter JavaScript
  */
 export const AboutStaticScreen: React.FC = () => {
-  const { COLORS } = useTheme();
+  const themeContext = useTheme();
+  const COLORS = themeContext.getColor;
 
   React.useEffect(() => {
     // Mettre à jour les meta tags pour cette page

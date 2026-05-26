@@ -25,7 +25,7 @@ const OptimizedImage = (props: Props) => {
       cachePolicy="memory-disk"
       onError={(error) => {
         // Silently handle network errors to avoid blocking UI
-        console.warn('[OptimizedImage] Image load error:', error.nativeEvent?.error);
+        console.warn('[OptimizedImage] Image load error:', (error as any).error || error);
       }}
       {...rest}
     />

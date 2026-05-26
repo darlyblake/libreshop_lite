@@ -104,7 +104,8 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
         return;
       }
       
-      if (fetchedOrder.store_id !== storeId) {
+      const fetchedOrderAny = fetchedOrder as any;
+      if (fetchedOrderAny.store_id !== storeId) {
         Alert.alert('Non autorisé', 'Cette commande n\'appartient pas à votre boutique.');
         setLoading(false);
         return;
@@ -126,7 +127,7 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
       });
 
       // 3. Calculer les quantités retournables
-      const orderItems = (fetchedOrder.order_items || []) as any[];
+      const orderItems = (fetchedOrderAny.order_items || []) as any[];
       const itemsWithAvailability = orderItems.map(item => {
         const pid = item.product_id;
         const alreadyReturned = refundedItemsMap[pid] || 0;
@@ -463,7 +464,7 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
     fontSize: FONT_SIZE.md,
     color: COLORS.text,
-    outlineStyle: 'none',
+    outlineStyle: 'none' as any,
   },
   scanBtn: {
     width: 50,

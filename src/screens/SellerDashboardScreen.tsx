@@ -125,7 +125,7 @@ export const SellerDashboardScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const setSession = useAuthStore((s) => s.setSession);
-  const { unreadCount, setNotifications } = useNotificationStore();
+  const { sellerUnreadCount, setNotifications } = useNotificationStore();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { 
@@ -1087,7 +1087,7 @@ export const SellerDashboardScreen: React.FC = () => {
               Activité récente
             </Text>
           </View>
-          <TouchableOpacity style={styles.seeAllButton} onPress={() => navigation.navigate('Notifications')}>
+          <TouchableOpacity style={styles.seeAllButton} onPress={() => navigation.navigate('Notifications', { context: 'seller' })}>
             <Text style={[styles.seeAll, { fontSize: fontSize.sm }]}>Voir tout</Text>
             <Ionicons name="arrow-forward" size={fontSize.sm} color={COLORS.accent} />
           </TouchableOpacity>
@@ -1290,12 +1290,12 @@ export const SellerDashboardScreen: React.FC = () => {
                   height: component.buttonHeight,
                   borderRadius: component.buttonBorderRadius,
                 }]}
-                onPress={() => navigation.navigate('Notifications')}
+                onPress={() => navigation.navigate('Notifications', { context: 'seller' })}
               >
                 <Ionicons name="notifications-outline" size={fontSize.lg} color={COLORS.text} />
-                {unreadCount > 0 && (
+                {sellerUnreadCount > 0 && (
                   <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationText}>{unreadCount}</Text>
+                    <Text style={styles.notificationText}>{sellerUnreadCount}</Text>
                   </View>
                 )}
               </TouchableOpacity>

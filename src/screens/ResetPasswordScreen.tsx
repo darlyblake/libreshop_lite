@@ -28,6 +28,7 @@ export function ResetPasswordScreen() {
     setLoading(true);
     try {
       // Verify OTP (recovery)
+      if (!supabase) { Alert.alert('Erreur', 'Service non disponible'); setLoading(false); return; }
       const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' } as any);
       if (verifyError) {
         Alert.alert('Erreur', verifyError.message || 'Code invalide');
@@ -36,7 +37,7 @@ export function ResetPasswordScreen() {
       }
 
       // Update password
-      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword } as any);
+      const { error: updateError } = await supabase!.auth.updateUser({ password: newPassword } as any);
       if (updateError) {
         Alert.alert('Erreur', updateError.message || 'Impossible de mettre à jour le mot de passe');
         setLoading(false);

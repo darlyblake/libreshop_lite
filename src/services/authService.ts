@@ -104,7 +104,7 @@ export const authService = {
     return data;
   },
 
-  async updateProfile(userId: string, data: { full_name?: string; phone?: string; whatsapp_number?: string; address?: string }) {
+  async updateProfile(userId: string, data: { full_name?: string; phone?: string; whatsapp_number?: string; address?: string; avatar_url?: string }) {
     const client = useSupabase();
     const { error } = await client.from('users').update(data).eq('id', userId);
     if (error) throw error;

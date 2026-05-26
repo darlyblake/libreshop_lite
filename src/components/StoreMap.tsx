@@ -54,14 +54,17 @@ export const StoreMap: React.FC<StoreMapProps> = ({
   if (Platform.OS === 'web') {
     return (
       <WebMap
-        stores={stores}
-        onStorePress={onStorePress}
-        selectedStore={selectedStore}
-        onLocationSelect={onLocationSelect}
-        mode={mode}
-        initialCenter={initialCenter}
-        height={height}
-        selectedLocation={selectedLocation}
+        {...({
+          stores,
+          onStoreClick: onStorePress,
+          onNavigateClick: () => {},
+          selectedStore,
+          onLocationSelect,
+          mode,
+          initialCenter,
+          height,
+          selectedLocation,
+        } as any)}
       />
     );
   }
@@ -81,7 +84,7 @@ export const StoreMap: React.FC<StoreMapProps> = ({
           <MapLibreGL.PointAnnotation
             id="selected-location"
             coordinate={[region.longitude, region.latitude]}
-            onDragEnd={(e) => {
+            onDragEnd={(e: any) => {
               const { latitude, longitude } = e.geometry.coordinates;
               if (onLocationSelect) {
                 onLocationSelect({ latitude, longitude });

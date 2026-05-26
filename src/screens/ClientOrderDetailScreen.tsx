@@ -61,9 +61,10 @@ export const ClientOrderDetailScreen: React.FC = () => {
       }
       
       // Normaliser: Supabase peut retourner `products` ou `product`, normaliser vers `product`
+      const orderAny = orderData as any;
       const normalized = {
-        ...orderData,
-        order_items: ((orderData.order_items || []) as any[]).map((item: any) => ({
+        ...orderAny,
+        order_items: ((orderAny.order_items || []) as any[]).map((item: any) => ({
           ...item,
           product: item.product || item.products, // Normaliser le nom de la clé
         })),
@@ -362,7 +363,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.helpButton}
           onPress={() => {
-            const phone = order.store?.whatsapp_number || order.store?.phone || order.customer_phone;
+            const phone = (order.store as any)?.whatsapp_number || order.store?.phone || order.customer_phone;
             if (!phone) {
               Alert.alert('Erreur', 'Numéro de téléphone de la boutique non disponible');
               return;

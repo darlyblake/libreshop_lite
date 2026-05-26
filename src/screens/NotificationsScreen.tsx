@@ -9,10 +9,10 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { useNotificationStore, Notification } from '../store/notificationStore';
+import { useNotificationStore, Notification, isClientNotification, isSellerNotification } from '../store/notificationStore';
 import { notificationService } from '../services/notificationService';
 import { useAuthStore, useStoreStore } from '../store';
 import { NotificationItem } from '../components/NotificationItem';
@@ -22,9 +22,11 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { RootStackParamList } from '../navigation/types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type NotificationsScreenRouteProp = RouteProp<RootStackParamList, 'Notifications'>;
 
 export const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<NotificationsScreenRouteProp>();
   const { user } = useAuthStore();
   const { store } = useStoreStore();
   const [refreshing, setRefreshing] = useState(false);
@@ -33,21 +35,31 @@ export const NotificationsScreen: React.FC = () => {
   const SPACING = themeContext.spacing;
   const FONT_SIZE = themeContext.fontSize;
 
+  // The context comes from the route params when navigating.
+  // We default to 'client' if not provided to handle legacy navigations safely.
+  const context = (route.params as any)?.context as 'client' | 'seller' || 'client';
+
   const styles = useMemo(() => getStyles(themeContext), [themeContext]);
 
   const {
     notifications,
-    unreadCount,
+    clientUnreadCount,
+    sellerUnreadCount,
     setNotifications,
     markAsRead,
     markAllAsRead,
     clearAll,
   } = useNotificationStore();
 
-  const visibleNotifications = useMemo(
-    () => notifications,
-    [notifications]
-  );
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      if (context === 'client') return isClientNotification(n);
+      if (context === 'seller') return isSellerNotification(n);
+      return true;
+    });
+  }, [notifications, context]);
+
+  const currentUnreadCount = context === 'client' ? clientUnreadCount : sellerUnreadCount;
 
   const loadNotifications = useCallback(async () => {
     if (!user) return;
@@ -107,11 +119,11 @@ export const NotificationsScreen: React.FC = () => {
     if (!user) return;
     try {
       await notificationService.markAllAsRead(user.id);
-      markAllAsRead();
+      markAllAsRead(context);
     } catch (e) {
       errorHandler.handleDatabaseError(e as Error, 'mark all as read');
     }
-  }, [user, markAllAsRead]);
+  }, [user, markAllAsRead, context]);
 
   const handleClearAll = useCallback(async () => {
     if (!user) return;
@@ -121,7 +133,7 @@ export const NotificationsScreen: React.FC = () => {
       if (window.confirm('Supprimer toutes les notifications ?')) {
         try {
           await notificationService.deleteAllByUser(user.id);
-          clearAll();
+          clearAll(context);
         } catch (e) {
           errorHandler.handleDatabaseError(e as Error, 'clear notifications');
         }
@@ -138,7 +150,7 @@ export const NotificationsScreen: React.FC = () => {
             onPress: async () => {
               try {
                 await notificationService.deleteAllByUser(user.id);
-                clearAll();
+                clearAll(context);
               } catch (e) {
                 errorHandler.handleDatabaseError(e as Error, 'clear notifications');
               }
@@ -147,7 +159,7 @@ export const NotificationsScreen: React.FC = () => {
         ]
       );
     }
-  }, [user, clearAll]);
+  }, [user, clearAll, context]);
 
   const onRefresh = useCallback(() => {
     const run = async () => {
@@ -168,9 +180,9 @@ export const NotificationsScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>Notifications {context === 'seller' ? 'Vendeur' : 'Client'}</Text>
         <View style={styles.headerActions}>
-          {unreadCount > 0 && (
+          {currentUnreadCount > 0 && (
             <TouchableOpacity
               style={styles.markAllButton}
               onPress={handleMarkAllRead}
@@ -188,10 +200,10 @@ export const NotificationsScreen: React.FC = () => {
       </View>
 
       {/* Unread Count Badge */}
-      {unreadCount > 0 && (
+      {currentUnreadCount > 0 && (
         <View style={styles.badgeContainer}>
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount} non lu(s)</Text>
+            <Text style={styles.badgeText}>{currentUnreadCount} non lu(s)</Text>
           </View>
         </View>
       )}

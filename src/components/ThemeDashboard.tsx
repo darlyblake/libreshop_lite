@@ -23,14 +23,10 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
   const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'ai' | 'sync'>('overview');
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Rafraîchir les données
+  // Démarrer le monitoring
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Mettre à jour les métriques
-      integratedTheme.performance.updateFPS();
-    }, 1000);
-
-    return () => clearInterval(interval);
+    integratedTheme.performance.startMonitoring();
+    return () => integratedTheme.performance.stopMonitoring();
   }, [integratedTheme.performance]);
 
   // Appliquer une suggestion IA
@@ -276,8 +272,8 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
             Modèle prêt:
           </Text>
           <Badge 
-            label={integratedTheme.ai.isModelReady ? 'Oui' : 'Non'} 
-            variant={integratedTheme.ai.isModelReady ? 'success' : 'warning'}
+            label={integratedTheme.ai.stats.hasEnoughData ? 'Oui' : 'Non'} 
+            variant={integratedTheme.ai.stats.hasEnoughData ? 'success' : 'warning'}
             size="small"
           />
         </View>
@@ -304,7 +300,7 @@ export const ThemeDashboard: React.FC<ThemeDashboardProps> = ({ userId, onClose 
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: getColor.success }]}
             onPress={handleApplyAISuggestion}
-            disabled={!integratedTheme.ai.canApplySuggestion}
+            disabled={!integratedTheme.ai.suggestion}
           >
             <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
               Appliquer la suggestion

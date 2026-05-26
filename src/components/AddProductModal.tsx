@@ -1403,7 +1403,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
               </View>
             </View>
 
-            <Text key={`step-${currentStep}`} style={styles.stepSubText} className="notranslate">
+            <Text key={`step-${currentStep}`} style={styles.stepSubText}>
               {getStepText()}
             </Text>
           </View>
@@ -1775,7 +1775,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   <View style={styles.studioGuideBox}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       <Ionicons name="sparkles" size={16} color={COLORS.accent} />
-                      <Text style={styles.studioGuideTitle} className="notranslate">Studio Photo Assisté par IA</Text>
+                      <Text style={styles.studioGuideTitle}>Studio Photo Assisté par IA</Text>
                       <View style={{ backgroundColor: '#F59E0B20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 'auto' }}>
                         <Text style={{ color: '#F59E0B', fontSize: 10, fontWeight: '700' }}>BIENTÔT</Text>
                       </View>

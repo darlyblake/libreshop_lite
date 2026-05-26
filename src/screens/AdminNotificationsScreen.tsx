@@ -125,7 +125,10 @@ export const AdminNotificationsScreen: React.FC = () => {
 
   const handleClearAllNotifications = async () => {
     try {
-      await Promise.all(notifications.map((n) => notificationService.delete(n.id)));
+      const sessionData = await authService.getSession();
+      const userId = sessionData.session?.user?.id;
+      if (!userId) return;
+      await notificationService.deleteAllByUser(userId);
       setNotifications([]);
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'clear notifications');

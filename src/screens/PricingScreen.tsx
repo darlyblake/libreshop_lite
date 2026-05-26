@@ -369,6 +369,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
+  expiredBanner: {
+    // Base style, overridden inline
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -181,6 +181,8 @@ export const SellerAnalyticsScreen = () => {
       const revenuePrev30 = prev30DaysOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
       const statsForCoach: SellerStats = {
+        totalExpenses: 0,
+        netProfit: 0,
         totalRevenue: totalRevenueAllTime,
         totalOrders: ordersCount,
         averageBasket: confirmedOrdersInRange.length > 0 ? totalRevenue / confirmedOrdersInRange.length : 0,

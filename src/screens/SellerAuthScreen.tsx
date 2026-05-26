@@ -147,6 +147,7 @@ export const SellerAuthScreen: React.FC = () => {
     const checkExistingUser = async () => {
       try {
         // Toujours vérifier la session la plus fraîche côté DB plutôt que le store seul
+        if (!supabase) return;
         const { data: { user: currentUser } } = await supabase.auth.getUser();
         if (currentUser?.id) {
           // Vérifier si l'utilisateur a déjà une boutique
@@ -760,6 +761,7 @@ export const SellerAuthScreen: React.FC = () => {
                               const webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
                               const redirectTo = webBaseUrl ? `${webBaseUrl}/auth/reset` : Linking.createURL('auth/reset');
                               // Use Supabase server to generate & send OTP (server-side)
+                              if (!supabase) { setResetError('Service non disponible'); return; }
                               const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo } as any);
                               if (error) throw error;
                               // Server sent the email (may be OTP or link depending on template)
@@ -804,6 +806,7 @@ export const SellerAuthScreen: React.FC = () => {
                             if (!resetCode) { setResetError('Entrez le code'); return; }
                             setResetLoading(true); setResetError('');
                             try {
+                              if (!supabase) { setResetError('Service non disponible'); return; }
                               const { error } = await supabase.auth.verifyOtp({ email: resetEmail, token: resetCode, type: 'recovery' } as any);
                               if (error) throw error;
                               setResetStep('set');
@@ -835,6 +838,7 @@ export const SellerAuthScreen: React.FC = () => {
                             if (resetNewPassword !== resetConfirmPassword) { setResetError('Les mots de passe ne correspondent pas'); return; }
                             setResetLoading(true); setResetError('');
                             try {
+                              if (!supabase) { setResetError('Service non disponible'); return; }
                               const { error } = await supabase.auth.updateUser({ password: resetNewPassword } as any);
                               if (error) throw error;
                               Alert.alert('Mot de passe modifié', 'Votre mot de passe a été mis à jour. Vous pouvez maintenant vous connecter.');
@@ -1145,7 +1149,7 @@ const createSellerAuthStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZ
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  submitButton: {
+  resetSubmitButton: {
     backgroundColor: COLORS.accent,
   },
   cancelText: {

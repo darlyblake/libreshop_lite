@@ -250,7 +250,7 @@ export const AdminUsersScreen: React.FC = () => {
   const handleViewStores = (user: User) => {
     handleMenuClose();
     // Navigate to AdminStores filtered by this seller
-    navigation.navigate('AdminStores' as never, { sellerId: user.id, sellerName: user.full_name } as never);
+    navigation.navigate('AdminStores' as any, { sellerId: user.id, sellerName: user.full_name } as any);
   };
 
   const handleViewOrders = (user: User) => {
@@ -1394,16 +1394,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.text,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+
   filterButton: {
     padding: SPACING.sm,
     height: 40,
@@ -1732,20 +1723,12 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
     flexWrap: 'wrap',
   },
-  orderNumber: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: COLORS.accent,
-  },
+
   orderDate: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
   },
-  orderAmount: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
+
   emptyStateText: {
     fontSize: FONT_SIZE.sm,
     color: COLORS.textMuted,
@@ -1765,10 +1748,7 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.border,
-  },
+
   userActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -1950,7 +1930,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: SPACING.xs,
     paddingVertical: 2,
-    borderRadius: RADIUS.xs,
+    borderRadius: RADIUS.sm,
   },
   mergedBadge: {
     backgroundColor: COLORS.warning + '30',
@@ -2077,29 +2057,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.text,
   },
-  modalOrderNumber: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.accent,
-  },
-  modalOrderClient: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '500',
-    color: COLORS.text,
-    marginLeft: SPACING.xs,
-  },
-  modalStatDivider: {
-    width: 1,
-    backgroundColor: COLORS.border,
-    marginHorizontal: SPACING.lg,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
-  },
-  modalActionButton: {
-    flex: 1,
-  },
+
 });

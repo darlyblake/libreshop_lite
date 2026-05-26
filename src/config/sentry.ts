@@ -27,7 +27,7 @@ export function initSentry() {
     profilesSampleRate: ENVIRONMENT === 'production' ? 0.1 : 0.5,
     
     // Security features
-    beforeSend(event, hint) {
+    beforeSend(event: any, hint: any) {
       // Filtrer les données sensibles
       if (event.request) {
         // Supprimer les headers sensibles
@@ -64,7 +64,7 @@ export function initSentry() {
     ],
     
     // Before breadcrumb
-    beforeBreadcrumb(breadcrumb, hint) {
+    beforeBreadcrumb(breadcrumb: any, hint: any) {
       // Filtrer les breadcrumbs sensibles
       if (breadcrumb.category === 'http') {
         if (breadcrumb.data) {

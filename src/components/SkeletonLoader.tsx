@@ -3,8 +3,8 @@ import { View, Animated, StyleSheet, ViewStyle, DimensionValue, Platform } from 
 import { useTheme } from '../hooks/useTheme';
 
 interface SkeletonLoaderProps {
-  width?: DimensionValue;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   borderRadius?: number;
   style?: ViewStyle;
 }
@@ -55,8 +55,8 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
       style={[
         styles.skeleton,
         {
-          width,
-          height,
+          width: width as any,
+          height: height as any,
           borderRadius: finalBorderRadius,
           opacity,
         },

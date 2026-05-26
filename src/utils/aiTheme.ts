@@ -259,7 +259,7 @@ export const useAITheme = (config: LearningConfig = {
       return false;
     }
 
-    setThemeMode(suggestion.recommendedTheme);
+    setThemeMode(suggestion.recommendedTheme === 'amoled' ? 'dark' : suggestion.recommendedTheme);
     recordUserAction(suggestion.recommendedTheme);
     return true;
   }, [suggestion, config.confidenceThreshold, setThemeMode, recordUserAction]);
@@ -345,7 +345,7 @@ export const useAITheme = (config: LearningConfig = {
     
     // Utilitaires
     hasSuggestion: !!suggestion,
-    canApplySuggestion: suggestion?.confidence >= config.confidenceThreshold,
+    canApplySuggestion: (suggestion?.confidence || 0) >= config.confidenceThreshold,
     isModelReady: userPatterns.length >= config.minDataPoints,
   };
 };
