@@ -49,10 +49,12 @@ export const ClientAllProductsScreen: React.FC = () => {
   const contentWidth = Math.min(windowWidth, MAX_CONTENT_WIDTH);
 
   const itemWidth = useMemo(() => {
+    const sidebarWidth = (!isMobile && subCategories.length > 0) ? 200 : 0;
     const totalPadding = SPACING.lg * 2;
     const gap = SPACING.md * (numColumns - 1);
-    return (contentWidth - totalPadding - gap) / numColumns;
-  }, [contentWidth, numColumns]);
+    const availableWidth = contentWidth - sidebarWidth;
+    return Math.max(0, (availableWidth - totalPadding - gap) / numColumns);
+  }, [contentWidth, numColumns, isMobile, subCategories.length]);
 
   // Load general categories from database
   useEffect(() => {
@@ -73,12 +75,15 @@ export const ClientAllProductsScreen: React.FC = () => {
     const loadSubCategories = async () => {
       try {
         if (!selectedGeneralCategory || selectedGeneralCategory.id === 'all') {
-          const allCats = await categoryService.getAll();
-          const subCats = allCats.filter((c: any) => c.parent_id !== null);
-          setSubCategories([{ id: 'all_sub', name: 'Toutes les sous-catégories' }, ...subCats]);
+          // When 'Toutes' is selected, don't show any subcategories sidebar
+          setSubCategories([]);
         } else {
           const subCatData = await categoryService.getByParent(selectedGeneralCategory.id);
-          setSubCategories([{ id: 'all_sub', name: 'Toutes les sous-catégories' }, ...subCatData]);
+          if (subCatData.length > 0) {
+            setSubCategories([{ id: 'all_sub', name: 'Toutes' }, ...subCatData]);
+          } else {
+            setSubCategories([]);
+          }
         }
       } catch (err) {
         console.error('Failed to load subcategories:', err);
@@ -164,8 +169,8 @@ export const ClientAllProductsScreen: React.FC = () => {
     { id: 'newest', label: 'Nouveautés' },
     { id: 'popular', label: 'Populaire' },
     { id: 'trending', label: 'Tendances' },
-    { id: 'ranked', label: 'Tendance' },
     { id: 'sales', label: 'Top ventes' },
+    { id: 'ranked', label: 'Mieux notés' },
   ];
 
   const filteredProducts = useMemo(() => {
@@ -250,8 +255,8 @@ export const ClientAllProductsScreen: React.FC = () => {
         </View>
 
         <View style={styles.mainContentRow}>
-          {subCategories.length > 0 && (
-            <View style={[styles.sidebar, { width: isMobile ? 130 : 200 }]}>
+          {subCategories.length > 0 && !isMobile && (
+            <View style={[styles.sidebar, { width: 200 }]}>
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sidebarContent}>
                 {subCategories.map((subCat) => {
                   const isActive = (!selectedSubCategory && subCat.id === 'all_sub') || selectedSubCategory?.id === subCat.id;
@@ -270,6 +275,25 @@ export const ClientAllProductsScreen: React.FC = () => {
           )}
 
           <View style={styles.flex1}>
+            {subCategories.length > 0 && isMobile && (
+              <View style={{ paddingBottom: SPACING.md }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesList}>
+                  {subCategories.map((subCat) => {
+                    const isActive = (!selectedSubCategory && subCat.id === 'all_sub') || selectedSubCategory?.id === subCat.id;
+                    return (
+                      <TouchableOpacity
+                        key={subCat.id}
+                        style={[styles.categoryChip, isActive && styles.categoryChipActive, { paddingVertical: SPACING.xs }]}
+                        onPress={() => setSelectedSubCategory(subCat.id === 'all_sub' ? null : subCat)}
+                      >
+                        <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>{subCat.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
             <View style={styles.resultsHeader}>
               <Text style={styles.resultsCount}>{filteredProducts.length} produits trouvés</Text>
             </View>

@@ -34,7 +34,8 @@ if (Platform.OS === 'web') {
     const msg = String(args[0] ?? '');
     // Common dev/noisy messages we want to ignore on web
     if (
-      msg.includes('pointerEvents is deprecated') || 
+      msg.includes('pointerEvents is deprecated') ||
+      msg.includes('shadow*') ||
       msg.includes('PushTokenManager') ||
       msg.includes('onStartShouldSetResponder') ||
       msg.includes('onResponder') ||
@@ -50,7 +51,9 @@ if (Platform.OS === 'web') {
       msg.includes('Performance optimizations') ||
       msg.includes('translate.google.com') ||
       msg.includes('translate.googleapis.com') ||
-      msg.includes('ERR_BLOCKED_BY_CLIENT')
+      msg.includes('ERR_BLOCKED_BY_CLIENT') ||
+      msg.includes('expo-notifications') ||
+      msg.includes('Listening to push token changes')
     ) {
       return;
     }
@@ -80,7 +83,8 @@ if (Platform.OS === 'web') {
       msg.includes('ERR_BLOCKED_BY_CLIENT') ||
       msg.includes('AuthApiError') ||
       msg.includes('Refresh Token') ||
-      msg.includes('message channel closed')
+      msg.includes('message channel closed') ||
+      msg.includes('Encountered two children with the same key')
     ) {
       return;
     }

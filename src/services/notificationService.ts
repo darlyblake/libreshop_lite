@@ -228,6 +228,62 @@ class NotificationService {
       return null;
     }
   }
+
+  async getByUser(userId: string) {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  }
+
+  async markAsRead(notificationId: string) {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('id', notificationId);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async markAllAsRead(userId: string) {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', userId)
+        .eq('read', false);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async deleteAllByUser(userId: string) {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId);
+      if (error) throw error;
+    } catch (e) {
+      console.error(e);
+    }
+  }
 }
 
 export const notificationService = new NotificationService();

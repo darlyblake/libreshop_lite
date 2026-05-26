@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
 
 type Option<T extends string> = { id: T; label: string };
@@ -12,7 +12,11 @@ export function SortTabs<T extends string>(props: {
 }) {
   const { options, selected, onSelect } = props;
   return (
-    <View style={styles.container}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.container}
+    >
       {options.map((opt) => (
         <TouchableOpacity
           key={opt.id}
@@ -22,7 +26,7 @@ export function SortTabs<T extends string>(props: {
           <Text style={[styles.tabText, selected === opt.id && styles.tabTextActive]}>{opt.label}</Text>
         </TouchableOpacity>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -32,6 +36,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginTop: SPACING.sm,
     marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
   },
   tab: {
     paddingVertical: 6,

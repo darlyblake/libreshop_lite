@@ -22,7 +22,11 @@ const OptimizedImage = (props: Props) => {
       placeholder={placeholder || BLURHASH}
       contentFit="cover"
       transition={300}
-      cachePolicy="disk"
+      cachePolicy="memory-disk"
+      onError={(error) => {
+        // Silently handle network errors to avoid blocking UI
+        console.warn('[OptimizedImage] Image load error:', error.nativeEvent?.error);
+      }}
       {...rest}
     />
   );

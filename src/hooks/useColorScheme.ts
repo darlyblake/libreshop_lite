@@ -157,7 +157,7 @@ export const useColorScheme = () => {
     if (mode === 'system') {
       setTheme(resolveTheme('system'));
     }
-  }, [deviceScheme, mode]);
+  }, [deviceScheme]);
 
   // Synchroniser l'état entre toutes les instances du hook via les écouteurs globaux
   useEffect(() => {

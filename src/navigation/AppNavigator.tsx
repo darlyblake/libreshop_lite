@@ -6,7 +6,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useAudioPlayer } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 
 // Imports optimisés en direct pour les écrans clients
@@ -22,6 +21,7 @@ import { SubscriptionExpiredScreen } from '../screens/SubscriptionExpiredScreen'
 import { ClientHomeScreen } from '../screens/ClientHomeScreen';
 import { ClientOrdersScreen } from '../screens/ClientOrdersScreen';
 import { ClientSearchScreen } from '../screens/ClientSearchScreen';
+import { ClientMapScreen } from '../screens/ClientMapScreen';
 import { WishlistScreen } from '../screens/WishlistScreen';
 import { ClientProfileScreen } from '../screens/ClientProfileScreen';
 import { ClientDetailScreen } from '../screens/ClientDetailScreen';
@@ -207,21 +207,12 @@ const useResponsiveTabBar = () => {
 
 // Hook personnalisé pour les notifications sonores
 const useNotificationSound = () => {
-  const player = useAudioPlayer('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-
   const playNotificationSound = useCallback(async (): Promise<void> => {
-    try {
-      if (player) {
-        player.play();
-      }
-    } catch (soundError) {
-      // Fallback haptique
-      if (Platform.OS !== 'web') {
-        try {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch (hapticError) {
-          errorHandler.handle(hapticError instanceof Error ? hapticError : new Error(String(hapticError)), 'NotificationFeedback', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-        }
+    if (Platform.OS !== 'web') {
+      try {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (hapticError) {
+        errorHandler.handle(hapticError instanceof Error ? hapticError : new Error(String(hapticError)), 'NotificationFeedback', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       }
     }
   }, []);
@@ -296,7 +287,6 @@ const ClientTabs: React.FC = React.memo(() => {
       ClientOrders: ['receipt', 'receipt-outline'],
       ClientSearch: ['search', 'search-outline'],
       Wishlist: ['heart', 'heart-outline'],
-      ClientProfile: ['person', 'person-outline'],
     };
     
     const [focusedIcon, outlineIcon] = icons[routeName] || ['home', 'home-outline'];
@@ -352,7 +342,6 @@ const ClientTabs: React.FC = React.memo(() => {
       />
       <ClientTab.Screen name="ClientSearch" component={ClientSearchScreen} options={{ title: 'Recherche' }} />
       <ClientTab.Screen name="Wishlist" component={WishlistScreen} options={{ title: 'Favoris' }} />
-      <ClientTab.Screen name="ClientProfile" component={ClientProfileScreen} options={{ title: 'Profil' }} />
     </ClientTab.Navigator>
   );
 });
@@ -655,6 +644,27 @@ export const AppNavigator: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Écoute en temps réel des nouvelles notifications (base de données)
+  useEffect(() => {
+    if (!supabase || !user) return;
+
+    const channel = supabase
+      .channel(`public:notifications:user_id=eq.${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const newNotification = payload.new as any;
+          useNotificationStore.getState().addNotification(newNotification);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   // Helper pour déterminer la route initiale
   const getInitialRouteForRole = async (role: UserRole, userId: string): Promise<keyof RootStackParamList> => {
     // Check if user is suspended
@@ -768,6 +778,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="ClientEdit" component={ClientEditScreen} />
         <Stack.Screen name="ClientAllStores" component={ClientAllStoresScreen} />
         <Stack.Screen name="ClientAllProducts" component={ClientAllProductsScreen} />
+        <Stack.Screen name="ClientMap" component={ClientMapScreen} />
         <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
@@ -781,6 +792,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Security" component={SecurityScreen} />
         <Stack.Screen name="Help" component={HelpScreen} />
         <Stack.Screen name="AccountSuspended" component={AccountSuspendedScreen} />
+        <Stack.Screen name="ClientProfile" component={ClientProfileScreen} />
         
         {/* Routes vendeurs */}
         <Stack.Screen name="SellerAddStore" component={SellerAddStoreScreen} />

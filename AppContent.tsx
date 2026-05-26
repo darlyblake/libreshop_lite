@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Dimensions, View } from 'react-native';
+import { Dimensions, View, Platform } from 'react-native';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { ThemeProvider } from './src/components/ThemeProvider';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -12,11 +12,13 @@ import { notificationService } from './src/services/notificationService';
 
 export default function AppContent() {
   React.useEffect(() => {
-    // Demander les permissions et enregistrer le token au démarrage
-    notificationService.registerForPushNotificationsAsync();
-    
-    // Planifier la notification d'engagement (pour faire revenir le client)
-    notificationService.scheduleEngagementNotification();
+    // Demander les permissions et enregistrer le token au démarrage (uniquement sur mobile)
+    if (Platform.OS !== 'web') {
+      notificationService.registerForPushNotificationsAsync();
+
+      // Planifier la notification d'engagement (pour faire revenir le client)
+      notificationService.scheduleEngagementNotification();
+    }
   }, []);
 
   return (

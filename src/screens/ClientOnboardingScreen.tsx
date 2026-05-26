@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { onboardingStorage } from '../lib/storage';
+import { homeBannerService } from '../services/homeBannerService';
+import { storeService } from '../services/storeService';
+import { productService } from '../services/productService';
+import { categoryService } from '../services/categoryService';
+import { cacheService } from '../services/cacheService';
+import { cloudinaryService } from '../services/cloudinaryService';
+import { CACHE_TTL } from '../config/cacheConfig';
+import OptimizedImage from '../components/OptimizedImage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -48,6 +56,68 @@ const SLIDES: Slide[] = [
 export const ClientOnboardingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  // Précharger les données de ClientHome en arrière-plan
+  useEffect(() => {
+    const preloadClientHomeData = async () => {
+      try {
+        // Charger les bannières
+        const [carousel, promo] = await Promise.all([
+          homeBannerService.getActiveByPlacement('carousel').catch(() => []),
+          homeBannerService.getActiveByPlacement('promo').catch(() => []),
+        ]);
+
+        const validCarousel = Array.isArray(carousel) ? carousel.filter((b: any) => b && b.id && b.image_url) : [];
+        const validPromo = Array.isArray(promo) ? promo.filter((b: any) => b && b.id && b.image_url) : [];
+
+        if (validCarousel.length > 0) {
+          cacheService.set('HOME_CAROUSEL_BANNERS', validCarousel, CACHE_TTL.CAROUSEL.duration, CACHE_TTL.CAROUSEL.stale);
+          // Précharger les images du carousel
+          try {
+            const urls = validCarousel.map((b: any) => cloudinaryService.getOptimizedUrl(b.image_url, 800)).filter(Boolean);
+            await OptimizedImage.preload(urls);
+          } catch (e) {
+            // Ignorer les erreurs de préchargement
+          }
+        }
+        if (validPromo.length > 0) {
+          cacheService.set('HOME_PROMO_BANNERS', validPromo, CACHE_TTL.PROMO.duration, CACHE_TTL.PROMO.stale);
+        }
+
+        // Charger les magasins en vedette
+        const stores = await storeService.getFeatured().catch(() => []);
+        if (Array.isArray(stores) && stores.length > 0) {
+          const validStores = stores.filter((store: any) => store && store.id);
+          cacheService.set('HOME_FEATURED_STORES', validStores, CACHE_TTL.STORES.duration, CACHE_TTL.STORES.stale);
+        }
+
+        // Charger les produits populaires
+        const products = await productService.getAll(0, 8, 'popular').catch(() => []);
+        if (Array.isArray(products) && products.length > 0) {
+          const validProducts = products.filter((product: any) => product && product.id);
+          cacheService.set('HOME_FEATURED_PRODUCTS', validProducts, CACHE_TTL.PRODUCTS.duration, CACHE_TTL.PRODUCTS.stale);
+        }
+
+        // Charger les catégories populaires
+        const categories = await categoryService.getPopularCategories(6).catch(() => []);
+        if (Array.isArray(categories) && categories.length > 0) {
+          const validCats = categories.filter((cat: any) => cat && cat.name);
+          const catNames = ['Toutes', ...validCats.map((c: any) => c.name)];
+          cacheService.set('HOME_POPULAR_CATEGORIES', catNames, CACHE_TTL.CATEGORIES.duration, CACHE_TTL.CATEGORIES.stale);
+        }
+      } catch (e) {
+        // Silencieux - ne pas bloquer l'onboarding si le préchargement échoue
+        console.warn('[ClientOnboarding] Failed to preload data:', e);
+      }
+    };
+
+    // Démarrer le préchargement après un court délai pour ne pas impacter l'animation initiale
+    const timer = setTimeout(() => {
+      preloadClientHomeData();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleNext = async () => {
     if (currentSlideIndex < SLIDES.length - 1) {

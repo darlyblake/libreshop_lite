@@ -353,7 +353,7 @@ export const productService = {
         // With cursor, we still need to fetch fresh batch from start for proper ranking
         // This ensures ranking consistency across page loads
         try {
-          const decodedCursor = JSON.parse(Buffer.from(cursor, 'base64').toString());
+          const decodedCursor = JSON.parse(atob(cursor));
           const offset = decodedCursor.offset || 0;
           
           const { data, error } = await query.range(offset, offset + batchSize - 1);
@@ -377,16 +377,16 @@ export const productService = {
       let nextCursor = null;
       if (hasMore && items.length > 0) {
         // Calculate next offset based on cursor position
-        const currentOffset = cursor ? 
-          JSON.parse(Buffer.from(cursor, 'base64').toString()).offset || 0 : 0;
+        const currentOffset = cursor ?
+          JSON.parse(atob(cursor)).offset || 0 : 0;
         const nextOffset = currentOffset + pageSize;
-        
-        nextCursor = Buffer.from(
+
+        nextCursor = btoa(
           JSON.stringify({
             offset: nextOffset,
             sort
           })
-        ).toString('base64');
+        );
       }
 
       return {
