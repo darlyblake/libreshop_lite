@@ -54,9 +54,9 @@ export const StoreInfoCard: React.FC<StoreInfoCardProps> = ({
     store.opening_hours ? { label: 'Horaires', value: store.opening_hours, icon: 'time', onPress: () => {} } : null,
     store.address ? { label: 'Adresse', value: store.address, icon: 'location', onPress: onAddressPress } : null,
     store.delivery_time ? { label: 'Livraison', value: store.delivery_time, icon: 'cube', onPress: () => {} } : null,
-    store.phone ? { label: 'Adal Memittes', value: store.phone, icon: 'call', onPress: handleCall } : null,
-    store.email ? { label: 'Devios euppinelerts', value: store.email, icon: 'mail', onPress: handleEmail } : null,
-    { label: 'Suibale', value: 'Service disponible', icon: 'checkmark-circle', onPress: () => {} },
+    store.phone ? { label: 'Téléphone', value: store.phone, icon: 'call', onPress: handleCall } : null,
+    store.email ? { label: 'Email', value: store.email, icon: 'mail', onPress: handleEmail } : null,
+    { label: 'Statut', value: 'Service disponible', icon: 'checkmark-circle', onPress: () => {} },
   ].filter(Boolean) as InfoItem[];
 
   if (infoItems.length === 0) return null;

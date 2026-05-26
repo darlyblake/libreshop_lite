@@ -19,7 +19,9 @@ const IGNORED_PATTERNS: RegExp[] = [
   /increment_product_views/, // supabase rpc 404 fetch error logs
   /Failed to execute 'removeChild'/, // google translate extension crash
   /\[DOM Shield\]/, // our defensive dom protective logs
-  /NotFoundError: Failed to execute/ // dom exception string
+  /NotFoundError: Failed to execute/, // dom exception string
+  /TouchableWithoutFeedback is deprecated/, // react-native-web deprecation warning
+  /\[OptimizedImage\] Image load error: undefined/, // missing fallback URL errors
 ];
 
 function shouldIgnore(args: any[]): boolean {

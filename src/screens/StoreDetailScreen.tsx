@@ -25,7 +25,7 @@ import * as ExpoLinking from "expo-linking";
 import { contactStore } from '../services/contactService';
 import { openURL } from '../utils/platformUtils';
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from "../config/theme";
+import { SPACING, RADIUS, FONT_SIZE } from "../config/theme";
 import { ProductCard, FollowButton, StoreHeader, StoreTabs, StoreInfoCard, shareContent } from "../components";
 import { StoreSchema } from "../components/ProductSchema";
 import { collectionService } from '../services/collectionService';
@@ -72,11 +72,14 @@ const FALLBACK_PRODUCT_IMAGE = "https://picsum.photos/400?15";
 const PAGE_SIZE = 24;
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
-const SkeletonBox = ({ style }: { style?: any }) => (
-  <View
-    style={[{ backgroundColor: COLORS.border, borderRadius: RADIUS.md }, style]}
-  />
-);
+const SkeletonBox = ({ style }: { style?: any }) => {
+  const { getColor: COLORS } = useTheme();
+  return (
+    <View
+      style={[{ backgroundColor: COLORS.border, borderRadius: RADIUS.md }, style]}
+    />
+  );
+};
 
 const StoreSkeleton = () => (
   <View>
@@ -129,6 +132,8 @@ const StoreSkeleton = () => (
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 const StarRating = ({ avg, count }: { avg: number; count?: number }) => {
+  const { getColor: COLORS } = useTheme();
+  const starStyles = useMemo(() => getStarStyles(COLORS), [COLORS]);
   const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
   const full = Math.floor(safe);
   const half = safe - full >= 0.5;
@@ -159,7 +164,7 @@ const StarRating = ({ avg, count }: { avg: number; count?: number }) => {
   );
 };
 
-const starStyles = StyleSheet.create({
+const getStarStyles = (COLORS: any) => StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 3 },
   avg: {
     fontSize: FONT_SIZE.sm,
@@ -180,7 +185,8 @@ export const StoreDetailScreen: React.FC = () => {
   const { storeId: storeIdParam, slug: slugParam } = route.params || {};
   const { user } = useAuthStore();
   const { isMobile, isTablet } = useResponsive();
-  const { isDark } = useTheme();
+  const { isDark, getColor: COLORS } = useTheme();
+  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
 
   const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -196,7 +202,6 @@ export const StoreDetailScreen: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOption, setSortOption] = useState<'recent' | 'price_desc' | 'price_asc' | 'stock_desc'>('recent');
-  const [reviewName, setReviewName] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -1364,7 +1369,6 @@ export const StoreDetailScreen: React.FC = () => {
                   <Text style={styles.aboutTitle}>À propos de {storeData.name}</Text>
                   <Text style={styles.descriptionText}>{storeData.description}</Text>
                 </View>
-
                 {/* Contact & Hours */}
                 <View style={styles.aboutCard}>
                   <Text style={styles.aboutTitle}>Informations de contact</Text>
@@ -1509,95 +1513,102 @@ export const StoreDetailScreen: React.FC = () => {
                 </View>
 
                 {/* Add Review Form */}
-                <View style={styles.reviewFormContainer}>
-                  <Text style={styles.formTitle}>Laissez un avis</Text>
-                  
-                  <Text style={styles.formLabel}>Votre nom *</Text>
-                  <TextInput
-                    style={styles.reviewInput}
-                    placeholder="Entrez votre nom"
-                    placeholderTextColor={COLORS.textMuted}
-                    value={reviewName}
-                    onChangeText={setReviewName}
-                    editable={!submittingReview}
-                  />
+                {user ? (
+                  <View style={styles.reviewFormContainer}>
+                    <Text style={styles.formTitle}>Laissez un avis</Text>
+                    
+                    <Text style={styles.formLabel}>Note *</Text>
+                    <View style={styles.ratingSelector}>
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <TouchableOpacity
+                          key={star}
+                          onPress={() => setReviewRating(star)}
+                          disabled={submittingReview}
+                        >
+                          <Ionicons
+                            name={star <= reviewRating ? "star" : "star-outline"}
+                            size={32}
+                            color={star <= reviewRating ? COLORS.star : COLORS.textMuted}
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
 
-                  <Text style={styles.formLabel}>Note *</Text>
-                  <View style={styles.ratingSelector}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity
-                        key={star}
-                        onPress={() => setReviewRating(star)}
-                        disabled={submittingReview}
-                      >
-                        <Ionicons
-                          name={star <= reviewRating ? "star" : "star-outline"}
-                          size={32}
-                          color={star <= reviewRating ? COLORS.star : COLORS.textMuted}
-                        />
-                      </TouchableOpacity>
-                    ))}
+                    <Text style={styles.formLabel}>Commentaire *</Text>
+                    <TextInput
+                      style={[styles.reviewInput, styles.reviewTextarea]}
+                      placeholder="Partagez votre avis..."
+                      placeholderTextColor={COLORS.textMuted}
+                      value={reviewComment}
+                      onChangeText={setReviewComment}
+                      multiline
+                      numberOfLines={4}
+                      editable={!submittingReview}
+                    />
+
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        submittingReview && styles.submitButtonDisabled,
+                        !reviewComment && styles.submitButtonDisabled,
+                      ]}
+                      onPress={async () => {
+                        if (!store?.id || !reviewComment) {
+                          Alert.alert("Erreur", "Veuillez remplir votre commentaire");
+                          return;
+                        }
+                        
+                        setSubmittingReview(true);
+                        try {
+                          const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Client LibreShop';
+                          
+                          await storeReviewService.create({
+                            store_id: store.id,
+                            user_name: userName,
+                            rating: reviewRating,
+                            comment: reviewComment,
+                          });
+                          
+                          // Reload reviews
+                          const updated = await storeReviewService.getByStore(store.id);
+                          setStoreReviews(Array.isArray(updated) ? updated : []);
+                          
+                          // Reset form
+                          setReviewRating(5);
+                          setReviewComment("");
+                          
+                          Alert.alert("Succès", "Votre avis a été ajouté");
+                        } catch (error) {
+                          console.error("Error submitting review:", error);
+                          Alert.alert("Erreur", "Impossible d'ajouter votre avis");
+                        } finally {
+                          setSubmittingReview(false);
+                        }
+                      }}
+                      disabled={submittingReview || !reviewComment}
+                    >
+                      {submittingReview ? (
+                        <ActivityIndicator color={COLORS.bg} size="small" />
+                      ) : (
+                        <Text style={styles.submitButtonText}>Soumettre l'avis</Text>
+                      )}
+                    </TouchableOpacity>
                   </View>
-
-                  <Text style={styles.formLabel}>Commentaire *</Text>
-                  <TextInput
-                    style={[styles.reviewInput, styles.reviewTextarea]}
-                    placeholder="Partagez votre avis..."
-                    placeholderTextColor={COLORS.textMuted}
-                    value={reviewComment}
-                    onChangeText={setReviewComment}
-                    multiline
-                    numberOfLines={4}
-                    editable={!submittingReview}
-                  />
-
-                  <TouchableOpacity
-                    style={[
-                      styles.submitButton,
-                      submittingReview && styles.submitButtonDisabled,
-                      (!reviewName || !reviewComment) && styles.submitButtonDisabled,
-                    ]}
-                    onPress={async () => {
-                      if (!store?.id || !reviewName || !reviewComment) {
-                        Alert.alert("Erreur", "Veuillez remplir tous les champs");
-                        return;
-                      }
-                      
-                      setSubmittingReview(true);
-                      try {
-                        await storeReviewService.create({
-                          store_id: store.id,
-                          user_name: reviewName,
-                          rating: reviewRating,
-                          comment: reviewComment,
-                        });
-                        
-                        // Reload reviews
-                        const updated = await storeReviewService.getByStore(store.id);
-                        setStoreReviews(Array.isArray(updated) ? updated : []);
-                        
-                        // Reset form
-                        setReviewName("");
-                        setReviewRating(5);
-                        setReviewComment("");
-                        
-                        Alert.alert("Succès", "Votre avis a été ajouté");
-                      } catch (error) {
-                        console.error("Error submitting review:", error);
-                        Alert.alert("Erreur", "Impossible d'ajouter votre avis");
-                      } finally {
-                        setSubmittingReview(false);
-                      }
-                    }}
-                    disabled={submittingReview || !reviewName || !reviewComment}
-                  >
-                    {submittingReview ? (
-                      <ActivityIndicator color={COLORS.white} />
-                    ) : (
-                      <Text style={styles.submitButtonText}>Soumettre l'avis</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                ) : (
+                  <View style={[styles.reviewFormContainer, { alignItems: 'center', paddingVertical: SPACING.xxl }]}>
+                    <Ionicons name="lock-closed-outline" size={48} color={COLORS.textMuted} style={{ marginBottom: SPACING.md }} />
+                    <Text style={[styles.formTitle, { textAlign: 'center', marginBottom: SPACING.sm }]}>Vous devez être connecté</Text>
+                    <Text style={{ color: COLORS.textMuted, textAlign: 'center', marginBottom: SPACING.lg }}>
+                      Connectez-vous pour pouvoir laisser un avis sur cette boutique.
+                    </Text>
+                    <TouchableOpacity 
+                      style={[styles.submitButton, { alignSelf: 'stretch' }]} 
+                      onPress={() => navigation.navigate('ClientAuth')}
+                    >
+                      <Text style={styles.submitButtonText}>Se connecter</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
                 {/* Reviews List */}
                 {storeReviews && storeReviews.length > 0 ? (
@@ -1728,7 +1739,7 @@ export const StoreDetailScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,

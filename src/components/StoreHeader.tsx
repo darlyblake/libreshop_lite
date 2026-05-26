@@ -167,14 +167,6 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
         </View>
       </View>
 
-      {/* Description below banner */}
-      {store.description && (
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.description}>
-            {store.description}
-          </Text>
-        </View>
-      )}
     </View>
   );
 };
