@@ -14,7 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, SPACING, RADIUS } from '../config/theme';
+import { SPACING, RADIUS } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { authService } from '../services/authService';
 import { useAuthStore, useCartStore } from '../store';
 import { productLikesService } from '../services/productLikesService';
@@ -28,6 +29,8 @@ export const ClientAuthModal: React.FC = () => {
   const { isAuthModalVisible, pendingAction, hideAuthModal, setUser, setSession, user } = useAuthStore();
   const { addItem } = useCartStore();
   const [loading, setLoading] = useState(false);
+  const { getColor: COLORS, isDark } = useTheme();
+  const styles = React.useMemo(() => getStyles(COLORS, isDark), [COLORS, isDark]);
 
   const handleGoogleSignIn = async () => {
     if (loading) return;
@@ -229,7 +232,7 @@ export const ClientAuthModal: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
   },
   modalContainer: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.card,
     width: Platform.OS === 'web' ? 420 : SCREEN_WIDTH - 40,
     borderRadius: RADIUS.xl,
     padding: SPACING.xl,
@@ -311,9 +314,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: isDark ? COLORS.bgElevated : '#fff',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: isDark ? COLORS.border : '#ddd',
     paddingVertical: 14,
     width: '100%',
     borderRadius: RADIUS.lg,

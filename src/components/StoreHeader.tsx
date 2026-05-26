@@ -10,7 +10,8 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +41,8 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
   onContact,
   onFollow,
 }) => {
+  const { getColor: COLORS } = useTheme();
+  const styles = React.useMemo(() => getStyles(COLORS), [COLORS]);
   const bannerUrl = store.banner_url || FALLBACK_BANNER;
   const logoUrl = store.logo_url || FALLBACK_LOGO;
   const rating = store.rating || 4.7;
@@ -156,7 +159,7 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
                 <Text style={styles.ratingCount}> 🟣 {ratingCount}</Text>
               </View>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.openBadge}
               onPress={onContact}
             >
@@ -171,9 +174,9 @@ export const StoreHeader: React.FC<StoreHeaderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.bg,
   },
   bannerContainer: {
     position: 'relative',
@@ -203,7 +206,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -287,7 +290,7 @@ const styles = StyleSheet.create({
   descriptionContainer: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.bg,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },

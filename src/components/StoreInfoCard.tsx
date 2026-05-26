@@ -7,7 +7,8 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { contactStore } from '../services/contactService';
 import { openURL } from '../utils/platformUtils';
 
@@ -35,6 +36,8 @@ export const StoreInfoCard: React.FC<StoreInfoCardProps> = ({
   onAddressPress,
   onCallPress,
 }) => {
+  const { getColor: COLORS } = useTheme();
+  const styles = React.useMemo(() => getStyles(COLORS), [COLORS]);
   const handleCall = () => {
     if (!store.phone) return;
     contactStore({ rawPhone: store.phone, fallback: 'tel' });
@@ -91,9 +94,9 @@ export const StoreInfoCard: React.FC<StoreInfoCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.card,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
     borderBottomWidth: 1,
@@ -112,7 +115,7 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.bg,
+    backgroundColor: COLORS.bgElevated || COLORS.bg,
     borderRadius: RADIUS.lg,
   },
   iconContainer: {

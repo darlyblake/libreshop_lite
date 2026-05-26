@@ -7,7 +7,8 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { COLORS, SPACING, FONT_SIZE } from '../config/theme';
+import { SPACING, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +29,8 @@ export const StoreTabs: React.FC<StoreTabsProps> = ({
   activeTab,
   onTabChange,
 }) => {
+  const { getColor: COLORS } = useTheme();
+  const styles = React.useMemo(() => getStyles(COLORS), [COLORS]);
   return (
     <View style={styles.container}>
       <ScrollView
@@ -65,9 +68,9 @@ export const StoreTabs: React.FC<StoreTabsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const getStyles = (COLORS: any) => StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.bg,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
