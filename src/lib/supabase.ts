@@ -90,11 +90,9 @@ const getSupabaseClient = (): SupabaseClient | null => {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: typeof window !== 'undefined',
-      lock: Platform.OS === 'web' 
-        ? async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
-            return await fn();
-          }
-        : undefined,
+      lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
+        return await fn();
+      },
     },
   });
   globalForSupabase.supabaseClient = client;

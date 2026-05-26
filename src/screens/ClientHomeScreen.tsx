@@ -145,6 +145,7 @@ export const ClientHomeScreen: React.FC = () => {
 
   const [hasMoreStores, setHasMoreStores] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [switchingToSeller, setSwitchingToSeller] = useState(false);
 
   const fetchStores = async (pageToLoad: number, isRefresh = false) => {
     try {
@@ -221,6 +222,31 @@ export const ClientHomeScreen: React.FC = () => {
     }
   }, [loadingMoreStores, hasMoreStores, storesPage]);
 
+  const handleSwitchToSeller = async () => {
+    if (switchingToSeller) return;
+    
+    if (!user) {
+      navigation.navigate('SellerAuth');
+      return;
+    }
+
+    setSwitchingToSeller(true);
+    try {
+      const stores = await storeService.getStoresByUser(user.id);
+      if (stores && stores.length > 0) {
+        // If they have a store, go to Hub
+        navigation.navigate('SellerTabs');
+      } else {
+        // Connected but no store: direct them to Auth / Add Store
+        navigation.navigate('SellerAuth');
+      }
+    } catch (error) {
+      navigation.navigate('SellerAuth');
+    } finally {
+      setSwitchingToSeller(false);
+    }
+  };
+
   const renderHeader = useCallback(() => {
     return (
       <View style={{ width: '100%' }}>
@@ -228,6 +254,13 @@ export const ClientHomeScreen: React.FC = () => {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
           <Text style={{ fontSize: FONT_SIZE.xl, fontWeight: '900', color: palette.accent }}>LibreShop</Text>
           <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+            <TouchableOpacity style={{ padding: SPACING.xs }} onPress={handleSwitchToSeller} disabled={switchingToSeller}>
+              {switchingToSeller ? (
+                <ActivityIndicator size={24} color={palette.textMuted} />
+              ) : (
+                <Ionicons name="briefcase-outline" size={24} color={palette.textMuted} />
+              )}
+            </TouchableOpacity>
             <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => navigation.navigate('ClientMap')}>
               <Ionicons name="location-outline" size={24} color={palette.textMuted} />
             </TouchableOpacity>

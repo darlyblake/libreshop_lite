@@ -381,7 +381,7 @@ export const ProductDetailScreen: React.FC = () => {
           style={styles.headerButton}
           onPress={handleGoBack}
         >
-          <Ionicons name="arrow-back" size={24} color="white" />
+          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {productData?.name || ""}
@@ -402,14 +402,14 @@ export const ProductDetailScreen: React.FC = () => {
               }
             }}
           >
-            <Ionicons name="share-social-outline" size={24} color="white" />
+            <Ionicons name="share-social-outline" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => navigation.navigate('Cart')}
           >
             <View style={styles.cartIconContainer}>
-              <Ionicons name="bag-handle" size={22} color="white" />
+              <Ionicons name="bag-handle" size={22} color={COLORS.text} />
               {items.length > 0 && (
                 <View style={styles.cartBadge}>
                   <Text style={styles.cartBadgeText}>{items.length}</Text>
@@ -443,52 +443,7 @@ export const ProductDetailScreen: React.FC = () => {
       }}
       style={styles.imageGallery}
     >
-      {variantLabels.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.variantChipRow}
-          contentContainerStyle={styles.variantChipContent}
-        >
-          <TouchableOpacity
-            style={[
-              styles.variantChip,
-              selectedVariantLabel === null && styles.variantChipActive,
-            ]}
-            onPress={() => setSelectedVariantLabel(null)}
-            activeOpacity={0.85}
-          >
-            <Text
-              style={[
-                styles.variantChipText,
-                selectedVariantLabel === null && styles.variantChipTextActive,
-              ]}
-            >
-              Toutes
-            </Text>
-          </TouchableOpacity>
-          {variantLabels.map((label) => (
-            <TouchableOpacity
-              key={label}
-              style={[
-                styles.variantChip,
-                selectedVariantLabel === label && styles.variantChipActive,
-              ]}
-              onPress={() => setSelectedVariantLabel(label)}
-              activeOpacity={0.85}
-            >
-              <Text
-                style={[
-                  styles.variantChipText,
-                  selectedVariantLabel === label && styles.variantChipTextActive,
-                ]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+      
       {loading ? (
         <View style={[styles.mainImage, styles.loaderContainer]}>
           <SkeletonLoader width="100%" height="100%" borderRadius={RADIUS.lg} />
@@ -1164,7 +1119,64 @@ export const ProductDetailScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         {/* Image gallery */}
-        {renderImageGallery()}
+        {variantLabels.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.variantChipRow}
+          contentContainerStyle={styles.variantChipContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.variantChip,
+              selectedVariantLabel === null && styles.variantChipActive,
+            ]}
+            onPress={() => setSelectedVariantLabel(null)}
+            activeOpacity={0.85}
+          >
+            <Text
+              style={[
+                styles.variantChipText,
+                selectedVariantLabel === null && styles.variantChipTextActive,
+              ]}
+            >
+              Toutes
+            </Text>
+          </TouchableOpacity>
+          {variantLabels.map((label) => {
+            const colorHex = getColorHex(label);
+            return (
+            <TouchableOpacity
+              key={label}
+              style={[
+                colorHex ? styles.variantColorSwatch : styles.variantChip,
+                selectedVariantLabel === label && (colorHex ? styles.variantColorSwatchActive : styles.variantChipActive),
+              ]}
+              onPress={() => setSelectedVariantLabel(label)}
+              activeOpacity={0.85}
+            >
+              {colorHex ? (
+                <View style={[
+                  styles.swatchInner, 
+                  { backgroundColor: colorHex }, 
+                  colorHex === '#FFFFFF' && { borderWidth: 1, borderColor: '#DDD' }
+                ]} />
+              ) : (
+                <Text
+                  style={[
+                    styles.variantChipText,
+                    selectedVariantLabel === label && styles.variantChipTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              )}
+            </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+          {renderImageGallery()}
 
         {/* Product info and options */}
         {renderProductInfo()}
@@ -1264,12 +1276,9 @@ const getStyles = (themeContext: any) => {
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: COLORS.card,
   },
-  headerTitle: {
-    flex: 1,
-    marginHorizontal: SPACING.md,
-    color: 'white',
+  headerTitle: { flex: 1, marginHorizontal: SPACING.md, color: COLORS.text,
     fontSize: FONT_SIZE.md,
     fontWeight: '800',
   },
@@ -1332,7 +1341,7 @@ const getStyles = (themeContext: any) => {
     width: '100%',
     aspectRatio: 1,
     maxHeight: 600,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: COLORS.card,
     position: 'relative',
     alignSelf: 'center',
   },
@@ -1352,7 +1361,7 @@ const getStyles = (themeContext: any) => {
   imagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.card,
     gap: SPACING.sm,
   },
   imagePlaceholderText: {
@@ -1409,14 +1418,34 @@ const getStyles = (themeContext: any) => {
     paddingVertical: SPACING.xs,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.border,
     marginRight: SPACING.sm,
   },
   variantChipActive: {
     backgroundColor: COLORS.accent + '18',
     borderColor: COLORS.accent,
+  },
+  variantColorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginRight: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  variantColorSwatchActive: {
+    borderColor: COLORS.accent,
+    borderWidth: 2,
+  },
+  swatchInner: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
   },
   variantChipText: {
     color: COLORS.text,
@@ -1429,9 +1458,9 @@ const getStyles = (themeContext: any) => {
     width: 65,
     height: 65,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.card,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.10)',
+    borderColor: COLORS.border,
     padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1449,12 +1478,12 @@ const getStyles = (themeContext: any) => {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: COLORS.card,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.border,
     alignSelf: 'flex-start',
   },
   storeLogo: {
@@ -1462,13 +1491,13 @@ const getStyles = (themeContext: any) => {
     height: 36,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.20)',
+    borderColor: COLORS.border,
   },
   storeLogoPlaceholder: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: COLORS.card,
   },
   storeTextContainer: {
     flex: 1,
@@ -1566,9 +1595,9 @@ const getStyles = (themeContext: any) => {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: COLORS.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.border,
   },
   optionValueSelected: {
     backgroundColor: COLORS.accent + '20',
@@ -1597,11 +1626,11 @@ const getStyles = (themeContext: any) => {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: COLORS.card,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: COLORS.border,
   },
   quantityButtonDisabled: {
     opacity: 0.5,
@@ -1664,7 +1693,7 @@ const getStyles = (themeContext: any) => {
   // Tabs
   tabsWrapper: {
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: COLORS.border,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -1676,7 +1705,7 @@ const getStyles = (themeContext: any) => {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.card,
   },
   tabButtonActive: {
     backgroundColor: COLORS.accent + '25',
@@ -1702,12 +1731,12 @@ const getStyles = (themeContext: any) => {
     color: COLORS.text,
   },
   descriptionCard: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     paddingVertical: SPACING.lg,
     paddingHorizontal: SPACING.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
   },
   descriptionText: {
     color: COLORS.textSoft,
@@ -1738,12 +1767,12 @@ const getStyles = (themeContext: any) => {
     gap: SPACING.md,
   },
   characteristicItem: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
   },
   characteristicName: {
     color: COLORS.textMuted,
@@ -1760,11 +1789,11 @@ const getStyles = (themeContext: any) => {
 
   // Reviews
   reviewForm: {
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
     gap: SPACING.md,
     marginBottom: SPACING.lg,
   },
@@ -1830,11 +1859,11 @@ const getStyles = (themeContext: any) => {
     gap: SPACING.md,
   },
   reviewItem: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -1888,21 +1917,21 @@ const getStyles = (themeContext: any) => {
   },
   similarProductCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
     overflow: 'hidden',
   },
   similarProductImage: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: COLORS.card,
   },
   similarProductImagePlaceholder: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    backgroundColor: COLORS.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2018,7 +2047,7 @@ const getStyles = (themeContext: any) => {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -2040,7 +2069,7 @@ const getStyles = (themeContext: any) => {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: COLORS.textMuted,
   },
   paginationDotActive: {
     backgroundColor: 'white',
@@ -2102,11 +2131,11 @@ const getStyles = (themeContext: any) => {
   },
   deliveryCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     padding: SPACING.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: COLORS.border,
     gap: SPACING.md,
     alignItems: 'center',
   },
