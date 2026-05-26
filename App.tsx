@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
-import { Dimensions, View, LogBox, Platform } from 'react-native';
+import { Dimensions, View, LogBox, Platform, AppState } from 'react-native';
 import { initSkiaWeb } from './SkiaLoader';
 import { resetMetaTags } from './src/services/seoService';
 
@@ -179,8 +179,20 @@ export default function App() {
 
     getInitialURL();
 
+    // AppState listener for Supabase token refresh
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        const { supabase } = require('./src/lib/supabase');
+        supabase.auth.startAutoRefresh();
+      } else {
+        const { supabase } = require('./src/lib/supabase');
+        supabase.auth.stopAutoRefresh();
+      }
+    });
+
     return () => {
       subscription?.remove();
+      appStateSubscription.remove();
     };
   }, []);
 
