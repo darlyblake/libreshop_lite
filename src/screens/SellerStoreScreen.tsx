@@ -14,6 +14,7 @@ import {
   Share,
   Platform,
 } from 'react-native';
+import OptimizedImage from '../components/OptimizedImage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { copyToClipboard } from '../services/contactService';
@@ -845,7 +846,7 @@ export const SellerStoreScreen: React.FC = () => {
               <View style={{ marginTop: spacing.xl }}>
                 <Text style={styles.modalLabel}>Logo</Text>
                 {form.logoUrl && (
-                  <Image 
+                  <OptimizedImage 
                     source={{ uri: cloudinaryService.getOptimizedUrl(form.logoUrl, 800) }} 
                     style={styles.modalPreview} 
                   />
@@ -1117,11 +1118,10 @@ export const SellerStoreScreen: React.FC = () => {
           <>
             <View style={[styles.bannerContainer, { backgroundColor: getColor.card, overflow: 'hidden' }]}>
               <TouchableOpacity onPress={() => handleQuickImageUpdate('bannerUrl')} activeOpacity={0.8} style={{ width: '100%', height: '100%' }}>
-                <Image 
+                <OptimizedImage 
                   key={storeData.bannerUrl || 'default'} 
                   source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl || 'https://images.unsplash.com/photo-1557683316-973673baf926', 800) }} 
                   style={styles.banner} 
-                  resizeMode="cover" 
                 />
                 <View style={styles.bannerOverlay} />
                 <View style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 15, padding: 6 }}>
@@ -1130,7 +1130,7 @@ export const SellerStoreScreen: React.FC = () => {
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.logoContainer} onPress={() => handleQuickImageUpdate('logoUrl')} activeOpacity={0.8}>
-                <Image source={{ uri: cloudinaryService.getOptimizedUrl(storeData.logoUrl || 'https://picsum.photos/200', 800) }} style={styles.logo} />
+                <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(storeData.logoUrl || 'https://picsum.photos/200', 800) }} style={styles.logo} />
                 <View style={{ position: 'absolute', bottom: -5, right: -5, backgroundColor: getColor.accent, borderRadius: 15, padding: 4, borderWidth: 2, borderColor: getColor.bg }}>
                   <Ionicons name="camera" size={14} color="white" />
                 </View>

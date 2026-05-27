@@ -19,6 +19,7 @@ import { type Product } from '../lib/supabase';
 import { collectionService } from '../services/collectionService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { productService } from '../services/productService';
+import OptimizedImage from '../components/OptimizedImage';
 
 export const SellerCollectionProductsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -120,7 +121,7 @@ export const SellerCollectionProductsScreen: React.FC = () => {
           </View>
         </TouchableOpacity>
         
-        <Image source={{ uri: cloudinaryService.getOptimizedUrl(imageUri, 400) }} style={styles.productImage} />
+        <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(imageUri, 400) }} style={styles.productImage} />
         
         <View style={styles.productInfo}>
           <Text style={styles.productName}>{product.name}</Text>

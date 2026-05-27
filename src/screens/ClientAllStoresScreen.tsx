@@ -24,7 +24,7 @@ import Animated, {
   Layout,
 } from 'react-native-reanimated';
 
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import StoreFiltersModal from '../components/StoreFiltersModal';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { Store, StoreStats } from '../lib/supabase';
@@ -35,6 +35,7 @@ import { cloudinaryService } from '../services/cloudinaryService';
 import { SearchBar } from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
 import { locationService } from '../services/locationService';
+import OptimizedImage from '../components/OptimizedImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -50,6 +51,8 @@ export const ClientAllStoresScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { getColor: COLORS, spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS, SPACING, RADIUS, FONT_SIZE), [COLORS, SPACING, RADIUS, FONT_SIZE]);
   const { isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
 
   // Calcul dynamique du nombre de colonnes selon la largeur
@@ -144,17 +147,31 @@ export const ClientAllStoresScreen: React.FC = () => {
       
       setHasMore(list.length === pageSize);
 
-      const storeIds = list.map((s) => s.id);
-      if (storeIds.length > 0) {
-        const stats = await storeStatsService.getByStores(storeIds);
-        setStatsByStoreId(prev => {
-          const next = { ...prev };
-          for (const st of stats) {
-            next[st.store_id] = st;
-          }
-          return next;
-        });
+      // Alimenter statsByStoreId depuis les stats embarquées (join) dans chaque boutique
+      const embeddedStatsMap: Record<string, any> = {};
+      for (const s of list) {
+        const embedded = Array.isArray((s as any).store_stats)
+          ? (s as any).store_stats[0]
+          : (s as any).store_stats;
+        if (embedded) embeddedStatsMap[s.id] = { ...embedded, store_id: s.id };
       }
+
+      const storeIds = list.map((s) => s.id);
+      // Requête séparée en complément (peut enrichir avec total_products, etc.)
+      let extraStats: any[] = [];
+      if (storeIds.length > 0) {
+        try {
+          extraStats = await storeStatsService.getByStores(storeIds);
+        } catch (_) { /* silencieux */ }
+      }
+
+      setStatsByStoreId(prev => {
+        const next = { ...prev, ...embeddedStatsMap };
+        for (const st of extraStats) {
+          next[st.store_id] = { ...embeddedStatsMap[st.store_id], ...st };
+        }
+        return next;
+      });
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'ClientAllStoresScreen loadStores error');
       setError('Impossible de charger les boutiques');
@@ -316,9 +333,13 @@ export const ClientAllStoresScreen: React.FC = () => {
 
   const renderStoreCard = useCallback(
     ({ item, index }: { item: Store; index: number }) => {
-      const stats = statsByStoreId[item.id];
-      const ratingAvg = stats?.rating_avg ?? 0;
-      const ratingCount = stats?.rating_count ?? 0;
+      // Priorité : stats embarquées (join) → statsByStoreId → champs directs sur la boutique
+      const embeddedStats = Array.isArray((item as any).store_stats)
+        ? (item as any).store_stats[0]
+        : (item as any).store_stats;
+      const stats = embeddedStats || statsByStoreId[item.id];
+      const ratingAvg = stats?.rating_avg ?? (item as any).rating_avg ?? 0;
+      const ratingCount = stats?.rating_count ?? (item as any).rating_count ?? 0;
       const logoUrl = item.logo_url;
       const bannerUrl = item.banner_url;
 
@@ -338,7 +359,7 @@ export const ClientAllStoresScreen: React.FC = () => {
           >
             <View style={styles.storeMedia}>
               {bannerUrl ? (
-                <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={styles.storeBanner} resizeMode="cover" />
+                <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={styles.storeBanner} />
               ) : (
                 <LinearGradient
                   colors={[COLORS.accent + '40', COLORS.accent + '10']}
@@ -348,7 +369,7 @@ export const ClientAllStoresScreen: React.FC = () => {
 
               <View style={styles.storeLogoWrap}>
                 {logoUrl ? (
-                  <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={styles.storeLogo} />
+                  <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={styles.storeLogo} />
                 ) : (
                   <View style={styles.storeLogoPlaceholder}>
                     <Ionicons name="storefront" size={20} color={COLORS.accent} />
@@ -456,7 +477,7 @@ export const ClientAllStoresScreen: React.FC = () => {
         <View style={[styles.container, { paddingTop: insets.top }]}>
           {/* Header avec dégradé */}
           <LinearGradient
-            colors={[COLORS.accent, COLORS.accentDark || COLORS.accent]}
+            colors={[COLORS.accent, COLORS.primaryDark || COLORS.accent]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.header}
@@ -493,7 +514,7 @@ export const ClientAllStoresScreen: React.FC = () => {
           </LinearGradient>
 
           {/* Barre de recherche flottante */}
-          <BlurView intensity={80} tint="light" style={styles.searchContainer}>
+          <BlurView intensity={isDark ? 30 : 80} tint={isDark ? "dark" : "light"} style={styles.searchContainer}>
             <SearchBar
               value={query}
               onChangeText={setQuery}
@@ -632,7 +653,7 @@ export const ClientAllStoresScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any) => StyleSheet.create({
   maxWidthContainer: {
     maxWidth: MAX_CONTENT_WIDTH,
     width: '100%',
@@ -964,7 +985,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   radiusChipTextActive: {
-    color: 'white',
+    color: COLORS.bg,
   },
   storeBody: {
     paddingHorizontal: SPACING.md,

@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
+import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
 import { ProductCard, ProductCardSkeleton } from '../components';
 import { SortTabs } from '../components/SortTabs';
@@ -30,6 +30,8 @@ export const ClientAllProductsScreen: React.FC = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const { getColor: COLORS, spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE } = useTheme();
+  const styles = useMemo(() => createStyles(COLORS, SPACING, RADIUS, FONT_SIZE), [COLORS, SPACING, RADIUS, FONT_SIZE]);
   const { width: windowWidth, isMobile, isTablet, isDesktop, isLargeDesktop } = useResponsive();
   const [searchQuery, setSearchQuery] = useState('');
   const [generalCategories, setGeneralCategories] = useState<any[]>([]);
@@ -355,7 +357,7 @@ export const ClientAllProductsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any) => StyleSheet.create({
   maxWidthContainer: { flex: 1, alignItems: 'center', backgroundColor: COLORS.bg },
   container: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, backgroundColor: COLORS.bg, flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md },

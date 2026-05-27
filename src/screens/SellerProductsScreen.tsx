@@ -36,6 +36,7 @@ import { storeService } from '../services/storeService';
 import { cacheService } from '../services/cacheService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useAuthStore } from '../store';
+import OptimizedImage from '../components/OptimizedImage';
 
 type SortOption = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc' | 'date_desc' | 'date_asc';
 type ViewMode = 'list' | 'grid';
@@ -553,7 +554,7 @@ export const SellerProductsScreen: React.FC = () => {
         {/* Image */}
         <View style={[styles.productImageContainer, isGrid && styles.productImageContainerGrid]}>
           {product.images && product.images[0] ? (
-            <Image source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 400) }} style={[styles.productImage, isGrid && styles.productImageGrid]} resizeMode="cover" />
+            <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(product.images[0], 400) }} style={[styles.productImage, isGrid && styles.productImageGrid]} />
           ) : (
             <LinearGradient colors={[COLORS.border + '60', COLORS.border + '20']} style={[styles.productImage, isGrid && styles.productImageGrid, styles.imagePlaceholder]}>
               {isGrid ? (

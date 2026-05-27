@@ -26,6 +26,7 @@ import { userService } from '../services/userService';
 import { notificationService } from '../services/notificationService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useAlertModal } from '../components/AlertModal';
+import OptimizedImage from '../components/OptimizedImage';
 
 const EmptyCartAnimation = ({ color }: { color: string }) => {
   const translateY = useSharedValue(0);
@@ -193,7 +194,7 @@ export const CartScreen: React.FC = () => {
     return (
       <View key={item.product.id} style={styles.cartItem}>
         {item.product.images?.[0] ? (
-          <Image source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 300) }} style={styles.itemImage} />
+          <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(item.product.images[0], 300) }} style={styles.itemImage} />
         ) : (
           <View style={styles.itemImagePlaceholder}>
             <Ionicons name="image-outline" size={28} color={palette.textMuted} />

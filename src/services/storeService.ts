@@ -145,11 +145,9 @@ export const storeService = {
       try {
         const { data, error } = await client
           .from('stores')
-          .select('*')
+          .select('*, store_stats(rating_avg, rating_count, followers_count, customers_count)')
           .eq('status', 'active')
           .eq('visible', true)
-          // Note: columns like 'store_score' and 'view_count' are currently missing from the DB
-          // Falling back to standard columns to avoid 400 errors.
           .order('created_at', { ascending: false })
           .order('verified', { ascending: false })
           .range(from, to);
@@ -159,7 +157,7 @@ export const storeService = {
         try {
           const { data: data2, error: error2 } = await client
             .from('stores')
-            .select('*')
+            .select('*, store_stats(rating_avg, rating_count, followers_count, customers_count)')
             .eq('status', 'active')
             .eq('visible', true)
             .order('created_at', { ascending: false })
@@ -185,7 +183,7 @@ export const storeService = {
       const client = useSupabase();
       const { data, error } = await client
         .from('stores')
-        .select('*, store_stats(followers_count, customers_count, rating_avg)')
+        .select('*, store_stats(followers_count, customers_count, rating_avg, rating_count)')
         .eq('status', 'active')
         .eq('visible', true)
         .limit(50); // Fetch mehr to sort client-side
@@ -241,11 +239,10 @@ export const storeService = {
     const fetcher = async () => {
       const client = useSupabase();
       try {
-        // Pour éviter une erreur 400 sur la colonne 'total_orders' manquante,
-        // on récupère les boutiques avec leurs followers, puis on trie en mémoire
+        // Récupérer les boutiques avec leurs stats embarquées
         const { data: stores, error } = await client
           .from('stores')
-          .select('*')
+          .select('*, store_stats(rating_avg, rating_count, followers_count, customers_count)')
           .eq('status', 'active')
           .eq('visible', true)
           .order('verified', { ascending: false })
@@ -254,21 +251,11 @@ export const storeService = {
         if (error) throw error;
         if (!stores || stores.length === 0) return [];
 
-        const storeIds = stores.map((s: any) => s.id);
-        const { data: stats } = await client
-          .from('store_stats')
-          .select('store_id, followers_count, customers_count')
-          .in('store_id', storeIds);
-
-        const statsMap: Record<string, any> = {};
-        (stats || []).forEach((st: any) => {
-          statsMap[st.store_id] = st;
-        });
-
         const scoredStores = stores.map((s: any) => {
-          const foll = Number(statsMap[s.id]?.followers_count || 0);
-          const cust = Number(statsMap[s.id]?.customers_count || 0);
-          return { ...s, _score: foll * 2 + cust };
+          const embedded = Array.isArray(s.store_stats) ? s.store_stats[0] : s.store_stats;
+          const foll = Number(embedded?.followers_count || 0);
+          const cust = Number(embedded?.customers_count || 0);
+          return { ...s, store_stats: embedded || null, _score: foll * 2 + cust };
         });
 
         scoredStores.sort((a: any, b: any) => b._score - a._score);

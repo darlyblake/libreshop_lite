@@ -22,6 +22,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useCartStore, useAuthStore } from '../store';
 import { useClientHomeState } from '../hooks/useClientHomeState';
 import { ProductCard, ProductCardSkeleton, StoreCard, StoreCardSkeleton } from '../components';
+import OptimizedImage from '../components/OptimizedImage';
 import { useResponsive } from '../utils/responsive';
 import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
@@ -77,7 +78,7 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
     >
       <View style={{ height: 90, width: '100%', position: 'relative' }}>
         {bannerUrl ? (
-          <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={{ width: '100%', height: '100%' }} />
         ) : (
           <View style={{ width: '100%', height: '100%', backgroundColor: palette.accent + '20' }} />
         )}
@@ -87,7 +88,7 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
           borderWidth: 3, borderColor: palette.card, backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
         }}>
           {logoUrl ? (
-            <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={{ width: '100%', height: '100%' }} />
+            <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={{ width: '100%', height: '100%' }} />
           ) : (
             <Ionicons name="storefront" size={20} color={palette.accent} />
           )}
@@ -304,7 +305,7 @@ export const ClientHomeScreen: React.FC = () => {
 
         {/* Hero Banner */}
         <View style={{ height: 180, borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SPACING.xl, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.card }}>
-          <Image source={{ uri: 'https://picsum.photos/id/1015/800/400' }} style={{ position: 'absolute', width: '100%', height: '100%' }} />
+          <OptimizedImage source={{ uri: 'https://picsum.photos/id/1015/800/400' }} style={{ position: 'absolute', width: '100%', height: '100%' }} />
           <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: palette.accent, opacity: 0.7 }} />
           <Text style={{ color: 'white', fontSize: FONT_SIZE.xxl, fontWeight: 'bold', textAlign: 'center', marginBottom: SPACING.xs }}>Tout le Gabon, au même endroit</Text>
           <Text style={{ color: 'white', fontSize: FONT_SIZE.md, textAlign: 'center', opacity: 0.9 }}>Boutiques • Restaurants • Hôtels • Logements</Text>

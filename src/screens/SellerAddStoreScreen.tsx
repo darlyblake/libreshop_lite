@@ -14,6 +14,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
+import OptimizedImage from '../components/OptimizedImage';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -406,7 +407,7 @@ const SellerAddStoreScreen: React.FC = () => {
       <Text style={styles.sectionTitle}>📸 Médias</Text>
       <View style={styles.imagesContainer}>
         <TouchableOpacity style={styles.logoPicker} onPress={() => pickImage('logo')}>
-          {logoUri ? <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUri, 800) }} style={styles.logoImage} /> : (
+          {logoUri ? <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUri, 800) }} style={styles.logoImage} /> : (
             <View style={styles.logoPlaceholder}>
               <Ionicons name="camera" size={32} color={COLORS.accent} />
               <Text style={styles.logoPickerText}>Logo</Text>
@@ -414,7 +415,7 @@ const SellerAddStoreScreen: React.FC = () => {
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.bannerPicker} onPress={() => pickImage('banner')}>
-          {bannerUri ? <Image source={{ uri: cloudinaryService.getOptimizedUrl(bannerUri, 800) }} style={styles.bannerImage} /> : (
+          {bannerUri ? <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(bannerUri, 800) }} style={styles.bannerImage} /> : (
             <View style={styles.bannerPlaceholder}>
               <Ionicons name="image-outline" size={32} color={COLORS.accent} />
               <Text style={styles.bannerPickerText}>Bannière</Text>
@@ -667,7 +668,7 @@ const SellerAddStoreScreen: React.FC = () => {
         <LinearGradient colors={[COLORS.accent + '20', COLORS.bg]} style={styles.previewGradient}>
           <Text style={styles.previewTitle}>Aperçu Final</Text>
           <View style={styles.previewContent}>
-            {logoUri ? <Image source={{ uri: cloudinaryService.getOptimizedUrl(logoUri, 800) }} style={styles.previewLogo} /> : <View style={styles.previewLogoPlaceholder} />}
+            {logoUri ? <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUri, 800) }} style={styles.previewLogo} /> : <View style={styles.previewLogoPlaceholder} />}
             <View style={styles.previewInfo}>
               <Text style={styles.previewName}>{values.name || 'Ma Boutique'}</Text>
               <Text style={styles.previewCategory}>
