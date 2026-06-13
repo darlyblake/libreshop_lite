@@ -89,6 +89,22 @@ export const SellerCollectionScreen: React.FC = () => {
         setCollections([]);
         return;
       }
+
+      if (!storeService.isSubscriptionActive(store)) {
+        Alert.alert(
+          'Abonnement expiré',
+          `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder à vos collections.`,
+          [
+            {
+              text: 'Renouveler',
+              onPress: () => navigation.replace('SubscriptionExpired'),
+            },
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+
       setStoreId(store.id);
       setStoreType(store.store_type || 'general');
 

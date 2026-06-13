@@ -25,6 +25,7 @@ import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { planService } from '../services/planService';
 import { storeService } from '../services/storeService';
+import { pointsService } from '../services/pointsService';
 import { categoryService } from '../services/categoryService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { countryService, type Country } from '../services/countryService';
@@ -64,6 +65,7 @@ interface FormData {
   city_name: string;
   website?: string;
   social: Record<string, string>;
+  referral_code?: string;
 }
 
 const STORE_VALIDATION_RULES = {
@@ -161,6 +163,7 @@ const SellerAddStoreScreen: React.FC = () => {
         twitter: '',
         tiktok: '',
       },
+      referral_code: '',
     },
     onSubmit: async (data) => {
       await performSubmit(data as FormData);
@@ -288,10 +291,35 @@ const SellerAddStoreScreen: React.FC = () => {
         }),
       };
 
+      // 2.5 Apply Referral Code if exists
+      if (formData.referral_code && formData.referral_code.trim() !== '') {
+        try {
+          await pointsService.applyReferralCode(user.id, formData.referral_code.trim());
+        } catch (e) {
+          console.warn('Erreur code parrainage:', e);
+          // Non bloquant
+        }
+      }
+
       await storeService.createWithPlanSlugRetry(user.id, createArgs as any, trial?.id || 'trial');
       
       setSubmissionStatus(s => ({ ...s, step: 'Terminé !', progress: 100 }));
       
+      // Award CREATE_STORE points
+      try {
+        const settings = await pointsService.getPointSettings();
+        const reward = settings['CREATE_STORE'] || 50;
+        const { supabase: client } = await import('../lib/supabase');
+        await client.rpc('add_points_to_user', {
+          p_user_id: user.id,
+          p_amount: reward,
+          p_action_type: 'CREATE_STORE',
+          p_reference_id: null
+        });
+      } catch (ptErr) {
+        console.warn('Failed to award CREATE_STORE points:', ptErr);
+      }
+
       // Success Handling
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await storeCreationDraftStorage.clear(user.id);
@@ -662,6 +690,15 @@ const SellerAddStoreScreen: React.FC = () => {
         placeholder="Lien WhatsApp direct"
         value={values.social.whatsapp}
         onChangeText={(v) => setFieldValue('social', { ...values.social, whatsapp: v })}
+      />
+      
+      <Text style={[styles.sectionTitle, { marginTop: SPACING.md }]}>🤝 Code de parrainage (Optionnel)</Text>
+      <Input
+        icon="gift-outline"
+        placeholder="Avez-vous été invité ? Entrez le code"
+        value={values.referral_code}
+        onChangeText={(v) => setFieldValue('referral_code', v)}
+        autoCapitalize="characters"
       />
       
       <View style={styles.previewCard}>

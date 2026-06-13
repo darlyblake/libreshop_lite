@@ -1,0 +1,9 @@
+WARN: no seed files matched pattern: supabase/seed.sql
+Connecting to remote database...
+Do you want to push these migrations to the remote database?
+ • 20260606_user_service_phase_3b_rls.sql
+
+ [Y/n] Applying migration 20260606_user_service_phase_3b_rls.sql...
+Finished supabase db push.
+A new version of Supabase CLI is available: v2.104.0 (currently installed v1.220.3)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

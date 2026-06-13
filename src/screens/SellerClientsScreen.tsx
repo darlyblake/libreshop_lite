@@ -135,6 +135,22 @@ export const SellerClientsScreen: React.FC = () => {
         setHasMore(false);
         return;
       }
+
+      if (!storeService.isSubscriptionActive(store)) {
+        Alert.alert(
+          'Abonnement expiré',
+          `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder à vos clients.`,
+          [
+            {
+              text: 'Renouveler',
+              onPress: () => navigation.replace('SubscriptionExpired'),
+            },
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+
       setStoreId(store.id);
 
       // 🚀 Appel avec pagination cursor

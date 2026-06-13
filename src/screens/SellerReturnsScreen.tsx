@@ -36,6 +36,19 @@ export default function SellerReturnsScreen() {
     try {
       const store = await storeService.getByUser(user.id);
       if (store?.id) {
+        if (!storeService.isSubscriptionActive(store)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder aux retours.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired'),
+              },
+            ]
+          );
+          return;
+        }
         setStoreId(store.id);
         const data = await returnService.getStoreReturns(store.id);
         setReturns(data);

@@ -67,6 +67,11 @@ module.exports = async function (env, argv) {
           from: 'node_modules/canvaskit-wasm/bin/full/canvaskit.wasm',
           to: 'canvaskit.wasm',
         },
+        {
+          from: 'public/sw.js',
+          to: 'sw.js',
+          noErrorOnMissing: true,
+        },
       ],
     })
   );

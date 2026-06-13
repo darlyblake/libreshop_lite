@@ -186,6 +186,7 @@ export interface Store {
   announcement_banner_enabled?: boolean;
   announcement_popup?: string;
   announcement_popup_enabled?: boolean;
+  version?: number; // ✅ Phase 2c: For optimistic locking
   created_at: string;
   store_stats?: any;
 }

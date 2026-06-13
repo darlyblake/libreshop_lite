@@ -87,7 +87,8 @@ export const ClientEditScreen: React.FC = () => {
       if (!store?.id) { setLoading(false); return; }
       setStoreId(store.id);
 
-      const { orders: allOrders } = await orderService.getByStore(store.id);
+      const result = await orderService.getByStore(store.id);
+      const allOrders = result.orders || [];
 
       // Find orders matching this clientId (phone)
       const clientOrders = allOrders.filter((o: any) => {

@@ -128,6 +128,21 @@ export const SellerAddProductScreen: React.FC = () => {
           setCollectionId('');
           return;
         }
+
+        if (!storeService.isSubscriptionActive(store)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour ajouter des produits.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired' as never),
+              },
+            ]
+          );
+          return;
+        }
+
         setStoreId(store.id);
         const cols = await collectionService.getByStore(store.id);
         setCollections(cols);

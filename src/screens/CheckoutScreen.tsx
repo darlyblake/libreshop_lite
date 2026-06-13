@@ -515,7 +515,7 @@ export const CheckoutScreen: React.FC = () => {
         coupon_code: couponApplied ? couponCode : null,
         status: 'pending',
         payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod,
-        payment_status: 'paid',
+        payment_status: 'pending',
         shipping_address: formData.address,
         city: formData.city,
         latitude: userLocation?.latitude,

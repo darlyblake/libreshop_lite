@@ -29,7 +29,8 @@ import { useTheme } from '../hooks/useTheme';
 import { AddProductModal } from '../components/AddProductModal';
 import { SellerFiltersRow } from '../components/SellerFiltersRow';
 import { useResponsive } from '../utils/useResponsive';
-import { type Collection, type Product as SupabaseProduct, type Store } from '../lib/supabase';
+import { type Collection, type Store } from '../lib/supabase';
+import { type Product } from '../types/product';
 import { collectionService } from '../services/collectionService';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
@@ -70,7 +71,7 @@ export const SellerProductsScreen: React.FC = () => {
   // Core state
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState<SupabaseProduct[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollection, setSelectedCollection] = useState('all');
   const [sortBy, setSortBy] = useState<SortOption>('date_desc');
@@ -144,7 +145,7 @@ export const SellerProductsScreen: React.FC = () => {
       const rows = products.map(product => {
         const collectionName = collections?.find(c => c.id === product.collection_id)?.name || 'Sans collection';
         const price = Number(product.price) || 0;
-        const costPrice = Number(product.cost_price || (product as any).costPrice) || 0;
+        const costPrice = Number((product as any).cost_price || (product as any).costPrice) || 0;
         const benefit = Math.max(0, price - costPrice);
         const stock = Number(product.stock) || 0;
         const totalValue = price * stock;
@@ -276,6 +277,21 @@ export const SellerProductsScreen: React.FC = () => {
         return;
       }
 
+      if (!storeService.isSubscriptionActive(store)) {
+        Alert.alert(
+          'Abonnement expiré',
+          `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder à vos produits.`,
+          [
+            {
+              text: 'Renouveler',
+              onPress: () => navigation.replace('SubscriptionExpired'),
+            },
+          ]
+        );
+        setLoading(false);
+        return;
+      }
+
       setStore(store);
       setStoreId(store.id);
 
@@ -389,7 +405,7 @@ export const SellerProductsScreen: React.FC = () => {
   const hasAnyCollection = collections.length > 0;
   const hasActiveFilters = priceRange.min || priceRange.max || stockFilter !== 'all';
 
-  const handleQuickToggleActive = async (product: SupabaseProduct) => {
+  const handleQuickToggleActive = async (product: Product) => {
     const newValue = !product.is_active;
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_active: newValue } : p));
     try {
@@ -400,7 +416,7 @@ export const SellerProductsScreen: React.FC = () => {
     }
   };
 
-  const handleDuplicateProduct = async (product: SupabaseProduct) => {
+  const handleDuplicateProduct = async (product: Product) => {
     Alert.alert(
       'Dupliquer le produit',
       `Voulez-vous créer une copie de "${product.name}" ?`,
@@ -424,7 +440,7 @@ export const SellerProductsScreen: React.FC = () => {
                 is_online_sale: (product as any).is_online_sale ?? true,
                 is_physical_sale: (product as any).is_physical_sale ?? true,
               } as any);
-              setProducts(prev => [newProduct as any as SupabaseProduct, ...prev]);
+              setProducts(prev => [newProduct as any as Product, ...prev]);
               Alert.alert('✅ Succès', 'Produit dupliqué (inactif par défaut).');
             } catch (e) {
               errorHandler.handleDatabaseError(e as Error, 'duplicate product');
@@ -517,7 +533,7 @@ export const SellerProductsScreen: React.FC = () => {
     return { label: `${stock} en stock`, color: COLORS.success, icon: 'checkmark-circle' as const };
   };
 
-  const renderProduct = useCallback((product: SupabaseProduct) => {
+  const renderProduct = useCallback((product: Product) => {
     const stockInfo = getStockInfo(product.stock);
     const hasPromo = product.compare_price && product.compare_price > (product.price || 0);
     const isSelected = selectedProducts.has(product.id);
@@ -697,7 +713,7 @@ export const SellerProductsScreen: React.FC = () => {
     handleDeleteProduct
   ]);
 
-  const renderProductItem = useCallback(({ item }: { item: SupabaseProduct }) => renderProduct(item), [renderProduct]);
+  const renderProductItem = useCallback(({ item }: { item: Product }) => renderProduct(item), [renderProduct]);
 
   const renderGridLayout = () => {
     const numCols = isDesktop ? 3 : isTablet ? 2 : 2;
@@ -1183,7 +1199,7 @@ export const SellerProductsScreen: React.FC = () => {
               is_physical_sale: true,
               attributes: product.attributes || {},
             } as any);
-            setProducts(prev => [created as any as SupabaseProduct, ...prev]);
+            setProducts(prev => [created as any as Product, ...prev]);
             setShowAddProductModal(false);
             Alert.alert('✅ Succès', 'Produit ajouté avec succès !');
           } catch (e) {

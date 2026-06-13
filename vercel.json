@@ -8,6 +8,14 @@
       "dest": "/api/search.ts"
     },
     {
+      "src": "/sw.js",
+      "dest": "/sw.js",
+      "headers": {
+        "Content-Type": "application/javascript",
+        "Cache-Control": "public, max-age=0, must-revalidate"
+      }
+    },
+    {
       "src": "/service-worker.js",
       "dest": "/service-worker.js",
       "headers": {

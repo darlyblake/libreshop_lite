@@ -6,8 +6,20 @@ async function isAdmin(): Promise<boolean> {
     const { data: { user } } = await supabase!.auth.getUser();
     if (!user) return false;
 
-    const role = user.user_metadata?.role || user.app_metadata?.role;
-    return role === 'admin';
+    // Check auth metadata first
+    const authRole = user.user_metadata?.role || user.app_metadata?.role;
+    if (authRole === 'admin') return true;
+
+    // Also check users table for role
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (userData?.role === 'admin') return true;
+
+    return false;
   } catch (error) {
     console.error('Error checking admin role:', error);
     return false;
@@ -375,32 +387,47 @@ export const adminService = {
   async getUsers() {
     await requireAdmin();
     if (!supabase) throw new Error('Supabase client not initialized');
-    
+
     // First, fetch users with basic info
     const { data: users, error: usersError } = await supabase
       .from('users')
       .select('id,email,full_name,role,status,created_at,phone,whatsapp_number,avatar_url')
       .order('created_at', { ascending: false })
       .limit(10000);
-    
-    if (usersError) throw usersError;
-    
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      throw usersError;
+    }
+
+    console.log('Fetched users:', users?.length || 0);
+
     // Then fetch orders for all users
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id,user_id,total_amount,status,created_at')
       .in('user_id', (users || []).map((u: any) => u.id));
-    
-    if (ordersError) throw ordersError;
-    
+
+    if (ordersError) {
+      console.error('Error fetching orders:', ordersError);
+      throw ordersError;
+    }
+
+    console.log('Fetched orders:', orders?.length || 0);
+
     // Then fetch order items for all orders
     const orderIds = (orders || []).map((o: any) => o.id);
     const { data: orderItems, error: itemsError } = await supabase
       .from('order_items')
       .select('id,order_id,quantity,price,products!inner(name,stores!inner(name))')
       .in('order_id', orderIds);
-    
-    if (itemsError) throw itemsError;
+
+    if (itemsError) {
+      console.error('Error fetching order items:', itemsError);
+      throw itemsError;
+    }
+
+    console.log('Fetched order items:', orderItems?.length || 0);
     
     // Group orders by user
     const ordersByUser: Record<string, any[]> = {};

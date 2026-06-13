@@ -4,7 +4,25 @@ import * as Device from 'expo-device';
 import type * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
-import { errorHandler } from '../utils/errorHandler';
+import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+
+// Clé publique VAPID générée pour LibreShop
+const VAPID_PUBLIC_KEY = 'BACkyGyicWJ1RoTJbHQsKTfLxTiLvl95OmPFQA9gue65hLQkELvND-OBuMgCo57srhUvoLgbnpUsqPJVvn79_XI';
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 export interface PushNotificationState {
   expoPushToken: string | undefined;
@@ -14,33 +32,37 @@ export interface PushNotificationState {
 export const usePushNotifications = (userId: string | undefined): PushNotificationState => {
   const [expoPushToken, setExpoPushToken] = useState<string | undefined>();
   const [notification, setNotification] = useState<Notifications.Notification | undefined>();
-  const notificationListener = useRef<Notifications.Subscription>(undefined);
-  const responseListener = useRef<Notifications.Subscription>(undefined);
+  const notificationListener = useRef<any>(undefined);
+  const responseListener = useRef<any>(undefined);
 
   useEffect(() => {
-    if (!userId || Platform.OS === 'web') return;
+    if (!userId) return;
 
     let isMounted = true;
 
     const initNotifications = async () => {
       try {
-        const NotificationsModule = await import('expo-notifications');
-        
-        const token = await registerForPushNotificationsAsync();
-        if (isMounted) {
-          setExpoPushToken(token);
-          if (token) {
-            saveTokenToUser(userId, token);
+        if (Platform.OS === 'web') {
+          await registerWebPush(userId);
+        } else {
+          const NotificationsModule = await import('expo-notifications');
+          
+          const token = await registerForPushNotificationsAsync();
+          if (isMounted) {
+            setExpoPushToken(token);
+            if (token) {
+              saveTokenToUser(userId, token);
+            }
           }
+
+          notificationListener.current = NotificationsModule.addNotificationReceivedListener((notification) => {
+            if (isMounted) setNotification(notification);
+          });
+
+          responseListener.current = NotificationsModule.addNotificationResponseReceivedListener((response) => {
+            console.log('Notification response received:', response);
+          });
         }
-
-        notificationListener.current = NotificationsModule.addNotificationReceivedListener((notification) => {
-          if (isMounted) setNotification(notification);
-        });
-
-        responseListener.current = NotificationsModule.addNotificationResponseReceivedListener((response) => {
-          console.log('Notification response received:', response);
-        });
       } catch (error) {
         console.error('Failed to initialize notifications:', error);
       }
@@ -50,10 +72,59 @@ export const usePushNotifications = (userId: string | undefined): PushNotificati
 
     return () => {
       isMounted = false;
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
+      if (notificationListener.current?.remove) notificationListener.current.remove();
+      if (responseListener.current?.remove) responseListener.current.remove();
     };
   }, [userId]);
+
+  const registerWebPush = async (uid: string) => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('[WebPush] Non supporté par le navigateur (ex: navigation privée iOS ou vieux navigateur).');
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.log('[WebPush] Permission refusée par l\'utilisateur.');
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+      }
+
+      if (subscription) {
+        const subJSON = subscription.toJSON();
+        
+        // Sauvegarde l'abonnement dans Supabase
+        const { error } = await supabase!
+          .from('web_push_subscriptions')
+          .upsert({ 
+            user_id: uid, 
+            endpoint: subJSON.endpoint,
+            p256dh: subJSON.keys?.p256dh,
+            auth: subJSON.keys?.auth
+          }, { onConflict: 'user_id, endpoint' });
+          
+        if (error) {
+          console.error('[WebPush] Erreur sauvegarde abonnement:', error);
+        } else {
+          console.log('[WebPush] Abonnement sauvegardé avec succès.');
+        }
+      }
+    } catch (error) {
+      console.error('[WebPush] Erreur d\'enregistrement:', error);
+    }
+  };
 
   const saveTokenToUser = async (uid: string, token: string) => {
     try {

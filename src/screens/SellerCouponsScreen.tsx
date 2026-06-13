@@ -49,6 +49,19 @@ export const SellerCouponsScreen: React.FC = () => {
       if (showLoading) setLoading(true);
       const store = await storeService.getByUser(user.id);
       if (store) {
+        if (!storeService.isSubscriptionActive(store)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder aux coupons.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired'),
+              },
+            ]
+          );
+          return;
+        }
         setStoreId(store.id);
         const storeCoupons = await couponService.getByStore(store.id);
         setCoupons(storeCoupons);

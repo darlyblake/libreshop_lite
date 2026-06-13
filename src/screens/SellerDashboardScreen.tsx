@@ -244,6 +244,13 @@ export const SellerDashboardScreen: React.FC = () => {
           }, 500);
           return;
         }
+        
+        if (!storeService.isSubscriptionActive(s)) {
+          // Redirection immédiate sans ouvrir le tableau de bord
+          navigation.replace('SubscriptionExpired');
+          return;
+        }
+
         setStore(s);
       }
     } catch (e) {

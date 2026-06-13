@@ -154,7 +154,11 @@ export const SellerAuthScreen: React.FC = () => {
           const stores = await storeService.getStoresByUser(currentUser.id);
           if (stores && stores.length > 0) {
              await sessionStorage.saveUserRole('seller');
-             navigation.replace('SellerTabs');
+             if (!storeService.isSubscriptionActive(stores[0])) {
+               navigation.replace('SubscriptionExpired');
+             } else {
+               navigation.replace('SellerHub');
+             }
           } else {
              // Connecté mais pas de boutique
              await sessionStorage.saveUserRole('seller');
@@ -250,13 +254,8 @@ export const SellerAuthScreen: React.FC = () => {
               }
               // Check if subscription is active (not expired and visible)
               if (!storeService.isSubscriptionActive(store)) {
-                // Subscription expired or not visible → redirect to SubscriptionExpired
-                errorHandler.handle(new Error('Seller subscription expired or not active'), 'SellerAuth', ErrorCategory.AUTHENTICATION, ErrorSeverity.HIGH, { 
-                  storeId: store.id, 
-                  subscriptionStatus: store.subscription_status,
-                  visible: store.visible 
-                });
-                navigation.replace('SubscriptionExpired', { storeName: store.name });
+                // Subscription expired or not visible → redirect to Pricing directly
+                navigation.replace('SubscriptionExpired');
               } else {
                 navigation.replace('SellerHub');
               }
@@ -472,7 +471,7 @@ export const SellerAuthScreen: React.FC = () => {
                 
                 // Check if subscription is active
                 if (!storeService.isSubscriptionActive(store)) {
-                  navigation.replace('SubscriptionExpired', { storeName: store.name });
+                  navigation.replace('SubscriptionExpired');
                 } else {
                   navigation.replace('SellerHub');
                 }

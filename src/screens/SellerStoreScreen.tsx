@@ -153,7 +153,7 @@ export const SellerStoreScreen: React.FC = () => {
           [
             {
               text: 'Renouveler',
-              onPress: () => navigation.replace('Pricing', { fromExpiredStore: true, storeName: s.name }),
+              onPress: () => navigation.replace('SubscriptionExpired'),
             },
           ]
         );

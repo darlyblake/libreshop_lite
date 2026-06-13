@@ -47,13 +47,14 @@ export const financeService = {
   async getWalletStats(storeId: string): Promise<WalletStats> {
     try {
       // In a real scenario, this would be computed on the backend (e.g. from a wallet table or sum of orders)
-      const { orders } = await orderService.getByStore(storeId);
+      const result = await orderService.getByStore(storeId);
+      const orders = result.orders || [];
       
       let available = 0;
       let pending = 0;
 
       // Simplistic calculation for demonstration
-      orders.forEach(o => {
+      orders.forEach((o: any) => {
         if (o.status === 'delivered') available += o.total_amount;
         else if (o.status === 'paid' || o.status === 'shipped') pending += o.total_amount;
       });
@@ -82,10 +83,11 @@ export const financeService = {
    */
   async getRecentTransactions(storeId: string): Promise<Transaction[]> {
     try {
-      const { orders } = await orderService.getByStore(storeId);
+      const result = await orderService.getByStore(storeId);
+      const orders = result.orders || [];
       const txs: Transaction[] = [];
 
-      orders.slice(0, 10).forEach(o => {
+      orders.slice(0, 10).forEach((o: any) => {
         txs.push({
           id: o.id,
           type: 'sale',

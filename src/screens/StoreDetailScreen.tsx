@@ -443,6 +443,11 @@ export const StoreDetailScreen: React.FC = () => {
     return getStoreStatus(store);
   }, [store]);
 
+  const isSubActive = useMemo(() => {
+    if (!store) return true;
+    return storeService.isSubscriptionActive(store);
+  }, [store]);
+
   // Product count per collection
   const productCountByCollection = useMemo(() => {
     const map: Record<string, number> = {};
@@ -880,7 +885,17 @@ export const StoreDetailScreen: React.FC = () => {
           </View>
         )}
 
-        {!loading && !errorMsg && (
+        {!loading && !errorMsg && !isSubActive && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="storefront-outline" size={64} color={COLORS.textMuted} />
+            <Text style={styles.errorTitle}>Boutique indisponible</Text>
+            <Text style={styles.errorText}>
+              Cette boutique n'est plus accessible au public pour le moment suite à l'expiration de son abonnement.
+            </Text>
+          </View>
+        )}
+
+        {!loading && !errorMsg && isSubActive && (
           <>
             {/* NEW: Modern Store Header with StoreHeader component */}
             <StoreHeader

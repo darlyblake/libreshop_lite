@@ -122,6 +122,19 @@ export const SellerAnalyticsScreen = () => {
     try {
       const s = await storeService.getByUser(user.id);
       if (s) {
+        if (!storeService.isSubscriptionActive(s)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${s.name}" a expiré. Veuillez le renouveler pour accéder aux analyses.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired'),
+              },
+            ]
+          );
+          return;
+        }
         setStoreId(s.id);
         setStore(s);
       }

@@ -25,7 +25,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       session: null,
-      isLoading: true,
+      isLoading: false,
       isAuthModalVisible: false,
       pendingAction: null,
       showAuthModal: (pendingAction = null) => set({ isAuthModalVisible: true, pendingAction }),

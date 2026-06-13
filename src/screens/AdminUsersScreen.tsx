@@ -34,6 +34,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { adminService } from '../services/adminService';
 import { contactStore } from '../services/contactService';
+import { pointsService } from '../services/pointsService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -99,6 +100,11 @@ export const AdminUsersScreen: React.FC = () => {
   const [sellerStores, setSellerStores] = useState<any[]>([]);
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'orders'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [pointsModalVisible, setPointsModalVisible] = useState(false);
+  const [pointsUser, setPointsUser] = useState<User | null>(null);
+  const [pointsAmount, setPointsAmount] = useState('');
+  const [pointsReason, setPointsReason] = useState('');
+  const [addingPoints, setAddingPoints] = useState(false);
 
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -530,6 +536,43 @@ export const AdminUsersScreen: React.FC = () => {
       { text: 'Annuler', style: 'cancel' },
       { text: 'Valider', onPress: () => void run() },
     ]);
+  };
+
+  const handleAddPoints = (user: User) => {
+    handleMenuClose();
+    setPointsUser(user);
+    setPointsAmount('');
+    setPointsReason('');
+    setPointsModalVisible(true);
+  };
+
+  const handleConfirmAddPoints = async () => {
+    if (!pointsUser || !pointsAmount || !pointsReason.trim()) {
+      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      return;
+    }
+
+    const amount = parseInt(pointsAmount, 10);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Erreur', 'Le montant doit être un nombre positif');
+      return;
+    }
+
+    try {
+      setAddingPoints(true);
+      await pointsService.addPointsByAdmin(pointsUser.id, amount, pointsReason.trim());
+      setPointsModalVisible(false);
+      setPointsUser(null);
+      setPointsAmount('');
+      setPointsReason('');
+      Alert.alert('Succès', `${amount} points ajoutés à ${pointsUser.full_name}`);
+      await loadUsers();
+    } catch (e: any) {
+      console.error('Erreur add points:', e);
+      Alert.alert('Erreur', e?.message || 'Impossible d\'ajouter les points');
+    } finally {
+      setAddingPoints(false);
+    }
   };
 
   const getRoleBadge = (role: User['role']) => {
@@ -1123,6 +1166,13 @@ export const AdminUsersScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuItem}
+                onPress={() => handleAddPoints(menuUser)}
+              >
+                <Ionicons name="star-outline" size={20} color={COLORS.warning} />
+                <Text style={styles.menuItemText}>Ajouter des points</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
                 onPress={() => {
                   handleMenuClose();
                   handleSuspendUser(menuUser);
@@ -1256,6 +1306,77 @@ export const AdminUsersScreen: React.FC = () => {
                   style={styles.modalActionButton}
                 />
               </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Points Modal */}
+      <Modal
+        visible={pointsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setPointsModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Ajouter des points</Text>
+              <TouchableOpacity onPress={() => setPointsModalVisible(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {pointsUser && (
+                <>
+                  <View style={styles.editFormSection}>
+                    <Text style={styles.editFormLabel}>Utilisateur</Text>
+                    <Text style={styles.editFormValue}>{pointsUser.full_name}</Text>
+                    <Text style={styles.editFormSubValue}>{pointsUser.email}</Text>
+                  </View>
+
+                  <View style={styles.editFormSection}>
+                    <Text style={styles.editFormLabel}>Nombre de points</Text>
+                    <TextInput
+                      style={styles.editFormInput}
+                      value={pointsAmount}
+                      onChangeText={setPointsAmount}
+                      placeholder="Ex: 100"
+                      keyboardType="number-pad"
+                    />
+                    <Text style={styles.editFormHint}>1 point = 1 FCFA</Text>
+                  </View>
+
+                  <View style={styles.editFormSection}>
+                    <Text style={styles.editFormLabel}>Raison (obligatoire)</Text>
+                    <TextInput
+                      style={[styles.editFormInput, styles.textAreaInput]}
+                      value={pointsReason}
+                      onChangeText={setPointsReason}
+                      placeholder="Expliquez pourquoi vous ajoutez ces points..."
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <Button
+                      title="Annuler"
+                      variant="outline"
+                      onPress={() => setPointsModalVisible(false)}
+                      style={styles.modalActionButton}
+                    />
+                    <Button
+                      title={addingPoints ? "Ajout en cours..." : "Ajouter les points"}
+                      onPress={handleConfirmAddPoints}
+                      disabled={addingPoints}
+                      style={styles.modalActionButton}
+                    />
+                  </View>
+                </>
+              )}
             </ScrollView>
           </View>
         </View>
@@ -2056,6 +2177,24 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.sm,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  editFormValue: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  editFormSubValue: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+  },
+  editFormHint: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
+  },
+  textAreaInput: {
+    height: 100,
   },
 
 });

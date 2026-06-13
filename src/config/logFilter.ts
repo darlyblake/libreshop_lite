@@ -22,6 +22,11 @@ const IGNORED_PATTERNS: RegExp[] = [
   /NotFoundError: Failed to execute/, // dom exception string
   /TouchableWithoutFeedback is deprecated/, // react-native-web deprecation warning
   /\[OptimizedImage\] Image load error: undefined/, // missing fallback URL errors
+  /Timer '.*' already exists/, // duplicate console.time calls on re-render
+  /Timer '.*' does not exist/, // console.timeEnd without matching time
+  /m=el_conf/, // Google Translate extension internal scripts
+  /RPC create_system_notification failed/, // expected fallback when RPC not yet deployed
+  /send-push-notification/, // edge function not deployed in dev
 ];
 
 function shouldIgnore(args: any[]): boolean {

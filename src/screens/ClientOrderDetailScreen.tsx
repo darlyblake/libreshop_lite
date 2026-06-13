@@ -260,6 +260,196 @@ export const ClientOrderDetailScreen: React.FC = () => {
         )}
       </Card>
 
+      {/* Tracking Info (Client view) */}
+      {(order as any).tracking_number && (
+        <Card style={[styles.section, { borderColor: COLORS.accent, borderWidth: 1 }]}>
+          <Text style={[styles.sectionTitle, { color: COLORS.accent }]}>Suivi de livraison</Text>
+          <View style={styles.infoRow}>
+            <Ionicons name="barcode-outline" size={18} color={COLORS.textMuted} />
+            <Text style={styles.infoText}>{(order as any).tracking_number}</Text>
+          </View>
+          {(order as any).shipping_provider && (
+            <View style={styles.infoRow}>
+              <Ionicons name="cube-outline" size={18} color={COLORS.textMuted} />
+              <Text style={styles.infoText}>{(order as any).shipping_provider}</Text>
+            </View>
+          )}
+          {(order as any).estimated_delivery_date && (
+            <View style={styles.infoRow}>
+              <Ionicons name="calendar-outline" size={18} color={COLORS.textMuted} />
+              <Text style={styles.infoText}>
+                Livraison estimée: {new Date((order as any).estimated_delivery_date).toLocaleDateString('fr-FR')}
+              </Text>
+            </View>
+          )}
+        </Card>
+      )}
+
+      {/* Out of stock warning */}
+      {(order as any).issue_type === 'out_of_stock' && (
+        <Card style={[styles.section, { borderColor: COLORS.danger, borderWidth: 1, backgroundColor: COLORS.danger + '10' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
+            <Ionicons name="warning" size={24} color={COLORS.danger} />
+            <Text style={[styles.sectionTitle, { color: COLORS.danger, marginLeft: SPACING.sm, marginBottom: 0 }]}>Rupture de stock</Text>
+          </View>
+          <Text style={{ color: COLORS.danger, marginBottom: SPACING.md }}>
+            Certains produits de votre commande sont actuellement en rupture de stock. Le vendeur ne peut pas accepter la commande en l'état.
+          </Text>
+
+          {/* Liste des produits en rupture et date prévue */}
+          {(order as any).issue_details && (order as any).issue_details.length > 0 && (
+            <View style={{ marginBottom: SPACING.md, backgroundColor: '#FFF', padding: SPACING.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.danger + '30' }}>
+              <Text style={{ fontWeight: '600', color: COLORS.text, marginBottom: SPACING.xs }}>Produits concernés :</Text>
+              {(order as any).issue_details.map((item: any) => (
+                <View key={item.product_id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <Text style={{ color: COLORS.text, flex: 1 }} numberOfLines={1}>• {item.name}</Text>
+                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.sm }}>
+                    Prévu : {item.restock_date || 'Non définie'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={{ gap: SPACING.sm }}>
+            <TouchableOpacity 
+              style={[styles.helpButton, { backgroundColor: COLORS.danger, borderColor: COLORS.danger }]}
+              onPress={() => {
+                Alert.alert('Annuler la commande', 'Êtes-vous sûr de vouloir annuler toute la commande ?', [
+                  { text: 'Non', style: 'cancel' },
+                  { 
+                    text: 'Oui, annuler', 
+                    style: 'destructive',
+                    onPress: async () => {
+                      setLoading(true);
+                      try {
+                        await orderService.respondToStockIssue(order.id, 'cancel');
+                        Alert.alert('Commande annulée', 'Votre commande a été annulée. Le vendeur a été informé.');
+                        loadOrder();
+                      } catch (e) {
+                        Alert.alert('Erreur', 'Impossible d\'annuler la commande');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }
+                  }
+                ]);
+              }}
+            >
+              <Ionicons name="close-circle" size={20} color="#FFF" />
+              <Text style={[styles.helpText, { color: '#FFF' }]}>Annuler la commande</Text>
+            </TouchableOpacity>
+
+            {order.order_items.length > ((order as any).issue_details?.length || 0) && (
+              <TouchableOpacity 
+                style={[styles.helpButton, { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '10' }]}
+                onPress={() => {
+                  const issueDetails = (order as any).issue_details || [];
+                  const remainingItems = order.order_items.filter(
+                    (item) => !issueDetails.find((d: any) => d.product_id === item.product_id)
+                  );
+                  const remainingNames = remainingItems.map(i => `• ${i.product?.name || 'Produit'}`).join('\n');
+                  Alert.alert(
+                    'Continuer sans les produits en rupture', 
+                    `Votre commande sera modifiée pour ne contenir que :\n\n${remainingNames}\n\nLe vendeur sera informé.`, 
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      { 
+                        text: 'Oui, continuer', 
+                        onPress: async () => {
+                          setLoading(true);
+                          try {
+                            await orderService.respondToStockIssue(order.id, 'continue_without');
+                            Alert.alert('Choix enregistré', 'Le vendeur a été informé. Il ajustera votre commande.');
+                            loadOrder();
+                          } catch (e) {
+                            Alert.alert('Erreur', 'Impossible de traiter votre demande');
+                          } finally {
+                            setLoading(false);
+                          }
+                        }
+                      }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="arrow-forward-circle" size={20} color={COLORS.accent} />
+                <Text style={[styles.helpText, { color: COLORS.accent }]}>Continuer avec les autres produits</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity 
+              style={[styles.helpButton, { borderColor: COLORS.warning, backgroundColor: COLORS.warning + '10' }]}
+              onPress={() => {
+                Alert.alert(
+                  'Attendre la disponibilité',
+                  'Vous serez notifié dès que le vendeur aura réapprovisionné les produits. Confirmer ?',
+                  [
+                    { text: 'Annuler', style: 'cancel' },
+                    {
+                      text: 'Oui, attendre',
+                      onPress: async () => {
+                        setLoading(true);
+                        try {
+                          await orderService.respondToStockIssue(order.id, 'wait');
+                          Alert.alert('Choix enregistré', 'Le vendeur a été informé. Vous serez notifié dès que le stock sera disponible.');
+                          loadOrder();
+                        } catch (e) {
+                          Alert.alert('Erreur', 'Impossible de traiter votre demande');
+                        } finally {
+                          setLoading(false);
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="time" size={20} color={COLORS.warning} />
+              <Text style={[styles.helpText, { color: COLORS.warning }]}>Attendre la disponibilité</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+      )}
+
+      {/* Waiting for restock banner */}
+      {(order as any).issue_type === 'waiting_restock' && (
+        <Card style={[styles.section, { borderColor: COLORS.warning, borderWidth: 1, backgroundColor: COLORS.warning + '10' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
+            <Ionicons name="time" size={24} color={COLORS.warning} />
+            <Text style={[styles.sectionTitle, { color: COLORS.warning, marginLeft: SPACING.sm, marginBottom: 0 }]}>En attente de réapprovisionnement</Text>
+          </View>
+          <Text style={{ color: COLORS.textSoft }}>
+            Vous avez choisi d'attendre que le vendeur réapprovisionne les produits en rupture. Vous serez notifié dès que la commande pourra être traitée.
+          </Text>
+          {(order as any).issue_details && (order as any).issue_details.length > 0 && (
+            <View style={{ marginTop: SPACING.sm }}>
+              {(order as any).issue_details.map((item: any) => (
+                <View key={item.product_id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                  <Text style={{ color: COLORS.text, flex: 1 }} numberOfLines={1}>• {item.name}</Text>
+                  <Text style={{ color: COLORS.warning, fontSize: FONT_SIZE.sm, fontWeight: '600' }}>
+                    {item.restock_date || 'Date non définie'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </Card>
+      )}
+
+      {/* Resolved partial banner */}
+      {(order as any).issue_type === 'resolved_partial' && (
+        <Card style={[styles.section, { borderColor: COLORS.accent, borderWidth: 1, backgroundColor: COLORS.accent + '10' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
+            <Ionicons name="swap-horizontal" size={24} color={COLORS.accent} />
+            <Text style={[styles.sectionTitle, { color: COLORS.accent, marginLeft: SPACING.sm, marginBottom: 0 }]}>Commande modifiée</Text>
+          </View>
+          <Text style={{ color: COLORS.textSoft }}>
+            Vous avez choisi de continuer sans les produits en rupture. Le vendeur va ajuster votre commande.
+          </Text>
+        </Card>
+      )}
+
       {/* Products */}
       <Card style={styles.section}>
         <Text style={styles.sectionTitle}>Produits ({order.order_items.length})</Text>
@@ -382,6 +572,20 @@ export const ClientOrderDetailScreen: React.FC = () => {
           >
             <Ionicons name="return-up-back" size={20} color={COLORS.danger} />
             <Text style={[styles.helpText, { color: COLORS.danger }]}>Demander un retour / remboursement</Text>
+          </TouchableOpacity>
+        )}
+
+        {order.status === 'delivered' && (
+          <TouchableOpacity
+            style={[styles.helpButton, { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '10' }]}
+            onPress={() => navigation.navigate('Review', {
+              orderId: order.id,
+              storeId: order.store_id || '',
+              storeName: (order.stores as any)?.name || 'Boutique',
+            })}
+          >
+            <Ionicons name="star-outline" size={20} color={COLORS.accent} />
+            <Text style={[styles.helpText, { color: COLORS.accent }]}>Noter la commande</Text>
           </TouchableOpacity>
         )}
       </View>

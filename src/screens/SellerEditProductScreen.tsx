@@ -37,6 +37,20 @@ export const SellerEditProductScreen: React.FC = () => {
       setCollections(cols);
 
       if (store?.id) {
+        if (!storeService.isSubscriptionActive(store)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour modifier des produits.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired'),
+              },
+            ]
+          );
+          return;
+        }
+
         const count = await productService.getFeaturedCount(store.id);
         setFeaturedCount(count);
       }

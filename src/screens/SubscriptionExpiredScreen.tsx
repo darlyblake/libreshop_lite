@@ -24,6 +24,7 @@ import { storeService } from '../services/storeService';
 import { Plan, planService } from '../services/planService';
 import { useSettingsStore } from '../store/settingsStore';
 import { contactStore } from '../services/contactService';
+import { pointsService } from '../services/pointsService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionExpired'>;
 
@@ -41,6 +42,8 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
   const [freePlanUsed, setFreePlanUsed] = React.useState(false);
   const [signingOut, setSigningOut] = React.useState(false);
   const [selectedPlan, setSelectedPlan] = React.useState<string | null>(null);
+  const [userPoints, setUserPoints] = React.useState(0);
+  const [payingWithPoints, setPayingWithPoints] = React.useState(false);
   const adminConfig = useSettingsStore(state => state.adminConfig);
 
   // Animations
@@ -78,6 +81,14 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
       setUserId(user.id);
       console.log('✅ SubscriptionExpired: Utilisateur trouvé', user.id);
 
+      // 1.5 Fetch points
+      try {
+        const pointsInfo = await pointsService.getUserPointsInfo(user.id);
+        setUserPoints(pointsInfo.points || 0);
+      } catch (e) {
+        console.warn('Failed to load points info:', e);
+      }
+
       // 2. Récupérer la boutique de l'utilisateur
       const storeData = await storeService.getByUser(user.id);
       
@@ -98,12 +109,23 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
       console.log('✅ SubscriptionExpired: Plans chargés', activePlans.length);
 
       // 4. Vérifier si le plan gratuit a été utilisé
+      // Un store qui arrive ici avec status "expired" a forcément déjà consommé son essai gratuit.
+      // On vérifie aussi la table subscriptions par sécurité (si un admin a manuellement réattribué un essai).
       if (storeData && activePlans.length > 0) {
         const freePlan = activePlans.find((p) => p.is_free);
+        
+        // Le store a déjà un abonnement expiré = il a déjà utilisé au moins un plan (y compris le gratuit)
+        const storeAlreadyHadSubscription = (storeData as any).subscription_status === 'expired';
+        
         if (freePlan && freePlan.id) {
-          const used = await planService.checkFreePlanUsed(storeData.id, freePlan.id);
+          const usedInDb = await planService.checkFreePlanUsed(storeData.id, freePlan.id);
+          const used = usedInDb || storeAlreadyHadSubscription;
           setFreePlanUsed(used);
-          if (used) console.log('✅ SubscriptionExpired: Plan gratuit déjà utilisé');
+          if (used) console.log('✅ SubscriptionExpired: Plan gratuit déjà utilisé (DB:', usedInDb, '| store expired:', storeAlreadyHadSubscription, ')');
+        } else if (storeAlreadyHadSubscription) {
+          // Pas de plan gratuit trouvé dans les plans actifs, mais le store a expiré
+          setFreePlanUsed(true);
+          console.log('✅ SubscriptionExpired: Plan gratuit désactivé (store déjà expiré)');
         }
       }
       
@@ -144,6 +166,67 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setSigningOut(false);
     }
+  };
+
+  const handlePayWithPoints = async (plan: Plan) => {
+    const requiredPoints = plan.price;
+    if (userPoints < requiredPoints) {
+      Alert.alert(
+        'Points XP insuffisants',
+        `Vous avez ${userPoints.toLocaleString()} XP.\nIl en faut ${requiredPoints.toLocaleString()} XP pour ce plan (1 XP = 1 FCFA).`
+      );
+      return;
+    }
+
+    const doPayment = async () => {
+      try {
+        setPayingWithPoints(true);
+        const { supabase: client } = await import('../lib/supabase');
+        
+        await client.rpc('add_points_to_user', {
+          p_user_id: userId!,
+          p_amount: -requiredPoints,
+          p_action_type: 'SUBSCRIPTION_PAYMENT',
+          p_reference_id: plan.id
+        });
+
+        const newEnd = new Date();
+        newEnd.setDate(newEnd.getDate() + (plan.duration_days || 30));
+        
+        if (store?.id) {
+          await client
+            .from('stores')
+            .update({
+              subscription_plan: plan.name,
+              subscription_status: 'active',
+              subscription_end: newEnd.toISOString(),
+              subscription_price: plan.price,
+            })
+            .eq('id', store.id);
+        }
+
+        setUserPoints(prev => prev - requiredPoints);
+        Alert.alert(
+          'Succès 🎉',
+          `Votre plan ${plan.name} est réactivé !\n${requiredPoints.toLocaleString()} XP débités.`,
+          [{ text: 'OK', onPress: () => navigation.replace('SellerTabs', { screen: 'SellerDashboard' } as any) }]
+        );
+      } catch (err) {
+        Alert.alert('Erreur', 'Impossible de traiter le paiement par points.');
+        console.error('Pay with points error:', err);
+      } finally {
+        setPayingWithPoints(false);
+      }
+    };
+
+    Alert.alert(
+      'Payer avec vos points XP',
+      `💱 Taux: 1 XP = 1 FCFA\n\nPlan: ${plan.name}\nCoût: ${requiredPoints.toLocaleString()} XP (= ${requiredPoints.toLocaleString()} FCFA)\n\n⭐ Solde actuel: ${userPoints.toLocaleString()} XP\n📉 Après paiement: ${(userPoints - requiredPoints).toLocaleString()} XP`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Confirmer le paiement', onPress: doPayment },
+      ]
+    );
   };
 
   const openWhatsApp = async (plan: Plan) => {
@@ -420,17 +503,44 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
                       )}
                     </View>
                   </TouchableOpacity>
+
+                  {!plan.is_free && !isPlanDisabled && (
+                    <TouchableOpacity
+                      style={[styles.pointsPayButton, userPoints < plan.price && { opacity: 0.4 }]}
+                      onPress={() => handlePayWithPoints(plan)}
+                      disabled={payingWithPoints || userPoints < plan.price}
+                    >
+                      {payingWithPoints ? (
+                        <ActivityIndicator size="small" color={COLORS.warning} />
+                      ) : (
+                        <>
+                          <Ionicons name="star" size={16} color={COLORS.warning} />
+                          <Text style={styles.pointsPayText}>
+                            Payer {plan.price.toLocaleString()} XP
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </Animated.View>
               );
             })}
           </View>
         </Animated.View>
 
-        {/* Logout Button */}
+        {/* Action Buttons */}
         <Animated.View style={[
-          styles.logoutContainer,
+          styles.actionButtonsContainer,
           { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
         ]}>
+          <TouchableOpacity
+            style={styles.backToHubButton}
+            onPress={() => navigation.navigate('SellerHub')}
+          >
+            <Ionicons name="home-outline" size={20} color={COLORS.text} />
+            <Text style={styles.backToHubText}>Retour au hub</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleSignOut}
@@ -536,7 +646,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: COLORS.card,
   },
   storeIconContainer: {
     width: 48,
@@ -605,9 +715,19 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 2,
-    borderColor: 'transparent',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-    elevation: 5,
+    borderColor: COLORS.border,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+      },
+      default: {
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+    }),
   },
   planCardSelected: {
     borderColor: COLORS.accent,
@@ -628,7 +748,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: RADIUS.md,
   },
   freeBadgeText: {
-    color: COLORS.text,
+    color: '#fff',
     fontSize: FONT_SIZE.xs,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -687,13 +807,13 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    backgroundColor: `${COLORS.accent}05`,
+    backgroundColor: COLORS.accent + '15',
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: `${COLORS.accent}10`,
+    borderColor: COLORS.accent + '30',
   },
   planActionDisabled: {
-    backgroundColor: COLORS.card,
+    backgroundColor: COLORS.bg,
     borderColor: COLORS.border,
   },
   planActionText: {
@@ -706,6 +826,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
   },
+  actionButtonsContainer: {
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  backToHubButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+  },
+  backToHubText: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: '#fff',
+  },
   logoutContainer: {
     alignItems: 'center',
     marginBottom: SPACING.lg,
@@ -713,9 +852,14 @@ const styles = StyleSheet.create({
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   logoutText: {
     fontSize: FONT_SIZE.md,
@@ -740,7 +884,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textSoft,
+    color: COLORS.text,
     marginTop: SPACING.md,
   },
   errorContainer: {
@@ -759,20 +903,38 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.textSoft,
+    color: COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: SPACING.xl,
   },
   errorButton: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.md,
   },
   errorButtonText: {
-    color: COLORS.text,
+    color: '#fff',
     fontSize: FONT_SIZE.md,
     fontWeight: '600',
+  },
+  pointsPayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.warning + '10',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    marginTop: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.warning + '30',
+  },
+  pointsPayText: {
+    color: COLORS.warning,
+    fontWeight: '600',
+    marginLeft: 6,
+    fontSize: FONT_SIZE.md,
   },
 });

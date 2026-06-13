@@ -34,6 +34,7 @@ export type RootStackParamList = {
   AgentChat: undefined;
   AdminAgentChat: undefined;
   AdminInterfaces: undefined;
+  AdminPoints: undefined;
   Payment: { amount?: number; orderId?: string };
   BulkPayment: { orders?: any[] };
   ClientTabs: NavigatorScreenParams<ClientTabParamList>;
@@ -80,6 +81,7 @@ export type RootStackParamList = {
   Features: undefined;
   Pricing: undefined;
   SellerChangePlan: undefined;
+  SellerSubscriptions: undefined;
   PersonalInfo: undefined;
   Address: undefined;
   Security: undefined;

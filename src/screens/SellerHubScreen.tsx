@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Clipboard from 'expo-clipboard';
 
 import { useTheme } from '../hooks/useTheme';
 import { useAuthStore, useStoreStore } from '../store';
@@ -30,6 +31,8 @@ import { supabase } from '../lib/supabase';
 import { sessionStorage } from '../lib/storage';
 import { Store, WithdrawalRequest, KYCStatus } from '../lib/supabase';
 import { financeService, WalletStats, Transaction } from '../services/financeService';
+import { pointsService } from '../services/pointsService';
+import { SellerSubscriptionsScreen } from './SellerSubscriptionsScreen';
 
 const formatAbbreviatedAmount = (value: number | undefined | null) => {
   const safeValue = value || 0;
@@ -57,8 +60,8 @@ export const SellerHubScreen: React.FC = () => {
 
   const styles = createStyles(COLORS, SPACING, RADIUS, FONT_SIZE, isMobileWidth);
 
-  // Tabs: 'stores' | 'finance' | 'settings'
-  const [activeTab, setActiveTab] = useState<'stores' | 'finance' | 'settings'>('stores');
+  // Tabs: 'stores' | 'finance' | 'subscriptions' | 'settings'
+  const [activeTab, setActiveTab] = useState<'stores' | 'finance' | 'subscriptions' | 'settings'>('stores');
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<Store[]>([]);
   
@@ -106,6 +109,10 @@ export const SellerHubScreen: React.FC = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
+  // Points & Referral states
+  const [userPoints, setUserPoints] = useState(0);
+  const [userReferralCode, setUserReferralCode] = useState<string | null>(null);
+
   useEffect(() => {
     loadStoresAndData();
   }, [user?.id]);
@@ -127,6 +134,23 @@ export const SellerHubScreen: React.FC = () => {
         console.error('Failed to sync user profile in Hub:', err);
       }
       
+      // 0.5 Fetch user points
+      try {
+        const pointsInfo = await pointsService.getUserPointsInfo(user.id);
+        setUserPoints(pointsInfo.points || 0);
+        
+        if (pointsInfo.referral_code) {
+          setUserReferralCode(pointsInfo.referral_code);
+        } else {
+          // Génération automatique du code de parrainage unique pour le vendeur
+          const randomCode = 'LBS-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+          await pointsService.setReferralCode(user.id, randomCode);
+          setUserReferralCode(randomCode);
+        }
+      } catch (err) {
+        console.error('Failed to load points info:', err);
+      }
+
       // 1. Fetch stores
       const userStores = await storeService.getStoresByUser(user.id);
       setStores(userStores);
@@ -432,6 +456,8 @@ export const SellerHubScreen: React.FC = () => {
     }
   };
 
+
+
   const renderStoreCard = ({ item }: { item: Store }) => {
     const status = storeService.getSubscriptionStatus(item);
     const isExpired = status === 'expired';
@@ -567,14 +593,38 @@ export const SellerHubScreen: React.FC = () => {
             </View>
             <View style={styles.profileDetails}>
               <Text style={styles.profileName}>{user?.full_name || 'Vendeur'}</Text>
-              <Text style={styles.profileEmail}>{user?.email}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                <Text style={styles.profileEmail}>{user?.email}</Text>
+                <View style={{
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  backgroundColor: 'rgba(251, 191, 36, 0.2)', 
+                  paddingHorizontal: 8, 
+                  paddingVertical: 4, 
+                  borderRadius: 16,
+                  marginLeft: 8,
+                  borderWidth: 1,
+                  borderColor: 'rgba(251, 191, 36, 0.5)'
+                }}>
+                  <Ionicons name="star" size={14} color="#FBBF24" />
+                  <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '900', marginLeft: 4 }}>
+                    {userPoints} XP
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
       </View>
 
       {/* INTERACTIVE NAVIGATION TABS */}
-      <View style={[styles.tabBar, { borderBottomColor: COLORS.border }]}>
+      <View>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: SPACING.sm }}
+          style={[styles.tabBar, { borderBottomColor: COLORS.border }]}
+        >
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'stores' && styles.tabItemActive]}
           onPress={() => setActiveTab('stores')}
@@ -604,6 +654,20 @@ export const SellerHubScreen: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'subscriptions' && styles.tabItemActive]}
+          onPress={() => setActiveTab('subscriptions')}
+        >
+          <Ionicons 
+            name="card-outline" 
+            size={18} 
+            color={activeTab === 'subscriptions' ? COLORS.primary : COLORS.textMuted} 
+          />
+          <Text style={[styles.tabText, { color: activeTab === 'subscriptions' ? COLORS.primary : COLORS.textMuted }]}>
+            Abonnements
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'settings' && styles.tabItemActive]}
           onPress={() => setActiveTab('settings')}
         >
@@ -616,6 +680,7 @@ export const SellerHubScreen: React.FC = () => {
             Paramètres Compte
           </Text>
         </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {activeTab === 'stores' ? (
@@ -984,6 +1049,8 @@ export const SellerHubScreen: React.FC = () => {
             </View>
           </View>
         </View>
+      ) : activeTab === 'subscriptions' ? (
+        <SellerSubscriptionsScreen isEmbedded={true} />
       ) : (
         /* PROFESSIONAL ACCOUNT SETTINGS MANAGEMENT TAB */
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -1070,22 +1137,75 @@ export const SellerHubScreen: React.FC = () => {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: COLORS.primary }]}
-            onPress={handleSaveSettings}
-            disabled={savingSettings}
-          >
-            {savingSettings ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />
-                <Text style={styles.saveButtonText}>Enregistrer les modifications</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: COLORS.primary }]}
+              onPress={handleSaveSettings}
+              disabled={savingSettings}
+            >
+              {savingSettings ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={20} color="#ffffff" />
+                  <Text style={styles.saveButtonText}>Enregistrer les modifications</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View style={[styles.settingsCard, { backgroundColor: COLORS.card, borderColor: COLORS.border, marginTop: SPACING.md }]}>
+              <Text style={[styles.settingsTitle, { color: COLORS.text }]}>
+                Points & Fidélité
+              </Text>
+
+              <View style={[styles.switchRow, { marginBottom: SPACING.sm }]}>
+                <View style={styles.switchTextContainer}>
+                  <Text style={[styles.switchLabel, { color: COLORS.text }]}>Solde actuel</Text>
+                  <Text style={[styles.switchDesc, { color: COLORS.textMuted }]}>
+                    Vos points LibreShop cumulés
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: COLORS.accent + '20', paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.full }}>
+                  <Text style={{ color: COLORS.accent, fontWeight: '800', fontSize: 16 }}>{userPoints} pts</Text>
+                </View>
+              </View>
+
+              <View style={[styles.cardDivider, { backgroundColor: COLORS.border, marginVertical: SPACING.sm }]} />
+
+              <View style={styles.switchRow}>
+                <View style={styles.switchTextContainer}>
+                  <Text style={[styles.switchLabel, { color: COLORS.text }]}>Code de Parrainage</Text>
+                  <Text style={[styles.switchDesc, { color: COLORS.textMuted }]}>
+                    Invitez des vendeurs et gagnez des points
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={{ marginTop: SPACING.sm, backgroundColor: COLORS.bg, padding: SPACING.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                {userReferralCode ? (
+                  <>
+                    <Text style={{ color: COLORS.text, fontWeight: '700', letterSpacing: 2, fontSize: 16 }}>{userReferralCode}</Text>
+                    <TouchableOpacity onPress={async () => {
+                      await Clipboard.setStringAsync(userReferralCode);
+                      Alert.alert('Succès', 'Code de parrainage copié !');
+                    }}>
+                      <Ionicons name="copy-outline" size={20} color={COLORS.primary} />
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                )}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveButton, { backgroundColor: COLORS.danger, marginTop: SPACING.xl, marginBottom: SPACING.xxl }]}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#ffffff" />
+              <Text style={styles.saveButtonText}>Se déconnecter</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )}
 
       {/* CUSTOM LOGOUT CONFIRMATION MODAL */}
       <Modal
@@ -1272,7 +1392,7 @@ const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any, is
     height: 50,
   },
   tabItem: {
-    flex: 1,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',

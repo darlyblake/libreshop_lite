@@ -93,6 +93,19 @@ export const SellerReportsScreen: React.FC = () => {
     try {
       const store = await storeService.getByUser(user.id);
       if (store?.id) {
+        if (!storeService.isSubscriptionActive(store)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder aux rapports.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired'),
+              },
+            ]
+          );
+          return;
+        }
         setStoreId(store.id);
         const pList = await productService.getByStoreAll(store.id);
         setProducts(pList || []);

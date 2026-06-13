@@ -123,11 +123,13 @@ const AdminBannersScreen = lazyLoad(() => import('../screens/AdminBannersScreen'
 const AdminBannerFormScreen = lazyLoad(() => import('../screens/AdminBannerFormScreen'), 'AdminBannerFormScreen');
 const AdminAgentScreen = lazyLoad(() => import('../screens/AdminAgentScreen'), 'AdminAgentScreen');
 const AdminInterfacesScreen = lazyLoad(() => import('../screens/AdminInterfacesScreen'), 'AdminInterfacesScreen');
+const AdminPointsScreen = lazyLoad(() => import('../screens/AdminPointsScreen'), 'AdminPointsScreen');
 
 // Other Lazy loaded screens
 const FeaturesScreen = lazyLoad(() => import('../screens/FeaturesScreen'), 'FeaturesScreen');
 const PricingScreen = lazyLoad(() => import('../screens/PricingScreen'), 'PricingScreen');
 const SellerChangePlanScreen = lazyLoad(() => import('../screens/SellerChangePlanScreen'), 'SellerChangePlanScreen');
+const SellerSubscriptionsScreen = lazyLoad(() => import('../screens/SellerSubscriptionsScreen'), 'SellerSubscriptionsScreen');
 const SellerAgentChatScreen = lazyLoad(() => import('../screens/SellerAgentChatScreen'), 'SellerAgentChatScreen');
 
 import { RootStackParamList, ClientTabParamList, SellerTabParamList, UserRole, NotificationPayload } from './types';
@@ -545,69 +547,85 @@ export const AppNavigator: React.FC = () => {
   useEffect(() => {
     const restoreSession = async () => {
       setLoading(true);
-      try {
-        if (!supabase?.auth) {
-          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-          return;
-        }
 
-        let session = null;
-        const hasHashToken = typeof window !== 'undefined' && 
-                             (window.location.hash.includes('access_token=') || 
-                              window.location.search.includes('access_token='));
+      // Safety timeout: never block on loading screen for more than 8 seconds
+      const safetyTimeout = new Promise<void>((resolve) => setTimeout(() => {
+        console.warn('[AppNavigator] restoreSession timeout — forcing ready state');
+        resolve();
+      }, 8000));
 
-        if (hasHashToken) {
-          // Poll every 100ms for up to 15 times (1.5 seconds) to let Supabase process URL token
-          for (let i = 0; i < 15; i++) {
-            const { data } = await supabase.auth.getSession();
-            if (data?.session) {
-              session = data.session;
-              break;
-            }
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        } else {
-          const { data } = await supabase.auth.getSession();
-          session = data?.session;
-        }
-
-        if (session?.user) {
-          const userData = await authService.getCurrentUser();
-          if (userData) {
-            setUser(userData as any);
-            setSession(session);
-            
-            const role = (userData as any)?.user_metadata?.role || (userData as any)?.app_metadata?.role;
-            
-            if (role) {
-              await sessionStorage.saveUserRole(String(role));
-            }
-
-            // Déterminer la route initiale
-            const route = await getInitialRouteForRole(role as UserRole, userData.id);
+      const doRestore = async () => {
+        try {
+          if (!supabase?.auth) {
             const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-            
-            if (route === 'ClientTabs' && !onboardingCompleted) {
-              setInitialRoute('ClientOnboarding');
-            } else {
-              setInitialRoute(route);
-            }
+            setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
             return;
           }
-        }
 
-        // Pas de session active -> Continue as guest
-        const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-        setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-      } catch (error) {
-        errorHandler.handleAuthError(error as Error, 'SessionRestoration');
-        const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-        setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-      } finally {
-        setLoading(false);
-        setIsReady(true);
-      }
+          let session = null;
+          const hasHashToken = typeof window !== 'undefined' &&
+                               (window.location.hash.includes('access_token=') ||
+                                window.location.search.includes('access_token='));
+
+          if (hasHashToken) {
+            // Poll every 100ms for up to 15 times (1.5 seconds) to let Supabase process URL token
+            for (let i = 0; i < 15; i++) {
+              const { data } = await supabase.auth.getSession();
+              if (data?.session) {
+                session = data.session;
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } else {
+            const { data } = await supabase.auth.getSession();
+            session = data?.session;
+          }
+
+          if (session?.user) {
+            const userData = await authService.getCurrentUser();
+            if (userData) {
+              setUser(userData as any);
+              setSession(session);
+
+              const role = (userData as any)?.user_metadata?.role || (userData as any)?.app_metadata?.role;
+
+              if (role) {
+                await sessionStorage.saveUserRole(String(role));
+              }
+
+              // Déterminer la route initiale
+              const route = await getInitialRouteForRole(role as UserRole, userData.id);
+              const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+
+              if (route === 'ClientTabs' && !onboardingCompleted) {
+                setInitialRoute('ClientOnboarding');
+              } else {
+                setInitialRoute(route);
+              }
+              return;
+            }
+          }
+
+          // Pas de session active -> Continue as guest
+          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
+        } catch (error) {
+          errorHandler.handleAuthError(error as Error, 'SessionRestoration');
+          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
+        } finally {
+          setLoading(false);
+          setIsReady(true);
+        }
+      };
+
+      // Race the real restore logic against the safety timeout
+      await Promise.race([doRestore(), safetyTimeout]);
+
+      // Ensure we always unblock even if doRestore hangs
+      setLoading(false);
+      setIsReady(true);
     };
 
     restoreSession();
@@ -839,11 +857,13 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="AdminCities" component={AdminCitiesScreen} />
         <Stack.Screen name="AdminBanners" component={AdminBannersScreen} />
         <Stack.Screen name="AdminBannerForm" component={AdminBannerFormScreen} />
+        <Stack.Screen name="AdminPoints" component={AdminPointsScreen} />
         
         {/* Routes info */}
         <Stack.Screen name="Features" component={FeaturesScreen} />
         <Stack.Screen name="Pricing" component={PricingScreen} />
         <Stack.Screen name="SellerChangePlan" component={SellerChangePlanScreen} />
+        <Stack.Screen name="SellerSubscriptions" component={SellerSubscriptionsScreen} />
         <Stack.Screen name="AgentChat" component={SellerAgentChatScreen} />
         <Stack.Screen name="AdminAgentChat" component={AdminAgentScreen} />
       </Stack.Navigator>

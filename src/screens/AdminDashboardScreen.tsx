@@ -369,6 +369,14 @@ export const AdminDashboardScreen: React.FC = () => {
       color: COLORS.primary,
       description: 'Activer, désactiver ou ajouter des types de boutiques',
     },
+    { 
+      id: 'points',
+      title: 'Gestion des Points', 
+      icon: 'star-outline' as const, 
+      screen: 'AdminPoints' as const,
+      color: COLORS.warning,
+      description: 'Définir les quotas de points et récompenses',
+    },
   ];
 
   const onRefresh = useCallback(async () => {

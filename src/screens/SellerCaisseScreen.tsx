@@ -105,6 +105,22 @@ export const SellerCaisseScreen = () => {
           setProducts([]);
           return;
         }
+
+        if (!storeService.isSubscriptionActive(store)) {
+          Alert.alert(
+            'Abonnement expiré',
+            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder à la caisse.`,
+            [
+              {
+                text: 'Renouveler',
+                onPress: () => navigation.replace('SubscriptionExpired'),
+              },
+            ]
+          );
+          setLoading(false);
+          return;
+        }
+
         setStoreId(store.id);
         setStore(store);
         const data = await productService.getByStoreAvailable(store.id);

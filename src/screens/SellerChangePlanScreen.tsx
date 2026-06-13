@@ -22,6 +22,7 @@ import { errorHandler } from '../utils/errorHandler';
 import { useSettingsStore } from '../store/settingsStore';
 import { contactStore } from '../services/contactService';
 import { openURL } from '../utils/platformUtils';
+import { pointsService } from '../services/pointsService';
 
 export const SellerChangePlanScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -30,6 +31,9 @@ export const SellerChangePlanScreen: React.FC = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [fullPlans, setFullPlans] = useState<Plan[]>([]);
   const [store, setStore] = useState<any>(null);
+  const [userPoints, setUserPoints] = useState(0);
+  // 1 XP = 1 FCFA — pointsCost is calculated dynamically per plan
+  const [payingWithPoints, setPayingWithPoints] = useState(false);
   const adminConfig = useSettingsStore(state => state.adminConfig);
 
   useEffect(() => {
@@ -54,6 +58,14 @@ export const SellerChangePlanScreen: React.FC = () => {
       errorHandler.handleDatabaseError(e as Error, 'load pricing data');
     } finally {
       setLoading(false);
+    }
+
+    // Load user points
+    try {
+      const pointsInfo = await pointsService.getUserPointsInfo(user.id);
+      setUserPoints(pointsInfo.points || 0);
+    } catch (e) {
+      console.warn('Failed to load points info:', e);
     }
   };
 
@@ -120,6 +132,72 @@ export const SellerChangePlanScreen: React.FC = () => {
       // fallback: try to open the url directly
       try { openURL(String(url)); } catch { /* ignore */ }
     }
+  };
+
+  const handlePayWithPoints = async (plan: Plan) => {
+    // 1 XP = 1 FCFA — cost in points equals the prorated price
+    const proratedPrice = calculateProrata(plan.price);
+    const requiredPoints = proratedPrice;
+
+    if (userPoints < requiredPoints) {
+      Alert.alert(
+        'Points XP insuffisants',
+        `Vous avez ${userPoints.toLocaleString()} XP.\nIl en faut ${requiredPoints.toLocaleString()} XP pour ce plan (1 XP = 1 FCFA).`
+      );
+      return;
+    }
+
+    const doPayment = async () => {
+      try {
+        setPayingWithPoints(true);
+        const { supabase: client } = await import('../lib/supabase');
+        
+        // Déduire les points (1 XP = 1 FCFA)
+        await client.rpc('add_points_to_user', {
+          p_user_id: user!.id,
+          p_amount: -requiredPoints,
+          p_action_type: 'SUBSCRIPTION_PAYMENT',
+          p_reference_id: plan.id
+        });
+
+        // Activer l'abonnement
+        const newEnd = new Date();
+        newEnd.setDate(newEnd.getDate() + 30);
+        
+        if (store?.id) {
+          await client
+            .from('stores')
+            .update({
+              subscription_plan: plan.name,
+              subscription_status: 'active',
+              subscription_end: newEnd.toISOString(),
+              subscription_price: plan.price,
+            })
+            .eq('id', store.id);
+        }
+
+        setUserPoints(prev => prev - requiredPoints);
+        Alert.alert(
+          'Succès 🎉',
+          `Votre plan ${plan.name} est actif pour 30 jours !\n${requiredPoints.toLocaleString()} XP débités.`,
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } catch (err) {
+        Alert.alert('Erreur', 'Impossible de traiter le paiement par points.');
+        console.error('Pay with points error:', err);
+      } finally {
+        setPayingWithPoints(false);
+      }
+    };
+
+    Alert.alert(
+      'Payer avec vos points XP',
+      `💱 Taux: 1 XP = 1 FCFA\n\nPlan: ${plan.name}\nCoût: ${requiredPoints.toLocaleString()} XP (= ${requiredPoints.toLocaleString()} FCFA)\n\n⭐ Solde actuel: ${userPoints.toLocaleString()} XP\n📉 Après paiement: ${(userPoints - requiredPoints).toLocaleString()} XP`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Confirmer le paiement', onPress: doPayment },
+      ]
+    );
   };
 
   if (loading) {
@@ -203,6 +281,24 @@ export const SellerChangePlanScreen: React.FC = () => {
                 <Text style={styles.selectButtonText}>Sélectionner</Text>
                 <Ionicons name="chevron-forward" size={18} color={COLORS.accent} />
               </View>
+
+              {/* Pay with Points button — 1 XP = 1 FCFA */}
+              <TouchableOpacity
+                style={[styles.pointsPayButton, userPoints < proratedPrice && { opacity: 0.4 }]}
+                onPress={() => handlePayWithPoints(plan)}
+                disabled={payingWithPoints || userPoints < proratedPrice}
+              >
+                {payingWithPoints ? (
+                  <ActivityIndicator size="small" color={COLORS.warning} />
+                ) : (
+                  <>
+                    <Ionicons name="star" size={16} color={COLORS.warning} />
+                    <Text style={styles.pointsPayText}>
+                      ⭐ Payer {proratedPrice.toLocaleString()} XP  •  Solde: {userPoints.toLocaleString()} XP
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </TouchableOpacity>
           );
         })}
@@ -367,5 +463,22 @@ const styles = StyleSheet.create({
     color: COLORS.accent,
     fontWeight: '600',
     marginRight: 4,
+  },
+  pointsPayButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.warning + '10',
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.warning + '30',
+  },
+  pointsPayText: {
+    color: COLORS.warning,
+    fontWeight: '600',
+    marginLeft: 6,
+    fontSize: FONT_SIZE.sm,
   },
 });

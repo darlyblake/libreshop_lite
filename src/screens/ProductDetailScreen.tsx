@@ -217,6 +217,16 @@ export const ProductDetailScreen: React.FC = () => {
         if (p?.store_id) {
           const s = (await storeService.getById(String(p.store_id))) as Store;
           if (!mounted) return;
+          
+          if (!storeService.isSubscriptionActive(s)) {
+            Alert.alert(
+              'Boutique indisponible',
+              'Cette boutique n\'est actuellement pas disponible.',
+              [{ text: 'OK', onPress: () => navigation.goBack() }]
+            );
+            return;
+          }
+          
           setStore(s);
         }
 

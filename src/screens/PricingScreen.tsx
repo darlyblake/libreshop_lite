@@ -99,15 +99,15 @@ export const PricingScreen: React.FC = () => {
       setPlans(raw.map(p => ({
         id: p.id,
         name: p.name,
-        price: p.price === 0 ? '0 FCFA' : `${(p.price / 100).toLocaleString()} FCFA`,
-        period: p.months ? `${p.months} mois` : (p.duration || ''),
+        price: p.price === 0 || p.is_free ? 'Gratuit' : `${p.price.toLocaleString('fr-FR')} FCFA`,
+        period: p.duration_days ? `${p.duration_days} jours` : (p.months ? `${p.months} mois` : (p.duration || '')),
         description: '',
         icon: 'checkmark-circle-outline',
         features: p.features || [],
         highlighted: false,
-        cta: p.price === 0 ? 'Commencer' : 'Souscrire',
-        disabled: p.price === 0 && hasTrialStore,
-        disabledReason: p.price === 0 && hasTrialStore ? 'Vous avez déjà utilisé le plan gratuit' : undefined,
+        cta: p.price === 0 || p.is_free ? 'Essayer gratuitement' : (isFromExpiredStore ? 'Renouveler' : 'Choisir'),
+        disabled: (p.price === 0 || p.is_free) && hasTrialStore,
+        disabledReason: (p.price === 0 || p.is_free) && hasTrialStore ? 'Vous avez déjà utilisé le plan gratuit' : undefined,
       })));
     } catch (e) {
       errorHandler.handleDatabaseError(e, 'load pricing plans');
@@ -288,8 +288,15 @@ export const PricingScreen: React.FC = () => {
                     );
                     return;
                   }
-                  // navigation could pass the plan id to the auth/signup screen
-                  navigation.navigate('SellerAuth', { planId: plan.id });
+                  if (user?.id) {
+                    if (isFromExpiredStore) {
+                      navigation.replace('SubscriptionExpired');
+                    } else {
+                      navigation.navigate('SellerChangePlan');
+                    }
+                  } else {
+                    navigation.navigate('SellerAuth', { planId: plan.id });
+                  }
                 }}
                 variant={plan.highlighted ? 'primary' : 'outline'}
                 size="large"

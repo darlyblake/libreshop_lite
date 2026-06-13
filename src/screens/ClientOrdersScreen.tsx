@@ -140,16 +140,6 @@ export const ClientOrdersScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
 
-  if (!user) {
-    return (
-      <RequireAuthPlaceholder
-        title="Mes Commandes"
-        description="Connectez-vous avec Google pour suivre en temps réel vos commandes, consulter vos reçus de paiement et gérer vos retours."
-        icon="receipt-outline"
-      />
-    );
-  }
-  
   // États principaux
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,7 +152,7 @@ export const ClientOrdersScreen: React.FC = () => {
   const [cancelingOrder, setCancelingOrder] = useState<string | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<OrderWithDetails | null>(null);
   const [returnModalVisible, setReturnModalVisible] = useState(false);
-  const [returnItem, setReturnItem] = useState<{order: OrderWithDetails, item: any} | null>(null);
+  const [returnItem, setReturnItem] = useState<{order: OrderWithDetails, item: any, isFullOrder?: boolean} | null>(null);
   const [returnReason, setReturnReason] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
 
@@ -386,27 +376,44 @@ export const ClientOrdersScreen: React.FC = () => {
     try {
       setSubmittingReturn(true);
       const reason = returnReason;
-      await returnService.requestReturn({
-        order_id: returnItem.order.id,
-        store_id: returnItem.order.store_id,
-        product_id: returnItem.item.product_id,
-        quantity: returnItem.item.quantity,
-        reason: reason,
-        refund_amount: Number(returnItem.item.price) * Number(returnItem.item.quantity),
-        user_id: user?.id as any
-      } as any);
+
+      if (returnItem.isFullOrder) {
+        // Retour de toute la commande
+        for (const item of returnItem.order.order_items) {
+          await returnService.requestReturn({
+            order_id: returnItem.order.id,
+            store_id: returnItem.order.store_id,
+            product_id: item.product_id,
+            quantity: item.quantity,
+            reason: reason,
+            refund_amount: Number(item.price || 0) * Number(item.quantity),
+            user_id: user?.id as any
+          } as any);
+        }
+      } else {
+        // Retour d'un seul item
+        await returnService.requestReturn({
+          order_id: returnItem.order.id,
+          store_id: returnItem.order.store_id,
+          product_id: returnItem.item.product_id,
+          quantity: returnItem.item.quantity,
+          reason: reason,
+          refund_amount: Number(returnItem.item.price || 0) * Number(returnItem.item.quantity),
+          user_id: user?.id as any
+        } as any);
+      }
 
       setReturnModalVisible(false);
       setReturnReason('');
-      
+
       Alert.alert(
         'Demande envoyée',
         'Voulez-vous contacter le vendeur sur WhatsApp pour envoyer les photos ?',
         [
           { text: 'Plus tard', style: 'cancel' },
-          { 
-            text: 'Oui, WhatsApp', 
-            onPress: () => contactSellerOnWhatsApp(returnItem, reason) 
+          {
+            text: 'Oui, WhatsApp',
+            onPress: () => contactSellerOnWhatsApp(returnItem, reason)
           }
         ]
       );
@@ -597,6 +604,16 @@ export const ClientOrdersScreen: React.FC = () => {
       </View>
     );
   };
+
+  if (!user) {
+    return (
+      <RequireAuthPlaceholder
+        title="Mes Commandes"
+        description="Connectez-vous avec Google pour suivre en temps réel vos commandes, consulter vos reçus de paiement et gérer vos retours."
+        icon="receipt-outline"
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -804,12 +821,12 @@ export const ClientOrdersScreen: React.FC = () => {
           <View style={styles.returnModal}>
             <Text style={styles.modalTitle}>Demander un retour</Text>
             <Text style={styles.returnSubtitle}>
-              Produit : {returnItem?.item?.product?.name}
+              {returnItem?.isFullOrder ? 'Retour de toute la commande' : `Produit : ${returnItem?.item?.product?.name}`}
             </Text>
-            
+
             <TextInput
               style={styles.returnInput}
-              placeholder="Motif du retour (ex: taille trop petite, défectueux...)"
+              placeholder={returnItem?.isFullOrder ? 'Motif du retour de la commande (ex: produits non conformes, erreur de commande...)' : 'Motif du retour (ex: taille trop petite, défectueux...)'}
               multiline
               numberOfLines={4}
               value={returnReason}
@@ -893,7 +910,22 @@ export const ClientOrdersScreen: React.FC = () => {
 
                 {/* Produits */}
                 <View style={[styles.detailSection, { paddingHorizontal: SPACING.lg }]}>
-                  <Text style={styles.detailSectionTitle}>Produits ({selectedOrder.order_items.length})</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md }}>
+                    <Text style={styles.detailSectionTitle}>Produits ({selectedOrder.order_items.length})</Text>
+                    {selectedOrder.status === 'delivered' && (
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, backgroundColor: palette.accent + '15', paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: RADIUS.md }}
+                        onPress={() => {
+                          setSelectedOrder(null);
+                          setReturnItem({ order: selectedOrder, item: null, isFullOrder: true });
+                          setReturnModalVisible(true);
+                        }}
+                      >
+                        <Ionicons name="refresh-outline" size={14} color={palette.accent} />
+                        <Text style={{ fontSize: FONT_SIZE.xs, color: palette.accent, fontWeight: '600' }}>Retourner toute la commande</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                   <View style={{ backgroundColor: palette.bg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, overflow: 'hidden' }}>
                     {selectedOrder.order_items.map((item, index) => (
                       <View key={index} style={[{ flexDirection: 'row', alignItems: 'center', padding: SPACING.md }, index !== selectedOrder.order_items.length - 1 && { borderBottomWidth: 1, borderBottomColor: palette.border }]}>
@@ -905,13 +937,14 @@ export const ClientOrdersScreen: React.FC = () => {
                           <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 4 }}>Quantité: {item.quantity}</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '700', color: palette.text }}>{(item.price * item.quantity).toLocaleString()} FCA</Text>
-                          <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 4 }}>{item.price.toLocaleString()} / u</Text>
+                          <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '700', color: palette.text }}>{((item.price || 0) * item.quantity).toLocaleString()} FCA</Text>
+                          <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginTop: 4 }}>{(item.price || 0).toLocaleString()} / u</Text>
                         </View>
                         {selectedOrder.status === 'delivered' && (
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={[styles.returnItemButton, { marginTop: 0, marginLeft: SPACING.sm }]}
                             onPress={() => {
+                              setSelectedOrder(null);
                               setReturnItem({ order: selectedOrder, item });
                               setReturnModalVisible(true);
                             }}
