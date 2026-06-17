@@ -96,7 +96,7 @@ export const storeService = {
         const client = useSupabase();
         const { data, error } = await client
           .from('stores')
-          .select('id, user_id, name, slug, description, logo_url, banner_url, category, status, visible, verified, phone, address, city, country, latitude, longitude, delivery_fee, delivery_radius, rating_avg, rating_count, followers_count, customers_count, created_at, updated_at')
+          .select('*')
           .eq('id', id)
           .maybeSingle();
         if (error) throw error;
