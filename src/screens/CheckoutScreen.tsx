@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,7 @@ export const CheckoutScreen: React.FC = () => {
   const styles = React.useMemo(() => createCheckoutStyles(COLORS, SPACING, RADIUS, FONT_SIZE), [COLORS, SPACING, RADIUS, FONT_SIZE]);
 
   // allow passing `itemsJson` or `items` in navigation to checkout a subset (per-store)
-  const paramItems = (() => {
+  const paramItems = useMemo(() => {
     const p = route.params || {};
     if (Array.isArray(p.items)) return p.items;
     // If itemsJson passed explicitly, parse it
@@ -69,10 +69,16 @@ export const CheckoutScreen: React.FC = () => {
     }
 
     return undefined;
-  })();
+  }, [route.params]);
 
-  const items = paramItems ?? globalItems;
+  const items = useMemo(() => paramItems ?? globalItems, [paramItems, globalItems]);
   const activeStoreId = route.params?.storeId ?? storeIdFromStore;
+  
+  // Extract store IDs to use as a stable dependency for store loading
+  const storeIds = useMemo(() => {
+    const ids = Array.from(new Set(items.map((i: any) => (i.product as any)?.store_id).filter(Boolean)));
+    return ids.sort().join(',');
+  }, [items]);
   const [store, setStore] = useState<any>(null);
   const [loadingStore, setLoadingStore] = useState(false);
     const [storesData, setStoresData] = useState<any[]>([]);
@@ -175,7 +181,7 @@ export const CheckoutScreen: React.FC = () => {
     
     computeShipping();
     return () => { mounted = false; };
-  }, [storesData, userLocation, formData.city]);
+  }, [storesData, userLocation]);
 
   // Load store data for tax and base settings.
   useEffect(() => {
@@ -233,7 +239,7 @@ export const CheckoutScreen: React.FC = () => {
     };
     loadStores();
     return () => { mounted = false; };
-  }, [activeStoreId, items, paramItems]);
+  }, []);
 
   const subtotal = (paramItems && Array.isArray(paramItems))
     ? paramItems.reduce((s: number, it: any) => s + (it.product.price || 0) * (it.quantity || 0), 0)
@@ -452,7 +458,7 @@ export const CheckoutScreen: React.FC = () => {
       }
     };
     restore();
-  }, [user]);
+  }, [user?.id]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => {

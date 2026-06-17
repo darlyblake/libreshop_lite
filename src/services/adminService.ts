@@ -15,7 +15,7 @@ async function isAdmin(): Promise<boolean> {
       .from('users')
       .select('role')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (userData?.role === 'admin') return true;
 

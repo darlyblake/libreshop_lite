@@ -98,12 +98,12 @@ RETURNS TABLE (
   banner_url text,
   status text,
   verified boolean,
-  created_at timestamp,
+  created_at timestamp with time zone,
   followers_count int,
   customers_count int,
   rating_avg numeric,
   rating_count int
-) AS $$
+) LANGUAGE plpgsql STABLE AS $$
 BEGIN
   RETURN QUERY
   SELECT

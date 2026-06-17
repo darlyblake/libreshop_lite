@@ -127,7 +127,7 @@ export const userService = {
             .from('users')
             .select('*')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
 
           if (error) throw new Error(`Failed to get profile: ${error.message}`);
           if (!data) {
@@ -180,7 +180,7 @@ export const userService = {
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.warn('[userService.getSelfProfile] error:', error.message);

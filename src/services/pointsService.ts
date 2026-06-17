@@ -38,7 +38,7 @@ export const pointsService = {
         .from('users')
         .select('points, referral_code, referred_by')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
         
       if (error) throw error;
       return data || { points: 0, referral_code: null, referred_by: null };
@@ -140,7 +140,7 @@ export const pointsService = {
         .from('users')
         .select('id')
         .eq('referral_code', codeToApply)
-        .single();
+        .maybeSingle();
 
       if (inviterError || !inviter) {
         throw new Error("Code de parrainage invalide ou introuvable.");

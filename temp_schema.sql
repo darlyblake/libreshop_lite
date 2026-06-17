@@ -507,7 +507,7 @@ $$;
 ALTER FUNCTION "public"."find_nearby_stores"("p_latitude" numeric, "p_longitude" numeric, "p_radius_km" numeric, "p_limit" integer) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_featured_stores"("p_limit" integer DEFAULT 10) RETURNS TABLE("id" "uuid", "user_id" "uuid", "name" "text", "slug" "text", "description" "text", "logo_url" "text", "banner_url" "text", "status" "text", "verified" boolean, "created_at" timestamp without time zone, "followers_count" integer, "customers_count" integer, "rating_avg" numeric, "rating_count" integer)
+CREATE OR REPLACE FUNCTION "public"."get_featured_stores"("p_limit" integer DEFAULT 10) RETURNS TABLE("id" "uuid", "user_id" "uuid", "name" "text", "slug" "text", "description" "text", "logo_url" "text", "banner_url" "text", "status" "text", "verified" boolean, "created_at" timestamp with time zone, "followers_count" integer, "customers_count" integer, "rating_avg" numeric, "rating_count" integer)
     LANGUAGE "plpgsql" STABLE
     AS $$
 BEGIN
