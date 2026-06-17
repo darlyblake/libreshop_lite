@@ -543,93 +543,95 @@ export const AppNavigator: React.FC = () => {
     return () => clearInterval(interval);
   }, [user?.id, playNotificationSound, setNotifications]);
 
-  // Restauration de session
+  // Restauration de session - Version optimisée
   useEffect(() => {
+    let isMounted = true;
+
     const restoreSession = async () => {
       setLoading(true);
 
-      // Safety timeout: never block on loading screen for more than 15 seconds
-      const safetyTimeout = new Promise<void>((resolve) => setTimeout(() => {
-        console.warn('[AppNavigator] restoreSession timeout — forcing ready state');
-        resolve();
-      }, 15000));
+      try {
+        console.log('🔄 [restoreSession] Démarrage...');
 
-      const doRestore = async () => {
-        try {
-          if (!supabase?.auth) {
+        if (!supabase?.auth) {
+          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+          if (isMounted) setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
+          return;
+        }
+
+        // 1. Récupération de la session
+        let session = null;
+        const hasHashToken = typeof window !== 'undefined' &&
+                            (window.location.hash.includes('access_token') ||
+                             window.location.search.includes('access_token'));
+
+        if (hasHashToken) {
+          // Polling court pour token dans l'URL
+          for (let i = 0; i < 12; i++) {  // ~1.2s max
+            const { data } = await supabase.auth.getSession();
+            if (data?.session) {
+              session = data.session;
+              break;
+            }
+            await new Promise(r => setTimeout(r, 100));
+          }
+        } else {
+          const { data } = await supabase.auth.getSession();
+          session = data?.session;
+        }
+
+        if (session?.user && isMounted) {
+          // 2. Récupération du profil utilisateur
+          const userData = await authService.getCurrentUser();
+
+          if (userData) {
+            setUser(userData as any);
+            setSession(session);
+
+            const role = (userData as any)?.user_metadata?.role ||
+                        (userData as any)?.app_metadata?.role;
+
+            if (role) await sessionStorage.saveUserRole(String(role));
+
+            const route = await getInitialRouteForRole(role as UserRole, userData.id);
             const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-            setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
+
+            if (isMounted) {
+              setInitialRoute(route === 'ClientTabs' && !onboardingCompleted
+                ? 'ClientOnboarding'
+                : route);
+            }
+            console.log('✅ [restoreSession] Session restaurée avec succès');
             return;
           }
+        }
 
-          let session = null;
-          const hasHashToken = typeof window !== 'undefined' &&
-                               (window.location.hash.includes('access_token=') ||
-                                window.location.search.includes('access_token='));
+        // Pas de session → mode invité
+        const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
+        if (isMounted) {
+          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
+        }
 
-          if (hasHashToken) {
-            // Poll every 100ms for up to 15 times (1.5 seconds) to let Supabase process URL token
-            for (let i = 0; i < 15; i++) {
-              const { data } = await supabase.auth.getSession();
-              if (data?.session) {
-                session = data.session;
-                break;
-              }
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-          } else {
-            const { data } = await supabase.auth.getSession();
-            session = data?.session;
-          }
+      } catch (error) {
+        console.error('❌ [restoreSession] Erreur:', error);
+        errorHandler.handleAuthError(error as Error, 'SessionRestoration');
 
-          if (session?.user) {
-            const userData = await authService.getCurrentUser();
-            if (userData) {
-              setUser(userData as any);
-              setSession(session);
-
-              const role = (userData as any)?.user_metadata?.role || (userData as any)?.app_metadata?.role;
-
-              if (role) {
-                await sessionStorage.saveUserRole(String(role));
-              }
-
-              // Déterminer la route initiale
-              const route = await getInitialRouteForRole(role as UserRole, userData.id);
-              const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-
-              if (route === 'ClientTabs' && !onboardingCompleted) {
-                setInitialRoute('ClientOnboarding');
-              } else {
-                setInitialRoute(route);
-              }
-              return;
-            }
-          }
-
-          // Pas de session active -> Continue as guest
+        if (isMounted) {
           const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
           setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-        } catch (error) {
-          errorHandler.handleAuthError(error as Error, 'SessionRestoration');
-          const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
-          setInitialRoute(onboardingCompleted ? 'ClientTabs' : 'ClientOnboarding');
-        } finally {
+        }
+      } finally {
+        if (isMounted) {
           setLoading(false);
           setIsReady(true);
         }
-      };
-
-      // Race the real restore logic against the safety timeout
-      await Promise.race([doRestore(), safetyTimeout]);
-
-      // Ensure we always unblock even if doRestore hangs
-      setLoading(false);
-      setIsReady(true);
+      }
     };
 
     restoreSession();
-  }, []);
+
+    return () => { isMounted = false; };
+  }, []); // Dépendances vides = une seule fois au montage
 
   // Écoute des changements d'authentification
   useEffect(() => {
@@ -685,39 +687,33 @@ export const AppNavigator: React.FC = () => {
 
   // Helper pour déterminer la route initiale
   const getInitialRouteForRole = async (role: UserRole, userId: string): Promise<keyof RootStackParamList> => {
-    // Check if user is suspended
-    if (userId && supabase) {
-      try {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('status')
-          .eq('id', userId)
-          .maybeSingle();
-        
-        if (userData?.status === 'suspended') {
-          return 'AccountSuspended';
-        }
-      } catch (error) {
-        console.error('Error checking user status:', error);
-      }
+    if (!userId || !supabase) {
+      return role === 'seller' ? 'SellerHub' : 'ClientTabs';
     }
 
-    // Check pending action first to route directly to Checkout
     try {
-      const pendingActionStr = await AsyncStorage.getItem('@libreshop_pending_action');
-      if (pendingActionStr) {
-        const action = JSON.parse(pendingActionStr);
+      // Faire les checks en parallèle pour gagner du temps
+      const [userCheck, storeCheck, pendingAction, intent] = await Promise.all([
+        supabase.from('users').select('status').eq('id', userId).maybeSingle(),
+        role === 'seller' ?
+          supabase.from('stores').select('id').eq('user_id', userId).maybeSingle() : null,
+        AsyncStorage.getItem('@libreshop_pending_action'),
+        AsyncStorage.getItem('@libreshop_auth_intent')
+      ]);
+
+      // Suspended ?
+      if (userCheck.data?.status === 'suspended') return 'AccountSuspended';
+
+      // Pending checkout ?
+      if (pendingAction) {
+        const action = JSON.parse(pendingAction);
         if (action.type === 'CHECKOUT' || action.type === 'BUY_NOW') {
+          await AsyncStorage.removeItem('@libreshop_pending_action');
           return 'Checkout';
         }
       }
-    } catch (e) {
-      console.error('Error checking pending action for initial route:', e);
-    }
 
-    // Check auth intent
-    try {
-      const intent = await AsyncStorage.getItem('@libreshop_auth_intent');
+      // Intent auth
       if (intent === 'client') {
         await AsyncStorage.removeItem('@libreshop_auth_intent');
         return 'ClientTabs';
@@ -725,33 +721,17 @@ export const AppNavigator: React.FC = () => {
         await AsyncStorage.removeItem('@libreshop_auth_intent');
         return 'SellerTabs';
       }
-    } catch (e) {
-      console.error('Error checking auth intent:', e);
-    }
 
-    switch (role) {
-      case 'seller':
-        if (userId && supabase) {
-          try {
-            const { data: store } = await supabase
-              .from('stores')
-              .select('id')
-              .eq('user_id', userId)
-              .maybeSingle();
-            
-            if (!store) {
-              return 'SellerAddStore';
-            }
-          } catch (error) {
-            console.error('Error checking store in getInitialRouteForRole:', error);
-          }
-        }
-        return 'SellerHub';
-      case 'admin':
-        return 'AdminDashboard';
-      case 'client':
-      default:
-        return 'ClientTabs';
+      // Seller sans store ?
+      if (role === 'seller' && !storeCheck?.data) {
+        return 'SellerAddStore';
+      }
+
+      return role === 'admin' ? 'AdminDashboard' : 'ClientTabs';
+
+    } catch (error) {
+      console.error('Error in getInitialRouteForRole:', error);
+      return role === 'seller' ? 'SellerHub' : 'ClientTabs';
     }
   };
 
