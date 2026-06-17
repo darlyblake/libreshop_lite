@@ -548,11 +548,11 @@ export const AppNavigator: React.FC = () => {
     const restoreSession = async () => {
       setLoading(true);
 
-      // Safety timeout: never block on loading screen for more than 8 seconds
+      // Safety timeout: never block on loading screen for more than 15 seconds
       const safetyTimeout = new Promise<void>((resolve) => setTimeout(() => {
         console.warn('[AppNavigator] restoreSession timeout — forcing ready state');
         resolve();
-      }, 8000));
+      }, 15000));
 
       const doRestore = async () => {
         try {
