@@ -87,15 +87,24 @@ export const storeService = {
   },
 
   async getById(id: string) {
+    const cacheKey = `store_${id}`;
     const startTime = performance.now();
-    const client = useSupabase();
-    const { data, error } = await client
-      .from('stores')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (error) throw error;
-    
+
+    const { data, fromCache } = await cacheManager.swr(
+      cacheKey,
+      async () => {
+        const client = useSupabase();
+        const { data, error } = await client
+          .from('stores')
+          .select('id, user_id, name, slug, description, logo_url, banner_url, category, status, visible, verified, phone, address, city, country, latitude, longitude, delivery_fee, delivery_radius, rating_avg, rating_count, followers_count, customers_count, created_at, updated_at')
+          .eq('id', id)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      },
+      { ttl: 10 * 60 * 1000 } // 10 minutes cache
+    );
+
     // ✅ Phase 2e: Track performance metrics
     performanceMonitor.recordMetric({
       operation: 'storeService.getById',
@@ -103,10 +112,10 @@ export const storeService = {
       timestamp: new Date(),
       itemsFetched: data ? 1 : 0,
       itemsReturned: data ? 1 : 0,
-      cacheHit: false,
+      cacheHit: fromCache,
       rpcUsed: false,
     });
-    
+
     return data;
   },
 
