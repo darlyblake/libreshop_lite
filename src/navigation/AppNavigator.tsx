@@ -692,7 +692,7 @@ export const AppNavigator: React.FC = () => {
           .from('users')
           .select('status')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
         
         if (userData?.status === 'suspended') {
           return 'AccountSuspended';

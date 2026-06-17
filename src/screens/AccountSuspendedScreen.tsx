@@ -25,7 +25,7 @@ export const AccountSuspendedScreen: React.FC = () => {
         .from('users')
         .select('suspension_reason')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
       if (userData) setSuspensionReason(userData.suspension_reason || 'Non spécifiée');
     } catch (e) {}
   };

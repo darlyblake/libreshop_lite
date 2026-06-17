@@ -279,7 +279,7 @@ export const userService = {
       .from('users')
       .upsert(payload, { onConflict: 'id' })
       .select('*')
-      .single();
+      .maybeSingle();
     if (error) throw error;
     return data as UserProfile;
   },
@@ -342,7 +342,7 @@ export const userService = {
           .from('users')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
 
         if (fetchError || !currentProfile) {
           throw new Error('Failed to fetch current profile after conflict');
