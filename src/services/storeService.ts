@@ -639,7 +639,7 @@ export const storeService = {
         visible: true,
       })
       .select('*')
-      .single();
+      .maybeSingle();
     if (error) throw error;
     
     // ✅ Phase 2e: Invalidate discovery caches on new store with plan creation
@@ -712,7 +712,7 @@ export const storeService = {
         visible: true,
       })
       .select('*')
-      .single();
+      .maybeSingle();
     if (error) throw error;
     
     // ✅ Phase 2e: Invalidate discovery caches on new store with trial creation
