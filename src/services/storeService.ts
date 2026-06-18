@@ -73,7 +73,7 @@ export const storeService = {
       .from('stores')
       .insert(storeData)
       .select('*')
-      .single();
+      .maybeSingle();
     if (error) throw error;
     
     // ✅ Phase 2e: Invalidate discovery/list caches on new store creation
