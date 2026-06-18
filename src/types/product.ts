@@ -16,9 +16,11 @@ export interface Store {
   name: string;
   logo_url?: string;
   category?: string;
-  owner_id?: string;
-  is_active?: boolean;
+  user_id?: string;
+  status?: string;
+  visible?: boolean;
 }
+
 
 /**
  * Product Option interface

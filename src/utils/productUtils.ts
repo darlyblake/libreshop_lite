@@ -62,7 +62,7 @@ export async function getStoreAndValidateOwnership(storeId: string) {
 
   const { data: store, error } = await client
     .from('stores')
-    .select('id, owner_id, name, is_active')
+    .select('id, user_id, name')
     .eq('id', storeId)
     .single();
 
@@ -70,7 +70,7 @@ export async function getStoreAndValidateOwnership(storeId: string) {
     throw new Error(`Store not found: ${storeId}`);
   }
 
-  if (store.owner_id !== user.id) {
+  if (store.user_id !== user.id) {
     throw new Error(`Unauthorized: you are not the owner of store ${storeId}`);
   }
 
@@ -87,7 +87,7 @@ export async function getProductAndValidateOwnership(productId: string) {
   // Fetch product with store owner info
   const { data: product, error } = await client
     .from('products')
-    .select('id, store_id, stores!inner(owner_id)')
+    .select('id, store_id, stores!inner(user_id)')
     .eq('id', productId)
     .single();
 
@@ -96,7 +96,7 @@ export async function getProductAndValidateOwnership(productId: string) {
   }
 
   const store = product.stores as any;
-  if (store.owner_id !== user.id) {
+  if (store.user_id !== user.id) {
     throw new Error(`Unauthorized: you don't own product ${productId}`);
   }
 
@@ -133,6 +133,7 @@ export async function canViewProduct(productId: string): Promise<boolean> {
   }
 }
 
+
 /**
  * Apply RLS - filter products by user's permission level
  * Returns products where:
@@ -147,7 +148,7 @@ export async function applyProductRLS(products: Product[]): Promise<Product[]> {
     const { data: stores, error } = await useSupabase()
       .from('stores')
       .select('id')
-      .eq('owner_id', user.id);
+      .eq('user_id', user.id);
 
     if (error) {
       throw error;

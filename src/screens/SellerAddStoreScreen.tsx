@@ -275,7 +275,7 @@ const SellerAddStoreScreen: React.FC = () => {
       setSubmissionStatus(s => ({ ...s, step: 'Création de la boutique...', progress: 90 }));
       const whatsappPhone = String(formData.phone || '').replace(/[^\d+]/g, '');
       // Exclude UI-only fields like city_name to prevent Supabase 400 Bad Request
-      const { city_name, ...databaseFields } = formData as any;
+      const { city_name, referral_code, ...databaseFields } = formData as any;
       const createArgs = {
         ...databaseFields,
         phone: whatsappPhone,

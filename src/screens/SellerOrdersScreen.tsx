@@ -58,7 +58,9 @@ interface OrderDisplay {
   daysInStatus: number;
   hoursInStatus: number;
   issueType?: string | null;
+  items?: OrderItemDisplay[];
 }
+
 
 const formatTimeAgo = (isoDate?: string) => {
   if (!isoDate) return '';
@@ -727,7 +729,7 @@ export const SellerOrdersScreen: React.FC = () => {
 
     const handleContactCustomer = (order: OrderDisplay) => {
       const formattedPhone = order.phone.replace(/[^0-9+]/g, '');
-      const itemsList = order.items.map(item => `- ${item.name} (x${item.quantity || 1})`).join('\n');
+      const itemsList = (order.items || []).map((item: OrderItemDisplay) => `- ${item.name} (x${item.quantity || 1})`).join('\n');
       const storeText = storeName ? `la boutique ${storeName} sur Libreshop` : `Libreshop`;
 
       const message = `Bonjour, je suis le vendeur de ${storeText}.
