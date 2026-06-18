@@ -464,7 +464,7 @@ export const productService = {
         })
         .eq('id', id)
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       
@@ -754,7 +754,7 @@ export const productService = {
     try {
       // Execute all counts in parallel for performance
       const [productRes, likesRes, salesRes] = await Promise.all([
-        client.from('products').select('view_count').eq('id', productId).single(),
+        client.from('products').select('view_count').eq('id', productId).maybeSingle(),
         client.from('product_likes').select('id', { count: 'exact', head: true }).eq('product_id', productId),
         client.from('order_items').select('quantity, orders(status)').eq('product_id', productId)
       ]);
