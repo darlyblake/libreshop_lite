@@ -281,13 +281,11 @@ const SellerAddStoreScreen: React.FC = () => {
         phone: whatsappPhone,
         logo_url: uploadedLogoUrl,
         banner_url: uploadedBannerUrl,
-        subcategory: selectedSubcategory || undefined,
         // Add location data if selected
         ...(selectedLocation && {
           latitude: selectedLocation.latitude,
           longitude: selectedLocation.longitude,
           city: selectedLocation.city || values.city_name,
-          country: countries.find(c => c.id === values.country_id)?.name || 'Gabon',
         }),
       };
 
@@ -301,7 +299,7 @@ const SellerAddStoreScreen: React.FC = () => {
         }
       }
 
-      await storeService.createWithPlanSlugRetry(user.id, createArgs as any, trial?.id || 'trial');
+      await storeService.createWithPlanSlugRetry(user.id, createArgs, trial?.id || 'trial');
       
       setSubmissionStatus(s => ({ ...s, step: 'Terminé !', progress: 100 }));
       

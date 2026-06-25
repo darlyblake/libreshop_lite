@@ -39,7 +39,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
     isActive: true,
     parentCategoryId: '',
     subCategoryId: '',
-    customAttributes: [] as any[],
+    customAttributes: [],
   });
 
   // Picker states
@@ -92,7 +92,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
         isActive: !!col.is_active,
         parentCategoryId: parentCatId,
         subCategoryId: col.category_id || '',
-        customAttributes: (col as any).custom_attributes || [],
+        customAttributes: col.custom_attributes || [],
       });
     } catch (e) {
       errorHandler.handleDatabaseError(e, 'load collection');
@@ -132,7 +132,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
         is_active: collection.isActive,
         category_id: collection.subCategoryId,
         custom_attributes: collection.customAttributes,
-      } as any);
+      });
 
       Alert.alert('Succès', 'Collection mise à jour avec succès');
       navigation.goBack();
@@ -396,7 +396,7 @@ export const SellerEditCollectionScreen: React.FC = () => {
                             styles.typeOptionChip,
                             newAttrType === type.key && styles.typeOptionChipActive,
                           ]}
-                          onPress={() => setNewAttrType(type.key as any)}
+                          onPress={() => setNewAttrType(type.key)}
                         >
                           <Text
                             style={[

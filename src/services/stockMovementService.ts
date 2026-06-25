@@ -30,10 +30,16 @@ export const stockMovementService = {
 
     if (error) throw error;
 
-    // 2. Automatically update product stock in database
-    await productService.update(movement.product_id, {
-      stock: movement.new_stock,
-    } as any);
+    // 2. Automatically update product stock in database (direct update to avoid validation)
+    const { error: updateError } = await client
+      .from('products')
+      .update({ stock: movement.new_stock })
+      .eq('id', movement.product_id);
+
+    if (updateError) {
+      console.error('Failed to update product stock:', updateError);
+      throw updateError;
+    }
 
     return data as StockMovement;
   },

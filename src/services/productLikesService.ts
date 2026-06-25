@@ -93,7 +93,7 @@ export const productLikesService = {
                 if (product?.store_id) {
                   try {
                     const store = await storeService.getById(product.store_id);
-                    if (store && (store as any).user_id) product.user_id = (store as any).user_id;
+                    if (store && store.user_id) product.user_id = store.user_id;
                   } catch (se) {
                     console.warn('productLikesService: failed to fetch store for owner fallback', se);
                   }

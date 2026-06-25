@@ -261,24 +261,24 @@ export const ClientOrderDetailScreen: React.FC = () => {
       </Card>
 
       {/* Tracking Info (Client view) */}
-      {(order as any).tracking_number && (
+      {order.tracking_number && (
         <Card style={[styles.section, { borderColor: COLORS.accent, borderWidth: 1 }]}>
           <Text style={[styles.sectionTitle, { color: COLORS.accent }]}>Suivi de livraison</Text>
           <View style={styles.infoRow}>
             <Ionicons name="barcode-outline" size={18} color={COLORS.textMuted} />
-            <Text style={styles.infoText}>{(order as any).tracking_number}</Text>
+            <Text style={styles.infoText}>{order.tracking_number}</Text>
           </View>
-          {(order as any).shipping_provider && (
+          {order.shipping_provider && (
             <View style={styles.infoRow}>
               <Ionicons name="cube-outline" size={18} color={COLORS.textMuted} />
-              <Text style={styles.infoText}>{(order as any).shipping_provider}</Text>
+              <Text style={styles.infoText}>{order.shipping_provider}</Text>
             </View>
           )}
-          {(order as any).estimated_delivery_date && (
+          {order.estimated_delivery_date && (
             <View style={styles.infoRow}>
               <Ionicons name="calendar-outline" size={18} color={COLORS.textMuted} />
               <Text style={styles.infoText}>
-                Livraison estimée: {new Date((order as any).estimated_delivery_date).toLocaleDateString('fr-FR')}
+                Livraison estimée: {new Date(order.estimated_delivery_date).toLocaleDateString('fr-FR')}
               </Text>
             </View>
           )}
@@ -286,7 +286,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
       )}
 
       {/* Out of stock warning */}
-      {(order as any).issue_type === 'out_of_stock' && (
+      {order.issue_type === 'out_of_stock' && (
         <Card style={[styles.section, { borderColor: COLORS.danger, borderWidth: 1, backgroundColor: COLORS.danger + '10' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
             <Ionicons name="warning" size={24} color={COLORS.danger} />
@@ -297,10 +297,10 @@ export const ClientOrderDetailScreen: React.FC = () => {
           </Text>
 
           {/* Liste des produits en rupture et date prévue */}
-          {(order as any).issue_details && (order as any).issue_details.length > 0 && (
+          {order.issue_details && order.issue_details.length > 0 && (
             <View style={{ marginBottom: SPACING.md, backgroundColor: '#FFF', padding: SPACING.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.danger + '30' }}>
               <Text style={{ fontWeight: '600', color: COLORS.text, marginBottom: SPACING.xs }}>Produits concernés :</Text>
-              {(order as any).issue_details.map((item: any) => (
+              {order.issue_details.map((item) => (
                 <View key={item.product_id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                   <Text style={{ color: COLORS.text, flex: 1 }} numberOfLines={1}>• {item.name}</Text>
                   <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.sm }}>
@@ -340,11 +340,11 @@ export const ClientOrderDetailScreen: React.FC = () => {
               <Text style={[styles.helpText, { color: '#FFF' }]}>Annuler la commande</Text>
             </TouchableOpacity>
 
-            {order.order_items.length > ((order as any).issue_details?.length || 0) && (
+            {order.order_items.length > (order.issue_details?.length || 0) && (
               <TouchableOpacity 
                 style={[styles.helpButton, { borderColor: COLORS.accent, backgroundColor: COLORS.accent + '10' }]}
                 onPress={() => {
-                  const issueDetails = (order as any).issue_details || [];
+                  const issueDetails = order.issue_details || [];
                   const remainingItems = order.order_items.filter(
                     (item) => !issueDetails.find((d: any) => d.product_id === item.product_id)
                   );
@@ -413,7 +413,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
       )}
 
       {/* Waiting for restock banner */}
-      {(order as any).issue_type === 'waiting_restock' && (
+      {order.issue_type === 'waiting_restock' && (
         <Card style={[styles.section, { borderColor: COLORS.warning, borderWidth: 1, backgroundColor: COLORS.warning + '10' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
             <Ionicons name="time" size={24} color={COLORS.warning} />
@@ -422,9 +422,9 @@ export const ClientOrderDetailScreen: React.FC = () => {
           <Text style={{ color: COLORS.textSoft }}>
             Vous avez choisi d'attendre que le vendeur réapprovisionne les produits en rupture. Vous serez notifié dès que la commande pourra être traitée.
           </Text>
-          {(order as any).issue_details && (order as any).issue_details.length > 0 && (
+          {order.issue_details && order.issue_details.length > 0 && (
             <View style={{ marginTop: SPACING.sm }}>
-              {(order as any).issue_details.map((item: any) => (
+              {order.issue_details.map((item) => (
                 <View key={item.product_id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
                   <Text style={{ color: COLORS.text, flex: 1 }} numberOfLines={1}>• {item.name}</Text>
                   <Text style={{ color: COLORS.warning, fontSize: FONT_SIZE.sm, fontWeight: '600' }}>
@@ -438,7 +438,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
       )}
 
       {/* Resolved partial banner */}
-      {(order as any).issue_type === 'resolved_partial' && (
+      {order.issue_type === 'resolved_partial' && (
         <Card style={[styles.section, { borderColor: COLORS.accent, borderWidth: 1, backgroundColor: COLORS.accent + '10' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
             <Ionicons name="swap-horizontal" size={24} color={COLORS.accent} />

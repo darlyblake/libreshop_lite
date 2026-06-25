@@ -145,7 +145,7 @@ export const SellerProductsScreen: React.FC = () => {
       const rows = products.map(product => {
         const collectionName = collections?.find(c => c.id === product.collection_id)?.name || 'Sans collection';
         const price = Number(product.price) || 0;
-        const costPrice = Number((product as any).cost_price || (product as any).costPrice) || 0;
+        const costPrice = Number(product.cost_price) || 0;
         const benefit = Math.max(0, price - costPrice);
         const stock = Number(product.stock) || 0;
         const totalValue = price * stock;
@@ -231,11 +231,11 @@ export const SellerProductsScreen: React.FC = () => {
     const { shareContent } = await import('../components/ShareButton');
     await shareContent({
       title: product.name || 'Produit',
-      description: (product as any).description || '',
+      description: product.description || '',
       url,
       price: `${Number(product.price || 0).toLocaleString()} FCFA`,
       type: 'product',
-      imageUrl: Array.isArray((product as any).images) ? (product as any).images[0] : undefined,
+      imageUrl: Array.isArray(product.images) ? product.images[0] : undefined,
     });
   }, [getProductPublicUrl, products]);
 
@@ -395,7 +395,7 @@ export const SellerProductsScreen: React.FC = () => {
   const collectionStats = useMemo(() => {
     const s: { [key: string]: number } = { all: products.length };
     collectionFilters.forEach(c => {
-      s[c.id] = products.filter(p => String((p as any).collection_id || '') === c.id).length;
+      s[c.id] = products.filter(p => String(p.collection_id || '') === c.id).length;
     });
     return s;
   }, [products, collectionFilters]);
@@ -409,7 +409,7 @@ export const SellerProductsScreen: React.FC = () => {
     const newValue = !product.is_active;
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_active: newValue } : p));
     try {
-      await productService.update(product.id, { is_active: newValue } as any);
+      await productService.update(product.id, { is_active: newValue });
     } catch (e) {
       setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_active: product.is_active } : p));
       Alert.alert('Erreur', 'Impossible de mettre à jour le produit');
@@ -429,18 +429,18 @@ export const SellerProductsScreen: React.FC = () => {
               setLoading(true);
               const newProduct = await productService.create({
                 store_id: storeId!,
-                collection_id: (product as any).collection_id,
+                collection_id: product.collection_id,
                 name: `${product.name} (copie)`,
                 price: product.price,
-                compare_price: (product as any).compare_price,
+                compare_price: product.compare_price,
                 stock: product.stock,
-                reference: (product as any).reference,
+                reference: product.reference,
                 images: product.images,
                 is_active: false,
-                is_online_sale: (product as any).is_online_sale ?? true,
-                is_physical_sale: (product as any).is_physical_sale ?? true,
-              } as any);
-              setProducts(prev => [newProduct as any as Product, ...prev]);
+                is_online_sale: product.is_online_sale ?? true,
+                is_physical_sale: product.is_physical_sale ?? true,
+              });
+              setProducts(prev => [newProduct as Product, ...prev]);
               Alert.alert('✅ Succès', 'Produit dupliqué (inactif par défaut).');
             } catch (e) {
               errorHandler.handleDatabaseError(e as Error, 'duplicate product');
@@ -490,7 +490,7 @@ export const SellerProductsScreen: React.FC = () => {
     const ids = Array.from(selectedProducts);
     setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, is_active: activate } : p));
     try {
-      await Promise.all(ids.map(id => productService.update(id, { is_active: activate } as any)));
+      await Promise.all(ids.map(id => productService.update(id, { is_active: activate })));
       Alert.alert('✅ Succès', `${ids.length} produit(s) ${activate ? 'activé(s)' : 'désactivé(s)'}.`);
     } catch (e) {
       loadProducts();
@@ -612,7 +612,7 @@ export const SellerProductsScreen: React.FC = () => {
             </Text>
             {hasPromo && (
               <Text style={styles.comparePrice}>
-                {Number((product as any).compare_price).toLocaleString()} FCFA
+                {Number(product.compare_price).toLocaleString()} FCFA
               </Text>
             )}
           </View>
@@ -1177,34 +1177,45 @@ export const SellerProductsScreen: React.FC = () => {
             const uploadedUrls: string[] = [];
             if (Array.isArray(product.images) && product.images.length > 0) {
               for (const uri of product.images.slice(0, 5)) {
-                const url = await cloudinaryService.uploadImage(uri, { 
+                const url = await cloudinaryService.uploadImage(uri, {
                   folder: 'libreshop/products',
-                  enhance: true 
+                  enhance: true
                 });
                 uploadedUrls.push(url);
               }
             }
-            const created = await productService.create({
+            const price = parseFloat(product.price) || 0;
+            const comparePrice = product.comparePrice ? parseFloat(product.comparePrice) : null;
+
+            const payload: any = {
               store_id: storeId,
               collection_id: product.collectionId,
               name: String(product.name || '').trim(),
-              price: parseFloat(product.price) || 0,
-              compare_price: product.comparePrice ? parseFloat(product.comparePrice) : null,
+              price: price,
               cost_price: (product as any).costPrice ? parseFloat((product as any).costPrice) : null,
               stock: Number.parseInt(product.stock || '0', 10) || 0,
               reference: product.barcode ? String(product.barcode) : undefined,
               images: uploadedUrls,
               is_active: true,
-              is_online_sale: true,
-              is_physical_sale: true,
               attributes: product.attributes || {},
-            } as any);
+            };
+
+            // Only include compare_price if valid (greater than price)
+            if (comparePrice && comparePrice > price) {
+              payload.compare_price = comparePrice;
+            }
+
+            console.log('Creating product with payload:', payload);
+
+            const created = await productService.create(payload);
             setProducts(prev => [created as any as Product, ...prev]);
             setShowAddProductModal(false);
             Alert.alert('✅ Succès', 'Produit ajouté avec succès !');
           } catch (e) {
+            console.error('Error creating product:', e);
+            const errorMessage = e instanceof Error ? e.message : JSON.stringify(e);
+            Alert.alert('Erreur détaillée', `Impossible d'ajouter le produit: ${errorMessage}`);
             errorHandler.handleDatabaseError(e as Error, 'create product');
-            Alert.alert('Erreur', "Impossible d'ajouter le produit");
           }
         }}
       />

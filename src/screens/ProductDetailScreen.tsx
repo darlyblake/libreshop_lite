@@ -119,7 +119,7 @@ export const ProductDetailScreen: React.FC = () => {
       name: product.name,
       description: product.description || "",
       price: product.price,
-      comparePrice: (product as any).compare_price ?? product.compare_price,
+      comparePrice: product.compare_price,
       images: Array.isArray(product.images) ? product.images : [],
       store: store
         ? {
@@ -131,7 +131,7 @@ export const ProductDetailScreen: React.FC = () => {
         : null,
       inStock: (product.stock ?? 0) > 0,
       category: product.category || "",
-      attributes: (product as any).attributes || {},
+      attributes: product.attributes || {},
     };
   }, [product, store]);
 
@@ -143,7 +143,7 @@ export const ProductDetailScreen: React.FC = () => {
 
   const variantImageMap = useMemo<Record<string, string>>(() => {
     if (!product?.attributes || typeof product.attributes !== 'object') return {} as Record<string, string>;
-    const raw = (product.attributes as any).image_variants;
+    const raw = (product.attributes as Record<string, any>)?.image_variants;
     if (!raw || typeof raw !== 'object') return {} as Record<string, string>;
     return Object.fromEntries(
       Object.entries(raw).filter(
@@ -346,7 +346,7 @@ export const ProductDetailScreen: React.FC = () => {
   };
 
   const handleDiscussWithSeller = async () => {
-    const raw = String((store as any)?.whatsapp_number || (store as any)?.phone || (store as any)?.phone_number || "").trim();
+    const raw = String(store?.whatsapp_number || store?.phone || store?.phone_number || "").trim();
     const waNumber = normalizeWhatsappNumber(raw);
     if (!waNumber) {
       Alert.alert("Discuter", "Le vendeur n'a pas de numéro WhatsApp renseigné.");
@@ -779,7 +779,7 @@ export const ProductDetailScreen: React.FC = () => {
         );
 
       case 'characteristics': {
-        const attributes = (productData as any)?.attributes || {};
+        const attributes = productData?.attributes || {};
         // Filter out internal attributes like image_variants
         const attributeKeys = Object.keys(attributes).filter(key => key !== 'image_variants');
         

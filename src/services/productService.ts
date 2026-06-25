@@ -460,7 +460,6 @@ export const productService = {
         .update({
           ...payload,
           updated_at: new Date().toISOString(),
-          version: (payload.version || 0) + 1, // Increment for versioning
         })
         .eq('id', id)
         .select('*')

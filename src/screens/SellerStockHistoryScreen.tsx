@@ -119,7 +119,12 @@ export const SellerStockHistoryScreen: React.FC = () => {
     }
 
     const product = products.find(p => p.id === selectedProductId);
-    if (!product) return;
+    if (!product) {
+      console.error('Product not found in products list:', selectedProductId);
+      console.error('Available products:', products.map(p => ({ id: p.id, name: p.name })));
+      Alert.alert('Erreur', 'Produit introuvable dans la liste');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -140,6 +145,17 @@ export const SellerStockHistoryScreen: React.FC = () => {
         finalQtyChanged = qty;
         newStock = currentStock + qty;
       }
+
+      console.log('Creating stock movement:', {
+        product_id: selectedProductId,
+        quantity_changed: finalQtyChanged,
+        previous_stock: currentStock,
+        new_stock: newStock,
+        type: adjustmentType,
+        reason: reason || undefined,
+        notes: notes || undefined,
+        created_by: user?.id,
+      });
 
       await stockMovementService.create({
         product_id: selectedProductId,
@@ -174,6 +190,7 @@ export const SellerStockHistoryScreen: React.FC = () => {
       // Reload
       await loadStoreData();
     } catch (e) {
+      console.error('Error saving stock adjustment:', e);
       errorHandler.handleDatabaseError(e, 'Error saving stock adjustment');
       Alert.alert('Erreur', 'Impossible d\'enregistrer l\'ajustement');
     } finally {

@@ -76,7 +76,7 @@ export const CheckoutScreen: React.FC = () => {
   
   // Extract store IDs to use as a stable dependency for store loading
   const storeIds = useMemo(() => {
-    const ids = Array.from(new Set(items.map((i: any) => (i.product as any)?.store_id).filter(Boolean)));
+    const ids = Array.from(new Set(items.map((i) => i.product?.store_id).filter(Boolean)));
     return ids.sort().join(',');
   }, [items]);
   const [store, setStore] = useState<any>(null);
@@ -204,7 +204,7 @@ export const CheckoutScreen: React.FC = () => {
               return;
             }
 
-        const ids = Array.from(new Set((paramItems ?? items).map((i: any) => (i.product as any)?.store_id).filter(Boolean)));
+        const ids = Array.from(new Set((paramItems ?? items).map((i) => i.product?.store_id).filter(Boolean)));
         if (ids.length === 0) {
           setStore(null);
           setStoresData([]);
@@ -218,8 +218,8 @@ export const CheckoutScreen: React.FC = () => {
         setStoresData(stores.filter(Boolean));
 
         const subtotalByStore: Record<string, number> = {};
-        (paramItems ?? items).forEach((it: any) => {
-          const sid = (it.product as any)?.store_id || (it as any).store_id;
+        (paramItems ?? items).forEach((it) => {
+          const sid = it.product?.store_id || (it as any).store_id;
           if (!sid) return;
           subtotalByStore[sid] = (subtotalByStore[sid] || 0) + ((it.product?.price || 0) * (it.quantity || 0));
         });
@@ -880,8 +880,8 @@ export const CheckoutScreen: React.FC = () => {
               // Mixed cart: show per-store tax lines
               storesData.map((s) => {
                 const sid = s?.id;
-                const storeSubtotal = (paramItems ?? items).reduce((sum: number, it: any) => {
-                  return sum + ((it.product as any)?.store_id === sid ? (it.product.price || 0) * (it.quantity || 0) : 0);
+                const storeSubtotal = (paramItems ?? items).reduce((sum: number, it) => {
+                  return sum + (it.product?.store_id === sid ? (it.product.price || 0) * (it.quantity || 0) : 0);
                 }, 0);
                 const tax = s?.tax_rate ? Math.round(storeSubtotal * (s.tax_rate / 100)) : 0;
                 return (
@@ -1027,7 +1027,7 @@ export const CheckoutScreen: React.FC = () => {
                   try {
                     const { productService } = await import('../services/productService');
                     const latest = await productService.getById(String(it.product.id));
-                    const liveStock = typeof (latest as any)?.stock === 'number' ? (latest as any).stock : 9999;
+                    const liveStock = typeof latest?.stock === 'number' ? latest.stock : 9999;
 
                     if (liveStock <= 0) {
                       stockIssues.push(`❌ "${it.product.name}" est en rupture de stock.`);

@@ -171,27 +171,27 @@ export const SellerAnalyticsScreen = () => {
       setLoyalty(loyal);
       setMarketBenchmark(bench);
 
-      const ordersInRange = (orders as any[]).filter((o: any) => {
+      const ordersInRange = orders.filter((o) => {
         const t = new Date(o.created_at).getTime();
         return Number.isFinite(t) && t >= start.getTime();
       });
 
       const confirmedStatuses = new Set(['paid', 'shipped', 'delivered']);
-      const confirmedOrdersInRange = ordersInRange.filter((o: any) => confirmedStatuses.has(o.status));
-      const totalRevenue = confirmedOrdersInRange.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
-      const cancelledOrders = ordersInRange.filter((o: any) => o.status === 'cancelled').length;
-      const deliveredOrders = ordersInRange.filter((o: any) => o.status === 'delivered').length;
+      const confirmedOrdersInRange = ordersInRange.filter((o) => confirmedStatuses.has(o.status));
+      const totalRevenue = confirmedOrdersInRange.reduce((sum: number, o) => sum + Number(o.total_amount || 0), 0);
+      const cancelledOrders = ordersInRange.filter((o) => o.status === 'cancelled').length;
+      const deliveredOrders = ordersInRange.filter((o) => o.status === 'delivered').length;
 
       // --- Préparation des stats pour le Coach IA ---
-      const totalRevenueAllTime = orders.filter((o: any) => confirmedStatuses.has(o.status)).reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+      const totalRevenueAllTime = orders.filter((o) => confirmedStatuses.has(o.status)).reduce((sum: number, o) => sum + Number(o.total_amount || 0), 0);
       
       // Calculer le revenu des 30 jours précédents pour la tendance
       const thirtyDaysAgo = new Date(start.getTime() - 30 * 24 * 60 * 60 * 1000);
-      const prev30DaysOrders = (orders as any[]).filter((o: any) => {
+      const prev30DaysOrders = orders.filter((o) => {
         const t = new Date(o.created_at).getTime();
         return Number.isFinite(t) && t >= thirtyDaysAgo.getTime() && t < start.getTime() && confirmedStatuses.has(o.status);
       });
-      const revenuePrev30 = prev30DaysOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+      const revenuePrev30 = prev30DaysOrders.reduce((sum: number, o) => sum + Number(o.total_amount || 0), 0);
 
       const statsForCoach: SellerStats = {
         totalExpenses: 0,

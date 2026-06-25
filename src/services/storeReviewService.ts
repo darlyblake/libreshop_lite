@@ -31,9 +31,9 @@ export const storeReviewService = {
     // Send notification to store owner
     try {
       const store = await storeService.getById(review.store_id);
-      if (store && (store as any).user_id) {
+      if (store && store.user_id) {
         await notificationService.create({
-          user_id: (store as any).user_id,
+          user_id: store.user_id,
           title: '💬 Nouveau commentaire sur votre boutique',
           body: `${review.user_name} a laissé un avis de ${review.rating} étoiles${review.comment ? ': "' + review.comment.substring(0, 50) + (review.comment.length > 50 ? '...' : '') + '"' : ''}`,
           type: 'comment',

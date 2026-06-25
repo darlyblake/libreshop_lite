@@ -128,12 +128,12 @@ export const SellerCollectionScreen: React.FC = () => {
         description: c.description || '',
         productCount: counts.get(c.id) || 0,
         isActive: !!c.is_active,
-        icon: (c.icon as any) || 'folder-outline',
+        icon: c.icon || 'folder-outline',
         createdAt: c.created_at ? String(c.created_at).slice(0, 10) : '',
-        updatedAt: (c as any).updated_at ? String((c as any).updated_at).slice(0, 10) : '',
+        updatedAt: c.updated_at ? String(c.updated_at).slice(0, 10) : '',
         parentCategoryId: c.category_id || undefined,
         coverColor: c.cover_color || undefined,
-        customAttributes: (c as any).custom_attributes || [],
+        customAttributes: c.custom_attributes || [],
       }));
 
       setCollections(uiCols);
@@ -210,8 +210,8 @@ export const SellerCollectionScreen: React.FC = () => {
         icon: data.icon,
         cover_color: data.coverColor || null,
         is_active: data.isActive ?? true,
-        custom_attributes: (data as any).customAttributes || [],
-      } as any);
+        custom_attributes: data.customAttributes || [],
+      });
 
       const uiCreated: UiCollection = {
         id: created.id,
@@ -219,12 +219,12 @@ export const SellerCollectionScreen: React.FC = () => {
         description: created.description || '',
         productCount: 0,
         isActive: !!created.is_active,
-        icon: ((created as any).icon as any) || ('folder-outline' as any),
-        createdAt: (created as any).created_at ? String((created as any).created_at).slice(0, 10) : '',
-        updatedAt: (created as any).updated_at ? String((created as any).updated_at).slice(0, 10) : '',
-        parentCategoryId: (created as any).category_id || undefined,
-        coverColor: (created as any).cover_color || undefined,
-        customAttributes: (created as any).custom_attributes || [],
+        icon: created.icon || 'folder-outline',
+        createdAt: created.created_at ? String(created.created_at).slice(0, 10) : '',
+        updatedAt: created.updated_at ? String(created.updated_at).slice(0, 10) : '',
+        parentCategoryId: created.category_id || undefined,
+        coverColor: created.cover_color || undefined,
+        customAttributes: created.custom_attributes || [],
       };
 
       setCollections((prev) => [uiCreated, ...prev]);

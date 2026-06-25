@@ -55,6 +55,7 @@ interface AddProductModalProps {
   initialProduct?: Partial<Product>;
   editProductId?: string;
   featuredCount?: number;
+  isSubmitting?: boolean;
 }
 
 const getStyles = (theme: any) => {
@@ -953,6 +954,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const initialCollectionId = initialProduct?.collectionId ||
     (collections && collections.length > 0 ? collections[0]!.id : '');
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Picker States
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
@@ -1231,38 +1233,46 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     }
   };
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     if (!validateStep(4)) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
+    setIsSubmitting(true);
+
     const productWithAttrs = { ...newProduct, attributes: productAttributes };
 
-    if (isEditMode && onUpdate) {
-      onUpdate(productWithAttrs);
-    } else {
-      onAdd(productWithAttrs);
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      if (isEditMode && onUpdate) {
+        await onUpdate(productWithAttrs);
+      } else {
+        await onAdd(productWithAttrs);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Reset form only in add mode
-    if (!isEditMode) {
-      setNewProduct({
-        name: '',
-        price: '',
-        costPrice: '',
-        comparePrice: '',
-        stock: '1',
-        barcode: undefined,
-        description: '',
-        images: [],
+      // Reset form only in add mode
+      if (!isEditMode) {
+        setNewProduct({
+          name: '',
+          price: '',
+          costPrice: '',
+          comparePrice: '',
+          stock: '1',
+          barcode: undefined,
+          description: '',
+          images: [],
         collectionId: initialCollectionId,
         featured: false,
         condition: 'new',
       });
       setProductAttributes({});
       setCurrentStep(1);
+    }
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1946,9 +1956,22 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                 <Ionicons name="arrow-forward" size={18} color="#fff" />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity style={[styles.modalButton, styles.confirmButton]} onPress={handleAddProduct}>
-                <Text style={styles.confirmButtonText}>Ajouter le produit</Text>
-                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+              <TouchableOpacity
+                style={[styles.modalButton, styles.confirmButton]}
+                onPress={handleAddProduct}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <ActivityIndicator size="small" color="#fff" />
+                    <Text style={styles.confirmButtonText}>Enregistrement...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.confirmButtonText}>Ajouter le produit</Text>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                  </>
+                )}
               </TouchableOpacity>
             )}
           </View>

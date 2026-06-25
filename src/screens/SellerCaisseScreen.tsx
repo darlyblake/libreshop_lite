@@ -44,6 +44,7 @@ type Product = {
   category?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   reference?: string;
+  cost_price?: number;
 };
 
 type CartItem = Product & {
@@ -482,7 +483,7 @@ export const SellerCaisseScreen = () => {
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
-        cost_price: (item as any).cost_price,
+        cost_price: item.cost_price,
       }));
       await orderService.createItems(itemsPayload);
 

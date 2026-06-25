@@ -353,7 +353,7 @@ describe('CacheService Integration', () => {
     });
 
     it('should support sync function registration', () => {
-      const syncFn = vi.fn(async (data) => ({ success: true }));
+      const syncFn = vi.fn(async (_data: any) => ({ success: true }));
       cacheService.registerSyncFn(CacheKey.USER_PROFILE, syncFn);
 
       // Should not throw
@@ -589,14 +589,14 @@ describe('CacheService Integration', () => {
       // Cache all
       await Promise.all(
         Object.entries(fetchers).map(([key, fetcher]) =>
-          cacheService.get(key as any, fetcher)
+          cacheService.get(key as any, fetcher as any)
         )
       );
 
       // Get all (should be cached)
       const results = await Promise.all(
         Object.entries(fetchers).map(([key, fetcher]) =>
-          cacheService.get(key as any, fetcher)
+          cacheService.get(key as any, fetcher as any)
         )
       );
 

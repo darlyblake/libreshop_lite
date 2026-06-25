@@ -38,8 +38,8 @@ export const SellerCollectionProductsScreen: React.FC = () => {
       setLoading(true);
       const col = await collectionService.getById(String(collectionId));
       const all = await productService.getByStoreAll(col.store_id);
-      const filtered = (all || []).filter((p) => String((p as any).collection_id || '') === String(col.id));
-      setProducts(filtered as any);
+      const filtered = (all || []).filter((p) => String(p.collection_id || '') === String(col.id));
+      setProducts(filtered);
       setCollectionInfo({
         id: col.id,
         name: col.name || 'Collection',
@@ -83,7 +83,7 @@ export const SellerCollectionProductsScreen: React.FC = () => {
                 setProducts((prev) => prev.filter((p) => !selectedProducts.includes(p.id)));
               } else {
                 const nextActive = action === 'activate';
-                await Promise.all(selectedProducts.map((id) => productService.update(id, { is_active: nextActive } as any)));
+                await Promise.all(selectedProducts.map((id) => productService.update(id, { is_active: nextActive })));
                 setProducts((prev) => prev.map((p) => (selectedProducts.includes(p.id) ? { ...p, is_active: nextActive } : p)));
               }
               setSelectedProducts([]);
@@ -102,10 +102,10 @@ export const SellerCollectionProductsScreen: React.FC = () => {
 
   const renderProduct = ({ item: product }: { item: Product }) => {
     const isSelected = selectedProducts.includes(product.id);
-    const imageUri = Array.isArray((product as any).images) && (product as any).images[0]
-      ? (product as any).images[0]
+    const imageUri = Array.isArray(product.images) && product.images[0]
+      ? product.images[0]
       : 'https://picsum.photos/200?product';
-    const isActive = !!(product as any).is_active;
+    const isActive = !!product.is_active;
     
     return (
       <View key={product.id} style={styles.productCard}>

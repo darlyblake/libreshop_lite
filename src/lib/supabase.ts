@@ -133,13 +133,13 @@ export interface Store {
   name: string;
   slug: string;
   description?: string;
-  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
   category: string;
-  subcategory?: string;
   logo_url?: string;
   banner_url?: string;
   email?: string;
   phone?: string;
+  whatsapp_number?: string;
+  phone_number?: string;
   address?: string;
   country_id?: string;
   city_id?: string;
@@ -158,7 +158,7 @@ export interface Store {
   subscription_price?: number;
   subscription_start?: string;
   subscription_end?: string;
-  subscription_status?: 'trial' | 'active' | 'expired';
+  subscription_status?: 'trial' | 'active' | 'expired' | 'cancelled' | null;
   billing_status?: 'pending' | 'paid' | 'failed';
   cashier_active?: boolean;
   online_store_active?: boolean;
@@ -178,7 +178,6 @@ export interface Store {
   latitude?: number;
   longitude?: number;
   city?: string;
-  country?: string;
   location_set_at?: string;
   business_hours?: Record<string, { isOpen: boolean; open: string; close: string }>;
   is_paused?: boolean;
@@ -188,7 +187,6 @@ export interface Store {
   announcement_popup_enabled?: boolean;
   version?: number; // ✅ Phase 2c: For optimistic locking
   created_at: string;
-  store_stats?: any;
 }
 
 // Types pour les produits
@@ -203,28 +201,22 @@ export interface Product {
   cost_price?: number;
   stock: number;
   attributes?: Record<string, any>;
-  low_stock_threshold?: number;
-  low_stock_alert_sent?: boolean;
   reference?: string;
   images: string[];
   is_active: boolean;
   is_online_sale: boolean;
   is_physical_sale: boolean;
   category?: string;
-  subcategory?: string;
-  sale_active?: boolean;
-  sale_price?: number;
   discount_percent?: number;
-  sale_start_date?: string;
-  sale_end_date?: string;
   view_count?: number;
-  total_sales?: number;
   featured?: boolean;
+  condition?: string;
   created_at: string;
   stores?: {
     name: string;
     logo_url?: string;
   };
+  store_name?: string;
 }
 
 export interface ProductReview {
@@ -275,6 +267,12 @@ export interface Order {
   latitude?: number;
   longitude?: number;
   created_at: string;
+  updated_at?: string;
+  tracking_number?: string;
+  shipping_provider?: string;
+  estimated_delivery_date?: string;
+  issue_type?: 'out_of_stock' | 'resolved_partial' | 'waiting_restock' | null;
+  issue_details?: Array<{ product_id: string; name: string; quantity: number }>;
 }
 
 export interface OrderItem {
@@ -314,6 +312,7 @@ export interface Collection {
   is_active: boolean;
   custom_attributes?: any[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface StoreStats {

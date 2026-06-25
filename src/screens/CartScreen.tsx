@@ -76,7 +76,7 @@ export const CartScreen: React.FC = () => {
 
   // prepare grouping and aggregated totals
   const groups = Object.entries(items.reduce((acc: Record<string, any[]>, it) => {
-    const sid = (it.product as any)?.store_id || 'unknown';
+    const sid = it.product?.store_id || 'unknown';
     acc[sid] = acc[sid] || [];
     acc[sid].push(it);
     return acc;
@@ -101,7 +101,7 @@ export const CartScreen: React.FC = () => {
       try {
         setLoadingStore(true);
         // gather unique store ids from items
-        const ids = Array.from(new Set(items.map(i => (i.product as any)?.store_id).filter(Boolean)));
+        const ids = Array.from(new Set(items.map(i => i.product?.store_id).filter(Boolean)));
         if (ids.length === 1 && storeId) {
           const s = await storeService.getById(storeId);
           if (!mounted) return;
@@ -202,7 +202,7 @@ export const CartScreen: React.FC = () => {
         )}
         <View style={styles.itemInfo}>
           <Text style={styles.itemName} numberOfLines={2}>{item.product.name}</Text>
-          <Text style={styles.itemStore}>{((item.product as any)?.store_name) || ''}</Text>
+          <Text style={styles.itemStore}>{item.product?.store_name || ''}</Text>
 
           {/* Low stock warning badge */}
           {isLowStock && (

@@ -73,6 +73,7 @@ export interface Product {
   // Pricing
   price: number;
   compare_price?: number;
+  cost_price?: number;
   discount_percent?: number;
 
   // Inventory
@@ -86,6 +87,7 @@ export interface Product {
   // Categorization
   category?: string;
   collection_id?: string;
+  condition?: string;
 
   // Stats
   view_count?: number;
@@ -97,6 +99,11 @@ export interface Product {
 
   // Status
   is_active: boolean;
+  is_online_sale?: boolean;
+  is_physical_sale?: boolean;
+
+  // Attributes
+  attributes?: Record<string, any>;
 
   // Timestamps
   created_at: string;
@@ -272,13 +279,18 @@ export interface CreateProductPayload {
   reference?: string;
   price: number;
   compare_price?: number;
+  cost_price?: number;
   stock: number;
   images?: string[];
   category?: string;
   collection_id?: string;
   featured?: boolean;
+  condition?: string;
   sale_active?: boolean;
   is_active?: boolean;
+  is_online_sale?: boolean;
+  is_physical_sale?: boolean;
+  attributes?: Record<string, any>;
 }
 
 export interface UpdateProductPayload extends Partial<CreateProductPayload> {

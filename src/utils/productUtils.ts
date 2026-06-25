@@ -24,8 +24,8 @@ export function validateProduct(product: Partial<Product>): ProductValidationErr
     errors.push({ field: 'price', message: 'Price must be >= 0' });
   }
 
-  if (product.compare_price !== undefined && product.compare_price < (product.price || 0)) {
-    errors.push({ field: 'compare_price', message: 'Compare price must be >= price' });
+  if (product.compare_price !== undefined && product.compare_price <= (product.price || 0)) {
+    errors.push({ field: 'compare_price', message: 'Compare price must be greater than price (for discount)' });
   }
 
   if (product.stock !== undefined && product.stock < 0) {

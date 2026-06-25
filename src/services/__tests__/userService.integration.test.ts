@@ -231,9 +231,9 @@ describe('RLS Policy Enforcement', () => {
       label: 'Home',
       street: '123 Main St',
       postal_code: '12345',
-      city: 'Douala',
-      country: 'Cameroon',
-      phone: '+237123456789',
+      city: 'Libreville',
+      country: 'Gabon',
+      phone: '+241123456789',
       is_default: true,
     });
     
@@ -284,9 +284,9 @@ describe('Audit Logging', () => {
       label: 'Work',
       street: '456 Business Ave',
       postal_code: '54321',
-      city: 'Yaounde',
-      country: 'Cameroon',
-      phone: '+237987654321',
+      city: 'Libreville',
+      country: 'Gabon',
+      phone: '+241987654321',
       is_default: false,
     });
     
@@ -398,9 +398,9 @@ describe('Edge Cases', () => {
       label: 'Home',
       street: '123 Main',
       postal_code: '12345',
-      city: 'Douala',
-      country: 'Cameroon',
-      phone: '+237123456789',
+      city: 'Owendo',
+      country: 'Gabon',
+      phone: '+241123456789',
       is_default: true,
     });
     
@@ -409,15 +409,15 @@ describe('Edge Cases', () => {
       label: 'Work',
       street: '456 Work Ave',
       postal_code: '54321',
-      city: 'Yaounde',
-      country: 'Cameroon',
-      phone: '+237987654321',
+      city: 'Libreville',
+      country: 'Gabon',
+      phone: '+241987654321',
       is_default: true,
     });
     
     // Only one should be default
     const addresses = await userService.getAddresses(testUserId);
-    const defaultCount = addresses.filter(a => a.is_default).length;
+    const defaultCount = addresses.filter((a: any) => a.is_default).length;
     expect(defaultCount).toBe(1);
   });
 
@@ -426,9 +426,9 @@ describe('Edge Cases', () => {
       label: 'Unique',
       street: '789 Only St',
       postal_code: '99999',
-      city: 'Douala',
-      country: 'Cameroon',
-      phone: '+237555555555',
+      city: 'Owendo',
+      country: 'Gabon',
+      phone: '+241555555555',
       is_default: true,
     });
     
@@ -444,9 +444,9 @@ describe('Edge Cases', () => {
       label: 'Home',
       street: '111 Default St',
       postal_code: '11111',
-      city: 'Douala',
-      country: 'Cameroon',
-      phone: '+237111111111',
+      city: 'Libreville',
+      country: 'Gabon',
+      phone: '+241111111111',
       is_default: true,
     });
     
@@ -454,9 +454,9 @@ describe('Edge Cases', () => {
       label: 'Work',
       street: '222 Work Ave',
       postal_code: '22222',
-      city: 'Yaounde',
-      country: 'Cameroon',
-      phone: '+237222222222',
+      city: 'Owendo',
+      country: 'Gabon',
+      phone: '+241222222222',
       is_default: false,
     });
     
@@ -465,7 +465,7 @@ describe('Edge Cases', () => {
     
     // addr2 should now be default
     const addresses = await userService.getAddresses(testUserId);
-    const newDefault = addresses.find(a => a.is_default);
+    const newDefault = addresses.find((a: any) => a.is_default);
     expect(newDefault?.id).toBe(addr2.id);
   });
 });

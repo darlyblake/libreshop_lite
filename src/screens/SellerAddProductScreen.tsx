@@ -136,7 +136,7 @@ export const SellerAddProductScreen: React.FC = () => {
             [
               {
                 text: 'Renouveler',
-                onPress: () => navigation.replace('SubscriptionExpired' as never),
+                onPress: () => navigation.navigate('SubscriptionExpired' as never),
               },
             ]
           );
@@ -336,29 +336,39 @@ export const SellerAddProductScreen: React.FC = () => {
         uploadedUrls.push(url);
       }
 
-      await productService.create({
+      const price = parseFloat(formData.price);
+      const comparePrice = formData.comparePrice ? parseFloat(formData.comparePrice) : undefined;
+
+      const payload: any = {
         store_id: storeId,
         collection_id: collectionId,
         name: formData.name,
         description: formData.description,
-        price: parseFloat(formData.price),
-        compare_price: formData.comparePrice ? parseFloat(formData.comparePrice) : undefined,
+        price: price,
         stock: formData.stock ? parseInt(formData.stock) : 0,
-        low_stock_threshold: formData.lowStockThreshold ? parseInt(formData.lowStockThreshold) : 5,
         reference: formData.reference,
         category: formData.category,
         subcategory: formData.subcategory,
         is_active: formData.isActive,
-        is_online_sale: formData.isOnlineSale,
-        is_physical_sale: formData.isPhysicalSale,
         images: uploadedUrls,
-      });
+      };
+
+      // Only include compare_price if valid (greater than price)
+      if (comparePrice && comparePrice > price) {
+        payload.compare_price = comparePrice;
+      }
+
+      console.log('Creating product with payload:', payload);
+
+      await productService.create(payload);
       Alert.alert('Succès', 'Produit ajouté avec succès', [
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     } catch (error) {
+      console.error('Error creating product:', error);
+      const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
+      Alert.alert('Erreur détaillée', `Impossible de créer le produit: ${errorMessage}`);
       errorHandler.handleDatabaseError(error, 'Error creating product:');
-      Alert.alert('Erreur', 'Impossible de créer le produit');
     } finally {
       setIsLoading(false);
     }

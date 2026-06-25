@@ -11,9 +11,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SWRManager } from '../swrManager';
 import { InvalidationManager } from '../invalidationManager';
-import { OfflineSyncManager, OfflineOperationType } from '../offlineSyncManager';
+import { OfflineSyncManager } from '../offlineSyncManager';
 import { CompressionManager } from '../compressionManager';
-import { CacheKey, CacheTag } from '../../types';
+import { CacheKey, CacheTag, OfflineOperationType } from '../../types';
 import { CACHE_PRESETS } from '../../config';
 
 /**
@@ -82,6 +82,10 @@ class MockAdapter {
 
   getInternalStats() {
     return this.stats;
+  }
+
+  async cleanup(): Promise<void> {
+    this.store.clear();
   }
 }
 
@@ -220,7 +224,7 @@ describe('InvalidationManager', () => {
     await adapter.set(CacheKey.PRODUCT_LIST, { id: 1 });
     const events = await invalidationManager.invalidateTags([
       CacheTag.PRODUCTS,
-      CacheTag.CATEGORIES,
+      CacheTag.STORE,
     ]);
 
     expect(events.length).toBe(2);
@@ -369,7 +373,7 @@ describe('OfflineSyncManager', () => {
     });
 
     await syncManager.dequeue(op.id);
-
+/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/services/cache/core/__tests__/core-managers.test.ts
     const pending = syncManager.getPending();
     expect(pending.length).toBe(0);
   });

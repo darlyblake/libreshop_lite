@@ -138,9 +138,9 @@ export const AdminStoresScreen: React.FC = () => {
   const updateStoreStatus = async (storeId: string, nextStatus: 'active' | 'suspended' | 'pending') => {
     try {
       const data = await adminService.updateStoreStatus(storeId, nextStatus);
-      setStores(prev => prev.map(s => (s.id === storeId ? { ...s, status: (data as any)?.status || nextStatus } : s)));
+      setStores(prev => prev.map(s => (s.id === storeId ? { ...s, status: data?.status || nextStatus } : s)));
       if (selectedStore?.id === storeId) {
-        setSelectedStore((prev: any) => ({ ...prev, status: (data as any)?.status || nextStatus }));
+        setSelectedStore((prev) => ({ ...prev, status: data?.status || nextStatus }));
       }
     } catch (e) {
       errorHandler.handleDatabaseError(e, 'update store status');

@@ -62,13 +62,13 @@ export const SellerEditProductScreen: React.FC = () => {
         costPrice: product.cost_price?.toString() || '',
         comparePrice: product.compare_price?.toString() || '',
         stock: product.stock?.toString() || '0',
-        barcode: (product as any).reference || '',
+        barcode: product.reference || '',
         description: product.description || '',
         images: product.images || [],
-        collectionId: (product as any).collection_id || (cols[0]?.id || ''),
-        featured: (product as any).featured || false,
-        condition: (product as any).condition || 'new',
-        attributes: (product as any).attributes || {},
+        collectionId: product.collection_id || (cols[0]?.id || ''),
+        featured: product.featured || false,
+        condition: product.condition || 'new',
+        attributes: product.attributes || {},
       });
     } catch (error) {
       console.error('[SellerEditProduct] Erreur chargement:', error);
@@ -108,21 +108,29 @@ export const SellerEditProductScreen: React.FC = () => {
         return isNaN(p) ? fallback : p;
       };
 
-      await productService.update(productId, {
+      const price = parseSafeFloat(updatedProduct.price) || 0;
+      const comparePrice = parseSafeFloat(updatedProduct.comparePrice);
+
+      const updatePayload: any = {
         name: updatedProduct.name,
         description: updatedProduct.description,
-        price: parseSafeFloat(updatedProduct.price) || 0,
+        price: price,
         cost_price: parseSafeFloat(updatedProduct.costPrice),
-        compare_price: parseSafeFloat(updatedProduct.comparePrice),
         stock: parseSafeInt(updatedProduct.stock),
         reference: updatedProduct.barcode || '',
         images: uploadedImages,
         collection_id: updatedProduct.collectionId || null,
         is_active: true,
-        condition: updatedProduct.condition || 'new',
         attributes: updatedProduct.attributes || {},
         featured: updatedProduct.featured || false,
-      } as any);
+      };
+
+      // Only include compare_price if it's valid (greater than price)
+      if (comparePrice && comparePrice > price) {
+        updatePayload.compare_price = comparePrice;
+      }
+
+      await productService.update(productId, updatePayload);
 
       Alert.alert('✅ Succès', 'Produit mis à jour avec succès !', [
         { text: 'OK', onPress: () => navigation.goBack() }

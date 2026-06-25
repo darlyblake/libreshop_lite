@@ -128,7 +128,7 @@ export const SellerHubScreen: React.FC = () => {
         if (profile) {
           setFullName(profile.full_name || '');
           setPhone(profile.phone || '');
-          setUser({ ...user, ...profile } as any);
+          setUser({ ...user, ...profile });
         }
       } catch (err) {
         console.error('Failed to sync user profile in Hub:', err);
@@ -446,7 +446,7 @@ export const SellerHubScreen: React.FC = () => {
       
       // Update auth store local state
       const updatedUser = { ...user, full_name: fullName, phone: phone };
-      setUser(updatedUser as any);
+      setUser(updatedUser);
       
       Alert.alert('Succès 🎉', 'Vos paramètres ont été mis à jour avec succès.');
     } catch (err: any) {
