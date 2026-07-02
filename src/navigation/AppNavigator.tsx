@@ -167,15 +167,48 @@ const linking = (() => {
     prefixes,
     config: {
       screens: {
-        ClientTabs: '',
+        ClientTabs: {
+          screens: {
+            ClientHome: '',
+            ClientOrders: 'orders',
+            ClientSearch: 'search',
+            Wishlist: 'wishlist',
+          }
+        },
+        SellerTabs: {
+          path: 'SellerTabs',
+          screens: {
+            SellerDashboard: 'SellerDashboard',
+            SellerProducts: 'SellerProducts',
+            SellerOrders: 'SellerOrders',
+            SellerCollection: 'SellerCollection',
+            SellerClients: 'SellerClients',
+            SellerStore: 'SellerStore',
+          }
+        },
+        AdminDashboard: 'AdminDashboard',
         Landing: 'welcome',
         About: 'about',
         SellerEmailConfirm: 'auth/confirm',
         Checkout: 'Checkout',
         Payment: 'Payment',
-            StoreDetail: 'store/:slug?',
+        StoreDetail: 'store/:slug?',
         ProductDetail: 'product/:productId',
-            // Password reset via deep link
+        ClientOrderDetail: 'ClientOrderDetail/:orderId',
+        SellerOrderDetail: 'SellerOrderDetail/:orderId',
+        SellerAddStore: 'SellerAddStore',
+        SellerAddProduct: 'SellerAddProduct',
+        SellerHub: 'SellerHub',
+        SellerAnalytics: 'SellerAnalytics',
+        SellerReports: 'SellerReports',
+        SellerLowStock: 'SellerLowStock',
+        SellerRefunds: 'SellerRefunds',
+        SellerCoupons: 'SellerCoupons',
+        SellerFinance: 'SellerFinance',
+        SellerAccounting: 'SellerAccounting',
+        SellerKYC: 'SellerKYC',
+        Notifications: 'Notifications',
+        Cart: 'Cart',
       },
     },
   } as const;
@@ -498,7 +531,7 @@ export const AppNavigator: React.FC = () => {
     return () => subscription.remove();
   }, []);
 
-  // Fallback Polling for notifications (in case Supabase Realtime is disabled for the table)
+  // Fallback Polling for notifications optimisé
   const { unreadCount, setNotifications } = useNotificationStore();
   const unreadCountRef = useRef(unreadCount);
 
@@ -510,35 +543,46 @@ export const AppNavigator: React.FC = () => {
   useEffect(() => {
     if (!user?.id) return;
     
-    // Polling every 15 seconds
     let pollingInProgress = false;
-    const interval = setInterval(async () => {
+    
+    // Check fonction pour le polling
+    const checkNotifications = async () => {
       try {
-        // Skip polling when offline
+        // Ne pas poll si hors ligne
         if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-        if (pollingInProgress) return; // avoid overlapping polls
+        
+        // Optimisation web : ne pas poll si la page n'est pas visible
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+        
+        // Optimisation mobile : ne pas poll si l'app n'est pas active
+        if (appState.current !== 'active') return;
+
+        if (pollingInProgress) return;
         pollingInProgress = true;
 
-        // Check if there are new unread notifications
         const { notificationService } = await import('../services/notificationService');
         const count = await notificationService.getUnreadCount(user.id);
         
         if (count > unreadCountRef.current) {
-          // New notification arrived! Fetch them all and play sound
           const notifs = await notificationService.getByUser(user.id);
           setNotifications(notifs);
           await playNotificationSound();
         } else if (count < unreadCountRef.current) {
-          // Some were deleted or read elsewhere
           const notifs = await notificationService.getByUser(user.id);
           setNotifications(notifs);
         }
       } catch (err) {
-        // Ignore silent polling errors
+        // Ignorer silencieusement
       } finally {
         pollingInProgress = false;
       }
-    }, 15000);
+    };
+
+    // Vérifier immédiatement au chargement
+    checkNotifications();
+
+    // Polling toutes les 45 secondes au lieu de 15s pour éviter la surcharge réseau signalée par l'utilisateur
+    const interval = setInterval(checkNotifications, 45000);
 
     return () => clearInterval(interval);
   }, [user?.id, playNotificationSound, setNotifications]);
@@ -724,6 +768,11 @@ export const AppNavigator: React.FC = () => {
 
       // Seller sans store ?
       if (role === 'seller' && !storeCheck?.data) {
+        // Si on est déjà sur une page vendeur (URL contient 'Seller'), ne pas rediriger vers SellerAddStore
+        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        if (currentPath.includes('Seller') && !currentPath.includes('SellerAddStore')) {
+          return 'SellerTabs';
+        }
         return 'SellerAddStore';
       }
 

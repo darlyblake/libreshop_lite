@@ -484,7 +484,7 @@ export const orderService = {
       .from('orders')
       .update(updatePayload)
       .eq('id', id)
-      .select('id, user_id, status, store_id, stores(name, user_id)')
+      .select('id, user_id, status, store_id, customer_name, total_amount, stores(name, user_id)')
       .single();
 
     if (error) throw error;
@@ -530,7 +530,7 @@ export const orderService = {
    * Accepte une commande avec vérification de stock
    */
   async acceptOrder(orderId: string, inventoryOnly: boolean = false): Promise<Order> {
-    const order = await this.getById(orderId);
+    const order = await this.getById(orderId, { includeStore: true });
     if (!order) throw new Error('Commande non trouvée');
 
     const client = useSupabase();
@@ -540,7 +540,7 @@ export const orderService = {
     });
 
     if (error) {
-      // Si la RPC n'existe pas ou échoue
+      // Si la RPC n'existe pas ou échoue, updateStatus enverra la notif lui-même
       console.warn('RPC accept_order failed, falling back to direct update', error);
       return this.updateStatus(orderId, 'accepted');
     }
@@ -558,7 +558,12 @@ export const orderService = {
     await this.logOrderStockMovementsBeforeUpdate(order, 'sale');
 
     await cacheService.remove(`order:${orderId}`);
-    // Update local object to reflect DB
+
+    // 🔔 Notifier le client que sa commande a été acceptée
+    this.sendCustomerNotification({ ...order, status: 'accepted' }, 'accepted').catch(e =>
+      console.warn('Failed to send accepted notification to client', e)
+    );
+
     return { ...order, status: 'accepted' };
   },
 
@@ -720,24 +725,53 @@ export const orderService = {
     if (error) throw error;
 
     await cacheService.remove(`order:${orderId}`);
+    const storeData = (order as any).stores || (order as any).store;
+    const sellerUserId = storeData?.user_id;
+    const storeName = storeData?.name || 'La boutique';
+    const shortId = order.id.slice(0, 8).toUpperCase();
 
-    // Notifier le vendeur
     try {
       const { notificationService } = await import('./notificationService');
-      const storeData = (order as any).stores || (order as any).store;
-      const sellerUserId = storeData?.user_id;
+
+      // 🔔 Notifier le vendeur
       if (sellerUserId) {
         await notificationService.create({
           user_id: sellerUserId,
           type: 'order',
           title: 'Commande reçue par le client ✅',
-          body: `Le client a confirmé la réception de la commande #${order.id.slice(0, 8).toUpperCase()}.`,
+          body: `Le client a confirmé la réception de la commande #${shortId}. Commande terminée !`,
           targetRole: 'seller',
           data: { order_id: order.id, type: 'status_update', status: 'delivered' },
         });
       }
+
+      // 🔔 Notifier le client lui-même
+      await notificationService.create({
+        user_id: order.user_id,
+        type: 'order',
+        title: 'Commande livrée ! 🎉',
+        body: `Votre commande #${shortId} chez ${storeName} est terminée. Merci de votre confiance !`,
+        targetRole: 'client',
+        data: { orderId: order.id, status: 'delivered', showRating: true },
+      });
     } catch (e) {
-      console.warn('Failed to notify seller of reception:', e);
+      console.warn('Failed to send delivery notifications:', e);
+    }
+
+    // 🏆 Attribuer des points XP au vendeur
+    if (sellerUserId) {
+      try {
+        const settings = await pointsService.getPointSettings();
+        const reward = settings['SALE'] || 10;
+        await client.rpc('add_points_to_user', {
+          p_user_id: sellerUserId,
+          p_amount: reward,
+          p_action_type: 'SALE',
+          p_reference_id: orderId
+        });
+      } catch (err) {
+        console.warn('Erreur XP vendeur:', err);
+      }
     }
 
     return data as Order;

@@ -622,21 +622,22 @@ Merci.`;
           />
         )}
         {order.status === 'shipped' && (
-          <>
-            <Button
-              title="Confirmer la livraison"
-              onPress={() => handleUpdateStatus('delivered')}
-              loading={updating}
-              style={{ marginBottom: SPACING.md }}
-            />
-            <TouchableOpacity
-              style={[styles.secondaryButton, { marginBottom: SPACING.md }]}
-              onPress={() => navigation.navigate('DeliveryProof', { orderId })}
-            >
-              <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.secondaryButtonText}>Ajouter preuve de livraison</Text>
-            </TouchableOpacity>
-          </>
+          <View style={{
+            backgroundColor: COLORS.accent + '15',
+            borderColor: COLORS.accent,
+            borderWidth: 1,
+            borderRadius: RADIUS.md,
+            padding: SPACING.md,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: SPACING.sm,
+            marginBottom: SPACING.md,
+          }}>
+            <Ionicons name="time-outline" size={20} color={COLORS.accent} />
+            <Text style={{ color: COLORS.accent, fontSize: FONT_SIZE.sm, flex: 1, fontWeight: '500' }}>
+              En attente de confirmation du client. Le statut passera à "Livrée" automatiquement dès que le client confirmera la réception.
+            </Text>
+          </View>
         )}
       </View>
 

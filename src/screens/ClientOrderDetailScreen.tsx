@@ -44,6 +44,8 @@ export const ClientOrderDetailScreen: React.FC = () => {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnReason, setReturnReason] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [showConfirmReceptionModal, setShowConfirmReceptionModal] = useState(false);
+  const [showSuccessReceptionModal, setShowSuccessReceptionModal] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -568,30 +570,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
         {order.status === 'shipped' && (
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: COLORS.success, backgroundColor: COLORS.success + '10' }]}
-            onPress={() => {
-              Alert.alert(
-                'Confirmer la réception',
-                'Avez-vous bien reçu tous les produits de cette commande ?',
-                [
-                  { text: 'Non', style: 'cancel' },
-                  {
-                    text: 'Oui, j\'ai reçu',
-                    onPress: async () => {
-                      setLoading(true);
-                      try {
-                        await orderService.confirmReception(order.id);
-                        Alert.alert('Succès', 'Merci d\'avoir confirmé la réception. Le vendeur a été notifié !');
-                        loadOrder();
-                      } catch (err) {
-                        Alert.alert('Erreur', 'Impossible de confirmer la réception.');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }
-                  }
-                ]
-              );
-            }}
+            onPress={() => setShowConfirmReceptionModal(true)}
           >
             <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.success} />
             <Text style={[styles.helpText, { color: COLORS.success }]}>Confirmer la réception</Text>
@@ -622,6 +601,93 @@ export const ClientOrderDetailScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Confirm Reception Modal */}
+      <Modal
+        visible={showConfirmReceptionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmReceptionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: COLORS.card, alignItems: 'center', padding: SPACING.xl }]}>
+            <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: COLORS.success + '20', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md }}>
+              <Ionicons name="checkmark-circle-outline" size={32} color={COLORS.success} />
+            </View>
+            <Text style={[styles.modalTitle, { color: COLORS.text, textAlign: 'center', fontSize: FONT_SIZE.lg }]}>
+              Confirmer la réception
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.xl }]}>
+              Avez-vous bien reçu tous les produits de cette commande ? Cette action est irréversible.
+            </Text>
+            
+            <View style={{ flexDirection: 'row', gap: SPACING.md, width: '100%' }}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, { flex: 1, backgroundColor: COLORS.border + '50' }]}
+                onPress={() => setShowConfirmReceptionModal(false)}
+                disabled={loading}
+              >
+                <Text style={[styles.modalCancelText, { color: COLORS.text }]}>Non, annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalConfirmButton, { flex: 1, backgroundColor: COLORS.success }]}
+                onPress={async () => {
+                  setShowConfirmReceptionModal(false);
+                  setLoading(true);
+                  try {
+                    await orderService.confirmReception(order.id);
+                    setShowSuccessReceptionModal(true);
+                  } catch (err) {
+                    Alert.alert('Erreur', 'Impossible de confirmer la réception.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+              >
+                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalConfirmText}>Oui, j'ai reçu</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Reception Modal */}
+      <Modal
+        visible={showSuccessReceptionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: COLORS.card, alignItems: 'center', padding: SPACING.xl }]}>
+            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.success + '20', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg }}>
+              <Ionicons name="gift-outline" size={40} color={COLORS.success} />
+            </View>
+            <Text style={[styles.modalTitle, { color: COLORS.text, textAlign: 'center', fontSize: FONT_SIZE.xl }]}>
+              Merci ! 🎉
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: COLORS.textMuted, textAlign: 'center', marginTop: SPACING.sm, marginBottom: SPACING.xl, fontSize: FONT_SIZE.md }]}>
+              Vous avez confirmé la réception de votre commande. Le vendeur a été notifié. Prenez un instant pour noter votre expérience !
+            </Text>
+            
+            <TouchableOpacity
+              style={[styles.modalConfirmButton, { width: '100%', backgroundColor: COLORS.accent, paddingVertical: SPACING.md }]}
+              onPress={() => {
+                setShowSuccessReceptionModal(false);
+                loadOrder();
+                navigation.navigate('Review', {
+                  orderId: order.id,
+                  storeId: order.store_id || '',
+                  storeName: (order.stores as any)?.name || order.store?.name || 'Boutique',
+                });
+              }}
+            >
+              <Text style={[styles.modalConfirmText, { fontSize: FONT_SIZE.md }]}>Noter la boutique</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Return Request Modal */}
       <Modal
