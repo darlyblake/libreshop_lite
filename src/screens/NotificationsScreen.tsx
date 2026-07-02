@@ -64,12 +64,12 @@ export const NotificationsScreen: React.FC = () => {
   const loadNotifications = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await notificationService.getByUser(user.id);
+      const data = await notificationService.getByUser(user.id, context);
       setNotifications(data);
     } catch (error) {
       errorHandler.handleDatabaseError(error as Error, 'Error loading notifications:');
     }
-  }, [user, setNotifications]);
+  }, [user, context, setNotifications]);
 
   useEffect(() => {
     loadNotifications();

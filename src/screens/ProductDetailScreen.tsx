@@ -1040,9 +1040,13 @@ export const ProductDetailScreen: React.FC = () => {
               showAuthModal({ type: 'BUY_NOW', payload: { product, quantity } });
               return;
             }
-            addItem(product, quantity);
+            // Navigate directly to Checkout with the item
+            const itemsJson = JSON.stringify([{ product, quantity }]);
+            navigation.navigate('Checkout' as never, {
+              storeId: product.store_id,
+              itemsJson,
+            } as never);
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            navigation.navigate('Cart');
           }}
           disabled={!productData?.inStock}
           activeOpacity={0.85}

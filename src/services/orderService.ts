@@ -475,9 +475,14 @@ export const orderService = {
    */
   async updateStatus(id: string, status: OrderStatus): Promise<Order> {
     const client = useSupabase();
+    const updatePayload: any = { status, status_changed_at: new Date().toISOString() };
+    if (status === 'delivered') {
+      updatePayload.payment_status = 'paid';
+    }
+
     const { data: order, error } = await client
       .from('orders')
-      .update({ status, status_changed_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', id)
       .select('id, user_id, status, store_id, stores(name, user_id)')
       .single();
@@ -691,6 +696,51 @@ export const orderService = {
       },
       { rpcName: 'confirm_order_payment' }
     );
+  },
+
+  /**
+   * Le client confirme la réception de sa commande
+   */
+  async confirmReception(orderId: string): Promise<Order> {
+    const client = useSupabase();
+    const order = await this.getById(orderId, { includeStore: true });
+    if (!order) throw new Error('Commande non trouvée');
+
+    const { data, error } = await client
+      .from('orders')
+      .update({
+        status: 'delivered',
+        payment_status: 'paid',
+        status_changed_at: new Date().toISOString(),
+      })
+      .eq('id', orderId)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+
+    await cacheService.remove(`order:${orderId}`);
+
+    // Notifier le vendeur
+    try {
+      const { notificationService } = await import('./notificationService');
+      const storeData = (order as any).stores || (order as any).store;
+      const sellerUserId = storeData?.user_id;
+      if (sellerUserId) {
+        await notificationService.create({
+          user_id: sellerUserId,
+          type: 'order',
+          title: 'Commande reçue par le client ✅',
+          body: `Le client a confirmé la réception de la commande #${order.id.slice(0, 8).toUpperCase()}.`,
+          targetRole: 'seller',
+          data: { order_id: order.id, type: 'status_update', status: 'delivered' },
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to notify seller of reception:', e);
+    }
+
+    return data as Order;
   },
 
   /**

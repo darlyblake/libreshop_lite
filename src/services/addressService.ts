@@ -87,13 +87,28 @@ export const addressService = {
         .eq('user_id', userId);
     }
 
+    // Map to DB schema to avoid 400 Bad Request
+    const dbPayload = {
+      user_id: userId,
+      label: input.label || 'Maison',
+      city: input.city || '',
+      address: input.address || '',
+      is_default: input.is_default !== undefined ? input.is_default : true,
+      latitude: input.latitude || null,
+      longitude: input.longitude || null,
+      note: input.note || null
+    };
+
     const { data, error } = await supabase!
       .from('user_addresses')
-      .insert({ ...input, user_id: userId })
+      .insert(dbPayload)
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[addressService] Error adding address:', error);
+      throw error;
+    }
     return data;
   },
 
@@ -108,15 +123,28 @@ export const addressService = {
         .eq('user_id', userId);
     }
 
+    // Map frontend fields to DB schema
+    const dbPayload: any = { updated_at: new Date().toISOString() };
+    if (input.address !== undefined) dbPayload.address = input.address;
+    if (input.city !== undefined) dbPayload.city = input.city;
+    if (input.label !== undefined) dbPayload.label = input.label;
+    if (input.latitude !== undefined) dbPayload.latitude = input.latitude;
+    if (input.longitude !== undefined) dbPayload.longitude = input.longitude;
+    if (input.note !== undefined) dbPayload.note = input.note;
+    if (input.is_default !== undefined) dbPayload.is_default = input.is_default;
+
     const { data, error } = await supabase!
       .from('user_addresses')
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update(dbPayload)
       .eq('id', id)
       .eq('user_id', userId)
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('[addressService] Error updating address:', error);
+      throw error;
+    }
     return data;
   },
 

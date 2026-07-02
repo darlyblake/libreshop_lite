@@ -11,15 +11,19 @@ export interface Notification {
 }
 
 export const isClientNotification = (n: Notification) => {
+  // Primary classifier: use the targetRole field stored in notification data
+  const targetRole = n.data?.targetRole as string | undefined;
+  if (targetRole) return targetRole === 'client';
+  // Fallback for legacy notifications without targetRole
   if (n.type === 'promo') return true;
-  if (n.type === 'order') {
-    // Client order notifications have 'status' in data. Seller order notifications have 'type' ('new', 'cancelled').
-    return n.data?.status !== undefined;
-  }
+  if (n.type === 'order') return n.data?.status !== undefined;
   return false;
 };
 
 export const isSellerNotification = (n: Notification) => {
+  const targetRole = n.data?.targetRole as string | undefined;
+  if (targetRole) return targetRole === 'seller';
+  // Fallback for legacy notifications without targetRole
   if (n.type === 'admin') return false;
   return !isClientNotification(n);
 };

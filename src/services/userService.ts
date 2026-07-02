@@ -311,15 +311,19 @@ export const userService = {
     try {
       // Build JSONB payload for RPC
       const jsonbUpdates = toRpcJsonb(updates);
+      const rpcArgs: any = {
+        p_user_id: userId,
+        p_updates: jsonbUpdates,
+      };
+      
+      if (expectedVersion !== undefined) {
+        rpcArgs.p_expected_version = expectedVersion;
+      }
 
       // Call versioned RPC (auto-increments version on success)
       const { data, error } = await supabase!.rpc(
         'update_user_profile_versioned',
-        {
-          p_user_id: userId,
-          p_updates: jsonbUpdates,
-          p_expected_version: expectedVersion ?? null,
-        }
+        rpcArgs
       );
 
       if (error) {

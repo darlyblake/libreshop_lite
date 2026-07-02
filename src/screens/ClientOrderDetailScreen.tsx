@@ -565,6 +565,39 @@ export const ClientOrderDetailScreen: React.FC = () => {
           <Text style={styles.helpText}>Contacter la boutique</Text>
         </TouchableOpacity>
 
+        {order.status === 'shipped' && (
+          <TouchableOpacity
+            style={[styles.helpButton, { borderColor: COLORS.success, backgroundColor: COLORS.success + '10' }]}
+            onPress={() => {
+              Alert.alert(
+                'Confirmer la réception',
+                'Avez-vous bien reçu tous les produits de cette commande ?',
+                [
+                  { text: 'Non', style: 'cancel' },
+                  {
+                    text: 'Oui, j\'ai reçu',
+                    onPress: async () => {
+                      setLoading(true);
+                      try {
+                        await orderService.confirmReception(order.id);
+                        Alert.alert('Succès', 'Merci d\'avoir confirmé la réception. Le vendeur a été notifié !');
+                        loadOrder();
+                      } catch (err) {
+                        Alert.alert('Erreur', 'Impossible de confirmer la réception.');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }
+                  }
+                ]
+              );
+            }}
+          >
+            <Ionicons name="checkmark-circle-outline" size={20} color={COLORS.success} />
+            <Text style={[styles.helpText, { color: COLORS.success }]}>Confirmer la réception</Text>
+          </TouchableOpacity>
+        )}
+
         {order.status === 'delivered' && refunds.length === 0 && (
           <TouchableOpacity
             style={[styles.helpButton, { borderColor: COLORS.danger, backgroundColor: COLORS.danger + '10' }]}

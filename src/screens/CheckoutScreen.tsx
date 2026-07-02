@@ -354,15 +354,17 @@ export const CheckoutScreen: React.FC = () => {
       const hasAddress = list.length > 0;
 
       if (!hasPhone || !hasAddress) {
-        // Pré-remplir avec les données existantes du profil si disponibles
-        setOnboardingPhone(freshProfile.whatsapp_number || freshProfile.phone || '');
-        setOnboardingAddress(prev => ({
-          ...prev,
-          city: '',
-          address: freshProfile.address || '',
-          label: 'Maison',
-        }));
-        setOnboardingStep(1);
+        // Only initialize form if onboarding is not already visible
+        if (!isOnboardingVisible) {
+          setOnboardingPhone(freshProfile.whatsapp_number || freshProfile.phone || '');
+          setOnboardingAddress(prev => ({
+            ...prev,
+            city: '',
+            address: freshProfile.address || '',
+            label: 'Maison',
+          }));
+          setOnboardingStep(1);
+        }
         setIsOnboardingVisible(true);
       } else {
         // L'utilisateur a déjà tout — aller directement au checkout
@@ -390,11 +392,13 @@ export const CheckoutScreen: React.FC = () => {
     setProcessing(true);
     try {
       // 1. Mettre à jour le profil Supabase avec le numéro WhatsApp
-      const updatedUser = await userService.upsertProfile(user.id, {
+      const updateResult = await userService.updateProfile(user.id, {
         whatsapp_number: onboardingPhone,
         phone: onboardingPhone,
       });
-      useAuthStore.getState().setUser(updatedUser);
+      if (!('type' in updateResult)) {
+        useAuthStore.getState().setUser(updateResult as any);
+      }
 
       // 2. Sauvegarder la première adresse dans Supabase (pas AsyncStorage)
       const savedAddr = await addressService.add(user.id, {
@@ -435,7 +439,7 @@ export const CheckoutScreen: React.FC = () => {
   useFocusEffect(
     React.useCallback(() => {
       loadAddresses();
-    }, [user])
+    }, [user?.id])
   );
 
   useEffect(() => {
@@ -501,15 +505,16 @@ export const CheckoutScreen: React.FC = () => {
         return;
       }
 
-      const updatedUser = await userService.upsertProfile(userId, {
+      const updateResult = await userService.updateProfile(userId, {
         full_name: formData.name,
         phone: formData.phone,
         whatsapp_number: formData.phone,
-        address: formData.address,
       });
 
       // Refresh global auth state with updated user data
-      useAuthStore.getState().setUser(updatedUser);
+      if (!('type' in updateResult)) {
+        useAuthStore.getState().setUser(updateResult as any);
+      }
 
       const payload = {
         user_id: userId,
@@ -554,9 +559,10 @@ export const CheckoutScreen: React.FC = () => {
         console.warn('order_items insert failed', e);
       }
 
-      // process order (decrement stock, notify)
-      try { await orderService.processPayment(created.id); } catch (e) { /* ignore */ }
-
+      // process order (decrement stock, notify) if online payment
+      if (paymentMethod !== 'cash') {
+        try { await orderService.processPayment(created.id); } catch (e) { /* ignore */ }
+      }
       // clear cart when success
       clearCart();
       setCompleted(true);
@@ -708,11 +714,11 @@ export const CheckoutScreen: React.FC = () => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Ville</Text>
             <TextInput
-              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null, { backgroundColor: COLORS.bg, color: COLORS.textSoft, opacity: 0.8 }]}
-              placeholder="Cliquez sur 'Obtenir ma position' ci-dessus"
+              style={[styles.input, errors.city ? { borderColor: COLORS.danger } : null]}
+              placeholder="Ex: Libreville, Owendo..."
               placeholderTextColor={COLORS.textMuted}
               value={formData.city}
-              editable={false}
+              onChangeText={(v) => handleInputChange('city', v)}
             />
             {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
           </View>
@@ -722,13 +728,13 @@ export const CheckoutScreen: React.FC = () => {
               <Text style={styles.label}>Adresse précise</Text>
             </View>
             <TextInput
-              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null, { backgroundColor: COLORS.bg, color: COLORS.textSoft, opacity: 0.8 }]}
-              placeholder="Cliquez sur 'Obtenir ma position' ci-dessus"
+              style={[styles.input, styles.multilineInput, errors.address ? { borderColor: COLORS.danger } : null]}
+              placeholder="Ex: Razel, derrière la pharmacie..."
               placeholderTextColor={COLORS.textMuted}
               multiline
               numberOfLines={3}
               value={formData.address}
-              editable={false}
+              onChangeText={(v) => handleInputChange('address', v)}
             />
             {errors.address ? <Text style={styles.errorText}>{errors.address}</Text> : null}
           </View>
@@ -1143,42 +1149,48 @@ export const CheckoutScreen: React.FC = () => {
                 <View style={styles.onboardingFormGroup}>
                   <Text style={styles.onboardingLabel}>Ville *</Text>
                   <TextInput
-                    style={[styles.onboardingInput, { backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
-                    placeholder="Rempli via 'Me localiser' ci-dessous"
+                    style={styles.onboardingInput}
+                    placeholder="Ex: Libreville, Owendo..."
                     placeholderTextColor={COLORS.textMuted}
                     value={onboardingAddress.city}
-                    editable={false}
+                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, city: v }))}
                   />
                 </View>
 
                 <View style={styles.onboardingFormGroup}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <Text style={styles.onboardingLabel}>Adresse complète (Quartier, détails) *</Text>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.onboardingLocateBtn}
                       onPress={async () => {
                         setProcessing(true);
                         try {
                           const pos = await locationService.getCurrentPosition();
+                          console.log('[Checkout] Position GPS:', pos);
                           if (pos) {
+                            const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
+                            console.log('[Checkout] Adresse retournée:', addr);
+                            // Update all fields in a single setState to avoid batching issues
                             setOnboardingAddress(prev => ({
                               ...prev,
                               latitude: pos.latitude,
                               longitude: pos.longitude,
+                              address: addr?.street || prev.address || '',
+                              city: addr?.city || prev.city || '',
                             }));
-                            const addr = await locationService.reverseGeocode(pos.latitude, pos.longitude);
-                            if (addr) {
-                              setOnboardingAddress(prev => ({
-                                ...prev,
-                                address: addr.street || prev.address || '',
-                                city: addr.city || prev.city || '',
-                              }));
+                            console.log('[Checkout] Adresse mise à jour:', { street: addr?.street, city: addr?.city });
+                            if (!addr) {
+                              // Delay alert so state update renders first (avoids dual-Modal conflict on web)
+                              setTimeout(() => showAlert({ type: 'warning', title: 'Attention', message: 'Position GPS obtenue mais adresse non trouvée.' }), 300);
+                            } else {
+                              // Delay success alert to let onboarding modal re-render with updated values
+                              setTimeout(() => showAlert({ type: 'success', title: 'Succès', message: 'Votre position GPS a été enregistrée !' }), 300);
                             }
-                            showAlert({ type: 'success', title: 'Succès', message: 'Votre position GPS a été enregistrée !' });
                           } else {
                             showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de récupérer votre position GPS.' });
                           }
                         } catch (e) {
+                          console.error('[Checkout] Erreur localisation:', e);
                           showAlert({ type: 'error', title: 'Erreur', message: 'Impossible de récupérer votre position GPS.' });
                         } finally {
                           setProcessing(false);
@@ -1190,12 +1202,12 @@ export const CheckoutScreen: React.FC = () => {
                     </TouchableOpacity>
                   </View>
                   <TextInput
-                    style={[styles.onboardingInput, { height: 60, textAlignVertical: 'top', backgroundColor: '#f0f0f0', color: COLORS.textSoft }]}
-                    placeholder="Rempli via 'Me localiser' ci-dessus"
+                    style={[styles.onboardingInput, { height: 60, textAlignVertical: 'top' }]}
+                    placeholder="Ex: Razel, derrière la pharmacie..."
                     placeholderTextColor={COLORS.textMuted}
                     multiline
                     value={onboardingAddress.address}
-                    editable={false}
+                    onChangeText={(v) => setOnboardingAddress(prev => ({ ...prev, address: v }))}
                   />
                 </View>
 
