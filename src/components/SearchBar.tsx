@@ -156,6 +156,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         style={[
           styles.input,
           compact && { fontSize: theme.fontSize.sm, paddingVertical: 0 },
+          Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)
         ]}
         value={value}
         onChangeText={onChangeText}
@@ -191,8 +192,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Cancel Button */}
-      {showCancelButton && isFocused && (
+      {/* Cancel Button (only show if there is no text, to avoid double X icons) */}
+      {showCancelButton && isFocused && !hasValue && (
         <TouchableOpacity
           onPress={onCancel}
           style={styles.cancelButton}

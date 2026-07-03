@@ -567,7 +567,7 @@ export const productService = {
   async getStoreHomepageProducts(storeId: string, limit = 8): Promise<Product[]> {
     const client = useSupabase();
 
-    // First try to get featured products
+    // Only return products explicitly marked as featured by the seller
     const { data: featured, error: featuredError } = await client
       .from('products')
       .select('*')
@@ -581,22 +581,7 @@ export const productService = {
       throw featuredError;
     }
 
-    // If we have featured products, return them
-    if (featured && featured.length > 0) {
-      return featured as Product[];
-    }
-
-    // Otherwise, fall back to recent products
-    const { data: recent, error: recentError } = await client
-      .from('products')
-      .select('*')
-      .eq('store_id', storeId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-
-    if (recentError) throw recentError;
-    return (recent || []) as Product[];
+    return (featured || []) as Product[];
   },
 
   /**

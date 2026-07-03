@@ -132,6 +132,8 @@ export const ProductDetailScreen: React.FC = () => {
       inStock: (product.stock ?? 0) > 0,
       category: product.category || "",
       attributes: product.attributes || {},
+      condition: product.condition as 'new' | 'used' | undefined,
+      featured: product.featured || false,
     };
   }, [product, store]);
 
@@ -548,7 +550,27 @@ export const ProductDetailScreen: React.FC = () => {
     <View style={styles.infoSection}>
       {renderStoreInfo()}
 
-      <Text style={styles.productTitle}>{productData?.name}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+        <Text style={[styles.productTitle, { flex: 1 }]}>{productData?.name}</Text>
+        {productData?.condition && (
+          <View style={{
+            backgroundColor: productData.condition === 'new' ? COLORS.accent + '15' : '#F59E0B15',
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: productData.condition === 'new' ? COLORS.accent + '40' : '#F59E0B40',
+          }}>
+            <Text style={{
+              fontSize: 12,
+              fontWeight: '600',
+              color: productData.condition === 'new' ? COLORS.accent : '#F59E0B',
+            }}>
+              {productData.condition === 'new' ? '✨ Neuf' : '♻️ Occasion'}
+            </Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.ratingRow}>
         <View style={styles.starsContainer}>

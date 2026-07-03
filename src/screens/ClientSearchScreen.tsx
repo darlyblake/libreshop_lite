@@ -80,6 +80,7 @@ interface Category {
   name: string;
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
+  subcategories?: Category[];
 }
 
 // Helper to get icon based on category name
@@ -132,7 +133,7 @@ const useResponsiveGrid = () => {
 type NavigationProp = any;
 
 // Global flag to avoid repeated 504/timeouts if the dev API server is not running
-let isHybridApiAvailable = true;
+let isHybridApiAvailable = false;
 
 const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top' = 'popular') => {
   const [products, setProducts] = useState<any[]>([]);
@@ -155,7 +156,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
   useEffect(() => {
     const fetchData = async () => {
       const cacheKey = `SEARCH_POPULAR_SUGGESTIONS:${sort}`;
-      const cacheKeyCategories = `SEARCH_POPULAR_CATEGORIES`;
+      const cacheKeyCategories = `SEARCH_POPULAR_CATEGORIES_WITH_SUBS`;
 
       try {
         // 1. Lire depuis le cache local pour éviter les surcharges de requêtes Supabase
@@ -175,16 +176,15 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
         }
 
         // 2. Récupérer uniquement les données manquantes
-        const [popularProducts, categoriesData] = await Promise.all([
+        const [popularProducts, allCategoriesData] = await Promise.all([
           !cachedNames ? productService.getAll(0, 8, sort as any) : Promise.resolve(null),
-          !cachedCats ? categoryService.getByParent(null) : Promise.resolve(null)
+          !cachedCats ? categoryService.getAll() : Promise.resolve(null)
         ]);
 
         if (popularProducts) {
           const names = Array.from(
             new Set(
               popularProducts.map(p => {
-                // Nettoyage intelligent : Prendre les 2 premiers mots et mettre la 1ère lettre en majuscule pour éviter la surcharge visuelle
                 const words = p.name.trim().split(/\s+/);
                 return words
                   .slice(0, 2)
@@ -198,13 +198,26 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
           await cacheService.set(cacheKey, names, 60); // 60 minutes de cache
         }
 
-        if (categoriesData) {
-          const formattedCategories = categoriesData.map((cat, index) => ({
-            id: cat.id,
-            name: cat.name,
-            icon: getCategoryIcon(cat.name),
-            color: getCategoryColor(index)
-          }));
+        if (allCategoriesData) {
+          // Construire l'arbre des catégories
+          const parents = allCategoriesData.filter(c => !c.parent_id);
+          const children = allCategoriesData.filter(c => c.parent_id);
+          
+          const formattedCategories = parents.map((cat, index) => {
+            const catChildren = children.filter(child => child.parent_id === cat.id);
+            return {
+              id: cat.id,
+              name: cat.name,
+              icon: getCategoryIcon(cat.name),
+              color: getCategoryColor(index),
+              subcategories: catChildren.map((child, childIdx) => ({
+                id: child.id,
+                name: child.name,
+                icon: getCategoryIcon(child.name),
+                color: getCategoryColor(childIdx)
+              }))
+            };
+          });
           
           setPopularCategories(formattedCategories);
           await cacheService.set(cacheKeyCategories, formattedCategories, 60); // 60 minutes de cache
@@ -262,35 +275,29 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
           });
           clearTimeout(apiTimeoutId);
           
-          if (apiRes.ok) {
-            const ct = (apiRes.headers.get('content-type') || '').toLowerCase();
-            if (!ct.includes('application/json')) {
-              throw new Error('non-json');
-            }
-            const json = await apiRes.json();
-            const productsData = json.data || [];
-            setIntentKeywords((json.intentKeywords || []).filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
-            if (reset) {
-              setProducts(productsData || []);
-              setStores([]);
-            } else {
-              setProducts(prev => [...prev, ...(productsData || [])]);
-            }
-            setHasMore((productsData?.length || 0) === PAGE_SIZE);
-            setLoading(false);
-            setLoadingMore(false);
-            return;
-          } else {
-            // If we get a 504 or 404, the API server is likely not running locally.
-            // Disable further attempts to avoid console pollution.
-            if (apiRes.status === 504 || apiRes.status === 404 || apiRes.status === 502) {
-              isHybridApiAvailable = false;
-              console.log('Hybrid API search unavailable (504/404), falling back to client-side grocService for this session.');
-            }
-            throw new Error('api-not-ok');
+          const ct = (apiRes.headers.get('content-type') || '').toLowerCase();
+          if (!apiRes.ok || !ct.includes('application/json')) {
+            // Non-JSON response means Expo dev server intercepted the route (returns HTML).
+            // Or non-ok status. Either way, the API route doesn't exist — disable it.
+            isHybridApiAvailable = false;
+            console.log('Hybrid API search unavailable (non-JSON or non-ok response), falling back to client-side grocService for this session.');
+            throw new Error('api-not-available');
           }
+          const json = await apiRes.json();
+          const productsData = json.data || [];
+          setIntentKeywords((json.intentKeywords || []).filter((t: string) => t.toLowerCase() !== q.toLowerCase()));
+          if (reset) {
+            setProducts(productsData || []);
+            setStores([]);
+          } else {
+            setProducts(prev => [...prev, ...(productsData || [])]);
+          }
+          setHasMore((productsData?.length || 0) === PAGE_SIZE);
+          setLoading(false);
+          setLoadingMore(false);
+          return;
         } catch (e) {
-          // ignore and fallback to grocService
+          // Fallback to grocService below
         }
       }
 
@@ -372,6 +379,28 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
     }, SEARCH_DEBOUNCE_DELAY);
   }, [performSearch]);
 
+  // Fetch all products from a category (uses getAllByCategory, not text search)
+  const searchByCategory = useCallback(async (categoryName: string) => {
+    if (!categoryName) return;
+    setLoading(true);
+    setHasSearched(true);
+    setError(null);
+    setSuggestions([]);
+    setIntentKeywords([]);
+    setStores([]);
+    setCurrentQuery('');
+    try {
+      const data = await productService.getAllByCategory(categoryName, 0, PAGE_SIZE, sort as any);
+      setProducts(data || []);
+      setHasMore((data?.length || 0) === PAGE_SIZE);
+    } catch (err: any) {
+      const appError = errorHandler.handleNetworkError(err, 'CategorySearch');
+      setError(appError.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sort]);
+
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -392,6 +421,7 @@ const useSearch = (sort: 'newest' | 'popular' | 'trending' | 'ranked' | 'sales' 
     popularCategories,
     intentKeywords,
     debouncedSearch,
+    searchByCategory,
     loadMore
   };
 };
@@ -413,6 +443,7 @@ export const ClientSearchScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFocused, setIsFocused] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [activeSidebarSubcategory, setActiveSidebarSubcategory] = useState<string | null>(null);
   const [sort, setSort] = useState<'newest' | 'popular' | 'trending' | 'ranked' | 'sales' | 'top'>('popular');
 
   // Nouveaux filtres
@@ -445,6 +476,7 @@ export const ClientSearchScreen: React.FC = () => {
     popularCategories,
     intentKeywords,
     debouncedSearch,
+    searchByCategory,
     loadMore 
   } = useSearch(sort);
 
@@ -522,8 +554,12 @@ export const ClientSearchScreen: React.FC = () => {
 
   // Valeurs mémoïsées
   const productItemWidth = useMemo(() => {
-    const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
-    return (contentWidth - SPACING.xl * 2 - SPACING.sm * (numColumns - 1)) / numColumns;
+    const windowWidth = Dimensions.get('window').width;
+    const isCompact = windowWidth <= 768;
+    const scrollbarWidth = Platform.OS === 'web' ? 24 : 0; // margin for web scrollbar & borders
+    const sidebarWidth = isCompact ? 68 : 280;
+    const contentWidth = Math.min(windowWidth - sidebarWidth - scrollbarWidth, MAX_CONTENT_WIDTH - sidebarWidth);
+    return Math.floor((contentWidth - SPACING.xl * 2 - SPACING.sm * (numColumns - 1)) / numColumns);
   }, [numColumns, SPACING]);
 
   const filteredProducts = useMemo(() => {
@@ -579,10 +615,13 @@ export const ClientSearchScreen: React.FC = () => {
 
   const handleCategoryPress = useCallback((category: Category) => {
     setSelectedCategory(category.name);
-    setSearchQuery(category.name);
-    debouncedSearch(category.name);
+    // Clear search bar to show we're browsing by category, not text search
+    setSearchQuery('');
     setIsFocused(false);
-  }, [debouncedSearch]);
+    Keyboard.dismiss();
+    // Fetch ALL products of this category (not a text search)
+    searchByCategory(category.name);
+  }, [searchByCategory]);
 
   const handleSuggestionPress = useCallback((suggestion: string) => {
     setSearchQuery(suggestion);
@@ -666,6 +705,139 @@ export const ClientSearchScreen: React.FC = () => {
   }, [nearbyEnabled, userLocation, stores]);
 
   // Renderers
+  
+  const handleToggleSidebarCategory = useCallback((categoryId: string, categoryName: string) => {
+    if (selectedCategory === categoryName) {
+      // Toggle off
+      setSelectedCategory(null);
+      setActiveSidebarSubcategory(null);
+      setSearchQuery('');
+      debouncedSearch(''); // Or some function to reset to all products
+    } else {
+      setSelectedCategory(categoryName);
+      setActiveSidebarSubcategory(null);
+      setSearchQuery('');
+      searchByCategory(categoryName);
+    }
+  }, [selectedCategory, searchByCategory, debouncedSearch]);
+
+  const handleSidebarSubcategoryPress = useCallback((subcategoryId: string, subcategoryName: string, parentCategoryName: string) => {
+    setActiveSidebarSubcategory(subcategoryId);
+    setSelectedCategory(parentCategoryName);
+    setSearchQuery('');
+    // For now, subcategory search might just be text search on subcategory name or category search.
+    // If you have getByCategory, you might need to filter by subcategory.
+    // We'll use debouncedSearch with the subcategory name to find it in the products.
+    debouncedSearch(subcategoryName);
+  }, [debouncedSearch]);
+
+  const renderSidebar = () => {
+    const windowWidth = Dimensions.get('window').width;
+    const isCompact = windowWidth <= 768;
+
+    if (isCompact) {
+      // Mobile: narrow icon-only strip
+      return (
+        <View style={styles.sidebarCompact}>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+            {popularCategories.map(cat => {
+              const isActive = selectedCategory === cat.name;
+              return (
+                <View key={cat.id}>
+                  <TouchableOpacity
+                    style={[styles.compactCatItem, isActive && styles.compactCatItemActive]}
+                    onPress={() => handleToggleSidebarCategory(cat.id, cat.name)}
+                  >
+                    <View style={[styles.compactCatIcon, isActive && styles.compactCatIconActive]}>
+                      <Ionicons name={cat.icon as any} size={20} color={isActive ? palette.accent : palette.textMuted} />
+                    </View>
+                    <Text style={[styles.compactCatLabel, isActive && styles.compactCatLabelActive]} numberOfLines={2}>
+                      {cat.name}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Subcategories below icon on mobile */}
+                  {isActive && cat.subcategories && cat.subcategories.length > 0 && (
+                    <Animated.View entering={FadeInDown.duration(150)} style={styles.compactSubList}>
+                      {cat.subcategories.map(sub => {
+                        const isSubActive = activeSidebarSubcategory === sub.id;
+                        return (
+                          <TouchableOpacity
+                            key={sub.id}
+                            style={[styles.compactSubItem, isSubActive && styles.compactSubItemActive]}
+                            onPress={() => handleSidebarSubcategoryPress(sub.id, sub.name, cat.name)}
+                          >
+                            <Text style={[styles.compactSubLabel, isSubActive && styles.compactSubLabelActive]} numberOfLines={1}>
+                              {sub.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </Animated.View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    // Desktop: full sidebar with logo and text
+    return (
+      <View style={styles.sidebar}>
+        <View style={styles.sidebarHeader}>
+          <Text style={styles.sidebarLogo}>
+            Libre<Text style={styles.sidebarLogoAccent}>Shop</Text>
+          </Text>
+        </View>
+        <Text style={styles.sidebarTitle}>📂 Catégories</Text>
+        <ScrollView style={styles.sidebarScroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.categoryList}>
+            {popularCategories.map(cat => {
+              const isActive = selectedCategory === cat.name;
+              return (
+                <View key={cat.id}>
+                  <TouchableOpacity
+                    style={[styles.sidebarCategoryItem, isActive && styles.sidebarCategoryItemActive]}
+                    onPress={() => handleToggleSidebarCategory(cat.id, cat.name)}
+                  >
+                    <View style={[styles.sidebarCategoryIcon, isActive && styles.sidebarCategoryIconActive]}>
+                      <Ionicons name={cat.icon as any} size={18} color={isActive ? 'white' : palette.text} />
+                    </View>
+                    <Text style={[styles.sidebarCategoryName, isActive && styles.sidebarCategoryNameActive]}>{cat.name}</Text>
+                    {cat.subcategories && cat.subcategories.length > 0 && (
+                      <Ionicons name={isActive ? 'chevron-down' : 'chevron-forward'} size={16} color={isActive ? 'white' : palette.textMuted} />
+                    )}
+                  </TouchableOpacity>
+
+                  {isActive && cat.subcategories && cat.subcategories.length > 0 && (
+                    <Animated.View entering={FadeInDown.duration(200)} style={styles.sidebarSubcategoryContainer}>
+                      {cat.subcategories.map(sub => {
+                        const isSubActive = activeSidebarSubcategory === sub.id;
+                        return (
+                          <TouchableOpacity
+                            key={sub.id}
+                            style={[styles.sidebarSubcategoryItem, isSubActive && styles.sidebarSubcategoryItemActive]}
+                            onPress={() => handleSidebarSubcategoryPress(sub.id, sub.name, cat.name)}
+                          >
+                            <Text style={[styles.sidebarSubcategoryName, isSubActive && styles.sidebarSubcategoryNameActive]}>
+                              {sub.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </Animated.View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  };
+
   const renderProductItem = useCallback(({ item, index }: { item: Product & { comparePrice?: number }; index: number }) => (
     <Animated.View
       entering={SlideInRight
@@ -704,7 +876,7 @@ export const ClientSearchScreen: React.FC = () => {
           .springify()
           .damping(14)
         }
-        style={{ position: 'relative' }}
+        style={{ position: 'relative', width: productItemWidth, marginBottom: SPACING.md }}
       >
         <StoreCard
           name={item.name}
@@ -832,48 +1004,59 @@ export const ClientSearchScreen: React.FC = () => {
     );
   };
 
-  const renderHeader = () => (
-    <Animated.View style={[styles.headerContainer, headerAnimatedStyle]}>
-      <BlurView intensity={80} tint="light" style={styles.headerBlur}>
-        <View style={[styles.headerContent, { paddingTop: insets.top }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
-            <View style={{ flex: 1 }}>
-              <SearchBar
-                value={searchQuery}
-                onChangeText={handleSearchChange}
-                onSubmitEditing={handleSearchSubmit}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                onClear={handleClearSearch}
-                placeholder="Rechercher des produits ou boutiques..."
-                style={styles.searchBar}
-                autoFocus={false}
-                showCancelButton={isFocused}
-                onCancel={() => {
-                  setIsFocused(false);
-                  Keyboard.dismiss();
-                }}
-              />
-            </View>
-            <TouchableOpacity 
-              style={{ width: 44, height: 44, borderRadius: RADIUS.lg, backgroundColor: (minPrice || maxPrice || minRating > 0) ? palette.accent : palette.card, alignItems: 'center', justifyContent: 'center', marginTop: SPACING.sm, borderWidth: 1, borderColor: palette.border }}
-              onPress={() => {
-                setTempMinPrice(minPrice);
-                setTempMaxPrice(maxPrice);
-                setTempMinRating(minRating);
-                setShowFilters(true);
-              }}
-            >
-              <Ionicons name="options-outline" size={22} color={(minPrice || maxPrice || minRating > 0) ? 'white' : palette.text} />
-              {(minPrice || maxPrice || minRating > 0) ? (
-                <View style={{ position: 'absolute', top: -4, right: -4, width: 12, height: 12, borderRadius: 6, backgroundColor: palette.danger, borderWidth: 2, borderColor: palette.card }} />
-              ) : null}
-            </TouchableOpacity>
+  const renderHeader = () => {
+    const windowWidth = Dimensions.get('window').width;
+    const isCompact = windowWidth <= 768;
+    return (
+      <View style={[styles.pageHeader, isCompact && styles.pageHeaderCompact]}>
+        {!isCompact && (
+          <View style={styles.headerTitles}>
+            <Text style={styles.pageTitle}>
+              {selectedCategory ? selectedCategory : (searchQuery ? 'Résultats' : 'Catalogue')}
+            </Text>
+            <Text style={styles.breadcrumb}>
+              Accueil / <Text style={styles.breadcrumbAccent}>{selectedCategory ? selectedCategory : 'Produits'}</Text>
+              {activeSidebarSubcategory && <Text> / <Text style={styles.breadcrumbAccent}>Sous-catégorie</Text></Text>}
+            </Text>
           </View>
+        )}
+
+        <View style={[styles.headerSearchArea, isCompact && { flex: 1 }]}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            onSubmitEditing={handleSearchSubmit}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onClear={handleClearSearch}
+            placeholder={isCompact ? 'Rechercher...' : 'Rechercher des produits...'}
+            style={isCompact ? { ...styles.searchBar, flex: 1 } : styles.searchBar}
+            autoFocus={false}
+            showCancelButton={false}
+            onCancel={() => {
+              setIsFocused(false);
+              Keyboard.dismiss();
+            }}
+          />
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => {
+              setTempMinPrice(minPrice);
+              setTempMaxPrice(maxPrice);
+              setTempMinRating(minRating);
+              setShowFilters(true);
+            }}
+          >
+            <Ionicons name="options-outline" size={22} color={(minPrice || maxPrice || minRating > 0) ? 'white' : palette.text} />
+            {(minPrice || maxPrice || minRating > 0) && (
+              <View style={styles.filterDot} />
+            )}
+          </TouchableOpacity>
         </View>
-      </BlurView>
-    </Animated.View>
-  );
+      </View>
+    );
+  };
+
 
   const renderResults = () => {
     if (loading) {
@@ -971,13 +1154,67 @@ export const ClientSearchScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <Ionicons name="cube-outline" size={22} color={palette.accent} />
-                <Text style={styles.sectionTitle}>Produits</Text>
+                <Ionicons name={selectedCategory ? 'apps-outline' : 'cube-outline'} size={22} color={palette.accent} />
+                <Text style={styles.sectionTitle}>
+                  {selectedCategory ? `${selectedCategory}` : 'Produits'}
+                </Text>
+                {selectedCategory && (
+                  <TouchableOpacity
+                    onPress={() => { setSelectedCategory(null); setSearchQuery(''); }}
+                    style={{ marginLeft: 6, backgroundColor: palette.accent + '20', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 }}
+                  >
+                    <Text style={{ fontSize: 11, color: palette.accent, fontWeight: '700' }}>✕ Effacer</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               <View style={styles.sectionBadge}>
                 <Text style={styles.sectionCount}>{filteredProducts.length}</Text>
               </View>
             </View>
+
+            {/* Mobile Subcategories (Visible only when a category is selected and sidebar is hidden) */}
+            {(() => {
+              const activeCatData = popularCategories.find(c => c.name === selectedCategory);
+              const isMobile = Platform.OS !== 'web' || Dimensions.get('window').width <= 768;
+              if (selectedCategory && isMobile && activeCatData?.subcategories && activeCatData.subcategories.length > 0) {
+                return (
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    contentContainerStyle={{ gap: SPACING.sm, paddingBottom: SPACING.md }}
+                  >
+                    {activeCatData.subcategories.map(sub => {
+                      const isSubActive = activeSidebarSubcategory === sub.id;
+                      return (
+                        <TouchableOpacity
+                          key={sub.id}
+                          onPress={() => handleSidebarSubcategoryPress(sub.id, sub.name, selectedCategory)}
+                          style={{
+                            paddingHorizontal: SPACING.md,
+                            paddingVertical: SPACING.xs,
+                            backgroundColor: isSubActive ? palette.accent : palette.card,
+                            borderRadius: RADIUS.full,
+                            borderWidth: 1,
+                            borderColor: isSubActive ? palette.accent : palette.border,
+                            marginRight: 4
+                          }}
+                        >
+                          <Text style={{ 
+                            fontSize: FONT_SIZE.sm, 
+                            fontWeight: isSubActive ? '600' : '500', 
+                            color: isSubActive ? 'white' : palette.text 
+                          }}>
+                            {sub.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                );
+              }
+              return null;
+            })()}
+
             {/* Sort tabs for search results */}
             <SortTabs
               options={[
@@ -1062,8 +1299,10 @@ export const ClientSearchScreen: React.FC = () => {
               data={nearbyEnabled ? nearbyStores : stores}
               renderItem={renderStoreItem}
               keyExtractor={(item) => `store-${item.id}`}
+              numColumns={numColumns}
+              key={`stores-grid-${numColumns}`}
               scrollEnabled={false}
-              contentContainerStyle={styles.storesList}
+              columnWrapperStyle={styles.storesGrid}
               initialNumToRender={5}
               maxToRenderPerBatch={5}
               windowSize={3}
@@ -1075,14 +1314,19 @@ export const ClientSearchScreen: React.FC = () => {
     );
   };
 
-  const renderInitialState = () => (
+  
+  const renderInitialState = () => {
+    const isWebLarge = Platform.OS === 'web' && width > 768;
+    return (
     <Animated.ScrollView
+
       style={styles.initialContainer}
       contentContainerStyle={styles.initialContent}
       showsVerticalScrollIndicator={false}
       entering={FadeIn.duration(ANIMATION_DURATION)}
     >
-      {/* Catégories populaires */}
+      {!isWebLarge && (<>
+{/* Catégories populaires */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleContainer}>
@@ -1100,6 +1344,7 @@ export const ClientSearchScreen: React.FC = () => {
           contentContainerStyle={styles.categoriesList}
         />
       </View>
+</>)}
 
       {/* Suggestions */}
       {popularSuggestions.length > 0 && (
@@ -1150,21 +1395,30 @@ export const ClientSearchScreen: React.FC = () => {
       )}
     </Animated.ScrollView>
   );
+  };
+
+  const windowWidth = Dimensions.get('window').width;
+  const isWebLarge = Platform.OS === 'web' && windowWidth > 768;
 
   return (
     <View style={styles.flexContainer}>
-      <View style={styles.maxWidthContainer}>
-        <View style={[styles.container, { backgroundColor: palette.bg }]}>
-          <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-          
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <View style={styles.appContainer}>
+        
+        {renderSidebar()}
+
+        <View style={styles.mainContent}>
           {renderHeader()}
           
-          {hasSearched ? renderResults() : renderInitialState()}
-
+          <View style={styles.mainScrollArea}>
+            {hasSearched ? renderResults() : renderInitialState()}
+          </View>
+          
           {renderSuggestionsDropdown()}
-
-          {/* Modal de filtres avancés */}
+          
+          {/* Modal de filtres */}
           <Modal visible={showFilters} transparent animationType="slide" onRequestClose={() => setShowFilters(false)}>
+            {/* Keeping modal content intact */}
             <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
               <View style={{ backgroundColor: palette.bg, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SPACING.xl, paddingBottom: insets.bottom + SPACING.xl, maxHeight: '90%' }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.xl }}>
@@ -1173,90 +1427,304 @@ export const ClientSearchScreen: React.FC = () => {
                     <Ionicons name="close" size={20} color={palette.text} />
                   </TouchableOpacity>
                 </View>
-
-                {/* Prix */}
                 <View style={{ marginBottom: SPACING.xl }}>
                   <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '600', color: palette.text, marginBottom: SPACING.md }}>Fourchette de prix (FCA)</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md }}>
                     <View style={{ flex: 1, backgroundColor: palette.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, paddingHorizontal: SPACING.md, paddingVertical: Platform.OS === 'ios' ? SPACING.md : 0 }}>
-                      <TextInput 
-                        placeholder="Min (ex: 5000)" 
-                        placeholderTextColor={palette.textMuted} 
-                        style={{ color: palette.text, fontSize: FONT_SIZE.md, height: 44 }} 
-                        keyboardType="numeric" 
-                        value={tempMinPrice} 
-                        onChangeText={setTempMinPrice} 
-                      />
+                      <TextInput placeholder="Min" placeholderTextColor={palette.textMuted} style={{ color: palette.text, fontSize: FONT_SIZE.md, height: 44 }} keyboardType="numeric" value={tempMinPrice} onChangeText={setTempMinPrice} />
                     </View>
                     <Text style={{ color: palette.textMuted, fontSize: FONT_SIZE.lg }}>-</Text>
                     <View style={{ flex: 1, backgroundColor: palette.card, borderRadius: RADIUS.md, borderWidth: 1, borderColor: palette.border, paddingHorizontal: SPACING.md, paddingVertical: Platform.OS === 'ios' ? SPACING.md : 0 }}>
-                      <TextInput 
-                        placeholder="Max (ex: 50000)" 
-                        placeholderTextColor={palette.textMuted} 
-                        style={{ color: palette.text, fontSize: FONT_SIZE.md, height: 44 }} 
-                        keyboardType="numeric" 
-                        value={tempMaxPrice} 
-                        onChangeText={setTempMaxPrice} 
-                      />
+                      <TextInput placeholder="Max" placeholderTextColor={palette.textMuted} style={{ color: palette.text, fontSize: FONT_SIZE.md, height: 44 }} keyboardType="numeric" value={tempMaxPrice} onChangeText={setTempMaxPrice} />
                     </View>
                   </View>
                 </View>
-
-                {/* Notes */}
                 <View style={{ marginBottom: SPACING.xl }}>
                   <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '600', color: palette.text, marginBottom: SPACING.md }}>Note minimale</Text>
                   <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
                     {[1, 2, 3, 4, 5].map(star => (
-                      <TouchableOpacity 
-                        key={star} 
-                        onPress={() => setTempMinRating(star === tempMinRating ? 0 : star)}
-                        style={{ flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: tempMinRating >= star ? palette.accent + '15' : palette.card, borderWidth: 1, borderColor: tempMinRating >= star ? palette.accent : palette.border, alignItems: 'center', justifyContent: 'center' }}
-                      >
+                      <TouchableOpacity key={star} onPress={() => setTempMinRating(star === tempMinRating ? 0 : star)} style={{ flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: tempMinRating >= star ? palette.accent + '15' : palette.card, borderWidth: 1, borderColor: tempMinRating >= star ? palette.accent : palette.border, alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name={tempMinRating >= star ? "star" : "star-outline"} size={20} color={tempMinRating >= star ? palette.accent : palette.textMuted} />
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
-
-                {/* Actions */}
                 <View style={{ flexDirection: 'row', gap: SPACING.md, marginTop: SPACING.md }}>
-                  <TouchableOpacity 
-                    style={{ flex: 1, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, alignItems: 'center' }}
-                    onPress={() => {
-                      setTempMinPrice('');
-                      setTempMaxPrice('');
-                      setTempMinRating(0);
-                      setMinPrice('');
-                      setMaxPrice('');
-                      setMinRating(0);
-                      setShowFilters(false);
-                    }}
-                  >
+                  <TouchableOpacity style={{ flex: 1, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: palette.card, borderWidth: 1, borderColor: palette.border, alignItems: 'center' }} onPress={() => { setTempMinPrice(''); setTempMaxPrice(''); setTempMinRating(0); setMinPrice(''); setMaxPrice(''); setMinRating(0); setShowFilters(false); }}>
                     <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '600', color: palette.text }}>Réinitialiser</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={{ flex: 2, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: palette.accent, alignItems: 'center' }}
-                    onPress={() => {
-                      setMinPrice(tempMinPrice);
-                      setMaxPrice(tempMaxPrice);
-                      setMinRating(tempMinRating);
-                      setShowFilters(false);
-                    }}
-                  >
+                  <TouchableOpacity style={{ flex: 2, paddingVertical: SPACING.md, borderRadius: RADIUS.lg, backgroundColor: palette.accent, alignItems: 'center' }} onPress={() => { setMinPrice(tempMinPrice); setMaxPrice(tempMaxPrice); setMinRating(tempMinRating); setShowFilters(false); }}>
                     <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: 'white' }}>Appliquer les filtres</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
           </Modal>
+
         </View>
       </View>
     </View>
   );
+
 };
 
 function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: any, FONT_SIZE: any, shadows: typeof SHADOWS) {
   return StyleSheet.create({
+    appContainer: {
+      flex: 1,
+      width: '100%',
+      flexDirection: 'row',  // Always side-by-side
+    },
+    // Compact sidebar (mobile / small screens ≤768px)
+    sidebarCompact: {
+      width: 68,
+      backgroundColor: palette.bg,
+      borderRightWidth: 1,
+      borderRightColor: palette.border,
+      flexShrink: 0,
+    },
+    compactCatItem: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      gap: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    compactCatItemActive: {
+      backgroundColor: palette.accent + '15',
+      borderLeftWidth: 3,
+      borderLeftColor: palette.accent,
+    },
+    compactCatIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor: palette.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    compactCatIconActive: {
+      backgroundColor: palette.accent + '20',
+    },
+    compactCatLabel: {
+      fontSize: 9,
+      color: palette.textMuted,
+      textAlign: 'center',
+      lineHeight: 12,
+    },
+    compactCatLabelActive: {
+      color: palette.accent,
+      fontWeight: '600',
+    },
+    compactSubList: {
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+      paddingVertical: 4,
+    },
+    compactSubItem: {
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+      alignItems: 'center',
+    },
+    compactSubItemActive: {
+      backgroundColor: palette.accent,
+    },
+    compactSubLabel: {
+      fontSize: 8,
+      color: palette.textMuted,
+      textAlign: 'center',
+    },
+    compactSubLabelActive: {
+      color: 'white',
+      fontWeight: '600',
+    },
+    sidebar: {
+      width: 280,
+      backgroundColor: palette.bg,
+      borderRightWidth: 1,
+      borderRightColor: palette.border,
+      paddingVertical: SPACING.xl,
+      paddingHorizontal: SPACING.lg,
+      flexShrink: 0,
+      zIndex: 10,
+    },
+    sidebarHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: SPACING.xxl,
+      paddingBottom: SPACING.md,
+      borderBottomWidth: 2,
+      borderBottomColor: palette.border,
+    },
+    sidebarLogo: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: palette.text,
+    },
+    sidebarLogoAccent: {
+      color: palette.accent,
+    },
+    sidebarTitle: {
+      fontSize: FONT_SIZE.lg,
+      fontWeight: '600',
+      color: palette.text,
+      marginBottom: SPACING.md,
+      paddingHorizontal: SPACING.xs,
+    },
+    sidebarScroll: {
+      flex: 1,
+    },
+    categoryList: {
+      gap: SPACING.xs,
+    },
+    sidebarCategoryItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: SPACING.md,
+      borderRadius: RADIUS.lg,
+      gap: SPACING.md,
+      backgroundColor: 'transparent',
+    },
+    sidebarCategoryItemActive: {
+      backgroundColor: palette.accent,
+      ...shadows.small,
+    },
+    sidebarCategoryIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: RADIUS.md,
+      backgroundColor: palette.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sidebarCategoryIconActive: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    sidebarCategoryName: {
+      fontSize: FONT_SIZE.md,
+      fontWeight: '500',
+      color: palette.textSoft,
+      flex: 1,
+    },
+    sidebarCategoryNameActive: {
+      color: 'white',
+      fontWeight: '600',
+    },
+    sidebarSubcategoryContainer: {
+      marginLeft: SPACING.md,
+      paddingLeft: SPACING.md,
+      borderLeftWidth: 2,
+      borderLeftColor: palette.border,
+      marginTop: SPACING.xs,
+      marginBottom: SPACING.sm,
+      gap: 2,
+    },
+    sidebarSubcategoryItem: {
+      paddingVertical: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      borderRadius: RADIUS.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    sidebarSubcategoryItemActive: {
+      backgroundColor: palette.accent,
+    },
+    sidebarSubcategoryName: {
+      fontSize: FONT_SIZE.sm,
+      color: palette.textMuted,
+      flex: 1,
+    },
+    sidebarSubcategoryNameActive: {
+      color: 'white',
+      fontWeight: '600',
+    },
+    mainContent: {
+      flex: 1,
+      backgroundColor: palette.bg,
+      position: 'relative',
+    },
+    pageHeader: {
+      backgroundColor: palette.card,
+      borderRadius: RADIUS.xl,
+      padding: SPACING.xl,
+      margin: SPACING.lg,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: SPACING.md,
+      ...shadows.medium,
+    },
+    pageHeaderCompact: {
+      padding: SPACING.sm,
+      margin: SPACING.sm,
+      borderRadius: RADIUS.lg,
+      gap: SPACING.xs,
+    },
+    headerTitles: {
+      gap: 4,
+      flexShrink: 1,
+    },
+    pageTitle: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    pageTitleCompact: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    breadcrumb: {
+      fontSize: FONT_SIZE.sm,
+      color: palette.textMuted,
+    },
+    breadcrumbAccent: {
+      color: palette.accent,
+    },
+    headerSearchArea: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    searchBar: {
+      width: Platform.OS === 'web' && Dimensions.get('window').width > 600 ? 300 : '100%',
+      backgroundColor: palette.bg,
+      borderRadius: 30,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginTop: 0,
+      shadowColor: 'transparent',
+      elevation: 0,
+    },
+    filterButton: {
+      width: 44,
+      height: 44,
+      borderRadius: RADIUS.full,
+      backgroundColor: palette.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    filterDot: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: palette.danger,
+      borderWidth: 2,
+      borderColor: palette.card,
+    },
+    mainScrollArea: {
+      flex: 1,
+    },
+
   flexContainer: {
     flex: 1,
     backgroundColor: palette.bg,
@@ -1287,11 +1755,7 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.md,
   },
-  searchBar: {
-    marginTop: SPACING.sm,
-    borderRadius: RADIUS.xl,
-    ...shadows.small,
-  },
+
   loadMoreItem: {
     paddingVertical: SPACING.lg,
     alignItems: 'center',
@@ -1312,7 +1776,6 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
   },
   resultsContainer: {
     flex: 1,
-    paddingTop: 100, // Espace pour le header fixe
   },
   resultsContent: {
     paddingHorizontal: SPACING.xl,
@@ -1320,7 +1783,6 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
   },
   initialContainer: {
     flex: 1,
-    paddingTop: 100, // Espace pour le header fixe
   },
   initialContent: {
     paddingHorizontal: SPACING.xl,
@@ -1528,6 +1990,10 @@ function createClientSearchStyles(palette: LegacyPalette, SPACING: any, RADIUS: 
   },
   productItemContainer: {
     marginBottom: SPACING.md,
+  },
+  storesGrid: {
+    gap: SPACING.sm,
+    justifyContent: 'flex-start',
   },
   storesList: {
     gap: SPACING.md,

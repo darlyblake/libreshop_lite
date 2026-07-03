@@ -2,18 +2,15 @@ import React from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Platform,
-  Animated,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useTheme } from '../hooks/useTheme';
-
-const { width } = Dimensions.get('window');
+import { openURL } from '../utils/platformUtils';
 
 interface StoreHeaderProps {
   store: {
@@ -26,277 +23,205 @@ interface StoreHeaderProps {
     verified?: boolean;
     rating?: number;
     rating_count?: number;
+    phone?: string;
+    address?: string;
   };
+  isFollowing?: boolean;
   onShare?: () => void;
   onContact?: () => void;
   onFollow?: () => void;
+  onReport?: () => void;
+  onDirections?: () => void;
 }
-
-const FALLBACK_BANNER = 'https://picsum.photos/800/400?random=1';
-const FALLBACK_LOGO = 'https://via.placeholder.com/100/ffffff/7C3AED?text=S';
 
 export const StoreHeader: React.FC<StoreHeaderProps> = ({
   store,
+  isFollowing,
   onShare,
   onContact,
   onFollow,
+  onReport,
+  onDirections,
 }) => {
-  const { getColor: COLORS } = useTheme();
-  const styles = React.useMemo(() => getStyles(COLORS), [COLORS]);
-  const bannerUrl = store.banner_url || FALLBACK_BANNER;
-  const logoUrl = store.logo_url || FALLBACK_LOGO;
-  const rating = store.rating || 4.7;
-  const ratingCount = store.rating_count || 312;
-
-  const logoAnim = React.useRef(new Animated.Value(0)).current;
-
-  const pulseAnim = React.useRef(new Animated.Value(0)).current;
-
-  React.useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0, duration: 1200, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [pulseAnim]);
-
-  React.useEffect(() => {
-    Animated.spring(logoAnim, {
-      toValue: 1,
-      friction: 8,
-      tension: 80,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [logoAnim]);
-
-  const renderStarRating = (avg: number) => {
-    const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
-    const full = Math.floor(safe);
-    const half = safe - full >= 0.5;
-
-    return (
-      <View style={styles.starsRow}>
-        {[...Array(5)].map((_, i) => {
-          if (i < full)
-            return (
-              <Ionicons
-                key={i}
-                name="star"
-                size={16}
-                color="#FFD700"
-              />
-            );
-          if (i === full && half)
-            return (
-              <Ionicons
-                key={i}
-                name="star-half"
-                size={16}
-                color="#FFD700"
-              />
-            );
-          return (
-            <Ionicons
-              key={i}
-              name="star-outline"
-              size={16}
-              color="#FFD700"
-            />
-          );
-        })}
-      </View>
-    );
-  };
+  const { getColor: COLORS, isDark } = useTheme();
+  const styles = React.useMemo(() => getStyles(COLORS, isDark), [COLORS, isDark]);
+  const rating = store.rating || 0;
+  const ratingCount = store.rating_count || 0;
 
   return (
     <View style={styles.container}>
-      {/* Large Banner with content overlaid */}
-      <View style={styles.bannerContainer}>
-        <Image
-          source={{ uri: bannerUrl }}
-          style={styles.banner}
-          resizeMode="cover"
-        />
-        <View style={styles.bannerOverlay} />
-
-        {/* Content INSIDE banner */}
-        <View style={styles.bannerContent}>
-          {/* Logo top-left */}
-          <View style={styles.logoWrapper} pointerEvents="none">
-            <Animated.View
-              style={[
-                styles.logoPulse,
-                {
-                  transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
-                  opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] }),
-                },
-              ]}
-            />
-            <Animated.Image
-              source={{ uri: logoUrl }}
-              style={[
-                styles.logo,
-                {
-                  transform: [
-                    { translateY: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-                    { scale: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.86, 1] }) },
-                  ],
-                  opacity: logoAnim,
-                },
-              ]}
-              resizeMode="cover"
-            />
-          </View>
-
-          {/* Top right: Store name + rating + status */}
-          <View style={styles.topRight}>
-            <View>
-              <Text style={styles.storeName}>{store.name}</Text>
-              <View style={styles.ratingStatusRow}>
-                {renderStarRating(rating)}
-                <Text style={styles.ratingNumber}>⭐ {rating.toFixed(1)}</Text>
-                <Text style={styles.ratingCount}> 🟣 {ratingCount}</Text>
+      <View style={styles.headerTopRow}>
+        {!!store.logo_url && (
+          <Image
+            source={{ uri: store.logo_url }}
+            style={styles.logo}
+            resizeMode="cover"
+          />
+        )}
+        <View style={styles.storeInfo}>
+          <Text style={styles.storeName}>{store.name}</Text>
+          <View style={styles.storeMeta}>
+            {rating > 0 && (
+              <View style={styles.metaItem}>
+                <Text style={styles.metaText}>⭐ {rating.toFixed(1)} · {ratingCount} avis</Text>
               </View>
+            )}
+            <View style={styles.badgeOpen}>
+              <Text style={styles.badgeOpenText}>🟢 Ouvert maintenant</Text>
             </View>
-            <TouchableOpacity
-              style={styles.openBadge}
-              onPress={onContact}
-            >
-              <Ionicons name="location" size={14} color="#7C3AED" />
-              <Text style={styles.openText}>Ouvert maintenant</Text>
-            </TouchableOpacity>
+            {!!store.address && (
+              <View style={styles.metaItem}>
+                <Text style={styles.metaText}>📍 {store.address}</Text>
+              </View>
+            )}
+            {!!store.phone && (
+              <View style={styles.metaItem}>
+                <Text style={styles.metaText}>📞 {store.phone}</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
 
+      <View style={styles.actions}>
+        <TouchableOpacity style={[styles.btn, styles.btnPrimary]} onPress={onContact}>
+          <Text style={styles.btnPrimaryText}>📩 Contacter</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity style={styles.btn} onPress={onFollow}>
+          <Text style={styles.btnText}>{isFollowing ? '✅ Suivi' : '➕ Suivre'}</Text>
+        </TouchableOpacity>
+        
+        {onShare && (
+          <TouchableOpacity style={styles.btn} onPress={onShare}>
+            <Text style={styles.btnText}>↗️ Partager</Text>
+          </TouchableOpacity>
+        )}
+        
+        {onReport && (
+          <TouchableOpacity style={styles.btn} onPress={onReport}>
+            <Text style={styles.btnText}>🚩 Signaler</Text>
+          </TouchableOpacity>
+        )}
+        
+        {onDirections && store.address && (
+          <TouchableOpacity style={styles.btn} onPress={onDirections}>
+            <Text style={styles.btnText}>📍 Itinéraire</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
 
-const getStyles = (COLORS: any) => StyleSheet.create({
+const getStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
   container: {
-    backgroundColor: COLORS.bg,
-  },
-  bannerContainer: {
-    position: 'relative',
-    height: 340,
-    overflow: 'visible',
-  },
-  banner: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-  },
-  bannerContent: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: SPACING.lg,
-    paddingLeft: SPACING.lg + 130,
-  },
-  logoWrapper: {
-    position: 'absolute',
-    left: SPACING.lg,
-    bottom: SPACING.lg,
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    padding: SPACING.xl,
     backgroundColor: COLORS.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: COLORS.primary,
-    overflow: 'hidden',
-    ...Platform.select({
-      web: {
-        boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.15)',
-      },
-      default: {
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-      },
-    }),
-    zIndex: 20,
-  },
-  logo: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
-  },
-  logoPulse: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: COLORS.primary,
-    left: -8,
-    top: -8,
-  },
-  topRight: {
-    flex: 1,
-    marginLeft: SPACING.lg,
-    justifyContent: 'space-between',
-    height: '100%',
-  },
-  storeName: {
-    fontSize: FONT_SIZE.xxl,
-    fontWeight: '700',
-    color: COLORS.white,
-    marginBottom: SPACING.xs,
-  },
-  ratingStatusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  ratingNumber: {
-    fontSize: FONT_SIZE.sm,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  ratingCount: {
-    fontSize: FONT_SIZE.xs,
-    color: COLORS.white,
-    fontWeight: '500',
-  },
-  openBadge: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    alignSelf: 'flex-start',
-  },
-  openText: {
-    fontSize: FONT_SIZE.xs,
-    fontWeight: '600',
-    color: COLORS.primary || '#7C3AED',
-  },
-  descriptionContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.bg,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: SPACING.xl,
+    ...Platform.select({
+      web: {
+        boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.2)' : '0 4px 20px rgba(0,0,0,0.04)',
+      },
+      default: {
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+      }
+    })
   },
-  description: {
-    fontSize: FONT_SIZE.sm,
-    lineHeight: 20,
+  headerTopRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xl,
+    minWidth: 280,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  storeInfo: {
+    flex: 1,
+  },
+  storeName: {
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontSize: 32,
+    fontWeight: 'bold',
     color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  storeMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.md,
+    alignItems: 'center',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaText: {
+    color: COLORS.textSoft,
+    fontSize: 15,
+  },
+  badgeOpen: {
+    backgroundColor: isDark ? 'rgba(21, 128, 61, 0.2)' : '#dcfce7',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  badgeOpenText: {
+    color: isDark ? '#4ade80' : '#15803d',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 110,
+  },
+  btnText: {
+    color: COLORS.text,
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  btnPrimary: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+    borderWidth: 0,
+    ...Platform.select({
+      web: {
+        boxShadow: `0 4px 12px ${COLORS.accent}40`,
+      }
+    })
+  },
+  btnPrimaryText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

@@ -37,6 +37,7 @@ export const StoreTabs: React.FC<StoreTabsProps> = ({
         horizontal
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
+        contentContainerStyle={{ minWidth: '100%' }}
       >
         <View style={styles.tabsWrapper}>
           {tabs.map((tab) => (
@@ -76,14 +77,19 @@ const getStyles = (COLORS: any) => StyleSheet.create({
   },
   tabsWrapper: {
     flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
+    flex: 1,
+    justifyContent: 'space-between',
   },
   tab: {
+    flex: 1,
     paddingVertical: SPACING.md,
-    marginRight: SPACING.xl,
+    paddingHorizontal: SPACING.sm,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 80,
   },
   activeTab: {
     borderBottomColor: COLORS.primary || '#7C3AED',

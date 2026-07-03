@@ -18,13 +18,38 @@ const guessMimeType = (uri: string) => {
 export const cloudinaryService = {
   getOptimizedUrl(url: string, width?: number): string {
     if (!url || !url.includes('res.cloudinary.com')) return url;
-    // Don't optimize if already optimized or containing transformations
-    if (url.includes('/upload/q_auto') || url.includes('/upload/w_')) return url;
-    
+
+    const uploadSegment = '/upload/';
+    const uploadIndex = url.indexOf(uploadSegment);
+    if (uploadIndex === -1) return url;
+
+    // Everything up to and including '/upload/'
+    const base = url.substring(0, uploadIndex + uploadSegment.length);
+    const afterUpload = url.substring(uploadIndex + uploadSegment.length);
+
+    // Cloudinary URLs after /upload/ can be:
+    //   <version>/<path>              e.g. v123456/folder/file.jpg
+    //   <transforms>/<version>/<path> e.g. q_auto,f_auto/v123456/folder/file.jpg
+    //   <path>                        e.g. folder/file.jpg (rare, no versioning)
+    //
+    // Strategy: find the version segment (v followed by digits then slash)
+    // which can appear at position 0 (no transforms) or after transforms.
+    const versionMatch = afterUpload.match(/(^|\/)v(\d+)\//);
+    let assetPath: string;
+    if (versionMatch && versionMatch.index !== undefined) {
+      // Start asset path from the 'v' character of the version
+      const vStart = versionMatch.index + (versionMatch[1] ? 1 : 0);
+      assetPath = afterUpload.substring(vStart); // e.g. "v123456/folder/file.jpg"
+    } else {
+      // No version segment — strip any leading transform block
+      assetPath = afterUpload.replace(/^([a-z_,0-9.]+\/)+/, '');
+    }
+
+    // Build fresh transforms
     const transforms = ['q_auto', 'f_auto'];
-    if (width) transforms.push(`w_${width}`);
-    
-    return url.replace('/upload/', `/upload/${transforms.join(',')}/`);
+    if (width) transforms.push(`w_${width},c_fill,g_auto`);
+
+    return `${base}${transforms.join(',')}/${assetPath}`;
   },
 
   async uploadImage(uri: string, opts?: { folder?: string; enhance?: boolean }): Promise<string> {

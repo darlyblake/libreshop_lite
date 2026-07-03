@@ -7,10 +7,10 @@ const BLURHASH =
   '|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXofj[ayj[j[fQayWCoeoeaya}j[ayfQa{oLj?j[WVj[ayayj[fQoff7azayj[ayj[j[ayofayayayj[fQj[ayayj[ayfjj[j[ayjuayj[';
 
 // Extend ImageProps if we need to support legacy 'uri' prop passed by old code
-type Props = ImageProps & { uri?: string };
+type Props = ImageProps & { uri?: string; priority?: 'high' | 'normal' | 'low' };
 
 const OptimizedImage = (props: Props) => {
-  const { source, uri, style, placeholder, ...rest } = props;
+  const { source, uri, style, placeholder, priority = 'normal', ...rest } = props;
 
   // Resolve source backward compatibility
   const resolvedSource = source || (uri ? { uri } : undefined);
@@ -21,8 +21,9 @@ const OptimizedImage = (props: Props) => {
       source={resolvedSource}
       placeholder={placeholder || BLURHASH}
       contentFit="cover"
-      transition={300}
+      transition={priority === 'high' ? 0 : 300}
       cachePolicy="memory-disk"
+      priority={priority}
       onError={(error) => {
         // Silently handle network errors to avoid blocking UI
         console.warn('[OptimizedImage] Image load error:', (error as any).error || error);

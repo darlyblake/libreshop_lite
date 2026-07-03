@@ -266,16 +266,13 @@ interface ProductCardProps {
   price: number;
   comparePrice?: number;
   imageUrl?: string;
+  priority?: 'high' | 'normal' | 'low';
   onPress: () => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = React.memo(({
-  name,
-  price,
-  comparePrice,
-  imageUrl,
-  onPress,
-}) => {
+export const ProductCard: React.FC<ProductCardProps> = React.memo((
+  { name, price, comparePrice, imageUrl, priority = 'normal', onPress }
+) => {
   const themeContext = useTheme();
   const COLORS = themeContext.getColor;
   const styles = React.useMemo(() => getStyles(themeContext), [themeContext.isDark, themeContext.getColor]);
@@ -288,7 +285,11 @@ export const ProductCard: React.FC<ProductCardProps> = React.memo(({
     >
       <View style={styles.productImageContainer}>
         {imageUrl ? (
-          <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(imageUrl, 400) }} style={styles.productImage} />
+          <OptimizedImage
+            source={{ uri: cloudinaryService.getOptimizedUrl(imageUrl, 400) }}
+            style={styles.productImage}
+            priority={priority}
+          />
         ) : (
           <View style={styles.productImagePlaceholder}>
             <Text style={styles.productImagePlaceholderText}>📦</Text>

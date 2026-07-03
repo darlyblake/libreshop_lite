@@ -1191,12 +1191,15 @@ export const SellerProductsScreen: React.FC = () => {
               store_id: storeId,
               collection_id: product.collectionId,
               name: String(product.name || '').trim(),
+              description: String(product.description || '').trim() || undefined,
               price: price,
               cost_price: (product as any).costPrice ? parseFloat((product as any).costPrice) : null,
               stock: Number.parseInt(product.stock || '0', 10) || 0,
               reference: product.barcode ? String(product.barcode) : undefined,
               images: uploadedUrls,
               is_active: true,
+              featured: product.featured || false,
+              condition: product.condition || 'new',
               attributes: product.attributes || {},
             };
 

@@ -123,6 +123,7 @@ export const SellerEditProductScreen: React.FC = () => {
         is_active: true,
         attributes: updatedProduct.attributes || {},
         featured: updatedProduct.featured || false,
+        condition: updatedProduct.condition || 'new',
       };
 
       // Only include compare_price if it's valid (greater than price)

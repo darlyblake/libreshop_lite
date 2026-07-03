@@ -995,7 +995,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       setProductAttributes(initialProduct.attributes || {});
       setCurrentStep(1);
     }
-  }, [visible, editProductId]);
+  }, [visible, editProductId, initialProduct]);
 
   const [enhancingImages, setEnhancingImages] = useState<{ [key: number]: boolean }>({});
   const [show3DPreview, setShow3DPreview] = useState(false);

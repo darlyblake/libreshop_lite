@@ -314,7 +314,11 @@ export const ClientHomeScreen: React.FC = () => {
         {/* Categories Chips */}
         <View style={{ marginBottom: SPACING.xl }}>
           <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', color: palette.text, marginBottom: SPACING.md, textAlign: 'center' }}>Explorer</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SPACING.md, paddingHorizontal: SPACING.md }}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: SPACING.md, paddingHorizontal: SPACING.md }}
+          >
             {CATEGORIES.map((cat, i) => (
               <TouchableOpacity 
                 key={i} 

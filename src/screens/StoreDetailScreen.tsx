@@ -897,7 +897,83 @@ export const StoreDetailScreen: React.FC = () => {
 
         {!loading && !errorMsg && isSubActive && (
           <>
-            {/* NEW: Modern Store Header with StoreHeader component */}
+            {/* ─── Promo Banner (Top) ─── */}
+            {shouldShowPromo ? (
+              <TouchableOpacity
+                style={{
+                  height: 320,
+                  width: '100%',
+                  position: 'relative',
+                  backgroundColor: COLORS.card,
+                  marginBottom: 10,
+                }}
+                onPress={handlePromoPress}
+                activeOpacity={0.85}
+              >
+                {!!storeData.promoImageUrl && (
+                  <Image
+                    source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
+                    style={{ width: '100%', height: '100%', position: 'absolute' }}
+                    resizeMode="cover"
+                  />
+                )}
+                {/* Gradient overlay */}
+                <View style={{
+                  ...StyleSheet.absoluteFillObject,
+                  backgroundColor: 'rgba(0,0,0,0.4)',
+                }} />
+                
+                <View style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  padding: SPACING.xl,
+                  width: '100%',
+                  maxWidth: 700,
+                }}>
+                  {!!String(storeData.promoTitle || "").trim() && (
+                    <Text style={{
+                      fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+                      fontSize: 32,
+                      fontWeight: 'bold',
+                      color: 'white',
+                      marginBottom: 8,
+                      textShadowColor: 'rgba(0,0,0,0.3)',
+                      textShadowOffset: { width: 0, height: 2 },
+                      textShadowRadius: 10,
+                    }}>
+                      {String(storeData.promoTitle)}
+                    </Text>
+                  )}
+                  {!!String(storeData.promoSubtitle || "").trim() && (
+                    <Text style={{
+                      fontSize: 16,
+                      color: 'rgba(255,255,255,0.95)',
+                    }}>
+                      {String(storeData.promoSubtitle)}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View
+                style={{
+                  height: 320,
+                  width: '100%',
+                  position: 'relative',
+                  backgroundColor: COLORS.card,
+                  marginBottom: 10,
+                }}
+              >
+                <Image
+                  source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
+                  style={{ width: '100%', height: '100%', position: 'absolute' }}
+                  resizeMode="cover"
+                />
+              </View>
+            )}
+
+            {/* ─── NOUVEAU STORE HEADER ─── */}
             <StoreHeader
               store={{
                 id: store?.id || "",
@@ -909,134 +985,20 @@ export const StoreDetailScreen: React.FC = () => {
                 verified: Boolean(store?.verified || storeData?.verified),
                 rating: ratingAvg,
                 rating_count: ratingCount,
+                phone: store?.phone,
+                address: store?.address,
               }}
+              isFollowing={isFollowing}
               onShare={handleShareStore}
               onContact={() => {
                 if (hasPhone) {
                   handleWhatsAppContact();
                 }
               }}
-              onFollow={() => {
-                // Follow is handled by the component if needed
-              }}
+              onFollow={handleFollowStore}
+              onReport={handleReportStore}
+              onDirections={handleOpenDirections}
             />
-
-            {/* NEW: Store Info Card */}
-            {store && (
-              <StoreInfoCard
-                store={{
-                  phone: store?.phone,
-                  address: store?.address,
-                  opening_hours: store?.opening_hours,
-                  delivery_time: store?.delivery_time,
-                  email: store?.email,
-                }}
-              />
-            )}
-
-            {/* Action Buttons: Contact & Follow */}
-            <View style={styles.actionButtonsSection}>
-              <View style={styles.actionButtonsRow}>
-                <TouchableOpacity 
-                  style={styles.contactButton}
-                  onPress={() => {
-                    if (hasPhone) {
-                      handleWhatsAppContact();
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name="call" 
-                    size={18} 
-                    color={'#ffffff'}
-                  />
-                  <Text style={styles.contactButtonText}>Contacter</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.followButton}
-                  onPress={handleFollowStore}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name={isFollowing ? 'heart' : 'heart-outline'} 
-                    size={18} 
-                    color={isFollowing ? COLORS.accent : COLORS.text}
-                  />
-                  <Text style={styles.followButtonText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.actionButtonsRow}>
-                <TouchableOpacity
-                  style={styles.followButton}
-                  onPress={() => {
-                    if (store) {
-                      const shareUrl = `https://libreshop.shop/api/store?id=${store.id}`;
-                      shareContent({
-                        title: store.name,
-                        description: store.description || '',
-                        url: shareUrl,
-                        imageUrl: store.avatar_url || store.banner_url || undefined,
-                        type: 'store',
-                      });
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name="share-outline" 
-                    size={18} 
-                    color={COLORS.text}
-                  />
-                  <Text style={styles.followButtonText}>Partager</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.reportButton}
-                  onPress={handleReportStore}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name="flag-outline" 
-                    size={18} 
-                    color={COLORS.danger}
-                  />
-                  <Text style={styles.reportButtonText}>Signaler</Text>
-                </TouchableOpacity>
-
-                {store?.latitude && store?.longitude && (
-                  <TouchableOpacity 
-                    style={styles.followButton}
-                    onPress={handleOpenMap}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons 
-                      name="map-outline" 
-                      size={18} 
-                      color={COLORS.text}
-                    />
-                    <Text style={styles.followButtonText}>Carte</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {store?.latitude && store?.longitude && (
-                <TouchableOpacity 
-                  style={styles.directionButton}
-                  onPress={handleOpenDirections}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name="navigate" 
-                    size={18} 
-                    color={'#ffffff'}
-                  />
-                  <Text style={styles.directionButtonText}>Itinéraire</Text>
-                </TouchableOpacity>
-              )}
-            </View>
 
             {/* NEW: Store Tabs Navigation */}
             <StoreTabs
@@ -1100,30 +1062,39 @@ export const StoreDetailScreen: React.FC = () => {
                   <Text style={styles.sectionTitle}>Bienvenue</Text>
                 </View>
 
-                {/* Featured/Recent Products */}
-                {homepageProducts && homepageProducts.length > 0 && (
-                  <View style={styles.homepageProductsSection}>
-                    <Text style={styles.sectionTitle}>
-                      {homepageProducts.some(p => p.featured) ? 'Produits en vedette' : 'Produits récents'}
-                    </Text>
+                {/* Featured Products - only products marked as featured */}
+                <View style={styles.homepageProductsSection}>
+                  <Text style={styles.sectionTitle}>Produits en vedette</Text>
+                  {homepageProducts && homepageProducts.length > 0 ? (
                     <View style={styles.productsGrid}>
-                            {homepageProducts.map((product, idx) => {
-                              const card = mapProductToCard(product);
-                              return (
-                                <View key={card.id || `hp-${idx}`} style={[styles.productCardWrapper, { width: cardWidth }]}> 
-                                  <ProductCard
-                                    name={card.name}
-                                    price={card.price}
-                                    comparePrice={card.comparePrice}
-                                    imageUrl={card.imageUrl}
-                                    onPress={() => navigation.push('ProductDetail', { productId: card.id, storeId: effectiveStoreId })}
-                                  />
-                                </View>
-                              );
-                            })}
+                      {homepageProducts.map((product, idx) => {
+                        const card = mapProductToCard(product);
+                        return (
+                          <View key={card.id || `hp-${idx}`} style={[styles.productCardWrapper, { width: cardWidth }]}>
+                            <ProductCard
+                              name={card.name}
+                              price={card.price}
+                              comparePrice={card.comparePrice}
+                              imageUrl={card.imageUrl}
+                              priority={idx < 4 ? 'high' : 'normal'}
+                              onPress={() => navigation.push('ProductDetail', { productId: card.id, storeId: effectiveStoreId })}
+                            />
+                          </View>
+                        );
+                      })}
                     </View>
-                  </View>
-                )}
+                  ) : (
+                    <View style={{ alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24 }}>
+                      <Text style={{ fontSize: 36, marginBottom: 12 }}>⭐</Text>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: COLORS.textSoft, textAlign: 'center', marginBottom: 6 }}>
+                        Aucun produit en vedette
+                      </Text>
+                      <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center', lineHeight: 20 }}>
+                        Le vendeur n'a pas encore sélectionné de produits à mettre en avant sur cette page.
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </>
             )}
 
@@ -1221,9 +1192,8 @@ export const StoreDetailScreen: React.FC = () => {
             <View style={styles.productsSection}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>{productsTitle}</Text>
-                <Text style={styles.sectionCount}>
-                  {allDisplayedProducts.length} produit
-                  {allDisplayedProducts.length !== 1 ? "s" : ""}
+                <Text style={styles.sectionSubtitle}>
+                  Les derniers arrivages de la semaine ({allDisplayedProducts.length} produit{allDisplayedProducts.length !== 1 ? "s" : ""})
                 </Text>
               </View>
 
@@ -1670,7 +1640,26 @@ export const StoreDetailScreen: React.FC = () => {
               </View>
             )}
 
-            <View style={{ height: SPACING.xxxl * 2 }} />
+            <View style={{ height: SPACING.xxxl }} />
+
+            {/* ─── FOOTER ─── */}
+            <View style={{ 
+              backgroundColor: COLORS.card, 
+              paddingVertical: 48, 
+              paddingHorizontal: 20, 
+              alignItems: 'center', 
+              borderTopWidth: 3, 
+              borderTopColor: COLORS.accent,
+              width: '100%',
+              marginTop: 'auto'
+            }}>
+              <Text style={{ fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', fontSize: 24, fontWeight: 'bold', color: COLORS.text, marginBottom: 8 }}>
+                {storeData.name}
+              </Text>
+              <Text style={{ color: COLORS.textSoft, fontSize: 14, opacity: 0.8 }}>
+                © {new Date().getFullYear()} · Gabon · Tous droits réservés
+              </Text>
+            </View>
           </>
         )}
       </ScrollView>
@@ -2058,15 +2047,25 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     paddingBottom: SPACING.xl,
   },
   sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xxl,
+    marginTop: SPACING.lg,
   },
   sectionTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: "700",
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+    fontSize: 32,
+    fontWeight: "bold",
     color: COLORS.text,
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSoft,
+    textAlign: "center",
+    marginBottom: SPACING.md,
   },
   sectionCount: {
     fontSize: FONT_SIZE.sm,
@@ -2105,7 +2104,7 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.md,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   productCardWrapper: {
     // width is set dynamically
