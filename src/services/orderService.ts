@@ -570,16 +570,23 @@ export const orderService = {
   /**
    * Notifie le client d'une rupture de stock sur sa commande
    */
-  async notifyClientStockIssue(orderId: string, missingItems: any[]): Promise<Order> {
+  async notifyClientStockIssue(orderId: string, missingItems: any[], restockStatus?: 'expected' | 'no_restock'): Promise<Order> {
     const client = useSupabase();
-    const order = await this.getById(orderId);
+    const order = await this.getById(orderId, { includeStore: true });
     if (!order) throw new Error('Commande non trouvée');
+
+    const shortId = order.id.slice(0, 8).toUpperCase();
+    const missingNames = missingItems.map(i => i.name).join(', ');
+    const restockInfo = restockStatus === 'no_restock'
+      ? ' Le vendeur nous indique qu\'aucun réapprovisionnement n\'est prévu.'
+      : '';
 
     const { data, error } = await client
       .from('orders')
       .update({
         issue_type: 'out_of_stock',
         issue_details: missingItems,
+        restock_status: restockStatus || null,
       })
       .eq('id', orderId)
       .select('*')
@@ -589,21 +596,123 @@ export const orderService = {
 
     await cacheService.remove(`order:${orderId}`);
 
-    // Send notification
+    // ✅ Send notification with deep-link data
     try {
       const { notificationService } = await import('./notificationService');
       await notificationService.create({
         user_id: order.user_id,
         type: 'order',
-        title: 'Problème de stock sur votre commande',
-        body: `Certains produits de votre commande #${order.id.slice(0, 8)} sont en rupture de stock. Veuillez consulter les détails.`,
-        data: { order_id: order.id, type: 'stock_issue' },
-      });
+        title: '⚠️ Rupture de stock sur votre commande',
+        body: `Produit(s) indisponible(s) dans la commande #${shortId} : ${missingNames}.${restockInfo} Ouvrez pour choisir une action.`,
+        targetRole: 'client',
+        data: {
+          orderId: order.id,
+          type: 'stock_issue',
+          navigate_to: 'ClientOrderDetail',
+        },
+      } as any);
     } catch (e) {
       console.warn('Failed to notify client of stock issue:', e);
     }
 
     return data as Order;
+  },
+
+  /**
+   * Le vendeur notifie les clients en attente que le stock est réapprovisionné
+   * (les clients qui ont choisi "Attendre")
+   */
+  async notifyRestockedClients(storeId: string, productId: string, productName: string): Promise<number> {
+    const client = useSupabase();
+    // Chercher toutes les commandes avec issue_type = 'waiting_restock' pour ce produit
+    const { data: waitingOrders, error } = await client
+      .from('orders')
+      .select('id, user_id, issue_details')
+      .eq('store_id', storeId)
+      .eq('issue_type', 'waiting_restock');
+
+    if (error) throw error;
+
+    const relevant = (waitingOrders || []).filter(o =>
+      (o.issue_details as any[])?.some((d: any) => d.product_id === productId)
+    );
+
+    if (relevant.length === 0) return 0;
+
+    const { notificationService } = await import('./notificationService');
+    let count = 0;
+    for (const o of relevant) {
+      try {
+        await notificationService.create({
+          user_id: o.user_id,
+          type: 'order',
+          title: '🎉 Produit disponible !',
+          body: `"${productName}" est à nouveau disponible ! Votre commande #${o.id.slice(0, 8).toUpperCase()} peut maintenant être traitée. Reconnectez-vous pour la passer.`,
+          targetRole: 'client',
+          data: { orderId: o.id, type: 'restock_available', navigate_to: 'ClientOrderDetail' },
+        } as any);
+
+        // Remettre la commande en attente normale
+        await client
+          .from('orders')
+          .update({ issue_type: null, issue_details: null, restock_status: null })
+          .eq('id', o.id);
+
+        await cacheService.remove(`order:${o.id}`);
+        count++;
+      } catch (e) {
+        console.warn(`Failed to notify client for order ${o.id}:`, e);
+      }
+    }
+    return count;
+  },
+
+  /**
+   * Le vendeur signale qu'il n'y aura pas de réapprovisionnement pour ce produit
+   * (notifie les clients en attente pour qu'ils annulent ou continuent sans ce produit)
+   */
+  async notifyNoRestock(storeId: string, productId: string, productName: string): Promise<number> {
+    const client = useSupabase();
+    const { data: waitingOrders, error } = await client
+      .from('orders')
+      .select('id, user_id, issue_details')
+      .eq('store_id', storeId)
+      .eq('issue_type', 'waiting_restock');
+
+    if (error) throw error;
+
+    const relevant = (waitingOrders || []).filter(o =>
+      (o.issue_details as any[])?.some((d: any) => d.product_id === productId)
+    );
+
+    if (relevant.length === 0) return 0;
+
+    const { notificationService } = await import('./notificationService');
+    let count = 0;
+    for (const o of relevant) {
+      try {
+        // Mettre à jour le statut pour indiquer qu'il n'y aura pas de réappro
+        await client
+          .from('orders')
+          .update({ restock_status: 'no_restock' })
+          .eq('id', o.id);
+
+        await cacheService.remove(`order:${o.id}`);
+
+        await notificationService.create({
+          user_id: o.user_id,
+          type: 'order',
+          title: '🚨 Réapprovisionnement impossible',
+          body: `Le vendeur nous informe qu'il ne pourra pas réapprovisionner "${productName}". Votre commande #${o.id.slice(0, 8).toUpperCase()} nécessite une action de votre part.`,
+          targetRole: 'client',
+          data: { orderId: o.id, type: 'no_restock', navigate_to: 'ClientOrderDetail' },
+        } as any);
+        count++;
+      } catch (e) {
+        console.warn(`Failed to notify client no-restock for order ${o.id}:`, e);
+      }
+    }
+    return count;
   },
 
   /**
@@ -647,7 +756,6 @@ export const orderService = {
     // Notifier le vendeur
     try {
       const { notificationService } = await import('./notificationService');
-      // Trouver le seller user_id via le store
       const storeData = (order as any).stores || (order as any).store;
       const sellerUserId = storeData?.user_id;
       if (sellerUserId) {
@@ -656,8 +764,9 @@ export const orderService = {
           type: 'order',
           title: notifTitle,
           body: notifBody,
-          data: { order_id: order.id, type: 'stock_response', action },
-        });
+          targetRole: 'seller',
+          data: { orderId: order.id, type: 'stock_response', action, navigate_to: 'SellerOrderDetail' },
+        } as any);
       }
     } catch (e) {
       console.warn('Failed to notify seller of client stock response:', e);

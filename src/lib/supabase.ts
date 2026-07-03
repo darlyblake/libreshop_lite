@@ -272,7 +272,8 @@ export interface Order {
   shipping_provider?: string;
   estimated_delivery_date?: string;
   issue_type?: 'out_of_stock' | 'resolved_partial' | 'waiting_restock' | null;
-  issue_details?: Array<{ product_id: string; name: string; quantity: number }>;
+  issue_details?: Array<{ product_id: string; name: string; quantity: number; restock_date?: string }>;
+  restock_status?: 'expected' | 'no_restock' | null; // Vendeur: réapprovisionnement prévu ou non
 }
 
 export interface OrderItem {

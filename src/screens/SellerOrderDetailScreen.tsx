@@ -57,6 +57,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
   const [restockModalVisible, setRestockModalVisible] = useState(false);
   const [missingItemsToRestock, setMissingItemsToRestock] = useState<any[]>([]);
   const [restockDates, setRestockDates] = useState<{[key: string]: string}>({});
+  const [restockStatusChoice, setRestockStatusChoice] = useState<'expected' | 'no_restock'>('expected');
 
   // 📦 Tracking livraison
   const [trackingModalVisible, setTrackingModalVisible] = useState(false);
@@ -143,6 +144,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
               onPress: () => {
                 setMissingItemsToRestock(error.missing_items);
                 setRestockDates({});
+                setRestockStatusChoice('expected');
                 setRestockModalVisible(true);
               } 
             },
@@ -159,24 +161,80 @@ export const SellerOrderDetailScreen: React.FC = () => {
   };
 
   const handleConfirmNotifyClient = async () => {
-    if (!orderId) return;
+    if (!orderId || !order) return;
     setUpdating(true);
     try {
-      // Map missing items with restock dates
       const missingWithDates = missingItemsToRestock.map(item => ({
         ...item,
-        restock_date: restockDates[item.product_id] || 'Non définie'
+        restock_date: restockStatusChoice === 'no_restock' ? 'Aucun réappro prévu' : (restockDates[item.product_id] || 'Date non définie')
       }));
       
-      await orderService.notifyClientStockIssue(orderId, missingWithDates);
-      Alert.alert('Succès', 'Le client a été notifié de la rupture de stock avec les dates prévues.');
+      await orderService.notifyClientStockIssue(orderId, missingWithDates, restockStatusChoice);
+
+      const msg = restockStatusChoice === 'no_restock'
+        ? 'Le client a été informé qu\'aucun réapprovisionnement n\'est prévu. Il devra annuler ou modifier sa commande.'
+        : 'Le client a été notifié de la rupture de stock avec les dates prévues.';
+      Alert.alert('Succès', msg);
       setRestockModalVisible(false);
-      loadOrder(); // Reload to show the new state
+      loadOrder();
     } catch (e) {
       Alert.alert('Erreur', 'Impossible de notifier le client.');
     } finally {
       setUpdating(false);
     }
+  };
+
+  // Notifier les clients en attente quand le stock arrive
+  const handleNotifyRestockedClients = async () => {
+    if (!order) return;
+    setUpdating(true);
+    try {
+      const storeId = order.store_id;
+      // Récupérer les produits concernés depuis issue_details
+      const items = (order as any).issue_details || [];
+      let count = 0;
+      for (const item of items) {
+        count += await orderService.notifyRestockedClients(storeId, item.product_id, item.name);
+      }
+      Alert.alert('✅ Clients notifiés', `${count} client(s) en attente ont été notifiés que le stock est disponible. Leurs commandes ont été remises en attente.`);
+      loadOrder();
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de notifier les clients.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Confirmer "pas de réappro" pour les commandes en attente
+  const handleNotifyNoRestock = async () => {
+    if (!order) return;
+    Alert.alert(
+      'Confirmer l\'absence de réapprovisionnement',
+      'Vous êtes sur le point de notifier les clients en attente qu\'aucun réapprovisionnement n\'est prévu. Ils devront annuler ou modifier leurs commandes.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
+          style: 'destructive',
+          onPress: async () => {
+            setUpdating(true);
+            try {
+              const items = (order as any).issue_details || [];
+              let count = 0;
+              for (const item of items) {
+                count += await orderService.notifyNoRestock(order.store_id, item.product_id, item.name);
+              }
+              Alert.alert('🚨 Clients informés', `${count} client(s) ont été informés qu\'aucun réapprovisionnement n\'est prévu.`);
+              loadOrder();
+            } catch (e) {
+              Alert.alert('Erreur', 'Impossible de notifier les clients.');
+            } finally {
+              setUpdating(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleSaveTracking = async () => {
@@ -641,6 +699,54 @@ Merci.`;
         )}
       </View>
 
+      {/* Waiting restock panel \u2014 client is waiting for stock */}
+      {(order as any).issue_type === 'waiting_restock' && (
+        <View style={{ paddingHorizontal: SPACING.lg, marginBottom: SPACING.md }}>
+          <View style={{
+            backgroundColor: COLORS.warning + '15', borderColor: COLORS.warning, borderWidth: 1,
+            borderRadius: RADIUS.md, padding: SPACING.md,
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
+              <Ionicons name="time" size={18} color={COLORS.warning} />
+              <Text style={{ color: COLORS.warning, fontWeight: '700', marginLeft: 6, fontSize: FONT_SIZE.sm }}>
+                Client en attente de r\u00e9approvisionnement
+              </Text>
+            </View>
+            <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.sm, marginBottom: SPACING.md }}>
+              Ce client a choisi d'attendre. Notifiez-le d\u00e8s que le stock est disponible, ou informez-le si aucun r\u00e9appro n'est pr\u00e9vu.
+            </Text>
+            <TouchableOpacity
+              onPress={handleNotifyRestockedClients}
+              disabled={updating}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                backgroundColor: COLORS.success, borderRadius: RADIUS.md, paddingVertical: SPACING.md,
+                marginBottom: SPACING.sm, opacity: updating ? 0.6 : 1,
+              }}
+            >
+              <Ionicons name="checkmark-circle" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: FONT_SIZE.sm }}>
+                \u2705 Stock arriv\u00e9, notifier le client
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleNotifyNoRestock}
+              disabled={updating}
+              style={{
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+                backgroundColor: COLORS.danger + '15', borderColor: COLORS.danger, borderWidth: 1,
+                borderRadius: RADIUS.md, paddingVertical: SPACING.md, opacity: updating ? 0.6 : 1,
+              }}
+            >
+              <Ionicons name="close-circle" size={18} color={COLORS.danger} />
+              <Text style={{ color: COLORS.danger, fontWeight: '700', fontSize: FONT_SIZE.sm }}>
+                \ud83d\udea8 Aucun r\u00e9appro pr\u00e9vu
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Restock Dates Modal */}
       <Modal
         visible={restockModalVisible}
@@ -651,30 +757,75 @@ Merci.`;
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: COLORS.card }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: COLORS.text }]}>Dates de réapprovisionnement</Text>
+              <Text style={[styles.modalTitle, { color: COLORS.text }]}>Rupture de stock — Notifier le client</Text>
               <TouchableOpacity onPress={() => setRestockModalVisible(false)}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.modalSubtitle, { color: COLORS.textMuted }]}>
-              Veuillez indiquer une date prévue de réapprovisionnement pour les produits en rupture de stock. Le client sera notifié.
+            {/* Choice: restock expected or not */}
+            <Text style={[styles.modalSubtitle, { color: COLORS.textMuted, marginBottom: SPACING.sm }]}>
+              Le vendeur prévoit-il un réapprovisionnement ?
             </Text>
+            <View style={{ flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.md }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1, padding: SPACING.sm, borderRadius: RADIUS.md, alignItems: 'center',
+                  borderWidth: 2,
+                  borderColor: restockStatusChoice === 'expected' ? COLORS.success : COLORS.border,
+                  backgroundColor: restockStatusChoice === 'expected' ? COLORS.success + '15' : COLORS.bg,
+                }}
+                onPress={() => setRestockStatusChoice('expected')}
+              >
+                <Ionicons name="checkmark-circle" size={20} color={restockStatusChoice === 'expected' ? COLORS.success : COLORS.textMuted} />
+                <Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '600', marginTop: 4, color: restockStatusChoice === 'expected' ? COLORS.success : COLORS.textMuted }}>
+                  Oui, réappro prévu
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flex: 1, padding: SPACING.sm, borderRadius: RADIUS.md, alignItems: 'center',
+                  borderWidth: 2,
+                  borderColor: restockStatusChoice === 'no_restock' ? COLORS.danger : COLORS.border,
+                  backgroundColor: restockStatusChoice === 'no_restock' ? COLORS.danger + '15' : COLORS.bg,
+                }}
+                onPress={() => setRestockStatusChoice('no_restock')}
+              >
+                <Ionicons name="close-circle" size={20} color={restockStatusChoice === 'no_restock' ? COLORS.danger : COLORS.textMuted} />
+                <Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '600', marginTop: 4, color: restockStatusChoice === 'no_restock' ? COLORS.danger : COLORS.textMuted }}>
+                  Non, pas de réappro
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-            <ScrollView style={{ maxHeight: 300 }}>
-              {missingItemsToRestock.map(item => (
-                <View key={item.product_id} style={{ marginBottom: SPACING.md }}>
-                  <Text style={{ fontWeight: '600', color: COLORS.text, marginBottom: SPACING.xs }}>{item.name}</Text>
-                  <TextInput
-                    style={[styles.modalInput, { marginBottom: 0 }]}
-                    value={restockDates[item.product_id] || ''}
-                    onChangeText={(text) => setRestockDates(prev => ({ ...prev, [item.product_id]: text }))}
-                    placeholder="Ex: Le 15 Octobre, Demain, Dans 3 jours..."
-                    placeholderTextColor={COLORS.textMuted}
-                  />
-                </View>
-              ))}
-            </ScrollView>
+            {/* Date inputs — only if restock is expected */}
+            {restockStatusChoice === 'expected' && (
+              <>
+                <Text style={[styles.modalSubtitle, { color: COLORS.textMuted }]}>
+                  Indiquez une date prévue pour chaque produit :
+                </Text>
+                <ScrollView style={{ maxHeight: 220 }}>
+                  {missingItemsToRestock.map(item => (
+                    <View key={item.product_id} style={{ marginBottom: SPACING.md }}>
+                      <Text style={{ fontWeight: '600', color: COLORS.text, marginBottom: SPACING.xs }}>{item.name}</Text>
+                      <TextInput
+                        style={[styles.modalInput, { marginBottom: 0 }]}
+                        value={restockDates[item.product_id] || ''}
+                        onChangeText={(text) => setRestockDates(prev => ({ ...prev, [item.product_id]: text }))}
+                        placeholder="Ex: Le 15 Octobre, Demain, Dans 3 jours..."
+                        placeholderTextColor={COLORS.textMuted}
+                      />
+                    </View>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
+            {restockStatusChoice === 'no_restock' && (
+              <Text style={{ color: COLORS.danger, fontSize: FONT_SIZE.sm, marginBottom: SPACING.md, lineHeight: 20 }}>
+                ⚠️ Le client sera informé qu'aucun réapprovisionnement n'est prévu. Il pourra annuler ou continuer sans ce produit.
+              </Text>
+            )}
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
@@ -684,7 +835,7 @@ Merci.`;
                 <Text style={styles.modalCancelText}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalConfirmButton}
+                style={[styles.modalConfirmButton, { backgroundColor: restockStatusChoice === 'no_restock' ? COLORS.danger : COLORS.accent }]}
                 onPress={handleConfirmNotifyClient}
               >
                 <Text style={styles.modalConfirmText}>Notifier</Text>
