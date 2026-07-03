@@ -88,13 +88,20 @@ export const SellerOrderDetailScreen: React.FC = () => {
 
   // Ouvrir le modal automatiquement si on vient de SellerOrdersScreen avec openRestockModal=true
   useEffect(() => {
-    if (openRestockModalParam && missingItemsParam && missingItemsParam.length > 0) {
-      setMissingItemsToRestock(missingItemsParam);
-      setRestockDates({});
-      setRestockStatusChoice('expected');
-      setRestockModalVisible(true);
+    if (openRestockModalParam && missingItemsParam) {
+      let items = missingItemsParam;
+      if (typeof items === 'string') {
+        try { items = JSON.parse(items); } catch(e) {}
+      }
+      const safeItems = Array.isArray(items) ? items : [items];
+      if (safeItems.length > 0 && safeItems[0]) {
+        setMissingItemsToRestock(safeItems);
+        setRestockDates({});
+        setRestockStatusChoice('expected');
+        setRestockModalVisible(true);
+      }
     }
-  }, [openRestockModalParam]);
+  }, [openRestockModalParam, missingItemsParam]);
 
   const loadOrder = async () => {
     try {
@@ -178,7 +185,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
     if (!orderId || !order) return;
     setUpdating(true);
     try {
-      const missingWithDates = missingItemsToRestock.map(item => ({
+      const missingWithDates = (missingItemsToRestock || []).map(item => ({
         ...item,
         restock_date: restockStatusChoice === 'no_restock' ? 'Aucun réappro prévu' : (restockDates[item.product_id] || 'Date non définie')
       }));
@@ -723,11 +730,11 @@ Merci.`;
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.sm }}>
               <Ionicons name="time" size={18} color={COLORS.warning} />
               <Text style={{ color: COLORS.warning, fontWeight: '700', marginLeft: 6, fontSize: FONT_SIZE.sm }}>
-                Client en attente de r\u00e9approvisionnement
+                Client en attente de réapprovisionnement
               </Text>
             </View>
             <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.sm, marginBottom: SPACING.md }}>
-              Ce client a choisi d'attendre. Notifiez-le d\u00e8s que le stock est disponible, ou informez-le si aucun r\u00e9appro n'est pr\u00e9vu.
+              Ce client a choisi d'attendre. Notifiez-le dès que le stock est disponible, ou informez-le si aucun réappro n'est prévu.
             </Text>
             <TouchableOpacity
               onPress={handleNotifyRestockedClients}
@@ -740,7 +747,7 @@ Merci.`;
             >
               <Ionicons name="checkmark-circle" size={18} color="#fff" />
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: FONT_SIZE.sm }}>
-                \u2705 Stock arriv\u00e9, notifier le client
+                ✅ Stock arrivé, notifier le client
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -754,7 +761,7 @@ Merci.`;
             >
               <Ionicons name="close-circle" size={18} color={COLORS.danger} />
               <Text style={{ color: COLORS.danger, fontWeight: '700', fontSize: FONT_SIZE.sm }}>
-                \ud83d\udea8 Aucun r\u00e9appro pr\u00e9vu
+                🚨 Aucun réappro prévu
               </Text>
             </TouchableOpacity>
           </View>
@@ -819,7 +826,7 @@ Merci.`;
                   Indiquez une date prévue pour chaque produit :
                 </Text>
                 <ScrollView style={{ maxHeight: 220 }}>
-                  {missingItemsToRestock.map(item => (
+                  {(missingItemsToRestock || []).map(item => (
                     <View key={item.product_id} style={{ marginBottom: SPACING.md }}>
                       <Text style={{ fontWeight: '600', color: COLORS.text, marginBottom: SPACING.xs }}>{item.name}</Text>
                       <TextInput
