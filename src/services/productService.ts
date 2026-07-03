@@ -470,6 +470,16 @@ export const productService = {
       // ✅ Invalidate product cache on update
       await invalidateProductCache(id);
       
+      // ✅ Auto-notify waiting clients if stock is now > 0
+      if (payload.stock && payload.stock > 0 && data) {
+        try {
+          const { orderService } = await import('./orderService');
+          await orderService.notifyRestockedClients(data.store_id, data.id, data.name);
+        } catch (e) {
+          console.warn('[ProductService] Auto-notify restocked clients failed:', e);
+        }
+      }
+      
       return data as Product;
     } finally {
       // ✅ Track performance
@@ -821,6 +831,16 @@ export const productService = {
         // ✅ Invalidate stock cache when updated via fallback
         await invalidateStockCache(productId);
         
+        // ✅ Auto-notify waiting clients if stock is now > 0
+        if (newStock > 0 && updated) {
+          try {
+            const { orderService } = await import('./orderService');
+            await orderService.notifyRestockedClients(updated.store_id, updated.id, updated.name);
+          } catch (e) {
+            console.warn('[ProductService] Auto-notify restocked clients failed:', e);
+          }
+        }
+        
         return updated as Product;
       }
 
@@ -840,6 +860,16 @@ export const productService = {
         
         // ✅ Invalidate stock cache when updated via RPC
         await invalidateStockCache(productId);
+        
+        // ✅ Auto-notify waiting clients if stock is now > 0
+        if (fullProduct && fullProduct.stock > 0) {
+          try {
+            const { orderService } = await import('./orderService');
+            await orderService.notifyRestockedClients(fullProduct.store_id, fullProduct.id, fullProduct.name);
+          } catch (e) {
+            console.warn('[ProductService] Auto-notify restocked clients failed:', e);
+          }
+        }
         
         return fullProduct as Product;
       }
