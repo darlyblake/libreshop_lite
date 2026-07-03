@@ -186,7 +186,7 @@ export const StoreDetailScreen: React.FC = () => {
   const { user } = useAuthStore();
   const { isMobile, isTablet } = useResponsive();
   const { isDark, getColor: COLORS } = useTheme();
-  const styles = useMemo(() => getStyles(COLORS), [COLORS]);
+  const styles = useMemo(() => getStyles(COLORS, isDark), [COLORS, isDark]);
 
   const [store, setStore] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
@@ -1743,7 +1743,7 @@ export const StoreDetailScreen: React.FC = () => {
   );
 };
 
-const getStyles = (COLORS: any) => StyleSheet.create({
+const getStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.bg,
@@ -1765,11 +1765,13 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.90)' : 'rgba(255, 255, 255, 0.85)',
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
     ...(Platform.OS === "web"
-      ? { boxShadow: "0px 2px 8px rgba(0,0,0,0.12)" }
+      ? { boxShadow: isDark ? '0px 2px 8px rgba(0,0,0,0.4)' : '0px 2px 8px rgba(0,0,0,0.12)' }
       : { elevation: 3 }),
   },
   headerTitle: {
@@ -1781,11 +1783,13 @@ const getStyles = (COLORS: any) => StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    backgroundColor: isDark ? 'rgba(30, 41, 59, 0.90)' : 'rgba(255, 255, 255, 0.85)',
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
     ...(Platform.OS === "web"
-      ? { boxShadow: "0px 2px 8px rgba(0,0,0,0.12)" }
+      ? { boxShadow: isDark ? '0px 2px 8px rgba(0,0,0,0.4)' : '0px 2px 8px rgba(0,0,0,0.12)' }
       : { elevation: 3 }),
   },
   // Error state
