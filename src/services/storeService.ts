@@ -894,17 +894,17 @@ export const storeService = {
 
     const client = useSupabase();
     try {
-      // ✅ Phase 2c: Use RPC with UPSERT to prevent race condition
-      // RPC handles ON CONFLICT DO UPDATE for idempotent follows
+      // ✅ Direct upsert bypasses the broken RPC (ambiguous 'id' column in add_store_follower)
       const { data, error } = await client
-        .rpc('add_store_follower', {
-          p_user_id: userId,
-          p_store_id: storeId
-        })
-        .single();
-      
+        .from('store_followers')
+        .upsert(
+          { user_id: userId, store_id: storeId, created_at: new Date().toISOString() },
+          { onConflict: 'user_id,store_id', ignoreDuplicates: true }
+        )
+        .select()
+        .maybeSingle();
+
       if (error) {
-        // RPC will throw if store doesn't exist
         if (error.message.includes('does not exist')) {
           throw new Error('La boutique n\'existe pas ou n\'est pas visible');
         }

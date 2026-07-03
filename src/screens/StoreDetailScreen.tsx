@@ -346,74 +346,30 @@ export const StoreDetailScreen: React.FC = () => {
   }, [loadStore]);
 
   useEffect(() => {
-    let mounted = true;
-    const loadHomepageProducts = async () => {
-      if (!mounted) return;
-      
-      // Use store.id if available, otherwise fallback to effectiveStoreId
-      const storeIdToUse = store?.id || effectiveStoreId;
-      
-      if (!storeIdToUse) {
-        console.warn('[StoreDetail] No storeId available, skipping homepage products load');
-        return;
-      }
-      
-      try {
-        console.log('[StoreDetail] Loading homepage products for store:', storeIdToUse);
-        const products = await productService.getStoreHomepageProducts(storeIdToUse, 8);
-        console.log('[StoreDetail] Homepage products loaded:', products?.length);
-        if (mounted) {
-          setHomepageProducts(products || []);
-        }
-      } catch (error) {
-        console.error('[StoreDetail] Error loading homepage products:', error);
-      }
-    };
-    
-    // Load when store is loaded or effectiveStoreId changes
-    if (store?.id || effectiveStoreId) {
-      loadHomepageProducts();
-    }
-    
-    return () => {
-      mounted = false;
-    };
-  }, [store?.id, effectiveStoreId]);
+    // Only run when store.id is definitively known to avoid double-fetch
+    const storeIdToUse = store?.id;
+    if (!storeIdToUse) return;
 
-  useEffect(() => {
     let mounted = true;
-    const loadPromotionProducts = async () => {
-      if (!mounted) return;
-      
-      // Use store.id if available, otherwise fallback to effectiveStoreId
-      const storeIdToUse = store?.id || effectiveStoreId;
-      
-      if (!storeIdToUse) {
-        console.warn('[StoreDetail] No storeId available, skipping promotion products load');
-        return;
-      }
-      
+
+    const loadSecondaryProducts = async () => {
       try {
-        console.log('[StoreDetail] Loading promotion products for store:', storeIdToUse);
-        const products = await productService.getStorePromotionProducts(storeIdToUse);
-        console.log('[StoreDetail] Promotion products loaded:', products?.length);
-        if (mounted) {
-          setPromotionProducts(products || []);
-        }
+        const [homepageResults, promotionResults] = await Promise.all([
+          productService.getStoreHomepageProducts(storeIdToUse, 8),
+          productService.getStorePromotionProducts(storeIdToUse),
+        ]);
+        if (!mounted) return;
+        setHomepageProducts(homepageResults || []);
+        setPromotionProducts(promotionResults || []);
       } catch (error) {
-        console.error('[StoreDetail] Error loading promotion products:', error);
+        console.error('[StoreDetail] Error loading secondary products:', error);
       }
     };
-    
-    // Load when store is loaded or effectiveStoreId changes
-    if (store?.id || effectiveStoreId) {
-      loadPromotionProducts();
-    }
-    
-    return () => {
-      mounted = false;
-    };
-  }, [store?.id, effectiveStoreId]);
+
+    loadSecondaryProducts();
+    return () => { mounted = false; };
+  }, [store?.id]);
+
 
   const storeData = store
     ? {

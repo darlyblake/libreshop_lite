@@ -705,8 +705,7 @@ export const productService = {
         await client
           .from('products')
           .update({ view_count: 1 }) // Conservative: just mark as viewed
-          .eq('id', productId)
-          .maybeSingle();
+          .eq('id', productId);
       } else {
         rpcUsed = true;
       }
