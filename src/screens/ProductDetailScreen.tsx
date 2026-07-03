@@ -365,6 +365,11 @@ export const ProductDetailScreen: React.FC = () => {
   };
 
   const increaseQuantity = () => {
+    const maxStock = product?.stock ?? 9999;
+    if (quantity >= maxStock) {
+      Alert.alert("Stock atteint", `Désolé, seulement ${maxStock} article(s) en stock.`);
+      return;
+    }
     setQuantity((q) => q + 1);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
