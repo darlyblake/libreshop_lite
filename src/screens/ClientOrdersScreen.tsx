@@ -242,19 +242,38 @@ export const ClientOrdersScreen: React.FC = () => {
   }, [orders, searchQuery, filters]);
 
   // Marquer comme reçu
-  const markAsReceived = async (orderId: string) => {
+  const markAsReceived = async (order: OrderWithDetails) => {
     try {
-      setMarkingAsReceived(orderId);
-      await orderService.updateStatus(orderId, 'delivered');
+      setMarkingAsReceived(order.id);
+      
+      // ✅ Use confirmReception instead of updateStatus to trigger seller notifications and points
+      await orderService.confirmReception(order.id);
       
       // Mettre à jour localement
-      setOrders(prev => prev.map(order => 
-        order.id === orderId 
-          ? { ...order, status: 'delivered', delivered_at: new Date().toISOString() }
-          : order
+      setOrders(prev => prev.map(o => 
+        o.id === order.id 
+          ? { ...o, status: 'delivered', delivered_at: new Date().toISOString() }
+          : o
       ));
       
-      Alert.alert('Succès', 'La commande a été marquée comme reçue');
+      const storeName = order.store?.name || 'la boutique';
+      Alert.alert(
+        'Commande Reçue ✅',
+        `Voulez-vous noter ${storeName} ?`,
+        [
+          { text: 'Plus tard', style: 'cancel' },
+          { 
+            text: 'Noter', 
+            onPress: () => {
+              navigation.navigate('Review', {
+                orderId: order.id,
+                storeId: order.store_id,
+                storeName: storeName
+              });
+            }
+          }
+        ]
+      );
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'mark as received failed');
       Alert.alert('Erreur', 'Impossible de marquer la commande comme reçue');
@@ -555,7 +574,7 @@ export const ClientOrdersScreen: React.FC = () => {
           {order.status === 'shipped' && (
             <TouchableOpacity 
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: palette.success + '15' }}
-              onPress={() => markAsReceived(order.id)}
+              onPress={() => markAsReceived(order)}
               disabled={markingAsReceived === order.id}
             >
               {markingAsReceived === order.id ? (

@@ -42,6 +42,7 @@ import { AddressScreen } from '../screens/AddressScreen';
 import { SecurityScreen } from '../screens/SecurityScreen';
 import { HelpScreen } from '../screens/HelpScreen';
 import { AccountSuspendedScreen } from '../screens/AccountSuspendedScreen';
+import ReviewScreen from '../screens/ReviewScreen';
 
 // HOC pour le lazy loading des écrans lourds (vendeurs / admin)
 const lazyLoad = (importFn: () => Promise<any>, exportName: string) => {
@@ -840,6 +841,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="Help" component={HelpScreen} />
         <Stack.Screen name="AccountSuspended" component={AccountSuspendedScreen} />
         <Stack.Screen name="ClientProfile" component={ClientProfileScreen} />
+        <Stack.Screen name="Review" component={ReviewScreen} />
         
         {/* Routes vendeurs */}
         <Stack.Screen name="SellerAddStore" component={SellerAddStoreScreen} />
