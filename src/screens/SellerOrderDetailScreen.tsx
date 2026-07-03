@@ -45,6 +45,9 @@ export const SellerOrderDetailScreen: React.FC = () => {
       ? new URLSearchParams(window.location.search).get('orderId') || undefined
       : undefined;
   const orderId = orderIdFromParams || orderIdFromQuery;
+  // Params passés depuis SellerOrdersScreen quand INSUFFICIENT_STOCK
+  const openRestockModalParam = (route as any)?.params?.openRestockModal as boolean | undefined;
+  const missingItemsParam = (route as any)?.params?.missingItems as any[] | undefined;
   
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,6 +84,16 @@ export const SellerOrderDetailScreen: React.FC = () => {
   useEffect(() => {
     void loadOrder();
   }, [orderId]);
+
+  // Ouvrir le modal automatiquement si on vient de SellerOrdersScreen avec openRestockModal=true
+  useEffect(() => {
+    if (openRestockModalParam && missingItemsParam && missingItemsParam.length > 0) {
+      setMissingItemsToRestock(missingItemsParam);
+      setRestockDates({});
+      setRestockStatusChoice('expected');
+      setRestockModalVisible(true);
+    }
+  }, [openRestockModalParam]);
 
   const loadOrder = async () => {
     try {

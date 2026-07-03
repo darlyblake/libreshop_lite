@@ -713,7 +713,11 @@ export const SellerOrdersScreen: React.FC = () => {
               },
               { 
                 text: 'Notifier le client', 
-                onPress: () => navigation.navigate('SellerOrderDetail', { orderId })
+                onPress: () => navigation.navigate('SellerOrderDetail', { 
+                  orderId,
+                  openRestockModal: true,
+                  missingItems: e.missing_items || [],
+                })
               },
               { text: 'Annuler', style: 'cancel' }
             ]

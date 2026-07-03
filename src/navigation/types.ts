@@ -63,7 +63,7 @@ export type RootStackParamList = {
   ClientEdit: { userId: string };
   SellerEditCollection: { collectionId: string };
   SellerCollectionProducts: { collectionId: string };
-  SellerOrderDetail: { orderId: string };
+  SellerOrderDetail: { orderId: string; openRestockModal?: boolean; missingItems?: any[] };
   SellerProductActions: { productId: string };
   SellerSale: { productId: string };
   SellerLowStock: undefined;
