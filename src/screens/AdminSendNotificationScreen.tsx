@@ -58,13 +58,22 @@ export const AdminSendNotificationScreen: React.FC = () => {
 
       // Send notifications to selected groups
       if (sendToClients) {
-        await notificationService.sendBroadcastToClients(notification);
+        await notificationService.sendBroadcastToClients({
+          ...notification,
+          data: { ...notification.data, targetRole: 'client' },
+        });
       }
       if (sendToSellers) {
-        await notificationService.sendBroadcastToSellers(notification);
+        await notificationService.sendBroadcastToSellers({
+          ...notification,
+          data: { ...notification.data, targetRole: 'seller' },
+        });
       }
       if (sendToAdmins) {
-        await notificationService.sendBroadcastToAdmins(notification);
+        await notificationService.sendBroadcastToAdmins({
+          ...notification,
+          data: { ...notification.data, targetRole: 'admin' },
+        });
       }
 
       setLoading(false);

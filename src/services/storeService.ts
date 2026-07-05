@@ -926,6 +926,7 @@ export const storeService = {
             title: '👥 Nouveau follower!',
             body: `Quelqu'un a suivi votre boutique "${storePartial.name}"`,
             type: 'system',
+            targetRole: 'seller',
             data: {
               storeId: storeId,
               followedBy: userId,

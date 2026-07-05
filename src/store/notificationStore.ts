@@ -13,18 +13,32 @@ export interface Notification {
 export const isClientNotification = (n: Notification) => {
   // Primary classifier: use the targetRole field stored in notification data
   const targetRole = n.data?.targetRole as string | undefined;
-  if (targetRole) return targetRole === 'client';
-  // Fallback for legacy notifications without targetRole
+  if (targetRole === 'client') return true;
+  if (targetRole === 'seller' || targetRole === 'admin') return false;
+
+  // Fallback for legacy notifications without targetRole:
+  // Interactions (like, comment, follow) are always for the SELLER
+  const originalType = (n.data?.originalType || n.type) as string;
+  const SELLER_ONLY_TYPES = ['like', 'comment', 'follow', 'interaction', 'alert'];
+  if (SELLER_ONLY_TYPES.includes(originalType)) return false;
+
+  // Promos and order-status-updates go to the client
   if (n.type === 'promo') return true;
-  if (n.type === 'order') return n.data?.status !== undefined;
+  if (n.type === 'order' && n.data?.status !== undefined) return true;
+
   return false;
 };
 
 export const isSellerNotification = (n: Notification) => {
   const targetRole = n.data?.targetRole as string | undefined;
-  if (targetRole) return targetRole === 'seller';
-  // Fallback for legacy notifications without targetRole
-  if (n.type === 'admin') return false;
+  if (targetRole === 'seller') return true;
+  if (targetRole === 'client' || targetRole === 'admin') return false;
+
+  // Fallback: interactions are seller-only
+  const originalType = (n.data?.originalType || n.type) as string;
+  const SELLER_ONLY_TYPES = ['like', 'comment', 'follow', 'interaction', 'alert'];
+  if (SELLER_ONLY_TYPES.includes(originalType)) return true;
+
   return !isClientNotification(n);
 };
 

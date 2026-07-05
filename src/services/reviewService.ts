@@ -48,6 +48,7 @@ export const reviewService = {
             ? `"${comment.slice(0, 80)}${comment.length > 80 ? '…' : ''}"`
             : `Un client a laissé une note de ${rating}/5 sur "${productName}".`,
           type: 'comment',
+          targetRole: 'seller',
           data: {
             productId: review.product_id,
             reviewId: data?.id,

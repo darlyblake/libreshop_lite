@@ -18,8 +18,11 @@ export interface ProductReturn {
   created_at: string;
   updated_at?: string;
   products?: {
+    id?: string;
     name: string;
     images: string[];
+    reference?: string;
+    price?: number;
   };
 }
 
@@ -30,7 +33,8 @@ export const returnService = {
    * Créer une demande de retour
    */
   async requestReturn(returnRow: Partial<ProductReturn>) {
-    const { data, error } = await useSupabase()
+    const supabase = useSupabase();
+    const { data, error } = await supabase
       .from('returns')
       .insert({
         ...returnRow,
@@ -41,6 +45,33 @@ export const returnService = {
       .single();
     
     if (error) throw error;
+
+    // 🔥 NOTIFIER LE VENDEUR DE LA NOUVELLE DEMANDE DE RETOUR
+    if (data.store_id) {
+      try {
+        const { data: storeData } = await supabase
+          .from('stores')
+          .select('user_id, name')
+          .eq('id', data.store_id)
+          .single();
+          
+        if (storeData && storeData.user_id) {
+          // Import dynamique pour éviter les dépendances circulaires au besoin
+          const { notificationService } = require('./notificationService');
+          await notificationService.create({
+            user_id: storeData.user_id,
+            title: 'Nouvelle demande de retour',
+            body: `Un client a demandé un retour pour la commande #${(data.order_id || '').substring(0, 8)}.`,
+            type: 'system',
+            targetRole: 'seller',
+            data: { returnId: data.id, orderId: data.order_id, action: 'return_requested' }
+          });
+        }
+      } catch (err) {
+        console.error('[ReturnService] Impossible de notifier le vendeur pour le retour:', err);
+      }
+    }
+
     return data as ProductReturn;
   },
 
@@ -50,7 +81,7 @@ export const returnService = {
   async getUserReturns(userId: string) {
     const { data, error } = await useSupabase()
       .from('returns')
-      .select('*, products(name, images), orders(id, customer_name, notes, payment_method)')
+      .select('*, products(*), orders(id, customer_name, notes, payment_method)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -84,7 +115,7 @@ export const returnService = {
   async getStoreReturns(storeId: string) {
     const { data, error } = await useSupabase()
       .from('returns')
-      .select('*, products(name, images), orders(id, customer_name, customer_phone, notes, payment_method)')
+      .select('*, products(*), orders(id, customer_name, customer_phone, notes, payment_method)')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false });
     
@@ -99,30 +130,94 @@ export const returnService = {
   async updateReturnStatus(returnId: string, status: ReturnStatus, notes?: string) {
     const supabase = useSupabase();
     
-    // 1. Récupérer les données actuelles du retour
+    // 1. Récupérer les données actuelles du retour + infos produit + client
     const { data: currentReturn, error: fetchError } = await supabase
       .from('returns')
-      .select('*')
+      .select('*, products(name), orders(user_id, customer_name)')
       .eq('id', returnId)
       .single();
     
     if (fetchError) throw fetchError;
 
+    const { notificationService } = require('./notificationService');
+    const productName = (currentReturn as any).products?.name || 'le produit';
+    const orderRef = `#${currentReturn.order_id.slice(0, 8)}`;
+    const clientUserId = (currentReturn as any).orders?.user_id;
+
     // 2. Logique spécifique selon le nouveau statut
-    
-    // Si le produit est REÇU : on réintègre le stock
-    if (status === 'received' && currentReturn.status !== 'received') {
-      await productService.updateStock(currentReturn.product_id, currentReturn.quantity);
+
+    // ✅ ACCEPTÉ : Notif client + enregistrement immédiat dans refunds pour traçabilité
+    if (status === 'approved' && currentReturn.status !== 'approved') {
+      // Notifier le client
+      if (clientUserId) {
+        await notificationService.create({
+          user_id: clientUserId,
+          title: '✅ Retour accepté',
+          body: `Votre demande de retour pour "${productName}" (commande ${orderRef}) a été acceptée. Renvoyez le produit au vendeur.`,
+          type: 'return',
+          targetRole: 'client',
+          data: { returnId, orderId: currentReturn.order_id, action: 'return_approved' }
+        });
+      }
+
+      // Enregistrement comptable préventif : dette de remboursement à payer
+      await accountingService.recordRefund({
+        store_id: currentReturn.store_id,
+        order_id: currentReturn.order_id,
+        amount: currentReturn.refund_amount,
+        reason: `Retour accepté: ${productName} — Commande ${orderRef}${notes ? ` (${notes})` : ''}`,
+      });
     }
 
-    // Si le retour est TERMINÉ : on enregistre le remboursement comptable
+    // 📦 REÇU : Réintégration du stock + Notif client
+    if (status === 'received' && currentReturn.status !== 'received') {
+      await productService.updateStock(currentReturn.product_id, currentReturn.quantity);
+
+      if (clientUserId) {
+        await notificationService.create({
+          user_id: clientUserId,
+          title: '📦 Produit reçu',
+          body: `Le vendeur a bien reçu "${productName}" retourné. Votre remboursement de ${currentReturn.refund_amount.toLocaleString()} FCFA va être traité.`,
+          type: 'return',
+          targetRole: 'client',
+          data: { returnId, orderId: currentReturn.order_id, action: 'return_received' }
+        });
+      }
+    }
+
+    // 💰 TERMINÉ : Enregistrement comptable final + Notif client
     if (status === 'completed' && currentReturn.status !== 'completed') {
       await accountingService.recordRefund({
         store_id: currentReturn.store_id,
         order_id: currentReturn.order_id,
         amount: currentReturn.refund_amount,
-        reason: `Retour: ${currentReturn.reason}`
+        reason: `Remboursement confirmé: ${productName} — Commande ${orderRef}`,
       });
+
+      if (clientUserId) {
+        await notificationService.create({
+          user_id: clientUserId,
+          title: '💰 Remboursement confirmé',
+          body: `Votre remboursement de ${currentReturn.refund_amount.toLocaleString()} FCFA pour "${productName}" a été confirmé par le vendeur.`,
+          type: 'return',
+          targetRole: 'client',
+          data: { returnId, orderId: currentReturn.order_id, action: 'return_completed' }
+        });
+      }
+    }
+
+    // ❌ REFUSÉ : Notif client
+    if (status === 'rejected' && currentReturn.status !== 'rejected') {
+      if (clientUserId) {
+        await notificationService.create({
+          user_id: clientUserId,
+          title: '❌ Retour refusé',
+          body: `Votre demande de retour pour "${productName}" (commande ${orderRef}) a été refusée par le vendeur.${notes ? ` Motif : ${notes}` : ''}`,
+          type: 'return',
+          targetRole: 'client',
+          data: { returnId, orderId: currentReturn.order_id, action: 'return_rejected' }
+        });
+      }
     }
 
     // 3. Mise à jour en base de données

@@ -117,6 +117,7 @@ export const productLikesService = {
           title: '❤️ Nouveau like sur votre produit',
           body: `Quelqu'un a aimé votre produit "${product.name}"`,
           type: 'like',
+          targetRole: 'seller',
           data: {
             productId: productId,
             likedBy: userId,

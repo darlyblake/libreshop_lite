@@ -401,7 +401,7 @@ export const ClientOrdersScreen: React.FC = () => {
         for (const item of returnItem.order.order_items) {
           await returnService.requestReturn({
             order_id: returnItem.order.id,
-            store_id: returnItem.order.store_id,
+            store_id: returnItem.order.store_id || (returnItem.order as any).stores?.id,
             product_id: item.product_id,
             quantity: item.quantity,
             reason: reason,
@@ -413,7 +413,7 @@ export const ClientOrdersScreen: React.FC = () => {
         // Retour d'un seul item
         await returnService.requestReturn({
           order_id: returnItem.order.id,
-          store_id: returnItem.order.store_id,
+          store_id: returnItem.order.store_id || (returnItem.order as any).stores?.id,
           product_id: returnItem.item.product_id,
           quantity: returnItem.item.quantity,
           reason: reason,

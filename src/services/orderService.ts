@@ -225,7 +225,7 @@ export const orderService = {
     try {
       const { data, error } = await client
         .from('orders')
-        .select('id, status, total_amount, created_at, customer_name, stores(id, name), order_items(id, quantity, price, products(id, name, images))')
+        .select('id, store_id, status, total_amount, created_at, customer_name, stores(id, name), order_items(id, product_id, quantity, price, products(id, name, images))')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 

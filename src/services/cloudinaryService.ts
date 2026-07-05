@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { cloudinaryConfig } from '../config/theme';
-
+import { useSupabase } from '../lib/supabase';
 type UploadResult = {
   secure_url?: string;
   url?: string;
@@ -139,5 +139,65 @@ export const cloudinaryService = {
       throw new Error('Cloudinary response missing secure_url');
     }
     return cloudinaryService.getOptimizedUrl(url);
+  },
+
+  extractPublicId(url: string): string | null {
+    if (!url || !url.includes('res.cloudinary.com')) return null;
+    try {
+      // url example: https://res.cloudinary.com/cloudName/image/upload/v1234567/folder/file.jpg
+      const uploadSegment = '/upload/';
+      const uploadIndex = url.indexOf(uploadSegment);
+      if (uploadIndex === -1) return null;
+
+      const afterUpload = url.substring(uploadIndex + uploadSegment.length);
+      const versionMatch = afterUpload.match(/(?:^|\/)v\d+\//);
+      
+      let assetPath: string;
+      if (versionMatch) {
+        // remove version and everything before it
+        assetPath = afterUpload.substring(versionMatch.index! + versionMatch[0].length);
+      } else {
+        // no version, just remove potential transforms
+        assetPath = afterUpload.replace(/^([a-z_,0-9.]+\/)+/, '');
+      }
+      
+      // Remove file extension to get the public_id
+      const lastDotIndex = assetPath.lastIndexOf('.');
+      if (lastDotIndex !== -1) {
+        assetPath = assetPath.substring(0, lastDotIndex);
+      }
+      
+      return assetPath;
+    } catch (e) {
+      console.warn('[CloudinaryService] Failed to extract publicId from url:', url, e);
+      return null;
+    }
+  },
+
+  async deleteImages(urls: string[]): Promise<boolean> {
+    if (!urls || urls.length === 0) return true;
+
+    const publicIds = urls
+      .map(url => cloudinaryService.extractPublicId(url))
+      .filter(id => id !== null) as string[];
+
+    if (publicIds.length === 0) return true;
+
+    try {
+      const client = useSupabase();
+      const { data, error } = await client.functions.invoke('delete-cloudinary-image', {
+        body: { publicIds }
+      });
+
+      if (error) {
+        console.error('[CloudinaryService] Error deleting images via Edge Function:', error);
+        return false;
+      }
+
+      return data?.success || false;
+    } catch (error) {
+      console.error('[CloudinaryService] Exception deleting images:', error);
+      return false;
+    }
   },
 };

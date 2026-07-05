@@ -369,6 +369,7 @@ export const adminService = {
             ? `Votre boutique "${data.name || ''}" a été approuvée par l'administration. Elle est maintenant visible.`
             : `Votre boutique "${data.name || ''}" a été suspendue. Contactez le support pour plus d'informations.`,
           type: 'system',
+          targetRole: 'seller',
           data: { storeId, status: nextStatus },
         }).catch(console.warn);
       }
@@ -546,12 +547,14 @@ export const adminService = {
     // 🔔 Notifier le vendeur si son compte est approuvé ou suspendu
     if (data?.role === 'seller' || data?.role === 'client') {
       const { notificationService } = await import('./notificationService');
+      const recipientRole = data?.role === 'seller' ? 'seller' : 'client';
       if (status === 'active') {
         await notificationService.create({
           user_id: userId,
           title: '✅ Compte activé',
           body: `Votre compte a été activé par l'administration. Vous pouvez maintenant accéder à toutes les fonctionnalités.`,
           type: 'system',
+          targetRole: recipientRole,
           data: { userId, status },
         }).catch(console.warn);
       } else if (status === 'suspended' || status === 'banned') {
@@ -560,6 +563,7 @@ export const adminService = {
           title: '🚫 Compte suspendu',
           body: `Votre compte a été suspendu par l'administration. Contactez le support pour plus d'informations.`,
           type: 'system',
+          targetRole: recipientRole,
           data: { userId, status },
         }).catch(console.warn);
       }
@@ -611,6 +615,7 @@ export const adminService = {
         title: '🎉 Compte vendeur approuvé !',
         body: `Bienvenue ${data?.full_name || ''} ! Votre compte vendeur a été validé par l'administration. Vous pouvez maintenant créer votre boutique et commencer à vendre.`,
         type: 'system',
+        targetRole: 'seller',
         data: { userId, role: 'seller' },
       });
     } catch (e) {

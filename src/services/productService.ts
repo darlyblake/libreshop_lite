@@ -1,5 +1,6 @@
 import { useSupabase } from '../lib/supabase';
 import { cacheManager } from '../utils/cacheManager';
+import { cloudinaryService } from './cloudinaryService';
 import { performanceMonitor, PerformanceMetric } from '../utils/performanceMonitor';
 import { CACHE_CONFIG, getOptimalTTL, generateProductCacheKey } from '../utils/cacheConfig';
 import {
@@ -505,7 +506,7 @@ export const productService = {
       const user = await getCurrentUser();
 
       // ✅ Validate ownership first
-      await getProductAndValidateOwnership(id);
+      const product = await getProductAndValidateOwnership(id);
 
       // ✅ Soft delete: mark as inactive instead of hard delete
       const { error } = await client
@@ -519,6 +520,14 @@ export const productService = {
 
       if (error) throw error;
       
+      // ✅ Supprimer les images Cloudinary
+      if (product && product.images && product.images.length > 0) {
+        // Run in background to avoid blocking
+        cloudinaryService.deleteImages(product.images).catch(e => {
+          console.warn('[ProductService] Failed to delete Cloudinary images:', e);
+        });
+      }
+
       // ✅ Invalidate all related caches on deletion
       await invalidateDeletedProductCache(id);
     } finally {

@@ -89,8 +89,14 @@ export const NotificationsScreen: React.FC = () => {
     const orderId = data.orderId ? String(data.orderId) : null;
     const productId = data.productId ? String(data.productId) : null;
     const storeId = data.storeId ? String(data.storeId) : null;
+    const action = data.action ? String(data.action) : null;
 
     const isSellerContext = Boolean(user?.id && store?.user_id && String(store.user_id) === String(user.id));
+
+    if (action === 'return_requested' && isSellerContext) {
+      navigation.navigate('SellerReturns');
+      return;
+    }
 
     if (orderId) {
       navigation.navigate(isSellerContext ? 'SellerOrderDetail' : 'ClientOrderDetail', { orderId });

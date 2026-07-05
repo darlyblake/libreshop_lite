@@ -613,21 +613,36 @@ export const AppNavigator: React.FC = () => {
         if (hasHashToken) {
           // Polling court pour token dans l'URL
           for (let i = 0; i < 12; i++) {  // ~1.2s max
-            const { data } = await supabase.auth.getSession();
-            if (data?.session) {
-              session = data.session;
+            const sessionResult = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise<{ data: any, error: any }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Timeout') }), 500))
+            ]);
+            if (sessionResult.data?.session) {
+              session = sessionResult.data.session;
               break;
             }
             await new Promise(r => setTimeout(r, 100));
           }
         } else {
-          const { data } = await supabase.auth.getSession();
-          session = data?.session;
+          const sessionResult = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise<{ data: any, error: any }>((resolve) => setTimeout(() => resolve({ data: null, error: new Error('Timeout') }), 3000))
+          ]);
+          session = sessionResult.data?.session;
         }
 
         if (session?.user && isMounted) {
-          // 2. Récupération du profil utilisateur
-          const userData = await authService.getCurrentUser();
+          // 2. Récupération du profil utilisateur avec timeout
+          let userData = await Promise.race([
+            authService.getCurrentUser(),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+          ]);
+          
+          // Fallback sur session.user si l'appel réseau échoue (ex: extension chrome, lenteur réseau, timeout)
+          if (!userData && session.user) {
+            console.log('⚠️ [restoreSession] Fallback sur session.user local');
+            userData = session.user;
+          }
 
           if (userData) {
             setUser(userData as any);
@@ -737,14 +752,23 @@ export const AppNavigator: React.FC = () => {
     }
 
     try {
-      // Faire les checks en parallèle pour gagner du temps
-      const [userCheck, storeCheck, pendingAction, intent] = await Promise.all([
+      // Faire les checks en parallèle avec un timeout pour éviter le blocage infini
+      const networkChecks = Promise.all([
         supabase.from('users').select('status').eq('id', userId).maybeSingle(),
         role === 'seller' ?
           supabase.from('stores').select('id').eq('user_id', userId).maybeSingle() : null,
-        AsyncStorage.getItem('@libreshop_pending_action'),
-        AsyncStorage.getItem('@libreshop_auth_intent')
       ]);
+
+      const timeoutPromise = new Promise<[any, any]>((resolve) => 
+        setTimeout(() => resolve([{ data: null }, { data: null }]), 3000)
+      );
+
+      const [dbUserCheck, dbStoreCheck] = await Promise.race([networkChecks, timeoutPromise]);
+      const userCheck = dbUserCheck || { data: null };
+      const storeCheck = dbStoreCheck || { data: null };
+
+      const pendingAction = await AsyncStorage.getItem('@libreshop_pending_action');
+      const intent = await AsyncStorage.getItem('@libreshop_auth_intent');
 
       // Suspended ?
       if (userCheck.data?.status === 'suspended') return 'AccountSuspended';

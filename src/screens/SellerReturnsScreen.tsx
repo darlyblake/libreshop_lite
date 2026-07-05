@@ -11,6 +11,7 @@ import {
   Image,
   Linking,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
@@ -19,6 +20,7 @@ import { PosReturnModal } from '../components/PosReturnModal';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 
 export default function SellerReturnsScreen() {
+  const navigation = useNavigation<any>();
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [returns, setReturns] = useState<ProductReturn[]>([]);
@@ -119,54 +121,59 @@ export default function SellerReturnsScreen() {
     return isCaisseReason || isPosMethod;
   };
 
-  const renderReturnItem = ({ item }: { item: ProductReturn }) => (
-    <TouchableOpacity 
-      style={styles.card}
-      onPress={() => {
-        setSelectedReturn(item);
-        setModalVisible(true);
-      }}
-    >
-      <View style={styles.cardHeader}>
-        <View>
-          <Text style={styles.orderId}>Commande #{item.order_id.slice(0, 8)}</Text>
-          <View style={[styles.sourceBadge, { backgroundColor: isPosReturn(item) ? COLORS.accent + '20' : COLORS.primary + '20' }]}>
-            <Text style={[styles.sourceText, { color: isPosReturn(item) ? COLORS.accent : COLORS.primary }]}>
-              {isPosReturn(item) ? 'En boutique' : 'En ligne'}
+  const renderReturnItem = ({ item }: { item: ProductReturn }) => {
+    const productData = item.products || (item as any).product;
+
+    return (
+      <TouchableOpacity 
+        style={styles.card}
+        onPress={() => {
+          setSelectedReturn(item);
+          setModalVisible(true);
+        }}
+      >
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.orderId}>Commande #{item.order_id.slice(0, 8)}</Text>
+            <View style={[styles.sourceBadge, { backgroundColor: isPosReturn(item) ? COLORS.accent + '20' : COLORS.primary + '20' }]}>
+              <Text style={[styles.sourceText, { color: isPosReturn(item) ? COLORS.accent : COLORS.primary }]}>
+                {isPosReturn(item) ? 'En boutique' : 'En ligne'}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+              {getStatusLabel(item.status)}
             </Text>
           </View>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(item.status)}20` }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {getStatusLabel(item.status)}
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.cardBody}>
-        <Image 
-          source={{ uri: item.products?.images?.[0] || 'https://via.placeholder.com/100' }} 
-          style={styles.productImage} 
-        />
-        <View style={styles.details}>
-          <Text style={styles.productName}>{item.products?.name}</Text>
-          <Text style={styles.quantity}>Quantité: {item.quantity}</Text>
-          <Text style={styles.customerName}>Client: {item.customer_name || (item as any).orders?.customer_name || 'Inconnu'}</Text>
+        <View style={styles.cardBody}>
+          <Image 
+            source={{ uri: productData?.images?.[0] || 'https://libreshop.app/placeholder.png' }} 
+            style={styles.productImage} 
+            defaultSource={{ uri: 'https://via.placeholder.com/100' }}
+          />
+          <View style={styles.details}>
+            <Text style={styles.productName}>{productData?.name || 'Produit inconnu'}</Text>
+            <Text style={styles.quantity}>Quantité: {item.quantity}</Text>
+            <Text style={styles.customerName}>Client: {item.customer_name || (item as any).orders?.customer_name || 'Inconnu'}</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.whatsappIcon}
+            onPress={() => contactClient(item)}
+          >
+            <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity 
-          style={styles.whatsappIcon}
-          onPress={() => contactClient(item)}
-        >
-          <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.cardFooter}>
-        <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString('fr-FR')}</Text>
-        <Text style={styles.amount}>{item.refund_amount.toLocaleString()} FCFA</Text>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.cardFooter}>
+          <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString('fr-FR')}</Text>
+          <Text style={styles.amount}>{item.refund_amount.toLocaleString()} FCFA</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && !returns.length) {
     return (
@@ -226,8 +233,29 @@ export default function SellerReturnsScreen() {
               </TouchableOpacity>
             </View>
 
-            {selectedReturn && (
+            {selectedReturn && (() => {
+              const productData = selectedReturn.products || (selectedReturn as any).product;
+              return (
               <View>
+                {/* Bloc produit retourné — même pattern que SellerOrderDetailScreen */}
+                {productData && (
+                  <View style={styles.productPreview}>
+                    <Image
+                      source={{ uri: productData.images?.[0] }}
+                      style={styles.productPreviewImage}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.productPreviewName}>{productData.name}</Text>
+                      {productData.reference && (
+                        <Text style={styles.productPreviewRef}>Réf: {productData.reference}</Text>
+                      )}
+                      <Text style={styles.productPreviewPrice}>
+                        {(selectedReturn.refund_amount / selectedReturn.quantity).toLocaleString()} FCFA × {selectedReturn.quantity}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
                 <Text style={styles.modalSubTitle}>Motif du client :</Text>
                 <Text style={styles.modalReason}>{selectedReturn.reason}</Text>
 
@@ -278,8 +306,21 @@ export default function SellerReturnsScreen() {
                     </View>
                   )}
                 </View>
+
+                {/* Bouton Voir la commande */}
+                <TouchableOpacity 
+                  style={styles.viewOrderBtn}
+                  onPress={() => {
+                    setModalVisible(false);
+                    navigation.navigate('SellerOrderDetail', { orderId: selectedReturn.order_id });
+                  }}
+                >
+                  <Ionicons name="receipt-outline" size={20} color={COLORS.primary} />
+                  <Text style={styles.viewOrderBtnText}>Voir la commande originale</Text>
+                </TouchableOpacity>
               </View>
-            )}
+              );
+            })()}
           </View>
         </View>
       </Modal>
@@ -527,5 +568,53 @@ const styles = StyleSheet.create({
   completedText: {
     color: COLORS.success,
     fontWeight: '600',
-  }
+  },
+  viewOrderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${COLORS.primary}15`,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.md,
+    gap: 8,
+  },
+  viewOrderBtnText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  productPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${COLORS.primary}08`,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: `${COLORS.primary}20`,
+  },
+  productPreviewImage: {
+    width: 64,
+    height: 64,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.border,
+  },
+  productPreviewName: {
+    color: COLORS.text,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.md,
+    marginBottom: 2,
+  },
+  productPreviewRef: {
+    color: COLORS.textMuted,
+    fontSize: FONT_SIZE.xs,
+    marginBottom: 2,
+  },
+  productPreviewPrice: {
+    color: COLORS.primary,
+    fontWeight: '600',
+    fontSize: FONT_SIZE.sm,
+  },
 });
