@@ -76,6 +76,7 @@ export type RootStackParamList = {
   SellerCoupons: undefined;
   SellerFinance: undefined;
   SellerKYC: undefined;
+  SellerPromoBanners: { storeId?: string } | undefined;
   SellerHub: undefined;
   Notifications: { context?: 'client' | 'seller' } | undefined;
   Features: undefined;

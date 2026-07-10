@@ -23,6 +23,7 @@ import { RootStackParamList } from '../navigation/types';
 import { Card, LoadingSpinner, OrderTimeline } from '../components';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { refundService } from '../services/refundService';
+import { returnService } from '../services/returnService';
 
 type RouteProps = RouteProp<RootStackParamList, 'ClientOrderDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -41,6 +42,7 @@ export const ClientOrderDetailScreen: React.FC = () => {
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [refunds, setRefunds] = useState<any[]>([]);
+  const [returns, setReturns] = useState<any[]>([]);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnReason, setReturnReason] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
@@ -80,6 +82,15 @@ export const ClientOrderDetailScreen: React.FC = () => {
         setRefunds(refundList || []);
       } catch (err) {
         console.warn('Error loading refunds:', err);
+      }
+
+      // Charger les retours de cette commande
+      try {
+        const returnList = await returnService.getUserReturns(order!.user_id || '');
+        const orderReturns = returnList.filter((r: any) => r.order_id === orderId);
+        setReturns(orderReturns || []);
+      } catch (err) {
+        console.warn('Error loading returns:', err);
       }
     } catch (error) {
       errorHandler.handleDatabaseError(error, 'Error loading order:');
@@ -197,6 +208,21 @@ export const ClientOrderDetailScreen: React.FC = () => {
         <Text style={styles.orderId}>Commande #{order.id.slice(0, 8)}</Text>
         <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
       </View>
+
+      {/* Return Banner */}
+      {returns.length > 0 && (
+        <View style={[styles.section, { borderColor: '#FF6B6B', borderWidth: 1, backgroundColor: '#FF6B6B10' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="return-down-back" size={24} color="#FF6B6B" />
+            <View style={{ marginLeft: SPACING.sm, flex: 1 }}>
+              <Text style={[styles.sectionTitle, { color: '#FF6B6B', marginBottom: 4 }]}>Commande avec retour(s)</Text>
+              <Text style={{ color: COLORS.textSoft, fontSize: FONT_SIZE.sm }}>
+                {returns.length} produit(s) retourné(s) sur cette commande
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Order Timeline */}
       <OrderTimeline status={order.status} />
@@ -456,12 +482,24 @@ export const ClientOrderDetailScreen: React.FC = () => {
       <Card style={styles.section}>
         <Text style={styles.sectionTitle}>Produits ({order.order_items.length})</Text>
         {order.order_items.map((item) => {
-          const productImage = item.product?.images && item.product.images.length > 0 
-            ? item.product.images[0] 
+          const productImage = item.product?.images && item.product.images.length > 0
+            ? item.product.images[0]
             : null;
-          
+
+          const itemReturn = returns.find((r: any) => r.product_id === item.product_id);
+
           return (
-            <View key={item.id} style={styles.itemContainer}>
+            <View
+              key={item.id}
+              style={[
+                styles.itemContainer,
+                itemReturn && {
+                  borderWidth: 2,
+                  borderColor: '#FF6B6B',
+                  backgroundColor: '#FF6B6B05',
+                }
+              ]}
+            >
               <View style={styles.itemImage}>
                 {productImage ? (
                   <Image
@@ -475,7 +513,14 @@ export const ClientOrderDetailScreen: React.FC = () => {
                 )}
               </View>
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.product?.name || 'Produit inconnu'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text style={styles.itemName}>{item.product?.name || 'Produit inconnu'}</Text>
+                  {itemReturn && (
+                    <View style={{ backgroundColor: '#FF6B6B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>RETOURNÉ</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={styles.itemPrice}>
                   {item.price.toLocaleString()} FCFAs × {item.quantity}
                 </Text>

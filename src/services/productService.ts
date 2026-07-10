@@ -586,6 +586,8 @@ export const productService = {
   async getStoreHomepageProducts(storeId: string, limit = 8): Promise<Product[]> {
     const client = useSupabase();
 
+    console.log('Getting homepage products for store:', storeId);
+
     // Only return products explicitly marked as featured by the seller
     const { data: featured, error: featuredError } = await client
       .from('products')
@@ -595,6 +597,8 @@ export const productService = {
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    console.log('Featured products result:', featured?.length, featuredError);
 
     if (featuredError && featuredError.code !== 'PGRST116') {
       throw featuredError;

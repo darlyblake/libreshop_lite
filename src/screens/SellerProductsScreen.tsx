@@ -817,6 +817,35 @@ export const SellerProductsScreen: React.FC = () => {
         </View>
       </LinearGradient>
 
+      {/* 🔴 Bandeau d'avertissement: dépassement de limite après downgrade */}
+      {store?.product_limit && store.product_limit !== -1 && totalCount > store.product_limit && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('SellerChangePlan')}
+          style={{
+            backgroundColor: '#FEF3C7',
+            borderLeftWidth: 4,
+            borderLeftColor: '#F59E0B',
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Ionicons name="warning" size={20} color="#D97706" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 13 }}>
+              Limite dépassée — Plan {store.subscription_plan}
+            </Text>
+            <Text style={{ color: '#B45309', fontSize: 12, marginTop: 2 }}>
+              Vous avez {totalCount} produits, mais votre plan actuel en autorise {store.product_limit}. Les produits en surplus restent actifs, mais vous ne pouvez plus en ajouter. Archivez ou supprimez des produits pour retrouver cette capacité.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color="#D97706" />
+        </TouchableOpacity>
+      )}
+
       {/* Stats and filters are rendered inside FlatList header to prevent overlap while scrolling */}
 
       {/* Product list with pagination */}

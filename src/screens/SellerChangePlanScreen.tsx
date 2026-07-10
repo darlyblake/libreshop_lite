@@ -110,7 +110,59 @@ export const SellerChangePlanScreen: React.FC = () => {
     return Math.max(0, newPlanPrice - credit);
   };
 
-  const handleSelectPlan = (plan: Plan) => {
+  /**
+   * Vérifie localement si le vendeur peut descendre de plan.
+   * Utilise les données déjà chargées (counts depuis l'API) pour une vérification rapide.
+   */
+  const checkSellerDowngradeEligibility = async (plan: Plan): Promise<{
+    allowed: boolean;
+    blockers: { resource: string; current: number; limit: number }[];
+  }> => {
+    if (!store?.id) return { allowed: true, blockers: [] };
+
+    const { supabase: client } = await import('../lib/supabase');
+
+    const newProductLimit = plan.product_limit != null ? plan.product_limit : -1;
+    const newCouponLimit = (plan as any).max_coupons != null ? (plan as any).max_coupons : -1;
+    const newCollectionLimit = (plan as any).max_collections != null ? (plan as any).max_collections : -1;
+
+    const [productRes, couponRes, collectionRes] = await Promise.all([
+      newProductLimit !== -1
+        ? client.from('products').select('id', { count: 'exact', head: true }).eq('store_id', store.id)
+        : Promise.resolve({ count: 0, error: null }),
+      newCouponLimit !== -1
+        ? client.from('coupons').select('id', { count: 'exact', head: true }).eq('store_id', store.id)
+        : Promise.resolve({ count: 0, error: null }),
+      newCollectionLimit !== -1
+        ? client.from('collections').select('id', { count: 'exact', head: true }).eq('store_id', store.id)
+        : Promise.resolve({ count: 0, error: null }),
+    ]);
+
+    const blockers: { resource: string; current: number; limit: number }[] = [];
+    if (newProductLimit !== -1 && (productRes.count ?? 0) > newProductLimit) {
+      blockers.push({ resource: 'produits', current: productRes.count ?? 0, limit: newProductLimit });
+    }
+    if (newCouponLimit !== -1 && (couponRes.count ?? 0) > newCouponLimit) {
+      blockers.push({ resource: 'codes promo', current: couponRes.count ?? 0, limit: newCouponLimit });
+    }
+    if (newCollectionLimit !== -1 && (collectionRes.count ?? 0) > newCollectionLimit) {
+      blockers.push({ resource: 'collections', current: collectionRes.count ?? 0, limit: newCollectionLimit });
+    }
+
+    return { allowed: blockers.length === 0, blockers };
+  };
+
+  const handleSelectPlan = async (plan: Plan) => {
+    const eligibility = await checkSellerDowngradeEligibility(plan);
+    if (!eligibility.allowed) {
+      const lines = eligibility.blockers.map(b => `• ${b.current} ${b.resource} (max: ${b.limit})`).join('\n');
+      Alert.alert(
+        '⛔ Downgrade impossible',
+        `Votre boutique dépasse les limites du plan "${plan.name}" :\n\n${lines}\n\nSupprimez les éléments en surplus pour pouvoir choisir ce plan.`,
+        [{ text: 'Compris' }]
+      );
+      return;
+    }
     const proratedPrice = calculateProrata(plan.price);
     contactAdmin(plan, proratedPrice);
   };
@@ -143,6 +195,17 @@ export const SellerChangePlanScreen: React.FC = () => {
       Alert.alert(
         'Points XP insuffisants',
         `Vous avez ${userPoints.toLocaleString()} XP.\nIl en faut ${requiredPoints.toLocaleString()} XP pour ce plan (1 XP = 1 FCFA).`
+      );
+      return;
+    }
+
+    const eligibility = await checkSellerDowngradeEligibility(plan);
+    if (!eligibility.allowed) {
+      const lines = eligibility.blockers.map(b => `• ${b.current} ${b.resource} (max: ${b.limit})`).join('\n');
+      Alert.alert(
+        '⛔ Downgrade impossible',
+        `Votre boutique dépasse les limites du plan "${plan.name}" :\n\n${lines}\n\nSupprimez les éléments en surplus pour pouvoir choisir ce plan.`,
+        [{ text: 'Compris' }]
       );
       return;
     }

@@ -132,23 +132,26 @@ export interface StoreWithDistance {
 /**
  * Validate a store object for required fields and constraints
  * @param store The store object to validate
+ * @param isPartialUpdate If true, only validates fields that are present in the object (for partial updates)
  * @returns Array of validation errors (empty if valid)
  */
-export function validateStore(store: Record<string, any>): StoreValidationError[] {
+export function validateStore(store: Record<string, any>, isPartialUpdate: boolean = false): StoreValidationError[] {
   const errors: StoreValidationError[] = [];
 
-  // Name validation
-  if (!store.name) {
-    errors.push({ field: 'name', message: 'Le nom est requis' });
-  } else if (typeof store.name !== 'string') {
-    errors.push({ field: 'name', message: 'Le nom doit être une chaîne de caractères' });
-  } else if (store.name.trim().length < 2) {
-    errors.push({ field: 'name', message: 'Le nom doit contenir au moins 2 caractères' });
-  } else if (store.name.length > 100) {
-    errors.push({ field: 'name', message: 'Le nom doit contenir au maximum 100 caractères' });
+  // Name validation - only required for full updates (creation)
+  if (!isPartialUpdate || store.name !== undefined) {
+    if (!store.name) {
+      errors.push({ field: 'name', message: 'Le nom est requis' });
+    } else if (typeof store.name !== 'string') {
+      errors.push({ field: 'name', message: 'Le nom doit être une chaîne de caractères' });
+    } else if (store.name.trim().length < 2) {
+      errors.push({ field: 'name', message: 'Le nom doit contenir au moins 2 caractères' });
+    } else if (store.name.length > 100) {
+      errors.push({ field: 'name', message: 'Le nom doit contenir au maximum 100 caractères' });
+    }
   }
 
-  // Slug validation
+  // Slug validation - only if present
   if (store.slug !== undefined) {
     if (typeof store.slug !== 'string') {
       errors.push({ field: 'slug', message: 'L\'URL personnalisée doit être une chaîne de caractères' });
@@ -161,7 +164,7 @@ export function validateStore(store: Record<string, any>): StoreValidationError[
     }
   }
 
-  // Description validation
+  // Description validation - only if present
   if (store.description !== undefined) {
     if (typeof store.description !== 'string') {
       errors.push({ field: 'description', message: 'La description doit être une chaîne de caractères' });

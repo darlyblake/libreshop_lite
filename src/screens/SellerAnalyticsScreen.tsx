@@ -135,6 +135,19 @@ export const SellerAnalyticsScreen = () => {
           );
           return;
         }
+
+        if (s.analytics_active === false) {
+          Alert.alert(
+            'Non inclus',
+            `Les Analytics ne sont pas inclus dans votre abonnement "${s.subscription_plan || 'actuel'}".`,
+            [
+              { text: 'Retour', onPress: () => navigation.goBack() },
+              { text: 'Changer d\'offre', onPress: () => navigation.navigate('SellerChangePlan') }
+            ]
+          );
+          return;
+        }
+        
         setStoreId(s.id);
         setStore(s);
       }
@@ -847,7 +860,22 @@ const styles = StyleSheet.create({
               return (
                 <TouchableOpacity
                   key={r.key}
-                  onPress={() => setTimeRange(r.key)}
+                  onPress={() => {
+                    const daysReq = getRangeBounds(r.key).days;
+                    const retention = store?.analytics_retention_days;
+                    if (retention && retention !== -1 && daysReq > retention) {
+                      Alert.alert(
+                        'Limite atteinte', 
+                        `Votre plan "${store?.subscription_plan}" limite l'historique à ${retention} jours.\nPassez à un plan supérieur pour voir cet historique.`,
+                        [
+                          { text: 'Changer d\'offre', onPress: () => navigation.navigate('SellerChangePlan') },
+                          { text: 'Fermer', style: 'cancel' }
+                        ]
+                      );
+                      return;
+                    }
+                    setTimeRange(r.key);
+                  }}
                   activeOpacity={0.8}
                   style={[
                     styles.timeChip,
@@ -868,6 +896,31 @@ const styles = StyleSheet.create({
             })}
           </ScrollView>
         </View>
+
+        {/* 🟠 Avertissement: historique réduit après downgrade */}
+        {store?.analytics_retention_days && store.analytics_retention_days !== -1 && (
+          <View style={{
+            backgroundColor: '#FFF7ED',
+            borderLeftWidth: 4,
+            borderLeftColor: '#F97316',
+            padding: 12,
+            borderRadius: 8,
+            marginBottom: 16,
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}>
+            <Ionicons name="time-outline" size={18} color="#EA580C" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#7C2D12', fontWeight: '700', fontSize: 13 }}>
+                Historique limité — Plan {store.subscription_plan}
+              </Text>
+              <Text style={{ color: '#9A3412', fontSize: 12, marginTop: 2 }}>
+                Votre plan actuel conserve {store.analytics_retention_days} jours d'historique analytique. Les données antérieures ne sont plus accessibles. Passez à un plan supérieur pour un historique plus long.
+              </Text>
+            </View>
+          </View>
+        )}
 
         {loading ? (
           <ActivityIndicator size="large" color={COLORS.accent} style={{ marginTop: 40 }} />

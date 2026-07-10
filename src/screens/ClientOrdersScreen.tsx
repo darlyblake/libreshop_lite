@@ -166,11 +166,11 @@ export const ClientOrdersScreen: React.FC = () => {
   // Charger les commandes avec détails
   const loadOrders = useCallback(async () => {
     if (!user?.id) return;
-    
+
     try {
       setLoading(true);
       const data = await orderService.getByUser(String(user.id));
-      
+
       const ordersWithDetails = Array.isArray(data) ? data.map((order: any) => ({
         ...order,
         order_items: ((order?.order_items || []) as any[]).map((item: any) => ({
@@ -178,8 +178,17 @@ export const ClientOrdersScreen: React.FC = () => {
           product: item.product || item.products,
         })),
       })) : [];
-      
-      setOrders(ordersWithDetails);
+
+      // Charger les retours pour détecter les commandes avec retours
+      const returns = await returnService.getUserReturns(String(user.id));
+      const orderIdsWithReturns = new Set((returns || []).map((r: any) => r.order_id));
+
+      const ordersWithReturnStatus = ordersWithDetails.map((order: any) => ({
+        ...order,
+        hasReturn: orderIdsWithReturns.has(order.id),
+      }));
+
+      setOrders(ordersWithReturnStatus);
     } catch (e: any) {
       errorHandler.handle(e, 'load orders failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       Alert.alert('Erreur', e?.message ? String(e.message) : 'Impossible de charger vos commandes');
@@ -512,8 +521,8 @@ export const ClientOrdersScreen: React.FC = () => {
     const hasUpdate = unreadNotifs.length > 0;
 
     return (
-      <View 
-        key={order.id} 
+      <View
+        key={order.id}
         style={[
           styles.orderCard,
           { padding: SPACING.lg, borderRadius: RADIUS.xl, shadowColor: palette.text, shadowOpacity: 0.05, shadowRadius: 10, elevation: 2, borderWidth: 1, borderColor: palette.border },
@@ -523,11 +532,16 @@ export const ClientOrdersScreen: React.FC = () => {
         {/* Header avec statut */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.md }}>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
               <Text style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: palette.text }}>Commande #{String(order.id).split('-')[0].toUpperCase()}</Text>
               {hasUpdate && (
                 <View style={{ backgroundColor: palette.accent, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>MAJ</Text>
+                </View>
+              )}
+              {(order as any).hasReturn && (
+                <View style={{ backgroundColor: '#FF6B6B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>RETOUR</Text>
                 </View>
               )}
             </View>

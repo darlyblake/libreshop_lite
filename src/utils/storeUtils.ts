@@ -113,6 +113,7 @@ export async function canStoreCreateProduct(storeId: string): Promise<boolean> {
   const currentCount = countRes.count || 0;
   const limit = Number(store?.product_limit || 0);
   
+  if (limit === -1 || limit <= 0) return true;
   return currentCount < limit;
 }
 

@@ -937,7 +937,12 @@ export const SellerDashboardScreen: React.FC = () => {
 
   // Rendu des actions rapides
   const renderQuickActions = () => {
-    const handleActionPress = (action: { screen: string; storeId?: string; inactive?: boolean }) => {
+    const handleActionPress = (action: { screen?: string; storeId?: string; inactive?: boolean; action?: string }) => {
+      if (action.action === 'promo') {
+        navigation.navigate('SellerPromoBanners', { storeId: action.storeId } as never);
+        return;
+      }
+
       if (action.inactive) {
         Alert.alert(
           'Option non incluse',
@@ -1007,6 +1012,12 @@ export const SellerDashboardScreen: React.FC = () => {
         screen: 'StoreDetail',
         storeId: store?.id,
         inactive: store?.online_store_active === false
+      },
+      { 
+        label: 'Bannière Promo', 
+        icon: 'megaphone-outline', 
+        color: COLORS.accent,
+        action: 'promo',
       },
     ];
 

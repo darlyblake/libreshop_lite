@@ -4,6 +4,7 @@ export interface Country {
   id: string;
   name: string;
   code: string;
+  phone_code?: string; // Indicatif téléphonique (ex: "+241")
   created_at?: string;
 }
 

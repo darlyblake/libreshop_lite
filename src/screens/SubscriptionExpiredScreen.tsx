@@ -25,6 +25,7 @@ import { Plan, planService } from '../services/planService';
 import { useSettingsStore } from '../store/settingsStore';
 import { contactStore } from '../services/contactService';
 import { pointsService } from '../services/pointsService';
+import { FEATURE_LABELS } from '../services/featureGatingService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubscriptionExpired'>;
 
@@ -75,7 +76,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
       const user = await authService.getCurrentUser();
       if (!user) {
         console.error('❌ SubscriptionExpired: Aucun utilisateur trouvé');
-        navigation.reset({ index: 0, routes: [{ name: 'Landing' }] });
+        (navigation as any).navigate('Landing');
         return;
       }
       setUserId(user.id);
@@ -140,7 +141,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
         'Impossible de charger les données. Veuillez réessayer ou contacter le support.',
         [
           { text: 'Réessayer', onPress: () => loadData() },
-          { text: 'Retour à l\'accueil', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Landing' }] }) }
+          { text: 'Retour à l\'accueil', onPress: () => (navigation as any).navigate('Landing') }
         ]
       );
     } finally {
@@ -156,10 +157,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
     try {
       setSigningOut(true);
       await authService.signOut();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Landing' }],
-      });
+      (navigation as any).replace('Landing');
     } catch (error: any) {
       errorHandler.handleDatabaseError(error, 'Sign out error:');
       Alert.alert('Erreur', 'Impossible de se déconnecter');
@@ -183,6 +181,10 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
         setPayingWithPoints(true);
         const { supabase: client } = await import('../lib/supabase');
         
+        if (!client) {
+          throw new Error('Supabase client not available');
+        }
+
         await client.rpc('add_points_to_user', {
           p_user_id: userId!,
           p_amount: -requiredPoints,
@@ -253,6 +255,41 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('fr-FR') + ' FCFA';
+  };
+
+  // Filtrer les fonctionnalités pour ne garder que les versions avancées quand les deux existent
+  const filterFeatures = (features: string[]) => {
+    const featureMap = new Map<string, string>();
+    
+    // Mapping des fonctionnalités basiques vers leurs versions avancées
+    const basicToAdvanced: Record<string, string> = {
+      'dashboard_basic': 'dashboard_advanced',
+      'analytics_basic': 'analytics_advanced',
+      'clients_basic': 'clients_advanced',
+      'coupons_basic': 'coupons_unlimited',
+      'collections_basic': 'collections_unlimited',
+      'reports_basic': 'reports_advanced',
+      'refunds_basic': 'refunds_advanced',
+      'finance_basic': 'accounting_advanced',
+    };
+
+    features.forEach(feature => {
+      const advancedVersion = basicToAdvanced[feature];
+      if (advancedVersion && features.includes(advancedVersion)) {
+        // Si la version avancée existe, on l'ajoutera plus tard, on ignore la basique
+        return;
+      }
+      featureMap.set(feature, feature);
+    });
+
+    // Ajouter les versions avancées si elles existent
+    features.forEach(feature => {
+      if (feature.endsWith('_advanced') || feature.endsWith('_unlimited')) {
+        featureMap.set(feature, feature);
+      }
+    });
+
+    return Array.from(featureMap.keys());
   };
 
   if (isLoading) {
@@ -460,7 +497,7 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
                     </View>
 
                     <View style={styles.featuresContainer}>
-                      {Array.isArray(plan.features) && plan.features.map((feature, idx) => (
+                      {Array.isArray(plan.features) && filterFeatures(plan.features).map((feature, idx) => (
                         <View key={idx} style={styles.featureRow}>
                           <View style={styles.featureIconContainer}>
                             <Ionicons 
@@ -469,10 +506,41 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
                               color={COLORS.accent} 
                             />
                           </View>
-                          <Text style={styles.featureText}>{feature}</Text>
+                          <Text style={styles.featureText}>{FEATURE_LABELS[feature as keyof typeof FEATURE_LABELS]?.name || feature}</Text>
                         </View>
                       ))}
                     </View>
+
+                    {/* Limits Section */}
+                    {(plan.product_limit !== undefined || plan.max_coupons !== undefined || plan.max_collections !== undefined || plan.analytics_retention_days !== undefined) && (
+                      <View style={styles.limitsSection}>
+                        <Text style={styles.limitsTitle}>Limites</Text>
+                        {plan.product_limit !== undefined && (
+                          <View style={styles.limitItem}>
+                            <Ionicons name="cube-outline" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.limitText}>Jusqu'à {plan.product_limit === -1 ? 'Illimité' : `${plan.product_limit} produits`}</Text>
+                          </View>
+                        )}
+                        {plan.max_coupons !== undefined && (
+                          <View style={styles.limitItem}>
+                            <Ionicons name="pricetag-outline" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.limitText}>Jusqu'à {plan.max_coupons === -1 ? 'Illimité' : `${plan.max_coupons} codes promo`}</Text>
+                          </View>
+                        )}
+                        {plan.max_collections !== undefined && (
+                          <View style={styles.limitItem}>
+                            <Ionicons name="layers-outline" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.limitText}>Jusqu'à {plan.max_collections === -1 ? 'Illimité' : `${plan.max_collections} collections`}</Text>
+                          </View>
+                        )}
+                        {plan.analytics_retention_days !== undefined && (
+                          <View style={styles.limitItem}>
+                            <Ionicons name="analytics-outline" size={16} color={COLORS.textMuted} />
+                            <Text style={styles.limitText}>Données analytics conservées {plan.analytics_retention_days} jours</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
 
                     <View style={[
                       styles.planAction,
@@ -504,11 +572,11 @@ export const SubscriptionExpiredScreen: React.FC<Props> = ({ navigation }) => {
                     </View>
                   </TouchableOpacity>
 
-                  {!plan.is_free && !isPlanDisabled && (
+                  {!plan.is_free && (
                     <TouchableOpacity
                       style={[styles.pointsPayButton, userPoints < plan.price && { opacity: 0.4 }]}
                       onPress={() => handlePayWithPoints(plan)}
-                      disabled={payingWithPoints || userPoints < plan.price}
+                      disabled={payingWithPoints || userPoints < plan.price || isPlanDisabled}
                     >
                       {payingWithPoints ? (
                         <ActivityIndicator size="small" color={COLORS.warning} />
@@ -705,10 +773,12 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   plansGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.md,
   },
   planWrapper: {
-    width: '100%',
+    width: '48%',
   },
   planCard: {
     backgroundColor: COLORS.card,
@@ -936,5 +1006,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
     fontSize: FONT_SIZE.md,
+  },
+  limitsSection: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  limitsTitle: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  limitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  limitText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
   },
 });

@@ -32,6 +32,9 @@ export interface Plan {
   months?: number;     // quantitative duration in months
   trial_days?: number; // free trial length
   product_limit?: number;
+  max_coupons?: number;
+  max_collections?: number;
+  analytics_retention_days?: number;
   has_caisse?: boolean;
   has_online_store?: boolean;
   has_analytics?: boolean;

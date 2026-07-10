@@ -122,6 +122,19 @@ export const SellerCaisseScreen = () => {
           return;
         }
 
+        if (store.cashier_active === false) {
+          Alert.alert(
+            'Non inclus',
+            `Le Point de Vente n'est pas inclus dans votre abonnement "${store.subscription_plan || 'actuel'}".`,
+            [
+              { text: 'Retour', onPress: () => navigation.goBack() },
+              { text: 'Changer d\'offre', onPress: () => navigation.navigate('SellerChangePlan') }
+            ]
+          );
+          setLoading(false);
+          return;
+        }
+
         setStoreId(store.id);
         setStore(store);
         const data = await productService.getByStoreAvailable(store.id);

@@ -25,6 +25,7 @@ import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
+import { returnService } from '../services/returnService';
 import { useSupabase } from '../lib/supabase';
 import { contactStore } from '../services/contactService';
 import { notificationService } from '../services/notificationService';
@@ -59,6 +60,7 @@ interface OrderDisplay {
   hoursInStatus: number;
   issueType?: string | null;
   items?: OrderItemDisplay[];
+  hasReturn?: boolean;
 }
 
 
@@ -474,6 +476,10 @@ export const SellerOrdersScreen: React.FC = () => {
           return;
         }
 
+        // Charger les retours pour détecter les commandes avec retours
+        const returns = await returnService.getStoreReturns(store.id);
+        const orderIdsWithReturns = new Set((returns || []).map((r: any) => r.order_id));
+
         // 🔄 Mapping optimisé
         const mapped: OrderDisplay[] = result.orders.map((o: any) => {
           const itemCount = Array.isArray(o.order_items) ? o.order_items.length : 0;
@@ -503,6 +509,7 @@ export const SellerOrdersScreen: React.FC = () => {
             daysInStatus,
             hoursInStatus,
             issueType: o.issue_type || null,
+            hasReturn: orderIdsWithReturns.has(o.id),
           };
         });
 
@@ -876,6 +883,26 @@ Merci.`;
                   {getStatusLabel(order.status)}
                 </Text>
               </View>
+
+              {/* Return badge */}
+              {order.hasReturn && (
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: '#FF6B6B20', marginLeft: 4 }
+                ]}>
+                  <Ionicons
+                    name="return-down-back"
+                    size={fontSize.xs}
+                    color="#FF6B6B"
+                  />
+                  <Text style={[
+                    styles.statusText,
+                    { fontSize: fontSize.xs, color: '#FF6B6B' }
+                  ]}>
+                    RETOUR
+                  </Text>
+                </View>
+              )}
 
               {/* Stock issue badge */}
               {order.issueType && (

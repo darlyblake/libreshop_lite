@@ -208,7 +208,58 @@ export const adminService = {
     }
     return `Il y a ${diffDays} j`;
   },
-  
+
+  /**
+   * Vérifie si une boutique peut descendre vers un nouveau plan sans dépasser ses limites.
+   * Retourne null si OK, ou un objet décrivant les blocages si downgrade refusé.
+   */
+  async checkDowngradeEligibility(storeId: string, newPlan: {
+    product_limit: number | null;
+    max_coupons?: number | null;
+    max_collections?: number | null;
+  }): Promise<{
+    allowed: boolean;
+    blockers: { resource: string; current: number; limit: number }[];
+  }> {
+    await requireAdmin();
+    if (!supabase) throw new Error('Supabase client not initialized');
+
+    const newProductLimit = newPlan.product_limit ?? -1;
+    const newCouponLimit = newPlan.max_coupons ?? -1;
+    const newCollectionLimit = newPlan.max_collections ?? -1;
+
+    // Count all resources in parallel
+    const [productRes, couponRes, collectionRes] = await Promise.all([
+      newProductLimit !== -1
+        ? supabase.from('products').select('id', { count: 'exact', head: true }).eq('store_id', storeId)
+        : Promise.resolve({ count: 0, error: null }),
+      newCouponLimit !== -1
+        ? supabase.from('coupons').select('id', { count: 'exact', head: true }).eq('store_id', storeId)
+        : Promise.resolve({ count: 0, error: null }),
+      newCollectionLimit !== -1
+        ? supabase.from('collections').select('id', { count: 'exact', head: true }).eq('store_id', storeId)
+        : Promise.resolve({ count: 0, error: null }),
+    ]);
+
+    const currentProducts = productRes.count ?? 0;
+    const currentCoupons = couponRes.count ?? 0;
+    const currentCollections = collectionRes.count ?? 0;
+
+    const blockers: { resource: string; current: number; limit: number }[] = [];
+
+    if (newProductLimit !== -1 && currentProducts > newProductLimit) {
+      blockers.push({ resource: 'produits', current: currentProducts, limit: newProductLimit });
+    }
+    if (newCouponLimit !== -1 && currentCoupons > newCouponLimit) {
+      blockers.push({ resource: 'codes promo', current: currentCoupons, limit: newCouponLimit });
+    }
+    if (newCollectionLimit !== -1 && currentCollections > newCollectionLimit) {
+      blockers.push({ resource: 'collections', current: currentCollections, limit: newCollectionLimit });
+    }
+
+    return { allowed: blockers.length === 0, blockers };
+  },
+
 
   async getStoresWithDetails(): Promise<any[]> {
     await requireAdmin();
@@ -635,7 +686,29 @@ export const adminService = {
       )
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    
+    // Fetch revenue for each store
+    const storesWithRevenue = await Promise.all(
+      (data || []).map(async (store: any) => {
+        try {
+          const { data: ordersData } = await supabase!
+            .from('orders')
+            .select('total_amount,status')
+            .eq('store_id', store.id);
+            
+          const revenue = (ordersData || [])
+            .filter((o: any) => o.status === 'completed' || o.status === 'delivered')
+            .reduce((sum: number, o: any) => sum + (Number(o.total_amount) || 0), 0);
+            
+          return { ...store, revenue };
+        } catch (err) {
+          console.error(`Error fetching revenue for store ${store.id}:`, err);
+          return { ...store, revenue: 0 };
+        }
+      })
+    );
+    
+    return storesWithRevenue;
   },
 
   async getStorePaymentHistory(storeId: string) {

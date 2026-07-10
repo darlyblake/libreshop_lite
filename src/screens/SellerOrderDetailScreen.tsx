@@ -26,6 +26,7 @@ import { Button } from '../components/Button';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { locationService } from '../services/locationService';
+import { returnService } from '../services/returnService';
 
 type RouteProps = RouteProp<RootStackParamList, 'SellerOrderDetail'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -53,6 +54,7 @@ export const SellerOrderDetailScreen: React.FC = () => {
   const [order, setOrder] = useState<OrderWithItems | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [returns, setReturns] = useState<any[]>([]);
 
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [packMode, setPackMode] = useState(false);
@@ -122,6 +124,15 @@ export const SellerOrderDetailScreen: React.FC = () => {
       };
 
       setOrder(normalized);
+
+      // Charger les retours de cette commande
+      try {
+        const returnList = await returnService.getStoreReturns(normalized.store_id || '');
+        const orderReturns = returnList.filter((r: any) => r.order_id === orderId);
+        setReturns(orderReturns || []);
+      } catch (err) {
+        console.warn('Error loading returns:', err);
+      }
     } catch (error) {
       errorHandler.handleDatabaseError(error, 'Error loading order:');
       Alert.alert('Erreur', 'Impossible de charger la commande');
@@ -364,6 +375,21 @@ Merci.`;
         <View style={{ width: 40 }} />
       </View>
 
+      {/* Return Banner */}
+      {returns.length > 0 && (
+        <View style={[styles.section, { borderColor: '#FF6B6B', borderWidth: 1, backgroundColor: '#FF6B6B10' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Ionicons name="return-down-back" size={24} color="#FF6B6B" />
+            <View style={{ marginLeft: SPACING.sm, flex: 1 }}>
+              <Text style={[styles.sectionTitle, { color: '#FF6B6B', marginBottom: 4 }]}>Commande avec retour(s)</Text>
+              <Text style={{ color: COLORS.textSoft, fontSize: FONT_SIZE.sm }}>
+                {returns.length} produit(s) retourné(s) sur cette commande
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Status Badge */}
       <View style={styles.statusContainer}>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
@@ -468,6 +494,7 @@ Merci.`;
 
         {order.order_items.map((item) => {
           const isChecked = checkedItems.has(item.id);
+          const itemReturn = returns.find((r: any) => r.product_id === item.product_id);
           return (
             <TouchableOpacity
               key={item.id}
@@ -482,6 +509,11 @@ Merci.`;
                   backgroundColor: isChecked ? COLORS.success + '10' : COLORS.bg,
                   marginBottom: SPACING.sm,
                   paddingHorizontal: SPACING.sm,
+                },
+                itemReturn && !packMode && {
+                  borderWidth: 2,
+                  borderColor: '#FF6B6B',
+                  backgroundColor: '#FF6B6B05',
                 }
               ]}
             >
@@ -501,9 +533,16 @@ Merci.`;
                 />
               )}
               <View style={styles.itemInfo}>
-                <Text style={[styles.itemName, packMode && isChecked && { textDecorationLine: 'line-through', color: COLORS.textMuted }]}>
-                  {item.product?.name || 'Produit'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text style={[styles.itemName, packMode && isChecked && { textDecorationLine: 'line-through', color: COLORS.textMuted }]}>
+                    {item.product?.name || 'Produit'}
+                  </Text>
+                  {returns.find((r: any) => r.product_id === item.product_id) && (
+                    <View style={{ backgroundColor: '#FF6B6B', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, marginLeft: 8 }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>RETOURNÉ</Text>
+                    </View>
+                  )}
+                </View>
                 {item.product?.reference ? (
                   <Text style={{ fontSize: FONT_SIZE.xs, color: COLORS.textMuted, marginTop: 2 }}>
                     Réf: {item.product.reference}

@@ -98,6 +98,7 @@ const SellerReturnsScreen = lazyLoad(() => import('../screens/SellerReturnsScree
 const SellerCouponsScreen = lazyLoad(() => import('../screens/SellerCouponsScreen'), 'SellerCouponsScreen');
 const SellerFinanceScreen = lazyLoad(() => import('../screens/SellerFinanceScreen'), 'SellerFinanceScreen');
 const SellerKYCScreen = lazyLoad(() => import('../screens/SellerKYCScreen'), 'SellerKYCScreen');
+const SellerPromoBannersScreen = lazyLoad(() => import('../screens/SellerPromoBannersScreen'), 'SellerPromoBannersScreen');
 const SellerHubScreen = lazyLoad(() => import('../screens/SellerHubScreen'), 'SellerHubScreen');
 
 // Lazy loaded Admin screens
@@ -208,6 +209,7 @@ const linking = (() => {
         SellerFinance: 'SellerFinance',
         SellerAccounting: 'SellerAccounting',
         SellerKYC: 'SellerKYC',
+        SellerPromoBanners: 'SellerPromoBanners',
         Notifications: 'Notifications',
         Cart: 'Cart',
       },
@@ -888,6 +890,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerCoupons" component={SellerCouponsScreen} />
         <Stack.Screen name="SellerFinance" component={SellerFinanceScreen} />
         <Stack.Screen name="SellerKYC" component={SellerKYCScreen} />
+        <Stack.Screen name="SellerPromoBanners" component={SellerPromoBannersScreen} />
         <Stack.Screen name="SellerHub" component={SellerHubScreen} />
         
         {/* Routes admin */}

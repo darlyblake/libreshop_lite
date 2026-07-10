@@ -15,6 +15,7 @@ import {
 import { type Plan } from '../lib/supabase';
 import { authService } from '../services/authService';
 import { planService } from '../services/planService';
+import { featureGatingService, FeatureKey, FEATURE_LABELS } from '../services/featureGatingService';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
@@ -31,6 +32,9 @@ interface Subscription {
   months?: number;             // durée en mois (quantitatif)
   trialDays?: number;          // longueur de l'essai gratuit
   productLimit?: number;       // nombre max de produits
+  maxCoupons?: number;         // nombre max de codes promo
+  maxCollections?: number;     // nombre max de collections
+  analyticsRetentionDays?: number; // rétention analytics en jours
   hasCaisse?: boolean;         // vente physique active
   hasOnlineStore?: boolean;    // boutique en ligne
   hasAnalytics?: boolean;      // analytique détaillée
@@ -66,6 +70,9 @@ export const AdminSubscriptionsScreen: React.FC = () => {
   React.useEffect(() => {
     const load = async () => {
       try {
+        // Charger les fonctionnalités depuis la base de données
+        await featureGatingService.loadFeaturesFromDatabase();
+
         const plans = await planService.getAll();
         
         // Fetch stores with their subscription plans to calculate user count and revenue
@@ -101,6 +108,9 @@ export const AdminSubscriptionsScreen: React.FC = () => {
               months: p.months,
               trialDays: p.trial_days,
               productLimit: p.product_limit,
+              maxCoupons: p.max_coupons,
+              maxCollections: p.max_collections,
+              analyticsRetentionDays: p.analytics_retention_days,
               hasCaisse: p.has_caisse,
               hasOnlineStore: p.has_online_store,
               hasAnalytics: p.has_analytics,
@@ -140,14 +150,17 @@ export const AdminSubscriptionsScreen: React.FC = () => {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
   const [statsSubscription, setStatsSubscription] = useState<Subscription | null>(null);
+  const [featuresModalVisible, setFeaturesModalVisible] = useState(false);
+  const [featuresSubscription, setFeaturesSubscription] = useState<Subscription | null>(null);
+  const [featuresRefreshKey, setFeaturesRefreshKey] = useState(0);
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newDuration, setNewDuration] = useState('');
   const [newMonths, setNewMonths] = useState('');
   const [newProductLimit, setNewProductLimit] = useState('');
-  const [newHasCaisse, setNewHasCaisse] = useState(false);
-  const [newHasOnlineStore, setNewHasOnlineStore] = useState(false);
-  const [newHasAnalytics, setNewHasAnalytics] = useState(false);
+  const [newMaxCoupons, setNewMaxCoupons] = useState('');
+  const [newMaxCollections, setNewMaxCollections] = useState('');
+  const [newAnalyticsRetentionDays, setNewAnalyticsRetentionDays] = useState('');
   const [newFeatures, setNewFeatures] = useState('');
   const [newTrialDays, setNewTrialDays] = useState('');
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
@@ -157,18 +170,19 @@ export const AdminSubscriptionsScreen: React.FC = () => {
     setNewName('');
     setNewPrice('');
     setNewDuration('');
+    setNewMonths('');
+    setNewProductLimit('');
+    setNewMaxCoupons('');
+    setNewMaxCollections('');
+    setNewAnalyticsRetentionDays('');
     setNewFeatures('');
     setNewTrialDays('');
-    setNewHasCaisse(false);
-    setNewHasOnlineStore(false);
-    setNewHasAnalytics(false);
     setAddModalVisible(true);
   };
   const closeAddModal = () => {
     blurActiveElement();
     setAddModalVisible(false);
     setEditingSubscription(null);
-    setNewHasAnalytics(false);
   };
 
   const closeStatsModal = () => {
@@ -216,9 +230,12 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         // trial days stored separately in the plans table – not part of our
         // local Subscription type (we use `trialDays` for display).
         productLimit: parseInt(newProductLimit) || undefined,
-        hasCaisse: newHasCaisse,
-        hasOnlineStore: newHasOnlineStore,
-        hasAnalytics: newHasAnalytics,
+        maxCoupons: parseInt(newMaxCoupons) || undefined,
+        maxCollections: parseInt(newMaxCollections) || undefined,
+        analyticsRetentionDays: parseInt(newAnalyticsRetentionDays) || undefined,
+        hasCaisse: editingSubscription.hasCaisse,
+        hasOnlineStore: editingSubscription.hasOnlineStore,
+        hasAnalytics: editingSubscription.hasAnalytics,
         features: featuresArr,
       };
       try {
@@ -229,6 +246,9 @@ export const AdminSubscriptionsScreen: React.FC = () => {
           months: updated.months,
           trial_days: updated.trialDays,
           product_limit: updated.productLimit,
+          max_coupons: updated.maxCoupons,
+          max_collections: updated.maxCollections,
+          analytics_retention_days: updated.analyticsRetentionDays,
           has_caisse: updated.hasCaisse,
           has_online_store: updated.hasOnlineStore,
           has_analytics: updated.hasAnalytics,
@@ -272,9 +292,12 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       trialDays: parseInt(newTrialDays) || undefined,
       months: parseInt(newMonths) || undefined,
       productLimit: parseInt(newProductLimit) || undefined,
-      hasCaisse: newHasCaisse,
-      hasOnlineStore: newHasOnlineStore,
-      hasAnalytics: newHasAnalytics,
+      maxCoupons: parseInt(newMaxCoupons) || undefined,
+      maxCollections: parseInt(newMaxCollections) || undefined,
+      analyticsRetentionDays: parseInt(newAnalyticsRetentionDays) || undefined,
+      hasCaisse: false,
+      hasOnlineStore: false,
+      hasAnalytics: false,
       features: featuresArr,
       userCount: 0,
       status: 'active',
@@ -289,6 +312,9 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         trial_days: newSub.trialDays,
         months: newSub.months,
         product_limit: newSub.productLimit,
+        max_coupons: newSub.maxCoupons,
+        max_collections: newSub.maxCollections,
+        analytics_retention_days: newSub.analyticsRetentionDays,
         has_caisse: newSub.hasCaisse,
         has_online_store: newSub.hasOnlineStore,
         has_analytics: newSub.hasAnalytics,
@@ -303,9 +329,6 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       setNewDuration('');
       setNewMonths('');
       setNewProductLimit('');
-      setNewHasCaisse(false);
-      setNewHasOnlineStore(false);
-      setNewHasAnalytics(false);
       setNewFeatures('');
       setNewTrialDays('');
       Alert.alert('Abonnement ajouté', `${newSub.name} a été créé.`);
@@ -338,7 +361,7 @@ export const AdminSubscriptionsScreen: React.FC = () => {
   };
 
 
-  const handleSubscriptionAction = async (subscription: Subscription, action: 'edit' | 'toggle' | 'delete' | 'stats') => {
+  const handleSubscriptionAction = async (subscription: Subscription, action: 'edit' | 'toggle' | 'delete' | 'stats' | 'features') => {
     switch (action) {
       case 'edit':
         // Ouvrir le modal en mode édition sans passer par openAddModal()
@@ -351,10 +374,12 @@ export const AdminSubscriptionsScreen: React.FC = () => {
         setNewTrialDays(subscription.trialDays ? String(subscription.trialDays) : '');
         setNewMonths(subscription.months ? String(subscription.months) : '');
         setNewProductLimit(subscription.productLimit ? String(subscription.productLimit) : '');
-        setNewHasCaisse(!!subscription.hasCaisse);
-        setNewHasOnlineStore(!!subscription.hasOnlineStore);
-        setNewHasAnalytics(!!subscription.hasAnalytics);
-        setNewFeatures(subscription.features.join(', '));
+        setNewMaxCoupons(subscription.maxCoupons ? String(subscription.maxCoupons) : '');
+        setNewMaxCollections(subscription.maxCollections ? String(subscription.maxCollections) : '');
+        setNewAnalyticsRetentionDays(subscription.analyticsRetentionDays ? String(subscription.analyticsRetentionDays) : '');
+        // Afficher les labels des fonctionnalités au lieu des clés
+        const featureLabels = subscription.features.map(f => FEATURE_LABELS[f as FeatureKey]?.name || f);
+        setNewFeatures(featureLabels.join(', '));
         break;
       case 'toggle':
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -414,6 +439,13 @@ export const AdminSubscriptionsScreen: React.FC = () => {
       case 'stats':
         setStatsSubscription(subscription);
         setStatsModalVisible(true);
+        break;
+      case 'features':
+        setFeaturesSubscription(subscription);
+        // Recharger les fonctionnalités depuis la base pour avoir les données à jour
+        featureGatingService.loadFeaturesFromDatabase();
+        setFeaturesRefreshKey(prev => prev + 1);
+        setFeaturesModalVisible(true);
         break;
       case 'delete':
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -542,7 +574,63 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 value={newFeatures}
                 onChangeText={setNewFeatures}
                 multiline
+                editable={false} // Lecture seule, utiliser le bouton "Gérer les fonctionnalités"
               />
+
+              {/* Section Limites du plan */}
+              <View style={{ marginBottom: SPACING.md }}>
+                <Text style={{ color: COLORS.text, fontWeight: '600', marginBottom: SPACING.sm }}>Limites du plan</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm }}>
+                  <View style={{ 
+                    backgroundColor: COLORS.card, 
+                    padding: SPACING.sm, 
+                    borderRadius: RADIUS.sm,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    flex: 1,
+                    minWidth: 120
+                  }}>
+                    <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Produits max</Text>
+                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>{newProductLimit || 'Illimité'}</Text>
+                  </View>
+                  <View style={{ 
+                    backgroundColor: COLORS.card, 
+                    padding: SPACING.sm, 
+                    borderRadius: RADIUS.sm,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    flex: 1,
+                    minWidth: 120
+                  }}>
+                    <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Codes promo</Text>
+                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>{newMaxCoupons || 'Illimité'}</Text>
+                  </View>
+                  <View style={{ 
+                    backgroundColor: COLORS.card, 
+                    padding: SPACING.sm, 
+                    borderRadius: RADIUS.sm,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    flex: 1,
+                    minWidth: 120
+                  }}>
+                    <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Collections</Text>
+                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>{newMaxCollections || 'Illimité'}</Text>
+                  </View>
+                  <View style={{ 
+                    backgroundColor: COLORS.card, 
+                    padding: SPACING.sm, 
+                    borderRadius: RADIUS.sm,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    flex: 1,
+                    minWidth: 120
+                  }}>
+                    <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Analytics</Text>
+                    <Text style={{ color: COLORS.text, fontWeight: '600' }}>{newAnalyticsRetentionDays ? `${newAnalyticsRetentionDays} jours` : 'Illimité'}</Text>
+                  </View>
+                </View>
+              </View>
 
               <TextInput
                 placeholder="Nombre de mois"
@@ -560,45 +648,56 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 onChangeText={setNewProductLimit}
                 keyboardType="numeric"
               />
+              <TextInput
+                placeholder="Limite de codes promo"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={newMaxCoupons}
+                onChangeText={setNewMaxCoupons}
+                keyboardType="numeric"
+              />
+              <TextInput
+                placeholder="Limite de collections"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={newMaxCollections}
+                onChangeText={setNewMaxCollections}
+                keyboardType="numeric"
+              />
+              <TextInput
+                placeholder="Rétention analytics (jours)"
+                placeholderTextColor={COLORS.textMuted}
+                style={styles.input}
+                value={newAnalyticsRetentionDays}
+                onChangeText={setNewAnalyticsRetentionDays}
+                keyboardType="numeric"
+              />
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: SPACING.md,
+                  padding: SPACING.md,
+                  backgroundColor: COLORS.card,
+                  borderRadius: RADIUS.md,
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
+                }}
+                onPress={() => {
+                  if (editingSubscription) {
+                    handleSubscriptionAction(editingSubscription, 'features');
+                  }
+                }}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Caisse physique</Text>
-                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Autoriser les ventes comptant</Text>
+                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Gérer les fonctionnalités</Text>
+                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>
+                    Activer/désactiver les fonctionnalités pour ce plan
+                  </Text>
                 </View>
-                <Switch
-                  value={newHasCaisse}
-                  onValueChange={setNewHasCaisse}
-                  trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
-                  thumbColor={newHasCaisse ? COLORS.accent : '#f4f3f4'}
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Boutique en ligne</Text>
-                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Activer la vitrine e-commerce</Text>
-                </View>
-                <Switch
-                  value={newHasOnlineStore}
-                  onValueChange={setNewHasOnlineStore}
-                  trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
-                  thumbColor={newHasOnlineStore ? COLORS.accent : '#f4f3f4'}
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.text, fontWeight: '600' }}>Analytiques Pro</Text>
-                  <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs }}>Statistiques détaillées du marché</Text>
-                </View>
-                <Switch
-                  value={newHasAnalytics}
-                  onValueChange={setNewHasAnalytics}
-                  trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
-                  thumbColor={newHasAnalytics ? COLORS.accent : '#f4f3f4'}
-                />
-              </View>
+                <Ionicons name="options-outline" size={20} color={COLORS.accent} />
+              </TouchableOpacity>
 
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.modalActionButton} onPress={closeAddModal}>
@@ -657,6 +756,30 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                   </View>
 
                   <View style={styles.statSection}>
+                    <Text style={styles.statSectionTitle}>Limites du plan</Text>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Produits max</Text>
+                      <Text style={styles.statValue}>{statsSubscription.productLimit || 'Illimité'}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Codes promo max</Text>
+                      <Text style={styles.statValue}>{statsSubscription.maxCoupons || 'Illimité'}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Collections max</Text>
+                      <Text style={styles.statValue}>{statsSubscription.maxCollections || 'Illimité'}</Text>
+                    </View>
+                    <View style={styles.statRow}>
+                      <Text style={styles.statLabel}>Rétention analytics</Text>
+                      <Text style={styles.statValue}>
+                        {statsSubscription.analyticsRetentionDays 
+                          ? `${statsSubscription.analyticsRetentionDays} jours` 
+                          : 'Illimité'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.statSection}>
                     <Text style={styles.statSectionTitle}>Statistiques</Text>
                     <View style={styles.statRow}>
                       <Text style={styles.statLabel}>Utilisateurs actifs</Text>
@@ -707,6 +830,82 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                   </View>
                 </>
               ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Features Management Modal */}
+      <Modal
+        visible={featuresModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFeaturesModalVisible(false)}
+        presentationStyle="overFullScreen"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.featuresModalContainer}>
+            <View style={styles.addModalHeader}>
+              <Text style={styles.addModalTitle}>Gestion des fonctionnalités - {featuresSubscription?.name}</Text>
+              <TouchableOpacity onPress={() => setFeaturesModalVisible(false)} style={{ padding: 6 }}>
+                <Ionicons name="close" size={22} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              key={featuresRefreshKey}
+              style={styles.addModalBody}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: SPACING.xl }}
+            >
+              {featuresSubscription && (
+                (() => {
+                  const featuresByCategory = featureGatingService.getFeaturesByCategory();
+                  const planName = featuresSubscription.name.toLowerCase();
+                  const planFeatures = featureGatingService.getPlanFeatures(planName);
+
+                  return Object.entries(featuresByCategory).map(([category, features]) => (
+                    <View key={category} style={styles.featureCategorySection}>
+                      <Text style={styles.featureCategoryTitle}>{category}</Text>
+                      {features.map((featureKey) => {
+                        const featureInfo = FEATURE_LABELS[featureKey];
+                        const isEnabled = planFeatures.includes(featureKey);
+
+                        return (
+                          <View key={featureKey} style={styles.featureToggleRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.featureToggleName}>{featureInfo.name}</Text>
+                              <Text style={styles.featureToggleDescription}>{featureInfo.description}</Text>
+                            </View>
+                            <Switch
+                              value={isEnabled}
+                              onValueChange={async (value) => {
+                                const success = value
+                                  ? await featureGatingService.enableFeatureForPlan(featureKey, planName)
+                                  : await featureGatingService.disableFeatureForPlan(featureKey, planName);
+
+                                if (success) {
+                                  setFeaturesRefreshKey(prev => prev + 1);
+                                  // Mettre à jour le champ fonctionnalités dans le modal d'ajout avec les labels
+                                  const updatedFeatures = featureGatingService.getPlanFeatures(planName);
+                                  const featureLabels = updatedFeatures.map(f => FEATURE_LABELS[f]?.name || f);
+                                  setNewFeatures(featureLabels.join(', '));
+                                } else {
+                                  Alert.alert(
+                                    'Erreur',
+                                    'Impossible de modifier la fonctionnalité. Veuillez réessayer.'
+                                  );
+                                }
+                              }}
+                              trackColor={{ false: COLORS.border, true: COLORS.accent + '80' }}
+                              thumbColor={isEnabled ? COLORS.accent : '#f4f3f4'}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ));
+                })()
+              )}
             </ScrollView>
           </View>
         </View>
@@ -831,6 +1030,12 @@ export const AdminSubscriptionsScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
+                onPress={() => handleSubscriptionAction(subscription, 'features')}
+              >
+                <Ionicons name="options-outline" size={18} color={COLORS.warning} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
                 onPress={() => handleSubscriptionAction(subscription, 'edit')}
               >
                 <Ionicons name="create-outline" size={18} color={COLORS.accent} />
@@ -848,10 +1053,10 @@ export const AdminSubscriptionsScreen: React.FC = () => {
                 ]}
                 onPress={() => handleSubscriptionAction(subscription, 'toggle')}
               >
-                <Ionicons 
-                  name={subscription.status === 'active' ? 'pause' : 'play'} 
-                  size={18} 
-                  color={COLORS.text} 
+                <Ionicons
+                  name={subscription.status === 'active' ? 'pause' : 'play'}
+                  size={18}
+                  color={COLORS.text}
                 />
               </TouchableOpacity>
             </View>
@@ -952,6 +1157,14 @@ const styles = StyleSheet.create({
   addModalContainer: {
     width: '100%',
     maxWidth: 820,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+  },
+  featuresModalContainer: {
+    width: '100%',
+    maxWidth: 600,
+    maxHeight: '80%',
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
@@ -1167,5 +1380,35 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     color: COLORS.textMuted,
     marginTop: SPACING.md,
+  },
+  featureCategorySection: {
+    marginBottom: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  featureCategoryTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  featureToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border + '50',
+  },
+  featureToggleName: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  featureToggleDescription: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
   },
 });

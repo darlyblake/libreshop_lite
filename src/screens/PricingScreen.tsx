@@ -9,6 +9,7 @@ import {
   Dimensions,
   RefreshControl,
   Alert,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { Button } from '../components';
 import { planService } from '../services/planService';
 import { storeService } from '../services/storeService';
 import { useAuthStore } from '../store';
+import { FEATURE_LABELS } from '../services/featureGatingService';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +39,10 @@ interface PricingPlan {
   cta?: string;
   disabled?: boolean;
   disabledReason?: string;
+  maxProducts?: number;
+  maxCoupons?: number;
+  maxCollections?: number;
+  analyticsRetentionDays?: number;
 }
 
 const FAQ = [
@@ -108,6 +114,10 @@ export const PricingScreen: React.FC = () => {
         cta: p.price === 0 || p.is_free ? 'Essayer gratuitement' : (isFromExpiredStore ? 'Renouveler' : 'Choisir'),
         disabled: (p.price === 0 || p.is_free) && hasTrialStore,
         disabledReason: (p.price === 0 || p.is_free) && hasTrialStore ? 'Vous avez déjà utilisé le plan gratuit' : undefined,
+        maxProducts: p.product_limit,
+        maxCoupons: p.max_coupons,
+        maxCollections: p.max_collections,
+        analyticsRetentionDays: p.analytics_retention_days,
       })));
     } catch (e) {
       errorHandler.handleDatabaseError(e, 'load pricing plans');
@@ -140,6 +150,41 @@ export const PricingScreen: React.FC = () => {
     setRefreshing(true);
     loadPlans().finally(() => setRefreshing(false));
   }, []);
+
+  // Filtrer les fonctionnalités pour ne garder que les versions avancées quand les deux existent
+  const filterFeatures = (features: string[]) => {
+    const featureMap = new Map<string, string>();
+    
+    // Mapping des fonctionnalités basiques vers leurs versions avancées
+    const basicToAdvanced: Record<string, string> = {
+      'dashboard_basic': 'dashboard_advanced',
+      'analytics_basic': 'analytics_advanced',
+      'clients_basic': 'clients_advanced',
+      'coupons_basic': 'coupons_unlimited',
+      'collections_basic': 'collections_unlimited',
+      'reports_basic': 'reports_advanced',
+      'refunds_basic': 'refunds_advanced',
+      'finance_basic': 'accounting_advanced',
+    };
+
+    features.forEach(feature => {
+      const advancedVersion = basicToAdvanced[feature];
+      if (advancedVersion && features.includes(advancedVersion)) {
+        // Si la version avancée existe, on l'ajoutera plus tard, on ignore la basique
+        return;
+      }
+      featureMap.set(feature, feature);
+    });
+
+    // Ajouter les versions avancées si elles existent
+    features.forEach(feature => {
+      if (feature.endsWith('_advanced') || feature.endsWith('_unlimited')) {
+        featureMap.set(feature, feature);
+      }
+    });
+
+    return Array.from(featureMap.keys());
+  };
 
   return (
     <View style={styles.container}>
@@ -221,11 +266,12 @@ export const PricingScreen: React.FC = () => {
               <Text style={styles.emptyStateText}>Aucun plan disponible pour le moment.</Text>
             </View>
           ) : (
-            plans.map((plan, index) => (
-              <View
-                key={plan.id}
-                style={[styles.pricingCard, plan.highlighted && styles.pricingCardHighlighted]}
-              >
+            <View style={styles.pricingGrid}>
+              {plans.map((plan, index) => (
+                <View
+                  key={plan.id}
+                  style={[styles.pricingCard, plan.highlighted && styles.pricingCardHighlighted]}
+                >
               {plan.highlighted && (
                 <View style={styles.badge}>
                   <Ionicons name={plan.icon as any} size={16} color={COLORS.accent} />
@@ -246,17 +292,48 @@ export const PricingScreen: React.FC = () => {
               <View style={styles.divider} />
 
               <View style={styles.featuresList}>
-                {plan.features.map((feature, featureIndex) => (
+                {filterFeatures(plan.features).map((feature, featureIndex) => (
                   <View key={featureIndex} style={styles.featureItem}>
                     <Ionicons
                       name="checkmark-circle"
                       size={20}
                       color={plan.highlighted ? COLORS.accent : COLORS.accent2}
                     />
-                    <Text style={styles.featureText}>{feature}</Text>
+                    <Text style={styles.featureText}>{(FEATURE_LABELS as any)[feature]?.name || feature}</Text>
                   </View>
                 ))}
               </View>
+
+              {/* Limits Section */}
+              {(plan.maxProducts !== undefined || plan.maxCoupons !== undefined || plan.maxCollections !== undefined || plan.analyticsRetentionDays !== undefined) && (
+                <View style={styles.limitsSection}>
+                  <Text style={styles.limitsTitle}>Limites</Text>
+                  {plan.maxProducts !== undefined && (
+                    <View style={styles.limitItem}>
+                      <Ionicons name="cube-outline" size={16} color={COLORS.textMuted} />
+                      <Text style={styles.limitText}>Jusqu'à {plan.maxProducts === -1 ? 'Illimité' : `${plan.maxProducts} produits`}</Text>
+                    </View>
+                  )}
+                  {plan.maxCoupons !== undefined && (
+                    <View style={styles.limitItem}>
+                      <Ionicons name="pricetag-outline" size={16} color={COLORS.textMuted} />
+                      <Text style={styles.limitText}>Jusqu'à {plan.maxCoupons === -1 ? 'Illimité' : `${plan.maxCoupons} codes promo`}</Text>
+                    </View>
+                  )}
+                  {plan.maxCollections !== undefined && (
+                    <View style={styles.limitItem}>
+                      <Ionicons name="layers-outline" size={16} color={COLORS.textMuted} />
+                      <Text style={styles.limitText}>Jusqu'à {plan.maxCollections === -1 ? 'Illimité' : `${plan.maxCollections} collections`}</Text>
+                    </View>
+                  )}
+                  {plan.analyticsRetentionDays !== undefined && (
+                    <View style={styles.limitItem}>
+                      <Ionicons name="analytics-outline" size={16} color={COLORS.textMuted} />
+                      <Text style={styles.limitText}>Données analytics conservées {plan.analyticsRetentionDays} jours</Text>
+                    </View>
+                  )}
+                </View>
+              )}
 
               {plan.disabled && (
                 <View style={[styles.disabledBanner, {
@@ -303,7 +380,9 @@ export const PricingScreen: React.FC = () => {
                 disabled={plan.disabled}
               />
             </View>
-          ))) }
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Benefits Section */}
@@ -411,7 +490,11 @@ const styles = StyleSheet.create({
   pricingContainer: {
     paddingHorizontal: SPACING.xl,
     marginBottom: SPACING.xxxl,
-    gap: SPACING.xl,
+  },
+  pricingGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.md,
   },
   pricingCard: {
     backgroundColor: COLORS.card,
@@ -419,6 +502,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
     borderWidth: 1,
     borderColor: COLORS.border,
+    width: '48%',
   },
   pricingCardHighlighted: {
     borderColor: COLORS.accent,
@@ -607,5 +691,27 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     color: COLORS.text,
     textAlign: 'center',
+  },
+  limitsSection: {
+    marginTop: SPACING.lg,
+    paddingTop: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  limitsTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  limitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  limitText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
   },
 });

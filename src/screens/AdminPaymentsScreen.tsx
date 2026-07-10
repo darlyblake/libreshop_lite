@@ -21,7 +21,6 @@ import { Card } from '../components/Card';
 import { BackToDashboard } from '../components/BackToDashboard';
 import { planService } from '../services/planService';
 import { adminService } from '../services/adminService';
-import { storeService } from '../services/storeService';
 
 interface StorePayment {
   id: string;
@@ -110,7 +109,7 @@ export const AdminPaymentsScreen: React.FC = () => {
             onlineStoreActive: Boolean(s.online_store_active ?? true),
             analyticsActive: Boolean(s.analytics_active ?? true),
             productsLimit: Number(s.product_limit || 0),
-            revenue: 0,
+            revenue: Number(s.revenue || 0),
             paymentHistory: (paymentHistory || []).map((ph: any) => ({
               id: String(ph.id),
               date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
@@ -263,97 +262,129 @@ export const AdminPaymentsScreen: React.FC = () => {
       setLoading(true);
       const store = stores.find(s => s.id === storeId);
       const plan = availablePlans.find(p => p.id === planId);
-      
-      const updatedStore = await storeService.upgradeSubscription(storeId, planId);
 
-      // Add payment history entry for the subscription upgrade/renewal (non-blocking)
-      if (store && plan) {
-        try {
-          const proratedPrice = getProratedPrice(store, plan.price);
-          const newPaymentHistory: PaymentHistory = {
-            id: String(Date.now()),
-            date: new Date().toISOString().slice(0, 10),
-            amount: proratedPrice,
-            status: 'paid',
-            method: 'Renewal',
-            plan: plan.name,
-          };
-          
-          await adminService.addPaymentHistory(storeId, newPaymentHistory);
-          
-          // Refresh payment history from database
-          const paymentHistory = await adminService.getStorePaymentHistory(storeId);
-          
-          setStores(prev =>
-            prev.map(s =>
-              s.id === storeId
-                ? {
-                    ...s,
-                    currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
-                    subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
-                    productsLimit: Number(updatedStore.product_limit || s.productsLimit),
-                    paymentStatus: (updatedStore.billing_status || 'paid') as any,
-                    paymentDate: updatedStore.last_payment_date || s.paymentDate,
-                    nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
-                    subscriptionActive: 
-                      String(updatedStore.subscription_status).toLowerCase() === 'active' || 
-                      String(updatedStore.subscription_status).toLowerCase() === 'trial',
-                    paymentHistory: (paymentHistory || []).map((ph: any) => ({
-                      id: String(ph.id),
-                      date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
-                      amount: Number(ph.amount || 0),
-                      status: ph.status as any,
-                      method: ph.method || 'Manual',
-                      plan: ph.plan || '-',
-                    })),
-                  }
-                : s
-            )
-          );
-        } catch (historyError) {
-          console.warn('Payment history save failed, but upgrade was processed:', historyError);
-          // Still update the store status even if history fails
-          setStores(prev =>
-            prev.map(s =>
-              s.id === storeId
-                ? {
-                    ...s,
-                    currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
-                    subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
-                    productsLimit: Number(updatedStore.product_limit || s.productsLimit),
-                    paymentStatus: (updatedStore.billing_status || 'paid') as any,
-                    paymentDate: updatedStore.last_payment_date || s.paymentDate,
-                    nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
-                    subscriptionActive: 
-                      String(updatedStore.subscription_status).toLowerCase() === 'active' || 
-                      String(updatedStore.subscription_status).toLowerCase() === 'trial',
-                  }
-                : s
-            )
-          );
+      if (!plan) throw new Error('Plan introuvable');
+
+      // ✅ DOWNGRADE GUARD: Vérifier si les données actuelles dépassent les limites du nouveau plan
+      const currentProductLimit = store?.productsLimit ?? -1;
+      const newProductLimit = plan.product_limit != null ? plan.product_limit : -1;
+      const isDowngrade = newProductLimit !== -1 && (currentProductLimit === -1 || newProductLimit < currentProductLimit);
+
+      if (isDowngrade || plan.max_coupons != null || plan.max_collections != null) {
+        const eligibility = await adminService.checkDowngradeEligibility(storeId, {
+          product_limit: plan.product_limit != null ? plan.product_limit : -1,
+          max_coupons: plan.max_coupons != null ? plan.max_coupons : -1,
+          max_collections: plan.max_collections != null ? plan.max_collections : -1,
+        });
+
+        if (!eligibility.allowed) {
+          setLoading(false);
+          const blockerLines = eligibility.blockers.map(
+            b => `• ${b.current} ${b.resource} (limite: ${b.limit})`
+          ).join('\n');
+
+          const message = `Impossible de passer au plan "${plan.name}".\n\nLa boutique dépasse les limites de ce plan :\n${blockerLines}\n\nLe vendeur doit d'abord supprimer les éléments en surplus avant de pouvoir descendre de plan.`;
+
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.alert('⛔ Downgrade refusé\n\n' + message);
+          } else {
+            Alert.alert('⛔ Downgrade refusé', message, [{ text: 'Compris' }]);
+          }
+          return;
         }
-      } else {
+      }
+
+      // ✅ FIX: l'admin ne peut pas appeler storeService.upgradeSubscription()
+      // car cette méthode valide que user_id = utilisateur courant (admin ≠ propriétaire)
+      // → Erreur 406 "Not Acceptable" de Supabase
+      // On utilise adminService.updateStoreBilling() qui vérifie le rôle admin, pas la propriété
+      const now = new Date();
+      const months = plan.months || 1;
+      const subscriptionEnd = new Date(now.getTime() + months * 30 * 24 * 60 * 60 * 1000);
+      const proratedPrice = getProratedPrice(store!, plan.price);
+
+      const updatedStore = await adminService.updateStoreBilling(storeId, {
+        subscription_plan: plan.name,
+        subscription_price: proratedPrice,
+        subscription_start: now.toISOString(),
+        subscription_end: subscriptionEnd.toISOString(),
+        subscription_status: 'active',
+        billing_status: 'paid',
+        product_limit: plan.product_limit != null ? plan.product_limit : -1,
+        cashier_active: Boolean(plan.has_caisse),
+        online_store_active: Boolean(plan.has_online_store),
+        analytics_active: Boolean(plan.has_analytics),
+        visible: true,
+        last_payment_date: now.toISOString().slice(0, 10),
+      });
+
+      // Enregistrer l'historique de paiement (non-bloquant)
+      try {
+        const newPaymentHistory: PaymentHistory = {
+          id: String(Date.now()),
+          date: now.toISOString().slice(0, 10),
+          amount: proratedPrice,
+          status: 'paid',
+          method: 'Renewal',
+          plan: plan.name,
+        };
+
+        await adminService.addPaymentHistory(storeId, newPaymentHistory);
+
+        // Rafraîchir l'historique depuis la BDD
+        const paymentHistory = await adminService.getStorePaymentHistory(storeId);
+
         setStores(prev =>
           prev.map(s =>
             s.id === storeId
               ? {
                   ...s,
-                  currentSubscription: updatedStore.subscription_plan || s.currentSubscription,
-                  subscriptionPrice: Number(updatedStore.subscription_price || s.subscriptionPrice),
-                  productsLimit: Number(updatedStore.product_limit || s.productsLimit),
-                  paymentStatus: (updatedStore.billing_status || 'paid') as any,
-                  paymentDate: updatedStore.last_payment_date || s.paymentDate,
-                  nextBillingDate: updatedStore.next_billing_date || s.nextBillingDate,
-                  subscriptionActive: 
-                    String(updatedStore.subscription_status).toLowerCase() === 'active' || 
-                    String(updatedStore.subscription_status).toLowerCase() === 'trial',
+                  currentSubscription: plan.name,
+                  subscriptionPrice: proratedPrice,
+                  productsLimit: plan.product_limit != null ? plan.product_limit : -1,
+                  cashierActive: Boolean(plan.has_caisse),
+                  onlineStoreActive: Boolean(plan.has_online_store),
+                  analyticsActive: Boolean(plan.has_analytics),
+                  paymentStatus: 'paid' as any,
+                  paymentDate: now.toISOString().slice(0, 10),
+                  nextBillingDate: subscriptionEnd.toISOString().slice(0, 10),
+                  subscriptionActive: true,
+                  paymentHistory: (paymentHistory || []).map((ph: any) => ({
+                    id: String(ph.id),
+                    date: ph.payment_date ? String(ph.payment_date).split('T')[0] : '-',
+                    amount: Number(ph.amount || 0),
+                    status: ph.status as any,
+                    method: ph.method || 'Manual',
+                    plan: ph.plan || '-',
+                  })),
+                }
+              : s
+          )
+        );
+      } catch (historyError) {
+        console.warn('Historique non sauvegardé, mais upgrade réussi:', historyError);
+        setStores(prev =>
+          prev.map(s =>
+            s.id === storeId
+              ? {
+                  ...s,
+                  currentSubscription: plan.name,
+                  subscriptionPrice: proratedPrice,
+                  productsLimit: plan.product_limit != null ? plan.product_limit : -1,
+                  cashierActive: Boolean(plan.has_caisse),
+                  onlineStoreActive: Boolean(plan.has_online_store),
+                  analyticsActive: Boolean(plan.has_analytics),
+                  paymentStatus: 'paid' as any,
+                  paymentDate: now.toISOString().slice(0, 10),
+                  nextBillingDate: subscriptionEnd.toISOString().slice(0, 10),
+                  subscriptionActive: true,
                 }
               : s
           )
         );
       }
 
-      const planName = updatedStore.subscription_plan || 'Nouveau plan';
+      const planName = plan.name;
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         window.alert(`✅ Offre changée en ${planName}`);
       } else {
@@ -624,11 +655,26 @@ export const AdminPaymentsScreen: React.FC = () => {
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Prochain paiement</Text>
-                <Text style={styles.infoValue}>{store.nextBillingDate}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={[styles.infoValue, !store.subscriptionActive && { color: COLORS.danger }]}>
+                    {store.nextBillingDate && store.nextBillingDate !== '-' 
+                      ? new Date(store.nextBillingDate).toLocaleDateString('fr-FR', {
+                          day: '2-digit', month: 'short', year: 'numeric'
+                        }) 
+                      : '-'}
+                  </Text>
+                  {!store.subscriptionActive && (
+                    <View style={{ backgroundColor: COLORS.danger + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: COLORS.danger, fontSize: 10, fontWeight: 'bold' }}>Expiré</Text>
+                    </View>
+                  )}
+                </View>
               </View>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Revenu généré</Text>
-                <Text style={styles.infoValue}>{(store.revenue / 1000000).toFixed(1)}M FCFA</Text>
+                <Text style={styles.infoValue}>
+                  {store.revenue > 0 ? store.revenue.toLocaleString() : '0'} FCFA
+                </Text>
               </View>
             </View>
 
@@ -745,7 +791,7 @@ export const AdminPaymentsScreen: React.FC = () => {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>Produits utilisés</Text>
                   <Text style={styles.detailValue}>
-                    Illimité / {selectedStore.productsLimit}
+                    {selectedStore.productsLimit <= 0 ? 'Illimité' : `Limite : ${selectedStore.productsLimit}`}
                   </Text>
                 </View>
 
@@ -755,7 +801,9 @@ export const AdminPaymentsScreen: React.FC = () => {
                     selectedStore.paymentHistory.map((payment, index) => (
                       <View key={payment.id} style={styles.paymentHistoryItem}>
                         <View style={styles.paymentHistoryLeft}>
-                          <Text style={styles.paymentHistoryDate}>{payment.date}</Text>
+                          <Text style={styles.paymentHistoryDate}>
+                            {payment.date !== '-' ? new Date(payment.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                          </Text>
                           <Text style={styles.paymentHistoryPlan}>{payment.plan}</Text>
                         </View>
                         <View style={styles.paymentHistoryRight}>

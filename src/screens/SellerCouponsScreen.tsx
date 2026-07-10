@@ -29,6 +29,7 @@ export const SellerCouponsScreen: React.FC = () => {
   const { fontSize, isMobile } = useResponsive();
 
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [store, setStore] = useState<any>(null);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -47,12 +48,12 @@ export const SellerCouponsScreen: React.FC = () => {
     if (!user?.id) return;
     try {
       if (showLoading) setLoading(true);
-      const store = await storeService.getByUser(user.id);
-      if (store) {
-        if (!storeService.isSubscriptionActive(store)) {
+      const s = await storeService.getByUser(user.id);
+      if (s) {
+        if (!storeService.isSubscriptionActive(s)) {
           Alert.alert(
             'Abonnement expiré',
-            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder aux coupons.`,
+            `Votre abonnement pour "${s.name}" a expiré. Veuillez le renouveler pour accéder aux coupons.`,
             [
               {
                 text: 'Renouveler',
@@ -62,8 +63,9 @@ export const SellerCouponsScreen: React.FC = () => {
           );
           return;
         }
-        setStoreId(store.id);
-        const storeCoupons = await couponService.getByStore(store.id);
+        setStore(s);
+        setStoreId(s.id);
+        const storeCoupons = await couponService.getByStore(s.id);
         setCoupons(storeCoupons);
       }
     } catch (e) {
@@ -241,7 +243,17 @@ export const SellerCouponsScreen: React.FC = () => {
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { fontSize: fontSize.xl }]}>Codes Promo</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => handleOpenModal()}>
+        <TouchableOpacity style={styles.addButton} onPress={() => {
+          if (store?.max_coupons && store.max_coupons !== -1 && coupons.length >= store.max_coupons) {
+            Alert.alert(
+              'Limite atteinte', 
+              `Votre plan "${store.subscription_plan}" vous limite à ${store.max_coupons} coupons.`,
+              [{ text: 'Changer d\'offre', onPress: () => navigation.navigate('SellerChangePlan') }, { text: 'OK' }]
+            );
+            return;
+          }
+          handleOpenModal();
+        }}>
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
       </LinearGradient>
@@ -254,7 +266,13 @@ export const SellerCouponsScreen: React.FC = () => {
         <View style={styles.emptyContainer}>
           <Ionicons name="ticket-outline" size={80} color={COLORS.border} />
           <Text style={[styles.emptyText, { fontSize: fontSize.md }]}>Aucun code promo créé.</Text>
-          <TouchableOpacity style={styles.createBtn} onPress={() => handleOpenModal()}>
+          <TouchableOpacity style={styles.createBtn} onPress={() => {
+            if (store?.max_coupons && store.max_coupons !== -1 && coupons.length >= store.max_coupons) {
+              Alert.alert('Limite atteinte', `Votre plan vous limite à ${store.max_coupons} coupons.`);
+              return;
+            }
+            handleOpenModal();
+          }}>
             <Text style={styles.createBtnText}>Créer un code promo</Text>
           </TouchableOpacity>
         </View>
@@ -263,6 +281,35 @@ export const SellerCouponsScreen: React.FC = () => {
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          {/* 🔴 Bandeau downgrade si limite dépassée */}
+          {store?.max_coupons && store.max_coupons !== -1 && coupons.length > store.max_coupons && (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('SellerChangePlan')}
+              style={{
+                backgroundColor: '#FEF3C7',
+                borderLeftWidth: 4,
+                borderLeftColor: '#F59E0B',
+                padding: 12,
+                borderRadius: 8,
+                marginBottom: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <Ionicons name="warning" size={18} color="#D97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 13 }}>
+                  Limite dépassée — Plan {store.subscription_plan}
+                </Text>
+                <Text style={{ color: '#B45309', fontSize: 12, marginTop: 2 }}>
+                  Vous avez {coupons.length} codes promo, votre plan en autorise {store.max_coupons}. Les codes existants restent actifs. Supprimez-en pour en créer de nouveaux.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#D97706" />
+            </TouchableOpacity>
+          )}
           {coupons.map(renderCouponCard)}
         </ScrollView>
       )}

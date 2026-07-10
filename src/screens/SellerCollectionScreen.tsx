@@ -75,6 +75,7 @@ export const SellerCollectionScreen: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [store, setStore] = useState<any>(null);
   const [storeType, setStoreType] = useState<string>('general');
   const [categories, setCategories] = useState<Category[]>([]);
   const [collections, setCollections] = useState<UiCollection[]>([]);
@@ -83,17 +84,18 @@ export const SellerCollectionScreen: React.FC = () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const store = await storeService.getByUser(user.id);
-      if (!store?.id) {
+      const s = await storeService.getByUser(user.id);
+      if (!s?.id) {
         setStoreId(null);
+        setStore(null);
         setCollections([]);
         return;
       }
 
-      if (!storeService.isSubscriptionActive(store)) {
+      if (!storeService.isSubscriptionActive(s)) {
         Alert.alert(
           'Abonnement expiré',
-          `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder à vos collections.`,
+          `Votre abonnement pour "${s.name}" a expiré. Veuillez le renouveler pour accéder à vos collections.`,
           [
             {
               text: 'Renouveler',
@@ -105,8 +107,9 @@ export const SellerCollectionScreen: React.FC = () => {
         return;
       }
 
-      setStoreId(store.id);
-      setStoreType(store.store_type || 'general');
+      setStore(s);
+      setStoreId(s.id);
+      setStoreType(s.store_type || 'general');
 
       const [cats, cols, prods] = await Promise.all([
         categoryService.getAll(),
@@ -953,6 +956,14 @@ export const SellerCollectionScreen: React.FC = () => {
                     Alert.alert('Erreur', 'Aucune boutique trouvée pour ce compte');
                     return;
                   }
+                  if (store?.max_collections && store.max_collections !== -1 && collections.length >= store.max_collections) {
+                    Alert.alert(
+                      'Limite atteinte', 
+                      `Votre plan "${store.subscription_plan}" vous limite à ${store.max_collections} collections.`,
+                      [{ text: 'Changer d\'offre', onPress: () => navigation.navigate('SellerChangePlan') }, { text: 'OK' }]
+                    );
+                    return;
+                  }
                   setShowAddModal(true);
                 }}
               >
@@ -1185,7 +1196,38 @@ export const SellerCollectionScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           ) : (
-            filteredCollections.map((collection, index) => renderCollection(collection, index))
+            <>
+              {/* 🔴 Bandeau downgrade si limite dépassée */}
+              {store?.max_collections && store.max_collections !== -1 && collections.length > store.max_collections && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => navigation.navigate('SellerChangePlan')}
+                  style={{
+                    backgroundColor: '#FEF3C7',
+                    borderLeftWidth: 4,
+                    borderLeftColor: '#F59E0B',
+                    padding: 12,
+                    borderRadius: 8,
+                    marginBottom: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <Ionicons name="warning" size={18} color="#D97706" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#92400E', fontWeight: '700', fontSize: 13 }}>
+                      Limite dépassée — Plan {store.subscription_plan}
+                    </Text>
+                    <Text style={{ color: '#B45309', fontSize: 12, marginTop: 2 }}>
+                      Vous avez {collections.length} collections, votre plan en autorise {store.max_collections}. Les collections existantes restent visibles. Supprimez-en pour en créer de nouvelles.
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#D97706" />
+                </TouchableOpacity>
+              )}
+              {filteredCollections.map((collection, index) => renderCollection(collection, index))}
+            </>
           )}
         </View>
       </ScrollView>

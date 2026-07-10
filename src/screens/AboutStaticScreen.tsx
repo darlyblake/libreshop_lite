@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
+import { planService } from '../services/planService';
 
 /**
  * Page statique "À propos" avec contenu HTML crawlable pour SEO
@@ -10,6 +11,20 @@ import { useTheme } from '../hooks/useTheme';
 export const AboutStaticScreen: React.FC = () => {
   const themeContext = useTheme();
   const COLORS = themeContext.getColor;
+  const [plans, setPlans] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadPlans();
+  }, []);
+
+  const loadPlans = async () => {
+    try {
+      const data = await planService.getAll();
+      setPlans(data);
+    } catch (error) {
+      console.error('Error loading plans:', error);
+    }
+  };
 
   React.useEffect(() => {
     // Mettre à jour les meta tags pour cette page
@@ -161,15 +176,11 @@ export const AboutStaticScreen: React.FC = () => {
         </Text>
 
         <View style={styles.pricingTable}>
-          <Text style={[styles.pricingRow, { color: COLORS.textMuted }]}>
-            <Text style={{ fontWeight: '600' }}>Essai</Text> : 7 jours gratuits (accès complet){'\n'}
-          </Text>
-          <Text style={[styles.pricingRow, { color: COLORS.textMuted }]}>
-            <Text style={{ fontWeight: '600' }}>Basic</Text> : 3 000 FCFA/mois (50 produits, QR code){'\n'}
-          </Text>
-          <Text style={[styles.pricingRow, { color: COLORS.textMuted }]}>
-            <Text style={{ fontWeight: '600' }}>Pro</Text> : 5 000 FCFA/mois (300 produits, vente physique, stats avancées)
-          </Text>
+          {plans.filter((p: any) => p.status === 'active').map((plan: any) => (
+            <Text key={plan.id} style={[styles.pricingRow, { color: COLORS.textMuted }]}>
+              <Text style={{ fontWeight: '600' }}>{plan.name}</Text> : {plan.trial_days ? `${plan.trial_days} jours gratuits` : `${plan.price} FCFA/${plan.duration || 'mois'}`} ({plan.description || 'Accès complet'})
+            </Text>
+          ))}
         </View>
 
         {/* H2 - Notre impact */}

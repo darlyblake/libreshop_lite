@@ -556,8 +556,8 @@ export const storeService = {
     // ✅ Phase 2c: Validate current user owns the store (RLS)
     const currentStore = await getStoreAndValidateOwnership(id);
     
-    // ✅ Validate store data
-    const validationErrors = validateStore(store);
+    // ✅ Validate store data (partial update - only validate fields present)
+    const validationErrors = validateStore(store, true);
     if (validationErrors.length > 0) {
       throw new Error(`Validation échouée: ${validationErrors.map((e: any) => `${e.field}: ${e.message}`).join(', ')}`);
     }
@@ -635,7 +635,10 @@ export const storeService = {
         subscription_end: end ? end.toISOString() : null,
         subscription_status:
           plan.price === 0 && plan.trial_days ? 'trial' : 'active',
-        product_limit: plan.product_limit || 0,
+        product_limit: plan.product_limit != null ? plan.product_limit : -1,
+        cashier_active: Boolean(plan.has_caisse),
+        online_store_active: Boolean(plan.has_online_store),
+        analytics_active: Boolean(plan.has_analytics),
         visible: true,
       })
       .select('*')
@@ -709,6 +712,9 @@ export const storeService = {
         subscription_end: end.toISOString(),
         subscription_status: 'trial',
         product_limit: 10,
+        cashier_active: false,
+        online_store_active: true,
+        analytics_active: false,
         visible: true,
       })
       .select('*')
@@ -782,7 +788,10 @@ export const storeService = {
         subscription_end: end ? end.toISOString() : null,
         subscription_status: 'active',
         billing_status: 'paid',
-        product_limit: plan.product_limit || 0,
+        product_limit: plan.product_limit != null ? plan.product_limit : -1,
+        cashier_active: Boolean(plan.has_caisse),
+        online_store_active: Boolean(plan.has_online_store),
+        analytics_active: Boolean(plan.has_analytics),
         visible: true,
         version: ((store.version || 0) + 1),
         updated_at: now.toISOString(),

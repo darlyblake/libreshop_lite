@@ -104,6 +104,8 @@ const SellerAddStoreScreen: React.FC = () => {
   
   const [countries, setCountries] = useState<Country[]>([]);
   const [countryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [phoneCountryCode, setPhoneCountryCode] = useState<string>('+241'); // Gabon par défaut
+  const [phoneCodePickerVisible, setPhoneCodePickerVisible] = useState(false);
   const [cityQuery, setCityQuery] = useState('');
   const [cityResults, setCityResults] = useState<City[]>([]);
   
@@ -116,6 +118,8 @@ const SellerAddStoreScreen: React.FC = () => {
   } | null>(null);
   
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<{
     loading: boolean;
     step: string;
@@ -249,6 +253,12 @@ const SellerAddStoreScreen: React.FC = () => {
   const performSubmit = async (formData: FormData) => {
     if (!user) return;
     
+    // Vérifier si les conditions sont acceptées
+    if (!termsAccepted) {
+      Alert.alert('Conditions requises', 'Vous devez accepter les conditions d\'utilisation pour continuer.');
+      return;
+    }
+    
     setSubmissionStatus({ loading: true, step: 'Préparation...', progress: 10, error: null });
     
     try {
@@ -273,7 +283,7 @@ const SellerAddStoreScreen: React.FC = () => {
       
       // 3. Create Store
       setSubmissionStatus(s => ({ ...s, step: 'Création de la boutique...', progress: 90 }));
-      const whatsappPhone = String(formData.phone || '').replace(/[^\d+]/g, '');
+      const whatsappPhone = `${phoneCountryCode}${String(formData.phone || '').replace(/[^\d]/g, '')}`;
       // Exclude UI-only fields like city_name to prevent Supabase 400 Bad Request
       const { city_name, referral_code, ...databaseFields } = formData as any;
       const createArgs = {
@@ -325,12 +335,22 @@ const SellerAddStoreScreen: React.FC = () => {
       setSubmissionStatus(s => ({ ...s, loading: false }));
 
       if (Platform.OS === 'web') {
-        alert('Succès 🎉\nVotre boutique a été créée avec succès ! Un essai de 7 jours est activé.');
+        const trialInfo = trial?.trial_days 
+          ? `Un essai de ${trial.trial_days} jours est activé.`
+          : trial?.months 
+          ? `Un abonnement de ${trial.months} mois est activé.`
+          : 'Votre boutique est active.';
+        alert(`Succès 🎉\nVotre boutique a été créée avec succès ! ${trialInfo}`);
         (navigation as any).replace('SellerHub');
       } else {
+        const trialInfo = trial?.trial_days 
+          ? `Un essai de ${trial.trial_days} jours est activé.`
+          : trial?.months 
+          ? `Un abonnement de ${trial.months} mois est activé.`
+          : 'Votre boutique est active.';
         Alert.alert(
           'Succès 🎉',
-          'Votre boutique a été créée avec succès ! Un essai de 7 jours est activé.',
+          `Votre boutique a été créée avec succès ! ${trialInfo}`,
           [{ text: 'Accéder à mon tableau de bord', onPress: () => (navigation as any).replace('SellerHub') }]
         );
       }
@@ -574,14 +594,30 @@ const SellerAddStoreScreen: React.FC = () => {
         autoCapitalize="none"
         error={touched.email ? errors.email : undefined}
       />
-      <Input
-        icon="call-outline"
-        placeholder="Numéro WhatsApp (ex: +241...)"
-        value={values.phone}
-        onChangeText={(v) => handleChange('phone', v)}
-        keyboardType="phone-pad"
-        error={touched.phone ? errors.phone : undefined}
-      />
+      <View style={[styles.phoneInputContainer, touched.phone && errors.phone && styles.phoneInputError]}>
+        <TouchableOpacity 
+          style={styles.phoneCodeSelector}
+          onPress={() => setPhoneCodePickerVisible(true)}
+        >
+          <Text style={styles.phoneCodeText}>{phoneCountryCode}</Text>
+          <Ionicons name="chevron-down" size={16} color={COLORS.textMuted} />
+        </TouchableOpacity>
+        <TextInput
+          style={styles.phoneInput}
+          placeholder="Numéro de téléphone"
+          placeholderTextColor={COLORS.textMuted}
+          value={values.phone}
+          onChangeText={(v) => {
+            // N'accepter que les chiffres
+            const numericValue = v.replace(/[^\d]/g, '');
+            handleChange('phone', numericValue);
+          }}
+          keyboardType="phone-pad"
+        />
+      </View>
+      {touched.phone && errors.phone && (
+        <Text style={styles.errorText}>{errors.phone}</Text>
+      )}
       
       <TouchableOpacity 
         style={[
@@ -699,6 +735,33 @@ const SellerAddStoreScreen: React.FC = () => {
         autoCapitalize="characters"
       />
       
+      <View style={styles.termsContainer}>
+        <TouchableOpacity 
+          style={styles.termsCheckbox} 
+          onPress={() => setTermsAccepted(!termsAccepted)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+            {termsAccepted && <Ionicons name="checkmark" size={16} color={COLORS.textInverse} />}
+          </View>
+          <View style={styles.termsTextContainer}>
+            <Text style={styles.termsText}>
+              J'accepte les{' '}
+              <TouchableOpacity onPress={() => setTermsModalVisible(true)}>
+                <Text style={styles.termsLink}>conditions d'utilisation</Text>
+              </TouchableOpacity>
+              {' '}et la{' '}
+              <TouchableOpacity onPress={() => setTermsModalVisible(true)}>
+                <Text style={styles.termsLink}>politique de confidentialité</Text>
+              </TouchableOpacity>
+            </Text>
+          </View>
+        </TouchableOpacity>
+        {!termsAccepted && touched.phone && (
+          <Text style={styles.errorText}>Vous devez accepter les conditions pour continuer</Text>
+        )}
+      </View>
+      
       <View style={styles.previewCard}>
         <LinearGradient colors={[COLORS.accent + '20', COLORS.bg]} style={styles.previewGradient}>
           <Text style={styles.previewTitle}>Aperçu Final</Text>
@@ -812,16 +875,128 @@ const SellerAddStoreScreen: React.FC = () => {
               data={countries}
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.categoryItem} onPress={() => {
+                <TouchableOpacity style={styles.pickerItem} onPress={() => {
                   setFieldValue('country_id', item.id);
                   setCountryPickerVisible(false);
                 }}>
-                  <Text style={styles.categoryName}>{item.name}</Text>
+                  <Text style={styles.pickerItemText}>{item.name}</Text>
                 </TouchableOpacity>
               )}
             />
-            <Button title="Fermer" onPress={() => setCountryPickerVisible(false)} />
+            <TouchableOpacity onPress={() => setCountryPickerVisible(false)} style={styles.pickerModalClose}>
+              <Text style={styles.pickerModalCloseText}>Fermer</Text>
+            </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      <Modal visible={phoneCodePickerVisible} transparent animationType="fade">
+        <View style={styles.pickerModalOverlay}>
+          <View style={styles.pickerModalCard}>
+            <Text style={styles.pickerModalTitle}>Choisir l'indicatif</Text>
+            <FlatList
+              data={countries.filter(c => c.phone_code)}
+              keyExtractor={item => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.pickerItem} onPress={() => {
+                  setPhoneCountryCode(item.phone_code || '+241');
+                  setPhoneCodePickerVisible(false);
+                }}>
+                  <Text style={styles.pickerItemText}>{item.name} ({item.phone_code})</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity onPress={() => setPhoneCodePickerVisible(false)} style={styles.pickerModalClose}>
+              <Text style={styles.pickerModalCloseText}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Terms of Service Modal */}
+      <Modal
+        visible={termsModalVisible}
+        animationType="slide"
+        onRequestClose={() => setTermsModalVisible(false)}
+      >
+        <View style={styles.fullScreenModal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Conditions d'utilisation</Text>
+            <TouchableOpacity onPress={() => setTermsModalVisible(false)}>
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.termsContent}>
+              <Text style={styles.termsSectionTitle}>1. Acceptation des conditions</Text>
+              <Text style={styles.termsParagraph}>
+                En utilisant la plateforme LibreShop, vous acceptez ces conditions d'utilisation et notre politique de confidentialité. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser notre service.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>2. Description du service</Text>
+              <Text style={styles.termsParagraph}>
+                LibreShop est une plateforme de commerce électronique qui permet aux vendeurs de créer et gérer leur boutique en ligne, et aux acheteurs d'acheter des produits auprès de ces vendeurs.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>3. Responsabilités du vendeur</Text>
+              <Text style={styles.termsParagraph}>
+                En tant que vendeur sur LibreShop, vous vous engagez à :
+              </Text>
+              <Text style={styles.termsList}>
+                • Fournir des informations exactes sur vos produits et services
+                • Respecter les lois et réglementations en vigueur
+                • Livrer les produits dans les délais annoncés
+                • Assurer un service client de qualité
+                • Ne pas vendre de produits contrefaits ou illégaux
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>4. Politique de confidentialité</Text>
+              <Text style={styles.termsParagraph}>
+                Nous collectons et utilisons vos données personnelles conformément à notre politique de confidentialité. Vos informations sont protégées et ne seront jamais partagées sans votre consentement, sauf si la loi l'exige.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>5. Paiements et frais</Text>
+              <Text style={styles.termsParagraph}>
+                LibreShop applique des frais de service sur chaque transaction. Ces frais sont clairement indiqués lors de l'inscription. Les paiements sont sécurisés via nos partenaires de paiement.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>6. Propriété intellectuelle</Text>
+              <Text style={styles.termsParagraph}>
+                Vous conservez la propriété de vos produits et contenus. En utilisant notre plateforme, vous nous accordez une licence pour afficher et promouvoir vos produits.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>7. Résiliation</Text>
+              <Text style={styles.termsParagraph}>
+                Nous nous réservons le droit de suspendre ou de résilier votre compte en cas de violation de ces conditions. Vous pouvez également résilier votre compte à tout moment.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>8. Limitation de responsabilité</Text>
+              <Text style={styles.termsParagraph}>
+                LibreShop ne peut être tenu responsable des dommages directs ou indirects résultant de l'utilisation de notre plateforme.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>9. Modifications des conditions</Text>
+              <Text style={styles.termsParagraph}>
+                Nous nous réservons le droit de modifier ces conditions à tout moment. Les modifications seront notifiées aux utilisateurs.
+              </Text>
+
+              <Text style={styles.termsSectionTitle}>10. Contact</Text>
+              <Text style={styles.termsParagraph}>
+                Pour toute question concernant ces conditions, contactez-nous à libreshp@gmail.com
+              </Text>
+
+              <TouchableOpacity 
+                style={styles.termsAcceptButton}
+                onPress={() => {
+                  setTermsAccepted(true);
+                  setTermsModalVisible(false);
+                }}
+              >
+                <Text style={styles.termsAcceptButtonText}>J'accepte les conditions</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -974,7 +1149,149 @@ const getStyles = (themeContext: any) => {
     flexWrap: 'wrap',
     gap: SPACING.xs,
     marginBottom: SPACING.md,
-    marginTop: SPACING.xs,
+  },
+  phoneInputContainer: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.card,
+    marginBottom: SPACING.md,
+  },
+  phoneInputError: {
+    borderColor: COLORS.danger,
+  },
+  phoneCodeSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRightWidth: 1,
+    borderRightColor: COLORS.border,
+    backgroundColor: COLORS.card,
+  },
+  phoneCodeText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    fontWeight: '600',
+    marginRight: SPACING.xs,
+  },
+  phoneInput: {
+    flex: 1,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  pickerModalCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    width: '100%',
+    maxHeight: 400,
+    padding: SPACING.lg,
+  },
+  pickerModalTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  pickerItem: {
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  pickerItemText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+  },
+  pickerModalClose: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.accent,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+  },
+  pickerModalCloseText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  termsContainer: {
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.lg,
+  },
+  termsCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  termsTextContainer: {
+    flex: 1,
+  },
+  termsText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: COLORS.accent,
+    textDecorationLine: 'underline',
+  },
+  termsContent: {
+    padding: SPACING.lg,
+  },
+  termsSectionTitle: {
+    fontSize: FONT_SIZE.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.sm,
+  },
+  termsParagraph: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
+    lineHeight: 24,
+    marginBottom: SPACING.md,
+  },
+  termsList: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.textSecondary,
+    lineHeight: 24,
+    marginBottom: SPACING.md,
+    marginLeft: SPACING.md,
+  },
+  termsAcceptButton: {
+    backgroundColor: COLORS.accent,
+    padding: SPACING.lg,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    marginTop: SPACING.xl,
+  },
+  termsAcceptButtonText: {
+    color: COLORS.textInverse,
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
   },
   storeTypeCard: {
     flexDirection: 'row',
@@ -1229,25 +1546,6 @@ const getStyles = (themeContext: any) => {
   categoryName: {
     fontSize: FONT_SIZE.md,
     color: COLORS.text,
-  },
-  pickerModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    padding: SPACING.xl,
-  },
-  pickerModalCard: {
-    backgroundColor: COLORS.bg,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    maxHeight: '80%',
-  },
-  pickerModalTitle: {
-    fontSize: FONT_SIZE.lg,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
   },
   locationButton: {
     flexDirection: 'row',

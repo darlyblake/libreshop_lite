@@ -853,81 +853,112 @@ export const StoreDetailScreen: React.FC = () => {
 
         {!loading && !errorMsg && isSubActive && (
           <>
-            {/* ─── Promo Banner (Top) ─── */}
-            {shouldShowPromo ? (
-              <TouchableOpacity
-                style={{
-                  height: 320,
-                  width: '100%',
-                  position: 'relative',
-                  backgroundColor: COLORS.card,
-                  marginBottom: 10,
-                }}
-                onPress={handlePromoPress}
-                activeOpacity={0.85}
+            {/* ─── Banner Carousel (Cover + Promos) ─── */}
+            <View style={{
+              height: 320,
+              width: '100%',
+              position: 'relative',
+              backgroundColor: COLORS.card,
+              marginBottom: 10,
+            }}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                style={{ width: '100%', height: '100%' }}
               >
-                {!!storeData.promoImageUrl && (
+                {/* Cover Image */}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={{ width: width, height: '100%' }}
+                  onPress={() => {
+                    // Cover image click - could open gallery or do nothing
+                  }}
+                >
                   <Image
-                    source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
-                    style={{ width: '100%', height: '100%', position: 'absolute' }}
+                    source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
+                    style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
                   />
+                </TouchableOpacity>
+
+                {/* Promo Images */}
+                {shouldShowPromo && !!storeData.promoImageUrl && (
+                  <TouchableOpacity
+                    onPress={handlePromoPress}
+                    activeOpacity={0.85}
+                    style={{ width: width, height: '100%', position: 'relative' }}
+                  >
+                    <Image
+                      source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
+                      style={{ width: '100%', height: '100%', position: 'absolute' }}
+                      resizeMode="cover"
+                    />
+                    {/* Gradient overlay */}
+                    <View style={{
+                      ...StyleSheet.absoluteFillObject,
+                      backgroundColor: 'rgba(0,0,0,0.4)',
+                    }} />
+                    
+                    <View style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      padding: SPACING.xl,
+                      width: '100%',
+                      maxWidth: 700,
+                    }}>
+                      {!!String(storeData.promoTitle || "").trim() && (
+                        <Text style={{
+                          fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+                          fontSize: 32,
+                          fontWeight: 'bold',
+                          color: 'white',
+                          marginBottom: 8,
+                          textShadowColor: 'rgba(0,0,0,0.3)',
+                          textShadowOffset: { width: 0, height: 2 },
+                          textShadowRadius: 10,
+                        }}>
+                          {String(storeData.promoTitle)}
+                        </Text>
+                      )}
+                      {!!String(storeData.promoSubtitle || "").trim() && (
+                        <Text style={{
+                          fontSize: 16,
+                          color: 'rgba(255,255,255,0.95)',
+                        }}>
+                          {String(storeData.promoSubtitle)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
                 )}
-                {/* Gradient overlay */}
+              </ScrollView>
+
+              {/* Pagination Dots */}
+              <View style={{
+                position: 'absolute',
+                bottom: SPACING.md,
+                flexDirection: 'row',
+                gap: SPACING.xs,
+                alignSelf: 'center',
+              }}>
                 <View style={{
-                  ...StyleSheet.absoluteFillObject,
-                  backgroundColor: 'rgba(0,0,0,0.4)',
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: 'rgba(255,255,255,0.8)',
                 }} />
-                
-                <View style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  padding: SPACING.xl,
-                  width: '100%',
-                  maxWidth: 700,
-                }}>
-                  {!!String(storeData.promoTitle || "").trim() && (
-                    <Text style={{
-                      fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
-                      fontSize: 32,
-                      fontWeight: 'bold',
-                      color: 'white',
-                      marginBottom: 8,
-                      textShadowColor: 'rgba(0,0,0,0.3)',
-                      textShadowOffset: { width: 0, height: 2 },
-                      textShadowRadius: 10,
-                    }}>
-                      {String(storeData.promoTitle)}
-                    </Text>
-                  )}
-                  {!!String(storeData.promoSubtitle || "").trim() && (
-                    <Text style={{
-                      fontSize: 16,
-                      color: 'rgba(255,255,255,0.95)',
-                    }}>
-                      {String(storeData.promoSubtitle)}
-                    </Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ) : (
-              <View
-                style={{
-                  height: 320,
-                  width: '100%',
-                  position: 'relative',
-                  backgroundColor: COLORS.card,
-                  marginBottom: 10,
-                }}
-              >
-                <Image
-                  source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
-                  style={{ width: '100%', height: '100%', position: 'absolute' }}
-                  resizeMode="cover"
-                />
+                {shouldShowPromo && !!storeData.promoImageUrl && (
+                  <View style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: 'rgba(255,255,255,0.4)',
+                  }} />
+                )}
               </View>
-            )}
+            </View>
 
             {/* ─── NOUVEAU STORE HEADER ─── */}
             <StoreHeader

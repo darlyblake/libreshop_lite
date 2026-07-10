@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../hooks/useTheme';
 import { Button } from '../components';
+import { planService } from '../services/planService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -42,27 +43,22 @@ const FEATURES = [
   },
 ];
 
-const PRICING = [
-  {
-    title: 'Essai',
-    price: '7 jours',
-    description: 'Accès complet pour tester LibreShop sans engagement',
-  },
-  {
-    title: 'Basic',
-    price: '3 000',
-    description: '50 produits • QR code • support prioritaire',
-    highlighted: false,
-  },
-  {
-    title: 'Pro',
-    price: '5 000',
-    description: '300 produits • vente physique • stats avancées',
-    highlighted: true,
-  },
-];
-
 export const LandingScreen: React.FC = () => {
+  const [pricing, setPricing] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadPricing();
+  }, []);
+
+  const loadPricing = async () => {
+    try {
+      const plans = await planService.getAll();
+      const activePlans = plans.filter((p: any) => p.status === 'active');
+      setPricing(activePlans);
+    } catch (error) {
+      console.error('Error loading pricing:', error);
+    }
+  };
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   
@@ -170,17 +166,20 @@ export const LandingScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tarifs simples</Text>
           <View style={styles.pricingGrid}>
-            {PRICING.map((plan, index) => (
+            {pricing.map((plan: any, index: number) => (
               <View
-                key={index}
+                key={plan.id || index}
                 style={[
                   styles.pricingCard,
                   plan.highlighted && styles.pricingCardHighlighted,
                 ]}
               >
-                <Text style={styles.pricingTitle}>{plan.title}</Text>
-                <Text style={styles.pricingPrice}>{plan.price} {'\n'}FCFA</Text>
-                <Text style={styles.pricingDescription}>{plan.description}</Text>
+                <Text style={styles.pricingTitle}>{plan.name}</Text>
+                <Text style={styles.pricingPrice}>
+                  {plan.trial_days ? `${plan.trial_days} jours` : `${plan.price}`} {'\n'}
+                  {plan.trial_days ? '' : 'FCFA'}
+                </Text>
+                <Text style={styles.pricingDescription}>{plan.description || 'Accès complet'}</Text>
                 {plan.highlighted && (
                   <View style={styles.pricingBadge}>
                     <Text style={styles.pricingBadgeText}>Populaire</Text>
