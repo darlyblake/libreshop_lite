@@ -22,7 +22,7 @@ export interface Store {
   country_id?: string;
   city_id?: string;
   website?: string;
-  social?: Record<string, string>;
+  social?: Record<string, any>;
   verified?: boolean;
   status: 'active' | 'suspended' | 'pending';
   subscription_plan?: string;
@@ -97,7 +97,7 @@ export interface UpdateStorePayload {
   city?: string;
   country?: string;
   website?: string;
-  social?: Record<string, string>;
+  social?: Record<string, any>;
   version?: number; // For optimistic locking
 }
 

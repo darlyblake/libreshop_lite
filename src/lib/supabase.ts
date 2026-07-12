@@ -144,7 +144,7 @@ export interface Store {
   country_id?: string;
   city_id?: string;
   website?: string;
-  social?: Record<string, string>;
+  social?: Record<string, any>;
   verified?: boolean;
   promo_enabled?: boolean;
   promo_title?: string;

@@ -54,12 +54,22 @@ export const NotificationsScreen: React.FC = () => {
   const visibleNotifications = useMemo(() => {
     return notifications.filter(n => {
       if (context === 'client') return isClientNotification(n);
-      if (context === 'seller') return isSellerNotification(n);
+      if (context === 'seller') {
+        if (!isSellerNotification(n)) return false;
+        // Filter by the active store if we are in seller context and have a store id
+        if (store?.id && n.data?.storeId) {
+          return String(n.data.storeId) === String(store.id);
+        }
+        return true;
+      }
       return true;
     });
-  }, [notifications, context]);
+  }, [notifications, context, store?.id]);
 
-  const currentUnreadCount = context === 'client' ? clientUnreadCount : sellerUnreadCount;
+  const currentUnreadCount = useMemo(() => {
+    if (context === 'client') return clientUnreadCount;
+    return visibleNotifications.filter(n => !n.read).length;
+  }, [context, clientUnreadCount, visibleNotifications]);
 
   const loadNotifications = useCallback(async () => {
     if (!user) return;

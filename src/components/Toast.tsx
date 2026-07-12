@@ -121,10 +121,13 @@ const getStyles = (theme: any) => {
     flex: 1,
     fontSize: FONT_SIZE.sm,
     fontWeight: '500',
-    // Assurer le contraste même sur les couleurs de statut
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 1px 2px rgba(0, 0, 0, 0.3)' } as any
+      : {
+          textShadowColor: 'rgba(0, 0, 0, 0.3)',
+          textShadowOffset: { width: 0, height: 1 },
+          textShadowRadius: 2,
+        }),
   },
 });
 };

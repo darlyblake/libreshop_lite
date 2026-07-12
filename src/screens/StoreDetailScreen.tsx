@@ -20,7 +20,7 @@ import {
   TextInput,
   Modal,
 } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import * as ExpoLinking from "expo-linking";
 import { contactStore } from '../services/contactService';
 import { openURL } from '../utils/platformUtils';
@@ -41,6 +41,8 @@ import { useTheme } from "../hooks/useTheme";
 import { StoreMap } from "../components/StoreMap";
 import { locationService } from "../services/locationService";
 import { getStoreStatus } from "../utils/storeStatus";
+import { cacheManager } from "../utils/cacheManager";
+import { useSupabase } from "../lib/supabase";
 
 const { width } = Dimensions.get("window");
 
@@ -207,6 +209,7 @@ export const StoreDetailScreen: React.FC = () => {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
+  const [storePromos, setStorePromos] = useState<any[]>([]);
 
   useEffect(() => {
     if (store?.announcement_popup_enabled && store?.announcement_popup) {
@@ -306,6 +309,25 @@ export const StoreDetailScreen: React.FC = () => {
         setStoreStats(stats);
         setStoreReviews(Array.isArray(reviews) ? reviews : []);
         setDisplayedCount(PAGE_SIZE);
+
+        // Charger les bannières depuis store_promos
+        try {
+          const client = useSupabase();
+          const { data: promosData, error: promoErr } = await client
+            .from('store_promos')
+            .select('*')
+            .eq('store_id', storeIdForProducts)
+            .eq('enabled', true)
+            .order('sort_order', { ascending: true });
+            
+          if (promoErr) {
+            console.error('[StoreDetail] Supabase error loading promos:', promoErr);
+          }
+          setStorePromos(promosData || []);
+        } catch (promoErr) {
+          console.warn('[StoreDetail] Exception loading promos:', promoErr);
+          setStorePromos([]);
+        }
       } else {
         setProducts([]);
         setCollections([]);
@@ -345,6 +367,19 @@ export const StoreDetailScreen: React.FC = () => {
     };
   }, [loadStore]);
 
+  // Reload store data (bypassing cache) whenever screen comes back into focus
+  // This ensures new banners saved from SellerPromoBanners are visible immediately
+  useFocusEffect(
+    useCallback(() => {
+      const storeIdToInvalidate = effectiveStoreId;
+      if (storeIdToInvalidate) {
+        cacheManager.remove(`store_${storeIdToInvalidate}`).then(() => {
+          loadStore();
+        }).catch(() => loadStore());
+      }
+    }, [effectiveStoreId])
+  );
+
   useEffect(() => {
     // Only run when store.id is definitively known to avoid double-fetch
     const storeIdToUse = store?.id;
@@ -371,7 +406,8 @@ export const StoreDetailScreen: React.FC = () => {
   }, [store?.id]);
 
 
-  const storeData = store
+  // Memoize storeData so it only recomputes when store changes
+  const storeData = useMemo(() => store
     ? {
         name: store.name || STORE_DATA.name,
         category: store.category || "",
@@ -391,8 +427,30 @@ export const StoreDetailScreen: React.FC = () => {
         promoTargetUrl: (store as any)?.promo_target_url
           ? String((store as any).promo_target_url)
           : null,
+        social: store?.social,
       }
-    : STORE_DATA;
+    : STORE_DATA, [store]);
+    
+  // promosList: bannières depuis store_promos table (source de vérité)
+  const promosList = useMemo(() => {
+    // Nouvelles bannières depuis la table dédiée
+    if (storePromos.length > 0) return storePromos;
+    // Fallback legacy: anciens champs promo_* sur la table stores
+    if ((store as any)?.promo_image_url && (store as any)?.promo_enabled) {
+      return [{
+        id: 'legacy',
+        image_url: (store as any).promo_image_url,
+        title: (store as any).promo_title || '',
+        subtitle: (store as any).promo_subtitle || '',
+        target_type: (store as any).promo_target_type,
+        target_id: (store as any).promo_target_id ? String((store as any).promo_target_id) : null,
+        target_url: (store as any).promo_target_url || null,
+      }];
+    }
+    return [];
+  }, [storePromos, store]);
+
+  const shouldShowPromo = promosList.length > 0;
 
   const storeStatus = useMemo(() => {
     if (!store) return { isOpen: true };
@@ -615,36 +673,28 @@ export const StoreDetailScreen: React.FC = () => {
     );
   }, []);
 
-  const handlePromoPress = useCallback(async () => {
-    if (!storeData?.promoEnabled) return;
-    const t = String(storeData?.promoTargetType || "");
+  const handlePromoPress = useCallback(async (promo: any) => {
+    if (!promo) return;
+    // Support both store_promos (snake_case) and legacy (camelCase) fields
+    const t = String(promo.target_type || promo.targetType || "");
+    const targetId = promo.target_id || promo.targetId || null;
+    const targetUrl = promo.target_url || promo.targetUrl || null;
+    
     if (t === "collection") {
-      const id = storeData?.promoTargetId;
-      if (id) setSelectedCollectionId(String(id));
+      if (targetId) {
+        setSelectedCollectionId(String(targetId));
+        setActiveTab("produits");
+      }
       return;
     }
     if (t === "product") {
-      const id = storeData?.promoTargetId;
-      if (id) navigation.navigate("ProductDetail", { productId: String(id) });
+      if (targetId) navigation.navigate("ProductDetail", { productId: String(targetId) });
       return;
     }
     if (t === "url") {
-      const url = storeData?.promoTargetUrl;
-      if (url) {
-        openURL(String(url));
-      }
+      if (targetUrl) openURL(String(targetUrl));
     }
-  }, [navigation, storeData]);
-
-  const shouldShowPromo = useMemo(() => {
-    if (!storeData?.promoEnabled) return false;
-    const hasContent = Boolean(
-      String(storeData?.promoTitle || "").trim() ||
-      String(storeData?.promoSubtitle || "").trim() ||
-      String(storeData?.promoImageUrl || "").trim(),
-    );
-    return hasContent;
-  }, [storeData]);
+  }, [navigation]);
 
   // Hide WhatsApp button when no phone set
   const hasPhone = useMemo(() => {
@@ -868,29 +918,32 @@ export const StoreDetailScreen: React.FC = () => {
                 style={{ width: '100%', height: '100%' }}
               >
                 {/* Cover Image */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  style={{ width: width, height: '100%' }}
-                  onPress={() => {
-                    // Cover image click - could open gallery or do nothing
-                  }}
-                >
-                  <Image
-                    source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
-                    style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
+                {!shouldShowPromo && (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={{ width: width, height: '100%' }}
+                    onPress={() => {
+                      // Cover image click - could open gallery or do nothing
+                    }}
+                  >
+                    <Image
+                      source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                )}
 
                 {/* Promo Images */}
-                {shouldShowPromo && !!storeData.promoImageUrl && (
+                {shouldShowPromo && promosList.map((promo: any, index: number) => (
                   <TouchableOpacity
-                    onPress={handlePromoPress}
+                    key={promo.id || `promo-${index}`}
+                    onPress={() => handlePromoPress(promo)}
                     activeOpacity={0.85}
                     style={{ width: width, height: '100%', position: 'relative' }}
                   >
                     <Image
-                      source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
+                      source={{ uri: cloudinaryService.getOptimizedUrl(promo.image_url || promo.imageUrl, 800) }}
                       style={{ width: '100%', height: '100%', position: 'absolute' }}
                       resizeMode="cover"
                     />
@@ -908,56 +961,36 @@ export const StoreDetailScreen: React.FC = () => {
                       width: '100%',
                       maxWidth: 700,
                     }}>
-                      {!!String(storeData.promoTitle || "").trim() && (
+                      {!!String(promo.title || "").trim() && (
                         <Text style={{
                           fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
                           fontSize: 32,
                           fontWeight: 'bold',
                           color: 'white',
                           marginBottom: 8,
-                          textShadowColor: 'rgba(0,0,0,0.3)',
-                          textShadowOffset: { width: 0, height: 2 },
-                          textShadowRadius: 10,
+                          ...(Platform.OS === 'web' 
+                            ? { textShadow: '0px 2px 10px rgba(0,0,0,0.3)' } as any
+                            : {
+                                textShadowColor: 'rgba(0,0,0,0.3)',
+                                textShadowOffset: { width: 0, height: 2 },
+                                textShadowRadius: 10,
+                              }),
                         }}>
-                          {String(storeData.promoTitle)}
+                          {String(promo.title)}
                         </Text>
                       )}
-                      {!!String(storeData.promoSubtitle || "").trim() && (
+                      {!!String(promo.subtitle || "").trim() && (
                         <Text style={{
                           fontSize: 16,
                           color: 'rgba(255,255,255,0.95)',
                         }}>
-                          {String(storeData.promoSubtitle)}
+                          {String(promo.subtitle)}
                         </Text>
                       )}
                     </View>
                   </TouchableOpacity>
-                )}
+                ))}
               </ScrollView>
-
-              {/* Pagination Dots */}
-              <View style={{
-                position: 'absolute',
-                bottom: SPACING.md,
-                flexDirection: 'row',
-                gap: SPACING.xs,
-                alignSelf: 'center',
-              }}>
-                <View style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: 'rgba(255,255,255,0.8)',
-                }} />
-                {shouldShowPromo && !!storeData.promoImageUrl && (
-                  <View style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: 'rgba(255,255,255,0.4)',
-                  }} />
-                )}
-              </View>
             </View>
 
             {/* ─── NOUVEAU STORE HEADER ─── */}
@@ -1007,43 +1040,6 @@ export const StoreDetailScreen: React.FC = () => {
             {/* ACCUEIL TAB */}
             {activeTab === "accueil" && (
               <>
-                {/* Promo Banner */}
-                {shouldShowPromo && (
-                  <TouchableOpacity
-                    style={styles.promoCard}
-                    onPress={handlePromoPress}
-                    activeOpacity={0.85}
-                  >
-                    {!!storeData.promoImageUrl && (
-                      <Image
-                        source={{ uri: cloudinaryService.getOptimizedUrl(storeData.promoImageUrl, 800) }}
-                        style={styles.promoImage}
-                        resizeMode="cover"
-                      />
-                    )}
-                    <View style={styles.promoContent}>
-                      {!!String(storeData.promoTitle || "").trim() && (
-                        <Text style={styles.promoTitle}>
-                          {String(storeData.promoTitle)}
-                        </Text>
-                      )}
-                      {!!String(storeData.promoSubtitle || "").trim() && (
-                        <Text style={styles.promoSubtitle}>
-                          {String(storeData.promoSubtitle)}
-                        </Text>
-                      )}
-                      <View style={styles.promoCtaRow}>
-                        <Text style={styles.promoCtaText}>Voir l'offre</Text>
-                        <Ionicons
-                          name="arrow-forward"
-                          size={16}
-                          color={COLORS.text}
-                        />
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                )}
-
                 {/* Welcome section */}
                 <View style={styles.welcomeSection}>
                   <Text style={styles.sectionTitle}>Bienvenue</Text>

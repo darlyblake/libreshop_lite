@@ -20,7 +20,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuthStore } from '../store';
 import { sessionStorage } from '../lib/storage';
-import { useNotificationStore } from '../store/notificationStore';
+import { useNotificationStore, isSellerNotification } from '../store/notificationStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -125,7 +125,7 @@ export const SellerDashboardScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const setSession = useAuthStore((s) => s.setSession);
-  const { sellerUnreadCount, setNotifications } = useNotificationStore();
+  const { notifications, setNotifications } = useNotificationStore();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { 
@@ -150,6 +150,10 @@ export const SellerDashboardScreen: React.FC = () => {
   const [timeRange, setTimeRange] = useState<TimeRange>('month');
 
   const [store, setStore] = useState<Partial<import('../lib/supabase').Store>>({});
+
+  const sellerUnreadCount = useMemo(() => {
+    return notifications.filter(n => !n.read && isSellerNotification(n) && (!n.data?.storeId || String(n.data.storeId) === String(store.id))).length;
+  }, [notifications, store?.id]);
   const [stats, setStats] = useState<Stat[]>([]);
   const [recentOrders, setRecentOrders] = useState<DashboardOrder[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
