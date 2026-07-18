@@ -12,11 +12,11 @@ export const qrCodeService = {
   getOrderUrl(orderId: string): string {
     // Prefer explicit environment variable, else try to use window origin on web,
     // otherwise fallback to deep-link scheme.
-    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-    if (envBase) return `${envBase}/order/${orderId}`;
     if (typeof window !== 'undefined' && window.location && window.location.origin) {
       return `${window.location.origin.replace(/\/+$/, '')}/order/${orderId}`;
     }
+    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    if (envBase) return `${envBase}/order/${orderId}`;
     return `libreshop://order/${orderId}`;
   },
 
@@ -25,11 +25,11 @@ export const qrCodeService = {
    * Ex: https://monsite.com/store/fred-shop
    */
   getStoreUrl(storeSlug: string): string {
-    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-    if (envBase) return `${envBase}/store/${storeSlug}`;
     if (typeof window !== 'undefined' && window.location && window.location.origin) {
       return `${window.location.origin.replace(/\/+$/, '')}/store/${storeSlug}`;
     }
+    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    if (envBase) return `${envBase}/store/${storeSlug}`;
     return `libreshop://store/${storeSlug}`;
   },
 
@@ -40,7 +40,7 @@ export const qrCodeService = {
    */
   getQrImageUrl(data: string, size = 200): string {
     const encoded = encodeURIComponent(data);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}&format=png`;
+    return `https://quickchart.io/qr?text=${encoded}&size=${size}`;
   },
   /**
    * Récupère l'image QR code en base64 (pour une intégration fiable dans le HTML du reçu).

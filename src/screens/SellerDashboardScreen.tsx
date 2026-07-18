@@ -1023,6 +1023,12 @@ export const SellerDashboardScreen: React.FC = () => {
         color: COLORS.accent,
         action: 'promo',
       },
+      { 
+        label: 'Centre Marketing', 
+        icon: 'color-wand', 
+        color: COLORS.warning,
+        screen: 'SellerMarketing',
+      },
     ];
 
 

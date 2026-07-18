@@ -39,6 +39,11 @@ export const SellerPromoBannersScreen: React.FC = () => {
   const FONT_SIZE = fontSize;
 
   const routeStoreId: string | undefined = route.params?.storeId;
+  const routeAutoOpen: boolean | undefined = route.params?.autoOpenModal;
+  const routeAutoImage: string | undefined = route.params?.autoImageUri;
+  const routeAutoProductId: string | undefined = route.params?.autoProductId;
+  const routeAutoTitle: string | undefined = route.params?.autoTitle;
+  const routeAutoSubtitle: string | undefined = route.params?.autoSubtitle;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,12 +103,33 @@ export const SellerPromoBannersScreen: React.FC = () => {
       setStoreProducts(prodRes.data || []);
       setStoreCollections(colRes.data || []);
       console.log('[SellerPromoBanners] Store:', s.name, '| Banners:', promosData?.length, '| Products:', prodRes.data?.length, '| Collections:', colRes.data?.length);
+      // Handle auto-open modal from Marketing
+      if (routeAutoOpen && !editModalVisible && promosData) {
+        if (promosData.length >= 5) {
+          Alert.alert('Limite atteinte', 'Vous avez déjà 5 bannières (maximum autorisé). Veuillez en supprimer une avant d\'en ajouter une nouvelle.');
+          navigation.setParams({ autoOpenModal: undefined, autoImageUri: undefined, autoProductId: undefined, autoTitle: undefined, autoSubtitle: undefined });
+        } else {
+          setEditingPromo(null);
+          setPromoData({ 
+            title: routeAutoTitle || 'Nouvelle Promotion', 
+            subtitle: routeAutoSubtitle || '', 
+            image_url: routeAutoImage || '', 
+            target_type: routeAutoProductId ? 'product' : 'collection', 
+            target_id: routeAutoProductId || '', 
+            target_url: '' 
+          });
+          setEditModalVisible(true);
+          // Clear params to avoid reopening on re-focus
+          navigation.setParams({ autoOpenModal: undefined, autoImageUri: undefined, autoProductId: undefined, autoTitle: undefined, autoSubtitle: undefined });
+        }
+      }
+
     } catch (e) {
       errorHandler.handleDatabaseError(e as any, 'load store promos');
     } finally {
       setLoading(false);
     }
-  }, [user?.id, routeStoreId]);
+  }, [user?.id, routeStoreId, routeAutoOpen, routeAutoImage, routeAutoProductId, routeAutoTitle, routeAutoSubtitle, editModalVisible, navigation]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

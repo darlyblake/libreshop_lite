@@ -124,10 +124,11 @@ export const SellerStoreScreen: React.FC = () => {
   const storePublicUrl = useMemo(() => {
     if (!store?.slug) return null;
     
-    let webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
-    
-    if (!webBaseUrl && Platform.OS === 'web' && typeof window !== 'undefined') {
+    let webBaseUrl = '';
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location && window.location.origin) {
       webBaseUrl = window.location.origin.replace(/\/+$/, '');
+    } else {
+      webBaseUrl = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
     }
     
     return webBaseUrl
@@ -183,7 +184,7 @@ export const SellerStoreScreen: React.FC = () => {
         products: Array.isArray(products) ? products.length : 0,
         orders: Array.isArray(orders) ? orders.length : 0,
         phone: s.phone,
-        whatsapp: s.whatsapp,
+        whatsapp: s.whatsapp_number,
         email: s.email,
         address: s.address,
         taxRate: Number(s.tax_rate) || 0,
@@ -320,21 +321,20 @@ export const SellerStoreScreen: React.FC = () => {
 
 
   const handleShareStore = async () => {
-    if (!store?.id) {
+    if (!store?.id || !storePublicUrl) {
       Alert.alert('Partager', 'Lien boutique indisponible.');
       return;
     }
     try {
-      const shareUrl = `https://libreshop.shop/api/store?id=${store.id}`;
       await shareContent({
         title: store?.name || 'Boutique',
         description: store?.description || '',
-        url: shareUrl,
+        url: storePublicUrl,
         imageUrl: (store as any)?.logo_url || (store as any)?.banner_url || undefined,
         type: 'store',
       });
     } catch (e: any) {
-      Alert.alert('Partager', `https://libreshop.shop/api/store?id=${store.id}`);
+      Alert.alert('Partager', storePublicUrl);
     }
   };
 
@@ -366,16 +366,14 @@ export const SellerStoreScreen: React.FC = () => {
   };
 
   const handleDownloadQr = async () => {
-    if (!store?.slug) return;
-    const qrDataUrl = qrCodeService.getStoreUrl(store.slug);
-    const qrImageUrl = qrCodeService.getQrImageUrl(qrDataUrl, 600);
-
+    if (!store?.slug || !storePublicUrl) return;
+    
     if (Platform.OS === 'web') {
       try {
+        const base64Url = await qrCodeService.getQrImageBase64(storePublicUrl, 600);
         const a = document.createElement('a');
-        a.href = qrImageUrl;
+        a.href = base64Url;
         a.download = `qr-${store.slug}.png`;
-        a.target = '_blank';
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -384,6 +382,8 @@ export const SellerStoreScreen: React.FC = () => {
       }
       return;
     }
+
+    const qrImageUrl = qrCodeService.getQrImageUrl(storePublicUrl, 600);
 
     await handleSaveQrToGallery();
   };
@@ -402,8 +402,7 @@ export const SellerStoreScreen: React.FC = () => {
         return;
       }
 
-      const qrDataUrl = qrCodeService.getStoreUrl(store.slug);
-      const qrImageUrl = qrCodeService.getQrImageUrl(qrDataUrl, 600);
+      const qrImageUrl = qrCodeService.getQrImageUrl(storePublicUrl || '', 600);
 
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -412,7 +411,7 @@ export const SellerStoreScreen: React.FC = () => {
       }
 
       const fileExt = 'png';
-      const baseDir = (FileSystem as any).cacheDirectory;
+      const baseDir = (FileSystem as any)['cacheDirectory'];
       if (!baseDir) throw new Error("Répertoire cache indisponible");
       const localUri = `${baseDir}qr-boutique-${store.slug}-${Date.now()}.${fileExt}`;
 
@@ -1245,9 +1244,9 @@ export const SellerStoreScreen: React.FC = () => {
             <Ionicons name="qr-code-outline" size={32} color={getColor.accent} style={{ marginBottom: 12 }} />
             <Text style={[styles.modalTitle, { marginBottom: 20 }]}>QR Code de votre boutique</Text>
 
-            {store?.slug ? (
+            {store?.slug && storePublicUrl ? (
               <Image
-                source={{ uri: qrCodeService.getQrImageUrl(qrCodeService.getStoreUrl(store.slug), 200) }}
+                source={{ uri: qrCodeService.getQrImageUrl(storePublicUrl, 200) }}
                 style={{ width: 200, height: 200, marginBottom: 20 }}
               />
             ) : null}

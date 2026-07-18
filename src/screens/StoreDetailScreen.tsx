@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   errorHandler,
   ErrorCategory,
@@ -210,6 +210,8 @@ export const StoreDetailScreen: React.FC = () => {
   const [showMapModal, setShowMapModal] = useState(false);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
   const [storePromos, setStorePromos] = useState<any[]>([]);
+  const bannerScrollRef = useRef<ScrollView>(null);
+  const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
 
   useEffect(() => {
     if (store?.announcement_popup_enabled && store?.announcement_popup) {
@@ -451,6 +453,18 @@ export const StoreDetailScreen: React.FC = () => {
   }, [storePromos, store]);
 
   const shouldShowPromo = promosList.length > 0;
+
+  useEffect(() => {
+    if (!shouldShowPromo || promosList.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBannerIdx((prev) => {
+        const nextIdx = (prev + 1) % promosList.length;
+        bannerScrollRef.current?.scrollTo({ x: nextIdx * width, animated: true });
+        return nextIdx;
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [shouldShowPromo, promosList.length, width]);
 
   const storeStatus = useMemo(() => {
     if (!store) return { isOpen: true };
@@ -892,12 +906,37 @@ export const StoreDetailScreen: React.FC = () => {
         )}
 
         {!loading && !errorMsg && !isSubActive && (
-          <View style={styles.errorContainer}>
-            <Ionicons name="storefront-outline" size={64} color={COLORS.textMuted} />
-            <Text style={styles.errorTitle}>Boutique indisponible</Text>
-            <Text style={styles.errorText}>
-              Cette boutique n'est plus accessible au public pour le moment suite à l'expiration de son abonnement.
+          <View style={[styles.errorContainer, { padding: 32, alignItems: 'center' }]}>
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.05)', padding: 24, borderRadius: 100, marginBottom: 16 }}>
+              <Ionicons name="storefront-outline" size={64} color={COLORS.textSoft} />
+            </View>
+            <Text style={[styles.errorTitle, { fontSize: 22, textAlign: 'center', marginBottom: 12 }]}>Boutique en pause</Text>
+            <Text style={[styles.errorText, { textAlign: 'center', lineHeight: 24, color: COLORS.textSoft, marginBottom: 32 }]}>
+              Cette boutique n'est pas accessible au public pour le moment suite à l'expiration de son abonnement. 
+              {store?.category ? ` Découvrez d'autres boutiques dans la catégorie ${store.category} !` : ''}
             </Text>
+
+            <TouchableOpacity 
+              style={{
+                backgroundColor: COLORS.accent,
+                paddingVertical: 14,
+                paddingHorizontal: 28,
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                shadowColor: COLORS.accent,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
+              onPress={() => navigation.navigate("ClientAllStores", store?.category ? { category: store.category } : undefined)}
+            >
+              <Ionicons name="compass-outline" size={22} color="white" style={{ marginRight: 8 }} />
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>
+                Explorer d'autres boutiques
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -912,24 +951,35 @@ export const StoreDetailScreen: React.FC = () => {
               marginBottom: 10,
             }}>
               <ScrollView
+                ref={bannerScrollRef}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
                 style={{ width: '100%', height: '100%' }}
+                onMomentumScrollEnd={(e) => {
+                  const slideIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                  setCurrentBannerIdx(slideIndex);
+                }}
               >
                 {/* Cover Image */}
                 {!shouldShowPromo && (
                   <TouchableOpacity
                     activeOpacity={0.85}
-                    style={{ width: width, height: '100%' }}
+                    style={{ width: width, height: '100%', backgroundColor: COLORS.bg }}
                     onPress={() => {
                       // Cover image click - could open gallery or do nothing
                     }}
                   >
                     <Image
                       source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
-                      style={{ width: '100%', height: '100%' }}
+                      style={{ ...StyleSheet.absoluteFillObject, opacity: 0.3 }}
                       resizeMode="cover"
+                      blurRadius={20}
+                    />
+                    <Image
+                      source={{ uri: cloudinaryService.getOptimizedUrl(storeData.bannerUrl, 1000) }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="contain"
                     />
                   </TouchableOpacity>
                 )}
@@ -940,12 +990,18 @@ export const StoreDetailScreen: React.FC = () => {
                     key={promo.id || `promo-${index}`}
                     onPress={() => handlePromoPress(promo)}
                     activeOpacity={0.85}
-                    style={{ width: width, height: '100%', position: 'relative' }}
+                    style={{ width: width, height: '100%', position: 'relative', backgroundColor: COLORS.bg }}
                   >
                     <Image
                       source={{ uri: cloudinaryService.getOptimizedUrl(promo.image_url || promo.imageUrl, 800) }}
-                      style={{ width: '100%', height: '100%', position: 'absolute' }}
+                      style={{ ...StyleSheet.absoluteFillObject, opacity: 0.3 }}
                       resizeMode="cover"
+                      blurRadius={20}
+                    />
+                    <Image
+                      source={{ uri: cloudinaryService.getOptimizedUrl(promo.image_url || promo.imageUrl, 800) }}
+                      style={{ width: '100%', height: '100%', position: 'absolute' }}
+                      resizeMode="contain"
                     />
                     {/* Gradient overlay */}
                     <View style={{
@@ -991,6 +1047,37 @@ export const StoreDetailScreen: React.FC = () => {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+
+              {/* Pagination Dots */}
+              {shouldShowPromo && promosList.length > 1 && (
+                <View style={{
+                  position: 'absolute',
+                  bottom: 15,
+                  left: 0,
+                  right: 0,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                  {promosList.map((_, idx) => (
+                    <View
+                      key={`dot-${idx}`}
+                      style={{
+                        width: currentBannerIdx === idx ? 24 : 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: currentBannerIdx === idx ? COLORS.primary : 'rgba(255,255,255,0.6)',
+                        marginHorizontal: 4,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 2,
+                        elevation: 2,
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* ─── NOUVEAU STORE HEADER ─── */}

@@ -38,7 +38,7 @@ import { locationService } from '../services/locationService';
 import OptimizedImage from '../components/OptimizedImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const MAX_CONTENT_WIDTH = 1200;
+// No MAX_CONTENT_WIDTH anymore
 
 // Nearby radius options
 const NEARBY_RADIUS_OPTIONS = [
@@ -77,7 +77,7 @@ export const ClientAllStoresScreen: React.FC = () => {
   }, []);
 
   const { query, setQuery, isLoading: searchLoading } = useSearch({ debounceDelay: 300 });
-  const [selectedCategory, setSelectedCategory] = useState('Toutes');
+  const [selectedCategory, setSelectedCategory] = useState(route.params?.category || 'Toutes');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stores, setStores] = useState<Store[]>([]);
@@ -267,7 +267,8 @@ export const ClientAllStoresScreen: React.FC = () => {
       paddingBottom: SPACING.xxl + insets.bottom,
     },
     columnWrapper: {
-      justifyContent: 'space-between' as const,
+      justifyContent: 'flex-start' as const,
+      gap: SPACING.md,
       marginBottom: SPACING.md,
     },
     cardWidth: (SCREEN_WIDTH - (SPACING.lg * 2) - (SPACING.md * (numColumns - 1))) / numColumns,
@@ -655,7 +656,6 @@ export const ClientAllStoresScreen: React.FC = () => {
 
 const createStyles = (COLORS: any, SPACING: any, RADIUS: any, FONT_SIZE: any) => StyleSheet.create({
   maxWidthContainer: {
-    maxWidth: MAX_CONTENT_WIDTH,
     width: '100%',
     alignSelf: 'center',
     flex: 1,

@@ -188,7 +188,7 @@ export const SellerProductsScreen: React.FC = () => {
         const storeName = store?.name ? store.name.replace(/[^a-zA-Z0-9]/g, '_') : 'LibreShop';
         const filename = `inventaire_${storeName}_${dateStr}.csv`;
         // documentDirectory peut être une string ou undefined selon la version d'expo-file-system
-        const docDir = (FileSystem as any).documentDirectory as string | null | undefined;
+        const docDir = (FileSystem as any)['documentDirectory'] as string | null | undefined;
         if (!docDir) {
           throw new Error("Dossier de documents introuvable.");
         }

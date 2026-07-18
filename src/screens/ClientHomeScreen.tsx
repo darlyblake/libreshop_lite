@@ -28,7 +28,7 @@ import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useNotificationStore } from '../store/notificationStore';
 
-const MAX_CONTENT_WIDTH = 1200;
+// No MAX_CONTENT_WIDTH anymore
 
 const CATEGORIES = [
   { name: 'Produits', emoji: '🛍️', bg: '#f4e8ff' },
@@ -65,6 +65,7 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
   return (
     <TouchableOpacity
       activeOpacity={0.85}
+      disabled={store.isNavigating}
       style={{
         width,
         backgroundColor: palette.card,
@@ -81,6 +82,12 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
           <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={{ width: '100%', height: '100%' }} />
         ) : (
           <View style={{ width: '100%', height: '100%', backgroundColor: palette.accent + '20' }} />
+        )}
+
+        {store.isNavigating && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}>
+            <ActivityIndicator size="large" color={palette.accent} />
+          </View>
         )}
 
         <View style={{
@@ -141,6 +148,17 @@ export const ClientHomeScreen: React.FC = () => {
   const [storesPage, setStoresPage] = useState(0);
   const [loadingStores, setLoadingStores] = useState(true);
   const [loadingMoreStores, setLoadingMoreStores] = useState(false);
+  const [navigatingState, setNavigatingState] = useState<string | null>(null);
+  
+  const handleNavigate = useCallback((screen: string, params?: any, id?: string) => {
+    const navId = id || screen;
+    if (navigatingState) return;
+    setNavigatingState(navId);
+    navigation.navigate(screen, params);
+    setTimeout(() => {
+      setNavigatingState(null);
+    }, 800);
+  }, [navigation, navigatingState]);
   
   const clientUnreadCount = useNotificationStore((state) => state.clientUnreadCount);
 
@@ -198,12 +216,14 @@ export const ClientHomeScreen: React.FC = () => {
   }, []);
 
   const numColumns = useMemo(() => {
-    if (width >= 1024) return 5;
-    if (width >= 768) return 4;
+    if (width >= 1400) return 6;
+    if (width >= 1200) return 5;
+    if (width >= 900) return 4;
+    if (width >= 768) return 3;
     return 2;
   }, [width]);
 
-  const contentWidth = Math.min(width, MAX_CONTENT_WIDTH);
+  const contentWidth = width;
   const cardWidth = useMemo(() => {
     const totalPadding = SPACING.md * 2;
     const totalGap = SPACING.md * (numColumns - 1);
@@ -317,24 +337,34 @@ export const ClientHomeScreen: React.FC = () => {
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', gap: SPACING.md, paddingHorizontal: SPACING.md }}
+            contentContainerStyle={{ 
+              flexGrow: 1, 
+              justifyContent: width >= 768 ? 'center' : 'space-between', 
+              gap: width >= 768 ? 48 : SPACING.md, 
+              paddingHorizontal: SPACING.md 
+            }}
           >
             {CATEGORIES.map((cat, i) => (
               <TouchableOpacity 
                 key={i} 
+                disabled={!!navigatingState}
                 style={{ alignItems: 'center', gap: 8 }}
                 onPress={() => {
                   if (cat.name === 'Boutiques') {
-                    navigation.navigate('ClientAllStores');
+                    handleNavigate('ClientAllStores', undefined, cat.name);
                   } else if (cat.name === 'Produits') {
-                    navigation.navigate('ClientAllProducts');
+                    handleNavigate('ClientAllProducts', undefined, cat.name);
                   } else {
                     Alert.alert('Bientôt disponible', `La catégorie ${cat.name} sera bientôt disponible !`);
                   }
                 }}
               >
                 <View style={{ width: 72, height: 72, backgroundColor: cat.bg, borderRadius: 20, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 32 }}>{cat.emoji}</Text>
+                  {navigatingState === cat.name ? (
+                    <ActivityIndicator color={palette.text} />
+                  ) : (
+                    <Text style={{ fontSize: 32 }}>{cat.emoji}</Text>
+                  )}
                 </View>
                 <Text style={{ color: palette.text, fontWeight: '600', fontSize: FONT_SIZE.sm }}>{cat.name}</Text>
               </TouchableOpacity>
@@ -344,20 +374,24 @@ export const ClientHomeScreen: React.FC = () => {
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
           <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', color: palette.text }}>Top 20 Boutiques</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('ClientAllStores')}>
-            <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.accent }}>Voir plus</Text>
+          <TouchableOpacity disabled={!!navigatingState} onPress={() => handleNavigate('ClientAllStores', undefined, 'voir_plus_boutiques')}>
+            {navigatingState === 'voir_plus_boutiques' ? (
+               <ActivityIndicator size="small" color={palette.accent} />
+            ) : (
+               <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.accent }}>Voir plus</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
     );
-  }, [navigation, items.length, palette, SPACING, FONT_SIZE, RADIUS]);
+  }, [navigation, items.length, palette, SPACING, FONT_SIZE, RADIUS, navigatingState, handleNavigate, clientUnreadCount, user, switchingToSeller, handleSwitchToSeller]);
 
   // Si l'écran vient de s'ouvrir ou que les données initiales chargent, on affiche un skeleton
   if (!isReady || (loadingStores && topStores.length === 0)) {
     return (
       <ScrollView 
         style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top }}
-        contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: 100, alignSelf: 'center', width: '100%', maxWidth: MAX_CONTENT_WIDTH }}
+        contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: 100, alignSelf: 'center', width: '100%' }}
         showsVerticalScrollIndicator={false}
       >
         {renderHeader()}
@@ -375,7 +409,7 @@ export const ClientHomeScreen: React.FC = () => {
   return (
     <ScrollView 
       style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top }}
-      contentContainerStyle={{ padding: SPACING.md, paddingBottom: 100, alignSelf: 'center', width: '100%', maxWidth: MAX_CONTENT_WIDTH }}
+      contentContainerStyle={{ padding: SPACING.md, paddingBottom: 100, alignSelf: 'center', width: '100%' }}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={palette.accent} />}
       onScroll={({ nativeEvent }) => {
@@ -393,13 +427,13 @@ export const ClientHomeScreen: React.FC = () => {
         {topStores.map((store: any) => (
           <BeautifulStoreCard
             key={store.id}
-            store={store}
+            store={{...store, isNavigating: navigatingState === `store_${store.id}`}}
             width={cardWidth}
             palette={palette}
             RADIUS={RADIUS}
             SPACING={SPACING}
             FONT_SIZE={FONT_SIZE}
-            onPress={() => navigation.navigate('StoreDetail', { storeId: store.id })}
+            onPress={() => handleNavigate('StoreDetail', { storeId: store.id }, `store_${store.id}`)}
           />
         ))}
       </View>
