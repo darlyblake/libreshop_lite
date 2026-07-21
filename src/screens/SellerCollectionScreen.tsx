@@ -113,8 +113,8 @@ export const SellerCollectionScreen: React.FC = () => {
 
       const [cats, cols, prods] = await Promise.all([
         categoryService.getAll(),
-        collectionService.getByStore(store.id),
-        productService.getByStoreAll(store.id),
+        collectionService.getByStore(s.id),
+        productService.getByStoreAll(s.id),
       ]);
       setCategories(cats);
 

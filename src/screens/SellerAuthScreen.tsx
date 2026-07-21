@@ -315,7 +315,7 @@ export const SellerAuthScreen: React.FC = () => {
           } catch (e: any) {
             errorHandler.handle(e, 'could not create seller profile row', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
           }
-          navigation.replace('SellerAddStore');
+          navigation.replace('SellerHub');
         }
       }
     } catch (err: any) {
