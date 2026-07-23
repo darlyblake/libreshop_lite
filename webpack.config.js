@@ -1,3 +1,4 @@
+require('dotenv').config();
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');

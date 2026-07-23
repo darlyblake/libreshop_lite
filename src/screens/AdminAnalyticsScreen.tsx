@@ -12,6 +12,9 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { BackToDashboard } from '../components/BackToDashboard';
+import { telemetryService, TelemetryData } from '../services/telemetryService';
+import { adminService } from '../services/adminService';
+import { supabase } from '../lib/supabase';
 
 interface Store {
   id: string;
@@ -37,122 +40,86 @@ interface Product {
 
 export const AdminAnalyticsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [activeTab, setActiveTab] = useState<'stores' | 'products'>('stores');
+  const [activeTab, setActiveTab] = useState<'stores' | 'products' | 'telemetry'>('stores');
   const [refreshing, setRefreshing] = useState(false);
+  const [telemetryData, setTelemetryData] = useState<TelemetryData>({ crashes: [], pages: [], devices: [] });
 
-  // Mock data - Boutiques
-  const [topStores] = useState<Store[]>([
-    {
-      id: '1',
-      name: 'Supermarché Central',
-      visits: 8540,
-      orders: 320,
-      revenue: 45600000,
-      rating: 4.8,
-      growth: 23.5,
-      topProduct: 'Riz 5kg',
-    },
-    {
-      id: '2',
-      name: 'Boutique Mode Pro',
-      visits: 6230,
-      orders: 215,
-      revenue: 32100000,
-      rating: 4.5,
-      growth: 18.2,
-      topProduct: 'T-shirt blanc',
-    },
-    {
-      id: '3',
-      name: 'Électronique Plus',
-      visits: 5890,
-      orders: 178,
-      revenue: 28900000,
-      rating: 4.6,
-      growth: 15.7,
-      topProduct: 'Chargeur USB',
-    },
-    {
-      id: '4',
-      name: 'Pharmacie Express',
-      visits: 4120,
-      orders: 156,
-      revenue: 18700000,
-      rating: 4.7,
-      growth: 12.3,
-      topProduct: 'Vitamines C',
-    },
-    {
-      id: '5',
-      name: 'Cosmétiques Luxe',
-      visits: 3650,
-      orders: 98,
-      revenue: 15200000,
-      rating: 4.4,
-      growth: 9.8,
-      topProduct: 'Crème visage',
-    },
-  ]);
+  // Data states
+  const [topStores, setTopStores] = useState<Store[]>([]);
+  const [topProducts, setTopProducts] = useState<Product[]>([]);
 
-  // Mock data - Produits
-  const [topProducts] = useState<Product[]>([
-    {
-      id: 'p1',
-      name: 'Riz 5kg',
-      sold: 2340,
-      revenue: 11700000,
-      rating: 4.9,
-      growth: 31.2,
-      category: 'Alimentation',
-      stock: 450,
-    },
-    {
-      id: 'p2',
-      name: 'Huile 1L',
-      sold: 1920,
-      revenue: 5760000,
-      rating: 4.7,
-      growth: 25.6,
-      category: 'Alimentation',
-      stock: 320,
-    },
-    {
-      id: 'p3',
-      name: 'T-shirt blanc',
-      sold: 1650,
-      revenue: 13200000,
-      rating: 4.6,
-      growth: 22.1,
-      category: 'Vêtements',
-      stock: 180,
-    },
-    {
-      id: 'p4',
-      name: 'Chargeur USB',
-      sold: 1450,
-      revenue: 8700000,
-      rating: 4.8,
-      growth: 19.8,
-      category: 'Électronique',
-      stock: 210,
-    },
-    {
-      id: 'p5',
-      name: 'Vitamines C',
-      sold: 980,
-      revenue: 4900000,
-      rating: 4.5,
-      growth: 16.3,
-      category: 'Santé',
-      stock: 150,
-    },
-  ]);
+  React.useEffect(() => {
+    loadAnalytics();
+  }, []);
+
+  const loadAnalytics = async () => {
+    try {
+      // 1. Télémétrie
+      const tData = await telemetryService.getAggregatedTelemetry();
+      setTelemetryData(tData);
+
+      // 2. Boutiques via adminService
+      const storesData = await adminService.getStoresWithDetails();
+      const mappedStores = storesData.map(s => ({
+        id: s.id,
+        name: s.name,
+        visits: s.visits || 0,
+        orders: s.orders || 0,
+        revenue: s.revenue || 0,
+        rating: s.rating || 0,
+        growth: 0,
+        topProduct: '-'
+      })).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+      setTopStores(mappedStores);
+
+      // 3. Produits via requêtes Supabase
+      const dateLimit = new Date();
+      dateLimit.setDate(dateLimit.getDate() - 30);
+
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('product_id, quantity, price, products(name, category, stock)')
+        .gte('created_at', dateLimit.toISOString());
+
+      if (orderItems) {
+        const pMap: Record<string, any> = {};
+        for (const item of orderItems) {
+          const pid = item.product_id;
+          if (!pid || !item.products) continue;
+          if (!pMap[pid]) {
+            const p = Array.isArray(item.products) ? item.products[0] : item.products;
+            pMap[pid] = {
+              id: pid,
+              name: p?.name || 'Inconnu',
+              sold: 0,
+              revenue: 0,
+              rating: 0,
+              growth: 0,
+              category: p?.category || 'Général',
+              stock: p?.stock || 0
+            };
+          }
+          pMap[pid].sold += (item.quantity || 0);
+          pMap[pid].revenue += (item.quantity || 0) * (item.price || 0);
+        }
+        const mappedProducts = Object.values(pMap)
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, 10);
+        setTopProducts(mappedProducts as Product[]);
+      }
+
+    } catch (e) {
+      console.warn('Error loading analytics', e);
+    }
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1500);
+    loadAnalytics().finally(() => {
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 500);
+    });
   };
 
   const formatCurrency = (value: number) => {
@@ -405,6 +372,72 @@ export const AdminAnalyticsScreen: React.FC = () => {
     </ScrollView>
   );
 
+  const renderTelemetryTab = () => (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.accent} />}
+    >
+      {/* Parcours et Appareils */}
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Appareils Utilisés</Text>
+        <View style={styles.telemetryCard}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: SPACING.md }}>
+            {telemetryData.devices.map(device => (
+              <View key={device.os} style={{ alignItems: 'center', flex: 1 }}>
+                <Ionicons name={device.icon as any} size={32} color={device.color} style={{ marginBottom: 4 }} />
+                <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', color: COLORS.text }}>{device.percentage}%</Text>
+                <Text style={{ fontSize: FONT_SIZE.sm, color: COLORS.textMuted }}>{device.os}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Pages les plus visitées</Text>
+        <View style={styles.telemetryCard}>
+          {telemetryData.pages.map((page, index) => (
+            <View key={page.id} style={[styles.pageRow, index !== telemetryData.pages.length - 1 && styles.borderBottom]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pagePath}>{page.path}</Text>
+                <Text style={styles.pageTime}>Temps moyen : {page.avgTime}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.pageViews}>{page.views.toLocaleString()}</Text>
+                <Text style={styles.pageTime}>Vues</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.sectionContainer}>
+        <Text style={styles.sectionTitle}>Rapports de Crashs & Erreurs</Text>
+        {telemetryData.crashes.map(crash => (
+          <View key={crash.id} style={styles.crashCard}>
+            <View style={styles.crashHeader}>
+              <View style={styles.crashBadge}>
+                <Ionicons name="warning-outline" size={16} color={COLORS.danger} />
+                <Text style={styles.crashBadgeText}>{crash.count} occurences</Text>
+              </View>
+              <Text style={styles.crashTime}>{crash.time}</Text>
+            </View>
+            <Text style={styles.crashError} numberOfLines={2}>{crash.error}</Text>
+            <View style={styles.crashFooter}>
+              <View style={styles.crashDeviceBadge}>
+                <Ionicons name={crash.os.includes('iOS') ? 'logo-apple' : crash.os.includes('Android') ? 'logo-android' : 'globe-outline'} size={12} color={COLORS.textMuted} />
+                <Text style={styles.crashDeviceText}>{crash.device} • {crash.os}</Text>
+              </View>
+              <TouchableOpacity>
+                <Text style={styles.crashAction}>Analyser</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+
   return (
     <View style={styles.container}>
       <BackToDashboard navigation={navigation} />
@@ -453,11 +486,30 @@ export const AdminAnalyticsScreen: React.FC = () => {
             Produits
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'telemetry' && styles.activeTab]}
+          onPress={() => setActiveTab('telemetry')}
+        >
+          <Ionicons 
+            name="analytics-outline" 
+            size={20} 
+            color={activeTab === 'telemetry' ? COLORS.accent : COLORS.textMuted} 
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'telemetry' && styles.activeTabText,
+            ]}
+          >
+            Télémétrie
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
       <View style={styles.content}>
-        {activeTab === 'stores' ? renderStoresTab() : renderProductsTab()}
+        {activeTab === 'stores' ? renderStoresTab() : activeTab === 'products' ? renderProductsTab() : renderTelemetryTab()}
       </View>
     </View>
   );
@@ -627,5 +679,99 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.xs,
     color: COLORS.textMuted,
     marginTop: 2,
+  },
+  telemetryCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  pageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+  },
+  borderBottom: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  pagePath: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  pageTime: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  pageViews: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.accent,
+  },
+  crashCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.danger + '40',
+    marginBottom: SPACING.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.danger,
+  },
+  crashHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  crashBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.danger + '15',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: RADIUS.full,
+    gap: 4,
+  },
+  crashBadgeText: {
+    fontSize: FONT_SIZE.xs,
+    fontWeight: '600',
+    color: COLORS.danger,
+  },
+  crashTime: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  crashError: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    fontFamily: 'monospace',
+    backgroundColor: COLORS.bg,
+    padding: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  crashFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  crashDeviceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  crashDeviceText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textMuted,
+  },
+  crashAction: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.accent,
   },
 });

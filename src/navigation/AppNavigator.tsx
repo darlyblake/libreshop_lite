@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { LandingScreen } from '../screens/LandingScreen';
 import { ClientOnboardingScreen } from '../screens/ClientOnboardingScreen';
 import { AboutStaticScreen } from '../screens/AboutStaticScreen';
+import { telemetryService } from '../services/telemetryService';
 import { SellerAuthScreen } from '../screens/SellerAuthScreen';
 import { ClientAuthScreen } from '../screens/ClientAuthScreen';
 import { ClientAuthModal } from '../components/ClientAuthModal';
@@ -466,6 +467,7 @@ const SellerTabs: React.FC = React.memo(() => {
 export const AppNavigator: React.FC = () => {
   const [isReady, setIsReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('ClientTabs');
+  const routeNameRef = useRef<string | null>(null);
   const appState = useRef(AppState.currentState);
 
   // Auth store avec fallback sécurisé
@@ -840,7 +842,28 @@ export const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer 
+      linking={linking}
+      onReady={() => {
+        routeNameRef.current = initialRoute;
+        telemetryService.logPageView('/' + initialRoute);
+      }}
+      onStateChange={async (state) => {
+        const getActiveRouteName = (routeState: any): string => {
+          const route = routeState?.routes[routeState.index];
+          if (route?.state) {
+            return getActiveRouteName(route.state);
+          }
+          return route?.name || 'Unknown';
+        };
+
+        const currentRouteName = state ? getActiveRouteName(state) : 'Unknown';
+        if (routeNameRef.current !== currentRouteName) {
+          telemetryService.logPageView('/' + currentRouteName);
+          routeNameRef.current = currentRouteName;
+        }
+      }}
+    >
       <StatusBar
         barStyle={initialRoute === 'Landing' ? 'light-content' : 'dark-content'}
         backgroundColor={initialRoute === 'Landing' ? 'transparent' : '#ffffff'}
