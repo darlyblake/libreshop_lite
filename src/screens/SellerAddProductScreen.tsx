@@ -284,6 +284,21 @@ export const SellerAddProductScreen: React.FC = () => {
     syncCollectionCategory();
   }, [collectionId, collections]);
 
+  // Converts a blob: URI to a base64 data: URI immediately (while blob is still alive)
+  const blobUriToDataUri = (uri: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      fetch(uri)
+        .then(r => r.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        })
+        .catch(reject);
+    });
+  };
+
   const pickImages = async () => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -301,7 +316,19 @@ export const SellerAddProductScreen: React.FC = () => {
       if (result.canceled) return;
       const uri = result.assets && result.assets[0] ? result.assets[0].uri : undefined;
       if (!uri) return;
-      setImages((prev) => [...prev, uri].slice(0, 5));
+
+      // On web, blob: URLs expire when the browser GC cleans them up.
+      // Convert to base64 immediately so the data is preserved until upload.
+      let stableUri = uri;
+      if (Platform.OS === 'web' && uri.startsWith('blob:')) {
+        try {
+          stableUri = await blobUriToDataUri(uri);
+        } catch (e) {
+          console.warn('[pickImages] Failed to convert blob to base64, using original', e);
+        }
+      }
+
+      setImages((prev) => [...prev, stableUri].slice(0, 5));
     } catch (e) {
       errorHandler.handle(e, 'pickImages error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       Alert.alert('Erreur', "Impossible d'ajouter l'image");
@@ -332,8 +359,18 @@ export const SellerAddProductScreen: React.FC = () => {
     try {
       const uploadedUrls: string[] = [];
       for (const uri of images) {
-        const url = await cloudinaryService.uploadImage(uri, { folder: 'libreshop/products' });
-        uploadedUrls.push(url);
+        try {
+          const url = await cloudinaryService.uploadImage(uri, { folder: 'libreshop/products' });
+          uploadedUrls.push(url);
+        } catch (uploadErr) {
+          console.error('[handleSubmit] Image upload failed for uri:', uri.substring(0, 80), uploadErr);
+          Alert.alert(
+            'Erreur upload image',
+            `L'upload d'une image a échoué. Vérifiez votre connexion et que Cloudinary est bien configuré.\n\n${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}`
+          );
+          setIsLoading(false);
+          return;
+        }
       }
 
       const price = parseFloat(formData.price);
@@ -358,12 +395,28 @@ export const SellerAddProductScreen: React.FC = () => {
         payload.compare_price = comparePrice;
       }
 
-      console.log('Creating product with payload:', payload);
-
       await productService.create(payload);
-      Alert.alert('Succès', 'Produit ajouté avec succès', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert('✅ Succès : Produit ajouté avec succès !');
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.navigate('SellerProducts');
+        }
+      } else {
+        Alert.alert('Succès', 'Produit ajouté avec succès', [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('SellerProducts');
+              }
+            }
+          },
+        ]);
+      }
     } catch (error) {
       console.error('Error creating product:', error);
       const errorMessage = error instanceof Error ? error.message : JSON.stringify(error);

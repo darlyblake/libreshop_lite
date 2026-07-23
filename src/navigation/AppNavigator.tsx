@@ -146,6 +146,7 @@ import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandle
 import { useTheme } from '../hooks/useTheme';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { useSettingsStore } from '../store/settingsStore';
+import { deviceSessionService } from '../services/deviceSessionService';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const ClientTab = createBottomTabNavigator<ClientTabParamList>();
@@ -657,6 +658,9 @@ export const AppNavigator: React.FC = () => {
 
             if (role) await sessionStorage.saveUserRole(String(role));
 
+            // Register device session
+            deviceSessionService.registerSession(userData.id).catch(e => console.warn('Failed to register session', e));
+
             const route = await getInitialRouteForRole(role as UserRole, userData.id);
             const onboardingCompleted = await onboardingStorage.isOnboardingCompleted();
 
@@ -716,6 +720,9 @@ export const AppNavigator: React.FC = () => {
 
           const role = (session.user as any)?.user_metadata?.role || 
                       (session.user as any)?.app_metadata?.role;
+
+          // Register device session
+          deviceSessionService.registerSession(session.user.id).catch(e => console.warn('Failed to register session', e));
 
           const route = await getInitialRouteForRole(role as UserRole, session.user.id);
           setInitialRoute(route);
@@ -795,17 +802,32 @@ export const AppNavigator: React.FC = () => {
         return 'SellerTabs';
       }
 
+      // Route par défaut en fonction du rôle
+      let defaultRoute: keyof RootStackParamList = 'ClientTabs';
+      if (role === 'admin') defaultRoute = 'AdminDashboard';
+      else if (role === 'seller') defaultRoute = 'SellerTabs';
+
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+
       // Seller sans store ?
       if (role === 'seller' && !storeCheck?.data) {
-        // Si on est déjà sur une page vendeur (URL contient 'Seller'), ne pas rediriger vers SellerAddStore
-        const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+        // Si l'utilisateur navigue explicitement sur le côté client (ex: /, /search, /orders), on le laisse tranquille
+        if (currentPath && !currentPath.includes('Seller') && currentPath !== '/') {
+          return 'ClientTabs';
+        }
+        // S'il essaie d'accéder à une autre page vendeur, on laisse faire la navigation ou on redirige vers AddStore
         if (currentPath.includes('Seller') && !currentPath.includes('SellerAddStore')) {
           return 'SellerTabs';
         }
         return 'SellerAddStore';
       }
 
-      return role === 'admin' ? 'AdminDashboard' : 'ClientTabs';
+      // Si le vendeur a une boutique et essaie d'accéder au client, on le laisse tranquille
+      if (role === 'seller' && currentPath && !currentPath.includes('Seller') && currentPath !== '/') {
+         return 'ClientTabs';
+      }
+
+      return defaultRoute;
 
     } catch (error) {
       console.error('Error in getInitialRouteForRole:', error);

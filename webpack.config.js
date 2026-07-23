@@ -1,5 +1,6 @@
 const createExpoWebpackConfigAsync = require('@expo/webpack-config');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+const webpack = require('webpack');
 const path = require('path');
 
 module.exports = async function (env, argv) {
@@ -73,6 +74,15 @@ module.exports = async function (env, argv) {
           noErrorOnMissing: true,
         },
       ],
+    })
+  );
+
+  // Inject AI API keys as compile-time constants for Webpack
+  // Keys are read from .env at build/serve time, not hardcoded in source
+  config.plugins.push(
+    new webpack.DefinePlugin({
+      'process.env.EXPO_PUBLIC_GEMINI_API_KEY': JSON.stringify(process.env.EXPO_PUBLIC_GEMINI_API_KEY || ''),
+      'process.env.EXPO_PUBLIC_GROC_API_KEY': JSON.stringify(process.env.EXPO_PUBLIC_GROC_API_KEY || ''),
     })
   );
 

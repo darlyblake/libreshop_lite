@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
+import { supabase } from '../lib/supabase';
 
 interface FAQItem {
   question: string;
@@ -83,6 +84,36 @@ export const HelpScreen: React.FC = () => {
     category: 'general',
   });
   const [sending, setSending] = useState(false);
+  const [contacts, setContacts] = useState({
+    phone: '+241XXXXXXXX',
+    whatsapp: '241XXXXXXXX',
+    email: 'support@libreshop.ga'
+  });
+
+  React.useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        if (!supabase) return; // Silent return or could throw
+
+        const { data, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'support_contacts')
+          .single();
+        
+        if (data && data.value) {
+          setContacts({
+            phone: data.value.phone || contacts.phone,
+            whatsapp: data.value.whatsapp || contacts.whatsapp,
+            email: data.value.email || contacts.email,
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to load support contacts');
+      }
+    };
+    fetchContacts();
+  }, []);
 
   const filteredFAQ = selectedCategory
     ? FAQ_DATA.filter(item => item.category === selectedCategory)
@@ -108,8 +139,19 @@ export const HelpScreen: React.FC = () => {
 
     setSending(true);
     try {
-      // Simuler l'envoi du message
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!supabase) {
+        throw new Error("Erreur de connexion : la base de données n'est pas initialisée");
+      }
+
+      const { error } = await supabase.from('support_tickets').insert({
+        user_id: user?.id || null,
+        user_email: user?.email || null,
+        subject: contactForm.subject,
+        message: contactForm.message,
+        category: contactForm.category,
+      });
+
+      if (error) throw error;
       
       Alert.alert(
         'Message envoyé',
@@ -132,9 +174,9 @@ export const HelpScreen: React.FC = () => {
       'Contacter le support',
       'Choisissez une option pour nous contacter',
       [
-        { text: 'Appeler', onPress: () => Linking.openURL('tel:+241XXXXXXXX') },
-        { text: 'WhatsApp', onPress: () => Linking.openURL('https://wa.me/241XXXXXXXX') },
-        { text: 'Email', onPress: () => Linking.openURL('mailto:support@libreshop.com') },
+        { text: 'Appeler', onPress: () => Linking.openURL(`tel:${contacts.phone}`) },
+        { text: 'WhatsApp', onPress: () => Linking.openURL(`https://wa.me/${contacts.whatsapp}`) },
+        { text: 'Email', onPress: () => Linking.openURL(`mailto:${contacts.email}`) },
         { text: 'Annuler', style: 'cancel' },
       ]
     );

@@ -1,6 +1,6 @@
 import { agentConfig } from '../config/theme';
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 export const agentService = {
 
@@ -10,7 +10,7 @@ export const agentService = {
    */
   async askAgent(question: string, context: string = '', sellerId?: string): Promise<string> {
     try {
-      const key = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+    const key = agentConfig.geminiApiKey;
       if (!key) {
         console.warn("⚠️ EXPO_PUBLIC_GEMINI_API_KEY non configurée dans .env");
         return "Service d'IA temporairement indisponible. Clé API manquante.";

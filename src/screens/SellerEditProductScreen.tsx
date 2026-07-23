@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { AddProductModal } from '../components/AddProductModal';
@@ -32,6 +32,10 @@ export const SellerEditProductScreen: React.FC = () => {
         productService.getById(productId),
         storeService.getByUser(user?.id || ''),
       ]);
+
+      if (!product) {
+        throw new Error('Produit introuvable');
+      }
 
       const cols = store?.id ? await collectionService.getByStore(store.id) : [];
       setCollections(cols);
@@ -86,16 +90,21 @@ export const SellerEditProductScreen: React.FC = () => {
   const handleUpdate = async (updatedProduct: any) => {
     setIsSaving(true);
     try {
-      // Upload les nouvelles images (data: ou file:// ou exp://)
-      const uploadedImages = [...(updatedProduct.images || [])];
-      for (let i = 0; i < uploadedImages.length; i++) {
-        const img = uploadedImages[i];
-        if (img.startsWith('data:') || img.startsWith('file://') || img.startsWith('exp://')) {
+      const uploadedImages = [];
+      for (let img of (updatedProduct.images || [])) {
+        if (typeof img === 'string' && img.startsWith('blob:')) {
+          // Skip dead blob URLs saved by mistake previously
+          continue;
+        }
+        if (typeof img === 'string' && (img.startsWith('data:') || img.startsWith('file://') || img.startsWith('exp://'))) {
           try {
-            uploadedImages[i] = await cloudinaryService.uploadImage(img, { folder: 'libreshop/products' });
+            const url = await cloudinaryService.uploadImage(img, { folder: 'libreshop/products' });
+            uploadedImages.push(url);
           } catch (e) {
             console.warn('[SellerEditProduct] Upload image échoué:', e);
           }
+        } else {
+          uploadedImages.push(img);
         }
       }
 
@@ -133,12 +142,34 @@ export const SellerEditProductScreen: React.FC = () => {
 
       await productService.update(productId, updatePayload);
 
-      Alert.alert('✅ Succès', 'Produit mis à jour avec succès !', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      if (Platform.OS === 'web') {
+        window.alert('✅ Succès : Produit mis à jour avec succès !');
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        } else {
+          navigation.navigate('SellerProducts');
+        }
+      } else {
+        Alert.alert('✅ Succès', 'Produit mis à jour avec succès !', [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('SellerProducts');
+              }
+            } 
+          }
+        ]);
+      }
     } catch (error: any) {
       console.error('[SellerEditProduct] Erreur mise à jour:', error);
-      Alert.alert('Erreur', 'Impossible de mettre à jour le produit. Réessayez.');
+      if (Platform.OS === 'web') {
+        window.alert('Erreur : Impossible de mettre à jour le produit. Réessayez.');
+      } else {
+        Alert.alert('Erreur', 'Impossible de mettre à jour le produit. Réessayez.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -156,7 +187,13 @@ export const SellerEditProductScreen: React.FC = () => {
     <View style={styles.container}>
       <AddProductModal
         visible={true}
-        onClose={() => navigation.goBack()}
+        onClose={() => {
+          if (navigation.canGoBack()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('SellerProducts');
+          }
+        }}
         onAdd={() => {}}
         onUpdate={handleUpdate}
         collections={collections}

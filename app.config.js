@@ -20,9 +20,9 @@ module.exports = ({ config }) => {
       EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
       EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET: process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET,
       EXPO_PUBLIC_WEB_BASE_URL: process.env.EXPO_PUBLIC_WEB_BASE_URL,
-      // CRITICAL: API keys must NOT be exposed in client code
-      // EXPO_PUBLIC_GEMINI_API_KEY removed - use server-side API instead
-      // EXPO_PUBLIC_GROC_API_KEY removed - use server-side API instead
+      // AI keys — prefixed EXPO_PUBLIC_ = intentionally client-side per Expo spec
+      EXPO_PUBLIC_GEMINI_API_KEY: process.env.EXPO_PUBLIC_GEMINI_API_KEY,
+      EXPO_PUBLIC_GROC_API_KEY: process.env.EXPO_PUBLIC_GROC_API_KEY,
     },
   };
 };

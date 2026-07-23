@@ -38,9 +38,9 @@ const getEnvVar = (key: string, fallback?: string) => {
   // Static access is required for bundlers to replace the strings
   if (key === 'EXPO_PUBLIC_SUPABASE_URL') return process.env.EXPO_PUBLIC_SUPABASE_URL || Constants?.expoConfig?.extra?.[key] || fallback;
   if (key === 'EXPO_PUBLIC_SUPABASE_ANON_KEY') return process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
-  // API keys should NOT be exposed on client side - removed for security
-  // if (key === 'EXPO_PUBLIC_GEMINI_API_KEY') return process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
-  // if (key === 'EXPO_PUBLIC_GROC_API_KEY') return process.env.EXPO_PUBLIC_GROC_API_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
+  // EXPO_PUBLIC_ keys are intentionally public (client-side) per Expo convention
+  if (key === 'EXPO_PUBLIC_GEMINI_API_KEY') return process.env.EXPO_PUBLIC_GEMINI_API_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
+  if (key === 'EXPO_PUBLIC_GROC_API_KEY') return process.env.EXPO_PUBLIC_GROC_API_KEY || Constants?.expoConfig?.extra?.[key] || fallback;
   if (key === 'EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME') return process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || Constants?.expoConfig?.extra?.[key] || fallback;
   if (key === 'EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET') return process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || Constants?.expoConfig?.extra?.[key] || fallback;
   
@@ -55,10 +55,8 @@ export const supabaseConfig = {
 };
 
 export const agentConfig = {
-  // API keys removed from client side for security
-  // These should be used via server-side endpoints only
-  geminiApiKey: undefined,
-  grocApiKey: undefined,
+  geminiApiKey: getEnvVar('EXPO_PUBLIC_GEMINI_API_KEY'),
+  grocApiKey: getEnvVar('EXPO_PUBLIC_GROC_API_KEY'),
 };
 
 // Validation au démarrage

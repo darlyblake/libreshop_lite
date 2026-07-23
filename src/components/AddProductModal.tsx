@@ -1100,7 +1100,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             schema.forEach((attr: any) => {
               initialAttrs[attr.name] = attr.type === 'multiselect' ? [] : '';
             });
-            setProductAttributes(initialAttrs);
+            // In edit mode, preserve existing product attributes (don't clear them)
+            const existingAttrs = productAttributes && Object.keys(productAttributes).length > 0
+              ? productAttributes
+              : {};
+            setProductAttributes({ ...initialAttrs, ...existingAttrs });
             lastFetchedCollectionId.current = newProduct.collectionId;
           }
         } catch (e) {
@@ -1276,6 +1280,21 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     }
   };
 
+  // Converts a blob: URI to a base64 data: URI immediately (while blob is still alive)
+  const blobUriToDataUri = (uri: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      fetch(uri)
+        .then(r => r.blob())
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        })
+        .catch(reject);
+    });
+  };
+
   const handleAddImage = () => {
     (async () => {
       try {
@@ -1295,9 +1314,18 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
         const uri = result.assets && result.assets[0] ? result.assets[0].uri : undefined;
         if (uri) {
+          // On web, blob: URLs expire quickly. Convert to base64 immediately.
+          let stableUri = uri;
+          if (Platform.OS === 'web' && uri.startsWith('blob:')) {
+            try {
+              stableUri = await blobUriToDataUri(uri);
+            } catch (e) {
+              console.warn('[AddProductModal] Failed to convert blob to base64, using original', e);
+            }
+          }
           setNewProduct({
             ...newProduct,
-            images: [...newProduct.images, uri].slice(0, 5),
+            images: [...newProduct.images, stableUri].slice(0, 5),
           });
         }
       } catch (e) {

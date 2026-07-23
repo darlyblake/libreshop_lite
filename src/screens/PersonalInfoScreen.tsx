@@ -13,9 +13,11 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
 import { locationService } from '../services/locationService';
+import { supabase } from '../lib/supabase';
 
 export const PersonalInfoScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -23,6 +25,7 @@ export const PersonalInfoScreen: React.FC = () => {
   const { getColor, spacing, radius, fontSize } = useTheme();
   
   const [loading, setLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: user?.full_name || '',
     phone: user?.phone || '',
@@ -30,6 +33,50 @@ export const PersonalInfoScreen: React.FC = () => {
     address: user?.address || '',
   });
   const [locating, setLocating] = useState(false);
+
+  // Sync formData when the user object changes (e.g., after Zustand rehydration from AsyncStorage)
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        full_name: user.full_name || '',
+        phone: user.phone || '',
+        whatsapp_number: user.whatsapp_number || '',
+        address: user.address || '',
+      });
+    }
+  }, [user]);
+
+  // On web/PWA, the page may load before Zustand has rehydrated from AsyncStorage.
+  // In that case, fetch the profile directly from Supabase using the active session.
+  useEffect(() => {
+    const fetchProfileFromSession = async () => {
+      if (user) return; // Already have user data, no need to fetch
+      setProfileLoading(true);
+      try {
+        const { data: sessionData } = await supabase!.auth.getSession();
+        const sessionUser = sessionData?.session?.user;
+        if (!sessionUser) return; // Not authenticated
+
+        const profile = await userService.getSelfProfile(sessionUser.id);
+        if (profile) {
+          setFormData({
+            full_name: profile.full_name || '',
+            phone: profile.phone || '',
+            whatsapp_number: profile.whatsapp_number || '',
+            address: profile.address || '',
+          });
+          // Update the store so it stays in sync
+          const { setUser } = useAuthStore.getState();
+          setUser(profile as any);
+        }
+      } catch (e) {
+        console.warn('[PersonalInfoScreen] Failed to fetch profile from session:', e);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+    fetchProfileFromSession();
+  }, []);
 
   const handleGetCurrentLocation = async () => {
     setLocating(true);
@@ -196,6 +243,15 @@ export const PersonalInfoScreen: React.FC = () => {
         <Text style={styles.headerTitle}>Informations personnelles</Text>
       </View>
 
+      {profileLoading && (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+          <ActivityIndicator size="large" color={getColor.accent} />
+          <Text style={{ color: getColor.textMuted, marginTop: 12, fontSize: fontSize.sm }}>
+            Chargement du profil…
+          </Text>
+        </View>
+      )}
+      {!profileLoading && (
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Informations de base</Text>
@@ -291,6 +347,7 @@ export const PersonalInfoScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </ScrollView>
+      )}
     </View>
   );
 };

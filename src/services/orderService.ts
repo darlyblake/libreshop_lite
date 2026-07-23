@@ -277,8 +277,8 @@ export const orderService = {
 
     // Projection sélective selon les besoins
     const projection = options?.includeUser
-      ? 'id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, status_changed_at, stores(id, name), users(id, email, full_name), order_items(id)'
-      : 'id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, status_changed_at, stores(id, name), order_items(id)';
+      ? 'id, user_id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, status_changed_at, stores(id, name), users(id, email, full_name, phone), order_items(id)'
+      : 'id, user_id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, status_changed_at, stores(id, name), order_items(id)';
 
     let query = client
       .from('orders')

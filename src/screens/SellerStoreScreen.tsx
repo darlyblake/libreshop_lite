@@ -18,7 +18,7 @@ import OptimizedImage from '../components/OptimizedImage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Linking from 'expo-linking';
 import { copyToClipboard } from '../services/contactService';
-import * as FileSystem from 'expo-file-system';
+// import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 
 import { useNavigation } from '@react-navigation/native';
@@ -411,11 +411,12 @@ export const SellerStoreScreen: React.FC = () => {
       }
 
       const fileExt = 'png';
-      const baseDir = (FileSystem as any)['cacheDirectory'];
+      const FileSystem = require('expo-file-system');
+      const baseDir = FileSystem.cacheDirectory;
       if (!baseDir) throw new Error("Répertoire cache indisponible");
       const localUri = `${baseDir}qr-boutique-${store.slug}-${Date.now()}.${fileExt}`;
 
-      const downloaded = await (FileSystem as any).downloadAsync(qrImageUrl, localUri);
+      const downloaded = await FileSystem.downloadAsync(qrImageUrl, localUri);
       const savedUri = downloaded?.uri || downloaded;
       if (!savedUri) throw new Error('Download du QR code impossible');
 

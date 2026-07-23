@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,27 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store';
 import { authService } from '../services/authService';
+import { supabase } from '../lib/supabase';
 import { useTheme } from '../hooks/useTheme';
 import { errorHandler } from '../utils/errorHandler';
+import { deviceSessionService, DeviceSession } from '../services/deviceSessionService';
 
 export const SecurityScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { user } = useAuthStore();
+  const { user, signOut } = useAuthStore();
   const { getColor, spacing, radius, fontSize } = useTheme();
   
   const [loading, setLoading] = useState(false);
+  const [signingOutAll, setSigningOutAll] = useState(false);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [currentDeviceKey, setCurrentDeviceKey] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -30,6 +37,78 @@ export const SecurityScreen: React.FC = () => {
     new: false,
     confirm: false,
   });
+
+  // Fetch real session data from Supabase Auth
+  useEffect(() => {
+    const loadSession = async () => {
+      if (!user) return;
+      setSessionsLoading(true);
+      try {
+        const [loadedSessions, key] = await Promise.all([
+          deviceSessionService.getSessions(user.id),
+          deviceSessionService.getCurrentDeviceKey()
+        ]);
+        setSessions(loadedSessions);
+        setCurrentDeviceKey(key);
+      } catch (e) {
+        console.warn('[SecurityScreen] loadSession error:', e);
+      } finally {
+        setSessionsLoading(false);
+      }
+    };
+    loadSession();
+  }, [user]);
+
+  const handleRevokeSession = async (sessionId: string) => {
+    Alert.alert(
+      'Déconnecter cet appareil',
+      'Voulez-vous vraiment déconnecter cet appareil ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deviceSessionService.revokeSession(sessionId);
+              setSessions(prev => prev.filter(s => s.id !== sessionId));
+            } catch (e) {
+              errorHandler.handle(e, 'Revoke session error');
+              Alert.alert('Erreur', 'Impossible de déconnecter cet appareil.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSignOutAll = async () => {
+    Alert.alert(
+      'Se déconnecter de tous les appareils',
+      'Cela invalidera toutes les sessions actives, y compris celle-ci. Vous serez redirigé vers la page de connexion.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
+          style: 'destructive',
+          onPress: async () => {
+            setSigningOutAll(true);
+            try {
+              if (user) await deviceSessionService.revokeAllSessions(user.id);
+              await supabase!.auth.signOut({ scope: 'global' });
+              signOut();
+              navigation.navigate('Home' as never);
+            } catch (e) {
+              errorHandler.handle(e, 'Sign out all error');
+              Alert.alert('Erreur', 'Impossible de se déconnecter de tous les appareils.');
+            } finally {
+              setSigningOutAll(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const securityFeatures = [
     {
@@ -356,6 +435,23 @@ export const SecurityScreen: React.FC = () => {
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
     },
+    signOutAllButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+      paddingVertical: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: '#ef4444',
+      backgroundColor: '#ef444410',
+    },
+    signOutAllText: {
+      color: '#ef4444',
+      fontSize: fontSize.sm,
+      fontWeight: '600',
+    },
   });
 
   return (
@@ -425,18 +521,69 @@ export const SecurityScreen: React.FC = () => {
 
         <View style={styles.deviceInfo}>
           <Text style={styles.sectionTitle}>Appareils connectés</Text>
-          
-          <View style={styles.deviceItem}>
-            <View style={styles.deviceIcon}>
-              <Ionicons name="phone-portrait-outline" size={20} color={getColor.accent} />
+
+          {sessionsLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+              <ActivityIndicator size="small" color={getColor.accent} />
+              <Text style={{ color: getColor.textMuted, marginTop: spacing.sm, fontSize: fontSize.sm }}>Chargement des sessions…</Text>
             </View>
-            <View style={styles.deviceInfoText}>
-              <Text style={styles.deviceName}>Appareil actuel</Text>
-              <Text style={styles.deviceDetails}>
-                {user?.email} • Maintenant
+          ) : sessions.length > 0 ? (
+            <>
+              {sessions.map((session, index) => {
+                const isCurrent = session.device_key === currentDeviceKey;
+                return (
+                  <View key={session.id} style={[styles.deviceItem, index === sessions.length - 1 && styles.deviceItemLast]}>
+                    <View style={styles.deviceIcon}>
+                      <Ionicons name={session.device_icon as any} size={20} color={getColor.accent} />
+                    </View>
+                    <View style={styles.deviceInfoText}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={styles.deviceName}>{session.device_name}</Text>
+                        {isCurrent && (
+                          <View style={{ backgroundColor: getColor.accent + '25', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                            <Text style={{ fontSize: fontSize.xs, color: getColor.accent, fontWeight: '600' }}>Actuel</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.deviceDetails}>
+                        Dernière activité : {new Date(session.last_seen).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                    {!isCurrent && (
+                      <TouchableOpacity 
+                        style={styles.removeButton}
+                        onPress={() => handleRevokeSession(session.id)}
+                      >
+                        <Ionicons name="close-circle-outline" size={24} color={getColor.textSoft} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
+
+              <TouchableOpacity
+                style={[styles.signOutAllButton, signingOutAll && { opacity: 0.6 }]}
+                onPress={handleSignOutAll}
+                disabled={signingOutAll}
+              >
+                {signingOutAll ? (
+                  <ActivityIndicator size="small" color="#ef4444" />
+                ) : (
+                  <>
+                    <Ionicons name="log-out-outline" size={16} color="#ef4444" />
+                    <Text style={styles.signOutAllText}>Se déconnecter de tous les appareils</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
+              <Ionicons name="shield-outline" size={32} color={getColor.textMuted} />
+              <Text style={{ color: getColor.textMuted, marginTop: spacing.sm, fontSize: fontSize.sm, textAlign: 'center' }}>
+                Aucune session active détectée.
               </Text>
             </View>
-          </View>
+          )}
         </View>
       </ScrollView>
     </View>

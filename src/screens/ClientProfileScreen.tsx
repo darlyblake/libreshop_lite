@@ -25,6 +25,7 @@ import { useThemeRefresh } from '../hooks/useThemeRefresh';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { authService } from '../services/authService';
+import { userService } from '../services/userService';
 import { navigateToClientTab } from '../navigation/clientNavigation';
 import type { ClientTabParamList } from '../navigation/types';
 import * as ImagePicker from 'expo-image-picker';
@@ -77,6 +78,11 @@ export const ClientProfileScreen: React.FC = () => {
   const [addressesCount, setAddressesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [profileUser, setProfileUser] = useState<any>(user);
+
+  useEffect(() => {
+    setProfileUser(user);
+  }, [user]);
 
   const handlePickAvatar = async () => {
     try {
@@ -134,6 +140,17 @@ export const ClientProfileScreen: React.FC = () => {
       }
 
       try {
+        try {
+          const dbProfile = await userService.getSelfProfile(user.id);
+          if (dbProfile) {
+            setProfileUser((prev: any) => ({ ...prev, ...dbProfile }));
+            // Met aussi à jour le store global pour que la donnée soit persistée
+            useAuthStore.getState().setUser({ ...user, ...dbProfile } as any);
+          }
+        } catch (e) {
+          console.warn('[ClientProfile] getSelfProfile error', e);
+        }
+
         const orders = await orderService.getByUser(String(user.id));
         setOrdersCount(Array.isArray(orders) ? orders.length : 0);
 
@@ -167,16 +184,29 @@ export const ClientProfileScreen: React.FC = () => {
     }
   };
 
+  const getFullName = () => {
+    return profileUser?.full_name || profileUser?.user_metadata?.full_name || profileUser?.user_metadata?.name || 'Utilisateur';
+  };
+
+  const getPhone = () => {
+    return profileUser?.whatsapp_number || profileUser?.phone || profileUser?.user_metadata?.phone || 'Téléphone non renseigné';
+  };
+
+  const getAvatarUrl = () => {
+    return profileUser?.avatar_url || profileUser?.user_metadata?.avatar_url;
+  };
+
   const getUserInitials = () => {
-    if (user?.full_name) {
-      return user.full_name
+    const name = getFullName();
+    if (name && name !== 'Utilisateur') {
+      return name
         .split(' ')
         .map((word: string) => word[0])
         .join('')
         .toUpperCase()
         .slice(0, 2);
     }
-    return user?.email?.slice(0, 2).toUpperCase() || 'U';
+    return profileUser?.email?.slice(0, 2).toUpperCase() || 'U';
   };
 
   const handleLogout = () => {
@@ -527,8 +557,8 @@ export const ClientProfileScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
           <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8} style={styles.avatarWrapper}>
-            {user?.avatar_url ? (
-              <Image source={{ uri: cloudinaryService.getOptimizedUrl(user.avatar_url, 150) }} style={styles.avatar} />
+            {getAvatarUrl() ? (
+              <Image source={{ uri: cloudinaryService.getOptimizedUrl(getAvatarUrl(), 150) }} style={styles.avatar} />
             ) : (
               <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <Text style={styles.avatarInitials}>{getUserInitials()}</Text>
@@ -546,19 +576,19 @@ export const ClientProfileScreen: React.FC = () => {
           </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.userName}>
-              {user?.full_name || 'Utilisateur'}
+              {getFullName()}
             </Text>
-            <Text style={styles.userEmail}>{user?.email || 'Email non disponible'}</Text>
+            <Text style={styles.userEmail}>{profileUser?.email || 'Email non disponible'}</Text>
             <Text style={styles.userPhone}>
-              {user?.whatsapp_number || user?.phone || 'Téléphone non renseigné'}
+              {getPhone()}
             </Text>
-            {user?.address && (
+            {profileUser?.address && (
               <Text style={[styles.userPhone, { marginTop: 2 }]} numberOfLines={1}>
-                <Ionicons name="location-outline" size={12} color={getColor.textMuted} /> {user.address}
+                <Ionicons name="location-outline" size={12} color={getColor.textMuted} /> {profileUser.address}
               </Text>
             )}
             <Text style={styles.joinDate}>
-              Membre depuis {user?.created_at ? formatDate(user.created_at) : 'Date inconnue'}
+              Membre depuis {profileUser?.created_at ? formatDate(profileUser.created_at) : 'Date inconnue'}
             </Text>
           </View>
           <TouchableOpacity

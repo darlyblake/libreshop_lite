@@ -7,19 +7,17 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
-  FlatList,
-  ListRenderItem,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   TextInput,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
-import { useResponsive } from '../utils/responsive';
 import AddUserModal, { UserData } from '../components/AddUserModal';
 import { SearchBar } from '../components/SearchBar';
 import { DatePickerInput } from '../components/DatePickerInput';
@@ -81,8 +79,14 @@ const calculateLoyaltyTier = (points: number, tiers: typeof DEFAULT_LOYALTY_CONF
 export const SellerClientsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { isDesktop } = useResponsive();
+  const { width: screenWidth } = useWindowDimensions();
   const { user } = useAuthStore();
+
+  // Calcul réactif du nombre de colonnes selon la largeur d'écran
+  const numColumns = screenWidth >= 1024 ? 4 : screenWidth >= 768 ? 3 : 2;
+  const GRID_H_PAD = SPACING.lg * 2;
+  const GRID_GAP = SPACING.md;
+  const cardWidth = (screenWidth - GRID_H_PAD - GRID_GAP * (numColumns - 1)) / numColumns;
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLoyaltySettings, setShowLoyaltySettings] = useState(false);
@@ -157,7 +161,8 @@ export const SellerClientsScreen: React.FC = () => {
       const orders = await orderService.getByStore(store.id, { 
         includeUser: true, 
         limit: 50,
-        cursor: reset ? undefined : cursor
+        cursor: reset ? undefined : cursor,
+        forceRefresh: reset, // Invalider le cache lors du rechargement initial
       });
       
       // Gérer les deux formats de réponse
@@ -366,7 +371,6 @@ export const SellerClientsScreen: React.FC = () => {
 
   const filteredClients = useMemo(() => {
     const searchTerm = query.toLowerCase().trim();
-
     return clients.filter((client) => {
       return (
         client.name?.toLowerCase().includes(searchTerm) ||
@@ -375,77 +379,83 @@ export const SellerClientsScreen: React.FC = () => {
     });
   }, [clients, query]);
 
+  // Découper en rangées selon numColumns
+  const clientRows = useMemo(() => {
+    const rows: Client[][] = [];
+    for (let i = 0; i < filteredClients.length; i += numColumns) {
+      rows.push(filteredClients.slice(i, i + numColumns));
+    }
+    return rows;
+  }, [filteredClients, numColumns]);
+
   /* =========================
      RENDER ITEM
   ========================= */
 
-  const renderClient: ListRenderItem<Client> = useCallback(
-    ({ item }) => {
-      const initials = item.name
-        ?.split(' ')
+  const renderClientCard = useCallback(
+    (item: Client) => {
+      const initials = (item.name || '?')
+        .split(' ')
         .map((n) => n[0])
         .join('')
-        .toUpperCase();
+        .toUpperCase()
+        .slice(0, 2);
 
       return (
-        <View style={styles.clientCard}>
+        <View key={item.id} style={[styles.clientCard, { width: cardWidth }]}>
           {/* HEADER */}
           <View style={styles.clientHeader}>
             <View style={styles.clientInfo}>
               <View style={styles.clientAvatar}>
                 <Text style={styles.avatarText}>{initials}</Text>
               </View>
-
               <View style={styles.clientDetails}>
-                <Text style={styles.clientName}>{item.name}</Text>
-                <Text style={styles.clientPhone}>{item.phone}</Text>
+                <Text style={styles.clientName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.clientPhone} numberOfLines={1}>{item.phone}</Text>
                 {item.email && (
-                  <Text style={styles.clientEmail}>{item.email}</Text>
+                  <Text style={styles.clientEmail} numberOfLines={1}>{item.email}</Text>
                 )}
               </View>
             </View>
-
             <TouchableOpacity
               style={[
                 styles.statusToggle,
-                {
-                  backgroundColor: item.isActive
-                    ? COLORS.success
-                    : COLORS.textMuted,
-                },
+                { backgroundColor: item.isActive ? COLORS.success : COLORS.textMuted },
               ]}
               onPress={() => toggleClientStatus(item.id)}
             >
-              <Ionicons
-                name={item.isActive ? 'checkmark' : 'close'}
-                size={16}
-                color={COLORS.text}
-              />
+              <Ionicons name={item.isActive ? 'checkmark' : 'close'} size={14} color={COLORS.text} />
             </TouchableOpacity>
           </View>
 
           {/* STATS */}
           <View style={styles.clientStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {item.ordersCount ?? 0}
-              </Text>
-              <Text style={styles.statLabel}>Commandes</Text>
+              <Text style={styles.statValue}>{item.ordersCount ?? 0}</Text>
+              <Text style={styles.statLabel}>Cmdes</Text>
             </View>
-
+            <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
+              <Text style={styles.statValue} numberOfLines={1}>
                 {(item.totalSpent ?? 0).toLocaleString('fr-FR')} F
               </Text>
-              <Text style={styles.statLabel}>Total dépensé</Text>
+              <Text style={styles.statLabel}>Total</Text>
             </View>
-
+            <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {item.loyaltyPoints ?? 0}
-              </Text>
-              <Text style={styles.statLabel}>Points fidélité</Text>
+              <Text style={styles.statValue}>{item.loyaltyPoints ?? 0}</Text>
+              <Text style={styles.statLabel}>Points</Text>
             </View>
+          </View>
+
+          {/* DERNIÈRE COMMANDE */}
+          <View style={styles.lastOrderRow}>
+            <Ionicons name="time-outline" size={12} color={COLORS.textMuted} />
+            <Text style={styles.lastOrderText}>
+              {item.lastOrder
+                ? new Date(item.lastOrder).toLocaleDateString('fr-FR')
+                : '—'}
+            </Text>
           </View>
 
           {/* LOYALTY TIER BADGE */}
@@ -453,7 +463,7 @@ export const SellerClientsScreen: React.FC = () => {
             <View style={[styles.loyaltyBadge, { backgroundColor: loyaltyConfig.tiers[item.loyaltyTier].color + '20' }]}>
               <Ionicons
                 name={loyaltyConfig.tiers[item.loyaltyTier].icon as any}
-                size={16}
+                size={12}
                 color={loyaltyConfig.tiers[item.loyaltyTier].color}
               />
               <Text style={[styles.loyaltyBadgeText, { color: loyaltyConfig.tiers[item.loyaltyTier].color }]}>
@@ -462,64 +472,35 @@ export const SellerClientsScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={styles.clientStats}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {item.lastOrder
-                  ? new Date(item.lastOrder).toLocaleDateString('fr-FR')
-                  : '—'}
-              </Text>
-              <Text style={styles.statLabel}>Dernière commande</Text>
-            </View>
-          </View>
-
           {/* ACTIONS */}
           <View style={styles.clientActions}>
             <TouchableOpacity
               style={[styles.actionButton, { backgroundColor: COLORS.info + '20' }]}
-              onPress={() =>
-                navigation.navigate('SellerCaisse', {
-                  initialClientName: item.name,
-                  initialClientPhone: item.phone,
-                })
-              }
+              onPress={() => navigation.navigate('SellerCaisse', { initialClientName: item.name, initialClientPhone: item.phone })}
             >
-              <Ionicons name="cart-outline" size={20} color={COLORS.info} />
+              <Ionicons name="cart-outline" size={16} color={COLORS.info} />
               <Text style={[styles.actionText, { color: COLORS.info }]}>Vendre</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() =>
-                navigation.navigate('ClientDetail', {
-                  clientId: item.id,
-                })
-              }
+              onPress={() => navigation.navigate('ClientDetail', { clientId: item.id })}
             >
-              <Ionicons name="eye-outline" size={20} color={COLORS.accent} />
+              <Ionicons name="eye-outline" size={16} color={COLORS.accent} />
               <Text style={styles.actionText}>Voir</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.actionButton}
-              onPress={() =>
-                navigation.navigate('ClientEdit', {
-                  clientId: item.id,
-                })
-              }
+              onPress={() => navigation.navigate('ClientEdit', { clientId: item.id })}
             >
-              <Ionicons
-                name="create-outline"
-                size={20}
-                color={COLORS.accent}
-              />
-              <Text style={styles.actionText}>Modifier</Text>
+              <Ionicons name="create-outline" size={16} color={COLORS.accent} />
             </TouchableOpacity>
           </View>
         </View>
       );
     },
-    [navigation]
+    [navigation, loyaltyConfig, cardWidth]
   );
 
   /* =========================
@@ -698,59 +679,54 @@ export const SellerClientsScreen: React.FC = () => {
         />
       </View>
 
-      {/* CONTENT */}
-      <FlatList
-          data={filteredClients}
-          renderItem={renderClient}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[
-            styles.clientsContainer,
-            isDesktop && styles.clientsContainerDesktop,
-          ]}
-          showsVerticalScrollIndicator={false}
-          
-          // 🚀 Props pour le scroll infini
-          onEndReached={loadMoreClients}
-          onEndReachedThreshold={0.3}
-          
-          // Props optimisées existantes
-          initialNumToRender={15}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          removeClippedSubviews
-          
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          
-          ListFooterComponent={
-            <View style={styles.footerContainer}>
-              {loadingMore && (
-                <View style={styles.loadingMoreContainer}>
-                  <ActivityIndicator size="small" color={COLORS.accent} />
-                  <Text style={styles.loadingMoreText}>Chargement de plus de clients...</Text>
-                </View>
-              )}
-              {!hasMore && clients.length > 0 && (
-                <View style={styles.endOfListContainer}>
-                  <Text style={styles.endOfListText}>
-                    📋 Tous les clients chargés ({clients.length})
-                  </Text>
-                </View>
-              )}
+      {/* CONTENT — grille responsive via ScrollView */}
+      <ScrollView
+        style={styles.flatList}
+        contentContainerStyle={styles.clientsContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const isNearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
+          if (isNearBottom) loadMoreClients();
+        }}
+        scrollEventThrottle={400}
+      >
+        {loading && clients.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <ActivityIndicator color={COLORS.accent} />
+          </View>
+        ) : filteredClients.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <Text style={{ color: COLORS.textSoft }}>
+              {storeId ? 'Aucun client trouvé' : 'Aucune boutique trouvée pour ce compte'}
+            </Text>
+          </View>
+        ) : (
+          clientRows.map((row, rowIndex) => (
+            <View key={rowIndex} style={[styles.gridRow, { gap: GRID_GAP }]}>
+              {row.map((client) => renderClientCard(client))}
             </View>
-          }
-          
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 40 }}>
-              {loading ? (
-                <ActivityIndicator color={COLORS.accent} />
-              ) : (
-                <Text style={{ color: COLORS.textSoft }}>
-                  {storeId ? 'Aucun client trouvé' : 'Aucune boutique trouvée pour ce compte'}
-                </Text>
-              )}
+          ))
+        )}
+
+        {/* Footer */}
+        <View style={styles.footerContainer}>
+          {loadingMore && (
+            <View style={styles.loadingMoreContainer}>
+              <ActivityIndicator size="small" color={COLORS.accent} />
+              <Text style={styles.loadingMoreText}>Chargement...</Text>
             </View>
-          }
-        />
+          )}
+          {!hasMore && clients.length > 0 && (
+            <View style={styles.endOfListContainer}>
+              <Text style={styles.endOfListText}>
+                📋 Tous les clients chargés ({clients.length})
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -826,25 +802,27 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
   },
 
+  flatList: {
+    flex: 1,
+  },
+
   clientsContainer: {
     paddingHorizontal: SPACING.lg,
     paddingBottom: 100,
   },
 
-  clientsContainerDesktop: {
-    paddingHorizontal: SPACING.xxl,
+  gridRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
   },
 
   clientCard: {
     backgroundColor: COLORS.card,
     borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
+    padding: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
+    overflow: 'hidden',
   },
 
   clientHeader: {
@@ -904,32 +882,56 @@ const styles = StyleSheet.create({
 
   clientStats: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-    paddingVertical: SPACING.md,
+    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.sm,
     borderTopWidth: 1,
     borderBottomWidth: 1,
     borderColor: COLORS.border,
   },
 
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: COLORS.border,
+  },
+
   statItem: {
+    flex: 1,
     alignItems: 'center',
+    minWidth: 0,
   },
 
   statValue: {
-    fontSize: FONT_SIZE.md,
+    fontSize: FONT_SIZE.sm,
     fontWeight: '700',
     color: COLORS.text,
+    textAlign: 'center',
   },
 
   statLabel: {
-    fontSize: FONT_SIZE.xs,
+    fontSize: 10,
     color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+
+  lastOrderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: SPACING.sm,
+  },
+
+  lastOrderText: {
+    fontSize: 11,
+    color: COLORS.textSoft,
   },
 
   clientActions: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
   },
 
   footerContainer: {

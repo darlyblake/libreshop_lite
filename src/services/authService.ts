@@ -83,6 +83,11 @@ export const authService = {
   async signOut() {
     const client = useSupabase();
     try {
+      const { data: { user } } = await client.auth.getUser();
+      if (user) {
+        const { deviceSessionService } = await import('./deviceSessionService');
+        await deviceSessionService.revokeCurrentSession(user.id);
+      }
       const { error } = await client.auth.signOut();
       if (error) throw error;
     } catch (error) {

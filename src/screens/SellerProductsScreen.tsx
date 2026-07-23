@@ -23,7 +23,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
-import * as FileSystem from 'expo-file-system';
+// import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useTheme } from '../hooks/useTheme';
 import { AddProductModal } from '../components/AddProductModal';
@@ -187,8 +187,8 @@ export const SellerProductsScreen: React.FC = () => {
         const dateStr = new Date().toISOString().split('T')[0];
         const storeName = store?.name ? store.name.replace(/[^a-zA-Z0-9]/g, '_') : 'LibreShop';
         const filename = `inventaire_${storeName}_${dateStr}.csv`;
-        // documentDirectory peut être une string ou undefined selon la version d'expo-file-system
-        const docDir = (FileSystem as any)['documentDirectory'] as string | null | undefined;
+        const FileSystem = require('expo-file-system');
+        const docDir = FileSystem.documentDirectory as string | null | undefined;
         if (!docDir) {
           throw new Error("Dossier de documents introuvable.");
         }
@@ -1206,11 +1206,16 @@ export const SellerProductsScreen: React.FC = () => {
             const uploadedUrls: string[] = [];
             if (Array.isArray(product.images) && product.images.length > 0) {
               for (const uri of product.images.slice(0, 5)) {
-                const url = await cloudinaryService.uploadImage(uri, {
-                  folder: 'libreshop/products',
-                  enhance: true
-                });
-                uploadedUrls.push(url);
+                if (typeof uri === 'string' && uri.startsWith('blob:')) continue; // Skip dead blob URLs
+                try {
+                  const url = await cloudinaryService.uploadImage(uri, {
+                    folder: 'libreshop/products',
+                    enhance: true
+                  });
+                  uploadedUrls.push(url);
+                } catch (e) {
+                  console.warn('Image upload failed:', e);
+                }
               }
             }
             const price = parseFloat(product.price) || 0;
