@@ -46,6 +46,7 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
 
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false); // Délai de montage caméra
 
   useEffect(() => {
     if (visible && storeId) {
@@ -91,8 +92,11 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
         return;
       }
     }
-    scannedRef.current = false; // Réinitialiser le verrou à chaque ouverture
+    scannedRef.current = false;
+    setCameraReady(false); // reset
     setShowCamera(true);
+    // Délai pour laisser le Modal se monter complètement avant d'activer la caméra
+    setTimeout(() => setCameraReady(true), 400);
   };
 
   const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
@@ -331,12 +335,59 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleClose}
-    >
+    <>
+      {/* Modal Scanner caméra - Modal PLEIN ÉCRAN séparé pour éviter le flou */}
+      <Modal
+        visible={showCamera}
+        animationType="fade"
+        transparent={false}
+        statusBarTranslucent
+        onRequestClose={() => {
+          scannedRef.current = false;
+          setCameraReady(false);
+          setShowCamera(false);
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
+          {cameraReady && (
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              autofocus="on"
+              barcodeScannerSettings={{
+                barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+              }}
+              onBarcodeScanned={scannedRef.current ? undefined : handleBarcodeScanned}
+            />
+          )}
+          {/* Overlay de visée */}
+          <View style={styles.scannerOverlay}>
+            <View style={styles.scannerTarget} />
+            <Text style={styles.scannerText}>
+              {cameraReady ? 'Visez le QR Code du reçu ou le code-barre' : 'Initialisation...'}
+            </Text>
+          </View>
+          {/* Bouton Annuler */}
+          <TouchableOpacity
+            style={styles.cancelCameraBtn}
+            onPress={() => {
+              scannedRef.current = false;
+              setCameraReady(false);
+              setShowCamera(false);
+            }}
+          >
+            <Ionicons name="close-circle" size={28} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Annuler le scan</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Modal principal (bottom sheet) */}
+      <Modal
+        visible={visible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleClose}
+      >
       <View style={styles.overlay}>
         <View style={styles.content}>
           
@@ -347,31 +398,7 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {showCamera ? (
-            <View style={styles.cameraContainer}>
-              <CameraView
-                style={StyleSheet.absoluteFillObject}
-                barcodeScannerSettings={{
-                  // QR codes pour les reçus + codes-barres produits courants
-                  barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
-                }}
-                onBarcodeScanned={scannedRef.current ? undefined : handleBarcodeScanned}
-              />
-              <TouchableOpacity
-                style={styles.cancelCameraBtn}
-                onPress={() => {
-                  scannedRef.current = false;
-                  setShowCamera(false);
-                }}
-              >
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Annuler le scan</Text>
-              </TouchableOpacity>
-              <View style={styles.scannerOverlay}>
-                <View style={styles.scannerTarget} />
-                <Text style={styles.scannerText}>Visez le QR Code du reçu ou le code-barre du produit</Text>
-              </View>
-            </View>
-          ) : (
+          {/* Recherche et liste - showCamera est maintenant dans un modal séparé */}
             <View style={{ flex: 1 }}>
               {/* Recherche */}
               <View style={styles.searchSection}>
@@ -481,11 +508,10 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
                 </View>
               )}
             </View>
-          )}
-
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+    </>
   );
 };
 
@@ -691,12 +717,14 @@ const styles = StyleSheet.create({
   },
   cancelCameraBtn: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    bottom: 50,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 30,
     zIndex: 10,
   },
   scannerOverlay: {
