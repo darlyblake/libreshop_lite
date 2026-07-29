@@ -1003,6 +1003,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const barcodeScanLock = React.useRef(false); // anti-spam lock
+  const [cameraReady, setCameraReady] = useState(false); // délai de montage
 
   const [categorySchema, setCategorySchema] = useState<any[]>([]);
   const [productAttributes, setProductAttributes] = useState<Record<string, any>>({});
@@ -1046,9 +1048,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const colorsAndSizes = getColorsAndSizes();
 
   const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (!showCameraScanner) return;
-    setNewProduct(prev => ({ ...prev, barcode: data }));
+    // Verrou anti-spam : une seule détection acceptée
+    if (barcodeScanLock.current || !showCameraScanner) return;
+    barcodeScanLock.current = true;
     setShowCameraScanner(false);
+    setCameraReady(false);
+    setNewProduct(prev => ({ ...prev, barcode: data }));
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -1636,7 +1641,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                             return;
                           }
                         }
+                        barcodeScanLock.current = false;
+                        setCameraReady(false);
                         setShowCameraScanner(true);
+                        // Attendre que le Modal soit monté avant d'activer la caméra
+                        setTimeout(() => setCameraReady(true), 400);
                       }}
                     >
                       <Ionicons name="barcode-outline" size={24} color={COLORS.accent} />
@@ -2081,33 +2090,54 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         </View>
       </Modal>
 
-      {/* MODAL SCANNER CAMÉRA */}
-      <Modal visible={showCameraScanner} animationType="slide" onRequestClose={() => setShowCameraScanner(false)}>
+      {/* MODAL SCANNER CAMÉRA - Plein écran pour autofocus correct */}
+      <Modal
+        visible={showCameraScanner}
+        animationType="fade"
+        transparent={false}
+        statusBarTranslucent
+        onRequestClose={() => {
+          barcodeScanLock.current = false;
+          setCameraReady(false);
+          setShowCameraScanner(false);
+        }}
+      >
         <View style={styles.cameraContainer}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            onBarcodeScanned={handleBarcodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
-            }}
-          >
-            <View style={styles.cameraOverlay}>
-              <View style={styles.cameraHeader}>
-                <TouchableOpacity style={styles.closeCameraButton} onPress={() => setShowCameraScanner(false)}>
-                  <Ionicons name="close" size={28} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.cameraTargetContainer}>
-                <View style={styles.cameraTarget} />
-              </View>
-
-              <View style={styles.cameraFooter}>
-                <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
-              </View>
+          {cameraReady && (
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing="back"
+              autofocus="on"
+              onBarcodeScanned={barcodeScanLock.current ? undefined : handleBarcodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+              }}
+            />
+          )}
+          <View style={styles.cameraOverlay}>
+            <View style={styles.cameraHeader}>
+              <TouchableOpacity
+                style={styles.closeCameraButton}
+                onPress={() => {
+                  barcodeScanLock.current = false;
+                  setCameraReady(false);
+                  setShowCameraScanner(false);
+                }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
             </View>
-          </CameraView>
+
+            <View style={styles.cameraTargetContainer}>
+              <View style={styles.cameraTarget} />
+            </View>
+
+            <View style={styles.cameraFooter}>
+              <Text style={styles.cameraHint}>
+                {cameraReady ? 'Placez le code-barres dans le cadre' : 'Initialisation...'}
+              </Text>
+            </View>
+          </View>
         </View>
       </Modal>
       {/* MODAL APERÇU 3D PREVIEW */}

@@ -186,10 +186,10 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
       setOrder(fetchedOrder);
       setReturnableItems(validItems);
       
-      // Initialize return quantities to 0
+      // Pré-remplir les quantités au maximum disponible (le vendeur peut réduire si besoin)
       const initialQs: Record<string, number> = {};
       validItems.forEach(item => {
-        initialQs[item.id] = 0;
+        initialQs[item.id] = item.availableToReturn;
       });
       setReturnQuantities(initialQs);
 
@@ -381,9 +381,9 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
         </View>
       </Modal>
 
-      {/* Modal principal (bottom sheet) */}
+      {/* Modal principal (bottom sheet) - masqué pendant le scan */}
       <Modal
-        visible={visible}
+        visible={visible && !showCamera}
         animationType="slide"
         transparent={true}
         onRequestClose={handleClose}
