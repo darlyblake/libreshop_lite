@@ -160,13 +160,8 @@ export const returnService = {
         });
       }
 
-      // Enregistrement comptable préventif : dette de remboursement à payer
-      await accountingService.recordRefund({
-        store_id: currentReturn.store_id,
-        order_id: currentReturn.order_id,
-        amount: currentReturn.refund_amount,
-        reason: `Retour accepté: ${productName} — Commande ${orderRef}${notes ? ` (${notes})` : ''}`,
-      });
+      // Enregistrement comptable est maintenant fait uniquement à la complétion.
+      // (Supprimé ici pour éviter les doublons dans les rapports)
     }
 
     // 📦 REÇU : Réintégration du stock + Notif client
@@ -192,6 +187,8 @@ export const returnService = {
         order_id: currentReturn.order_id,
         amount: currentReturn.refund_amount,
         reason: `Remboursement confirmé: ${productName} — Commande ${orderRef}`,
+        status: 'processed',
+        type: 'full'
       });
 
       if (clientUserId) {

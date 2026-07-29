@@ -145,17 +145,8 @@ export const refundService = {
         }
       }
 
-      // 2. Enregistrer l'opération comptable
-      try {
-        await accountingService.recordRefund({
-          order_id: data.order_id,
-          store_id: data.store_id,
-          amount: data.amount,
-          reason: data.reason || 'Retour commande client',
-        });
-      } catch (accountingErr) {
-        console.error(`[RefundService] Error recording accounting refund:`, accountingErr);
-      }
+      // 2. Enregistrement comptable : Déjà géré car la ligne est dans la table `refunds`
+      // et sera récupérée par accountingService.getRefunds().
 
       return this.mapToRefund(data);
     } catch (error) {

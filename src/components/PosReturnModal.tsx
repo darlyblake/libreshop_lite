@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showCamera, setShowCamera] = useState(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const scannedRef = React.useRef(false); // Verrou pour éviter les scans multiples
   
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<any | null>(null);
@@ -42,6 +43,31 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
   const [returnQuantities, setReturnQuantities] = useState<Record<string, number>>({});
 
   const [processing, setProcessing] = useState(false);
+
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+
+  useEffect(() => {
+    if (visible && storeId) {
+      loadRecentOrders();
+    } else {
+      resetState();
+    }
+  }, [visible, storeId]);
+
+  const loadRecentOrders = async () => {
+    setLoadingRecent(true);
+    try {
+      const res = await orderService.getByStore(storeId, { limit: 15 });
+      // Afficher les commandes récentes payées ou livrées (susceptibles d'être retournées)
+      const validOrders = (res.items || []).filter(o => o.status === 'paid' || o.status === 'delivered');
+      setRecentOrders(validOrders);
+    } catch (e) {
+      console.warn('Failed to load recent orders', e);
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
 
   const resetState = () => {
     setSearchQuery('');
@@ -53,6 +79,7 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
   const handleClose = () => {
     resetState();
     setShowCamera(false);
+    scannedRef.current = false;
     onClose();
   };
 
@@ -64,25 +91,32 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
         return;
       }
     }
+    scannedRef.current = false; // Réinitialiser le verrou à chaque ouverture
     setShowCamera(true);
   };
 
   const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
+    // 🔒 Verrou anti-spam : ignorer tous les scans après le premier
+    if (scannedRef.current) return;
+    scannedRef.current = true;
+
+    // Fermer la caméra immédiatement pour stopper les callbacks
     setShowCamera(false);
     
-    // Le QR code généré sur le ticket est de format URL (ex: https://libreshop.shop/api/order?id=ORDER_ID)
-    // On extrait l'ID si c'est une URL
-    let scannedId = data;
+    // Le QR code du ticket est une URL (ex: https://libreshop.shop/api/order?id=ORDER_ID)
+    // On peut aussi recevoir directement un UUID ou un code-barre produit
+    let scannedId = data.trim();
     try {
       if (data.includes('id=')) {
         const url = new URL(data);
         const id = url.searchParams.get('id');
-        if (id) scannedId = id;
-      } else {
-        // Fallback pour les anciens QR codes ou autres formats
+        if (id) scannedId = id.trim();
+      } else if (data.includes('/')) {
+        // Fallback pour les anciens QR codes sous forme de chemin
         const parts = data.split('/');
-        scannedId = parts[parts.length - 1] || data;
+        scannedId = parts[parts.length - 1]?.trim() || data.trim();
       }
+      // Si c'est un code-barre produit brut, on le garde tel quel
     } catch (e) {
       // Si ce n'est pas une URL valide, on garde le texte brut
     }
@@ -318,16 +352,23 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
               <CameraView
                 style={StyleSheet.absoluteFillObject}
                 barcodeScannerSettings={{
-                  barcodeTypes: ["qr"],
+                  // QR codes pour les reçus + codes-barres produits courants
+                  barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
                 }}
-                onBarcodeScanned={handleBarcodeScanned}
+                onBarcodeScanned={scannedRef.current ? undefined : handleBarcodeScanned}
               />
-              <TouchableOpacity style={styles.cancelCameraBtn} onPress={() => setShowCamera(false)}>
+              <TouchableOpacity
+                style={styles.cancelCameraBtn}
+                onPress={() => {
+                  scannedRef.current = false;
+                  setShowCamera(false);
+                }}
+              >
                 <Text style={{ color: '#fff', fontWeight: 'bold' }}>Annuler le scan</Text>
               </TouchableOpacity>
               <View style={styles.scannerOverlay}>
                 <View style={styles.scannerTarget} />
-                <Text style={styles.scannerText}>Visez le QR Code du reçu</Text>
+                <Text style={styles.scannerText}>Visez le QR Code du reçu ou le code-barre du produit</Text>
               </View>
             </View>
           ) : (
@@ -366,8 +407,8 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
                 {loading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.searchSubmitText}>Rechercher le reçu</Text>}
               </TouchableOpacity>
 
-              {/* Résultat */}
-              {order && (
+              {/* Résultat ou Récents */}
+              {order ? (
                 <View style={styles.resultSection}>
                   <View style={styles.orderSummary}>
                     <Text style={styles.orderSummaryTitle}>Ticket #{order.id.slice(0, 8)}</Text>
@@ -404,6 +445,39 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
                       )}
                     </TouchableOpacity>
                   </View>
+                </View>
+              ) : (
+                <View style={styles.recentSection}>
+                  <Text style={styles.recentTitle}>Derniers reçus</Text>
+                  {loadingRecent ? (
+                    <ActivityIndicator color={COLORS.info} style={{ marginTop: 20 }} />
+                  ) : recentOrders.length > 0 ? (
+                    <FlatList
+                      data={recentOrders}
+                      keyExtractor={item => item.id}
+                      renderItem={({ item }) => (
+                        <TouchableOpacity 
+                          style={styles.recentOrderItem}
+                          onPress={() => searchOrder(item.id)}
+                        >
+                          <View>
+                            <Text style={styles.recentOrderTitle}>Ticket #{item.id.slice(0, 8).toUpperCase()}</Text>
+                            <Text style={styles.recentOrderMeta}>
+                              {new Date(item.created_at).toLocaleString('fr-FR')} • {item.total_amount?.toLocaleString()} FCFA
+                            </Text>
+                            {item.customer_name ? (
+                              <Text style={styles.recentOrderClient}>Client : {item.customer_name}</Text>
+                            ) : null}
+                          </View>
+                          <Ionicons name="chevron-forward" size={20} color={COLORS.textMuted} />
+                        </TouchableOpacity>
+                      )}
+                      contentContainerStyle={{ paddingBottom: 20 }}
+                      showsVerticalScrollIndicator={false}
+                    />
+                  ) : (
+                    <Text style={styles.noRecentText}>Aucun reçu récent trouvé.</Text>
+                  )}
                 </View>
               )}
             </View>
@@ -648,5 +722,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+  },
+  recentSection: {
+    flex: 1,
+    marginTop: SPACING.md,
+  },
+  recentTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  recentOrderItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.card,
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  recentOrderTitle: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 4,
+  },
+  recentOrderMeta: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  recentOrderClient: {
+    fontSize: 12,
+    color: COLORS.text,
+    marginTop: 4,
+  },
+  noRecentText: {
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: 20,
+    fontStyle: 'italic',
   },
 });

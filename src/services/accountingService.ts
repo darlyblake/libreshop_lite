@@ -52,6 +52,8 @@ export interface Refund {
   amount: number;
   reason?: string;
   created_at?: string;
+  status?: string;
+  type?: string;
 }
 
 export const accountingService = {

@@ -84,6 +84,8 @@ export const SellerCaisseScreen = () => {
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptHtml, setReceiptHtml] = useState('');
 
   // Initialiser le client si passé en paramètre
   useEffect(() => {
@@ -674,85 +676,6 @@ export const SellerCaisseScreen = () => {
         </html>
       `;
 
-      try {
-        if (Platform.OS === 'web') {
-          // Sur le web (mobile & desktop) : ouvrir une nouvelle fenêtre dédiée au ticket
-          // Beaucoup de navigateurs mobiles gèrent mieux window.print() depuis une popup.
-          try {
-            const printWindow = window.open('', '_blank');
-            if (printWindow) {
-              printWindow.document.open();
-              printWindow.document.write(html);
-              printWindow.document.close();
-              // Laisser le navigateur charger les ressources puis lancer l'impression
-              setTimeout(() => {
-                try {
-                  printWindow.focus();
-                  printWindow.print();
-                  // Fermer la fenêtre après impression (certaines plateformes empêchent)
-                  setTimeout(() => { try { printWindow.close(); } catch {} }, 1000);
-                } catch (pwErr) {
-                  console.warn('printWindow.print failed', pwErr);
-                }
-              }, 600);
-            } else {
-              // Fallback visible iframe (utile si popup bloquée) — rendre visible pour éviter capture écran
-              const iframe = document.createElement('iframe');
-              iframe.style.position = 'fixed';
-              iframe.style.left = '50%';
-              iframe.style.top = '10%';
-              iframe.style.transform = 'translateX(-50%)';
-              iframe.style.width = '360px';
-              iframe.style.height = '640px';
-              iframe.style.zIndex = '99999';
-              iframe.style.border = '1px solid #ccc';
-              document.body.appendChild(iframe);
-              if (iframe.contentWindow) {
-                iframe.contentWindow.document.open();
-                iframe.contentWindow.document.write(html);
-                iframe.contentWindow.document.close();
-                setTimeout(() => {
-                  iframe.contentWindow?.focus();
-                  iframe.contentWindow?.print();
-                  setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 1000);
-                }, 700);
-              }
-            }
-          } catch (e) {
-            console.warn('Web print fallback failed, attempting iframe', e);
-            try {
-              const iframe = document.createElement('iframe');
-              iframe.style.position = 'fixed';
-              iframe.style.left = '50%';
-              iframe.style.top = '10%';
-              iframe.style.transform = 'translateX(-50%)';
-              iframe.style.width = '360px';
-              iframe.style.height = '640px';
-              iframe.style.zIndex = '99999';
-              iframe.style.border = '1px solid #ccc';
-              document.body.appendChild(iframe);
-              if (iframe.contentWindow) {
-                iframe.contentWindow.document.open();
-                iframe.contentWindow.document.write(html);
-                iframe.contentWindow.document.close();
-                setTimeout(() => {
-                  iframe.contentWindow?.focus();
-                  iframe.contentWindow?.print();
-                  setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 1000);
-                }, 700);
-              }
-            } catch (e2) {
-              console.warn('All web print fallbacks failed', e2);
-            }
-          }
-        } else {
-          const { uri } = await Print.printToFileAsync({ html });
-          await Sharing.shareAsync(uri);
-        }
-      } catch (printError) {
-        console.warn('Erreur lors de l\'impression ou du partage du ticket:', printError);
-      }
-      
       // Recharger les produits pour mettre à jour les stocks
       const updatedProducts = await productService.getByStoreAvailable(storeId);
       setProducts(updatedProducts || []);
@@ -762,13 +685,78 @@ export const SellerCaisseScreen = () => {
       setShowCheckoutModal(false);
       setCashReceived('');
       
-      Alert.alert('Succès', 'Vente effectuée avec succès !');
+      setReceiptHtml(html);
+      setShowReceiptModal(true);
     } catch (error) {
       errorHandler.handleDatabaseError(error as any, 'Erreur finalisation caisse:');
       Alert.alert('Erreur', 'Impossible de finaliser la vente');
       
       // Ensure Modal closes even if order errors out partially
       setShowCheckoutModal(false);
+    }
+  };
+
+  const handleShareReceipt = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        Alert.alert('Info', 'Le partage natif n\'est pas supporté sur le web. Veuillez utiliser l\'impression.');
+      } else {
+        const { uri } = await Print.printToFileAsync({ html: receiptHtml });
+        await Sharing.shareAsync(uri);
+      }
+    } catch (e) {
+      console.warn('Erreur de partage:', e);
+    }
+  };
+
+  const handlePrintReceipt = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        try {
+          const printWindow = window.open('', '_blank');
+          if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write(receiptHtml);
+            printWindow.document.close();
+            setTimeout(() => {
+              try {
+                printWindow.focus();
+                printWindow.print();
+                setTimeout(() => { try { printWindow.close(); } catch {} }, 1000);
+              } catch (pwErr) {
+                console.warn('printWindow.print failed', pwErr);
+              }
+            }, 600);
+          } else {
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.left = '50%';
+            iframe.style.top = '10%';
+            iframe.style.transform = 'translateX(-50%)';
+            iframe.style.width = '360px';
+            iframe.style.height = '640px';
+            iframe.style.zIndex = '99999';
+            iframe.style.border = '1px solid #ccc';
+            document.body.appendChild(iframe);
+            if (iframe.contentWindow) {
+              iframe.contentWindow.document.open();
+              iframe.contentWindow.document.write(receiptHtml);
+              iframe.contentWindow.document.close();
+              setTimeout(() => {
+                iframe.contentWindow?.focus();
+                iframe.contentWindow?.print();
+                setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 1000);
+              }, 700);
+            }
+          }
+        } catch (e) {
+          console.warn('Web print fallback failed', e);
+        }
+      } else {
+        await Print.printAsync({ html: receiptHtml });
+      }
+    } catch (e) {
+      console.warn('Erreur d\'impression:', e);
     }
   };
 
@@ -1345,6 +1333,54 @@ export const SellerCaisseScreen = () => {
           userId={user.id}
         />
       )}
+
+      {/* MODAL DE RÉCEPISSÉ (PARTAGE/IMPRESSION) */}
+      <Modal
+        visible={showReceiptModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowReceiptModal(false)}
+      >
+        <BlurView intensity={90} tint="dark" style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { alignItems: 'center', padding: 30 }]}>
+            <Ionicons name="checkmark-circle" size={60} color={COLORS.success} style={{ marginBottom: 20 }} />
+            <Text style={{ color: COLORS.text, fontSize: 20, fontWeight: 'bold', marginBottom: 10 }}>
+              Vente validée !
+            </Text>
+            <Text style={{ color: COLORS.textMuted, fontSize: 14, textAlign: 'center', marginBottom: 30 }}>
+              Le ticket de caisse a été généré. Que souhaitez-vous faire ?
+            </Text>
+
+            <TouchableOpacity 
+              style={[styles.validateButton, { width: '100%', marginBottom: 15 }]}
+              onPress={handleShareReceipt}
+            >
+              <View style={[styles.validateButtonGradient, { backgroundColor: COLORS.info }]}>
+                <Text style={[styles.validateButtonText, { color: 'white' }]}>Envoyer / Partager</Text>
+                <Ionicons name="share-outline" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.validateButton, { width: '100%', marginBottom: 15 }]}
+              onPress={handlePrintReceipt}
+            >
+              <View style={[styles.validateButtonGradient, { backgroundColor: COLORS.accent }]}>
+                <Text style={[styles.validateButtonText, { color: 'white' }]}>Imprimer et Enregistrer</Text>
+                <Ionicons name="print-outline" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{ padding: 10, marginTop: 10 }}
+              onPress={() => setShowReceiptModal(false)}
+            >
+              <Text style={{ color: COLORS.textMuted, fontWeight: 'bold' }}>Fermer</Text>
+            </TouchableOpacity>
+          </View>
+        </BlurView>
+      </Modal>
+
         </>
       )}
     </SafeAreaView>
