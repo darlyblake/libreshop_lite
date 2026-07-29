@@ -82,6 +82,7 @@ export const SellerCaisseScreen = () => {
   const [cashReceived, setCashReceived] = useState('');
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [showCameraScanner, setShowCameraScanner] = useState(false);
+  const [cartDiscount, setCartDiscount] = useState(''); // Réduction négociée
   const [permission, requestPermission] = useCameraPermissions();
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -241,6 +242,7 @@ export const SellerCaisseScreen = () => {
               );
             });
             setCart([]);
+            setCartDiscount('');
           },
         },
       ]
@@ -252,9 +254,15 @@ export const SellerCaisseScreen = () => {
     [cart]
   );
 
+  const discountAmount = useMemo(() => {
+    const val = parseFloat(cartDiscount);
+    return isNaN(val) ? 0 : val;
+  }, [cartDiscount]);
+
+  const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
   const taxRate = store?.tax_rate !== undefined ? Number(store.tax_rate) : 18;
-  const tax = subtotal * (taxRate / 100);
-  const total = subtotal + tax;
+  const tax = subtotalAfterDiscount * (taxRate / 100);
+  const total = subtotalAfterDiscount + tax;
 
   useEffect(() => {
     if (!storeId) return;
@@ -481,6 +489,7 @@ export const SellerCaisseScreen = () => {
         store_id: storeId,
         total_amount: total,
         tax_amount: tax,
+        discount_amount: discountAmount,
         delivery_fee: 0,
         status: 'paid',
         payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod === 'card' ? 'card' : 'mobile_money',
@@ -636,6 +645,16 @@ export const SellerCaisseScreen = () => {
               <td class="left">SOUS-TOTAL :</td>
               <td class="right">${format(subtotal)}</td>
             </tr>
+            ${discountAmount > 0 ? `
+            <tr>
+              <td class="left">REMISE :</td>
+              <td class="right">- ${format(discountAmount)}</td>
+            </tr>
+            <tr>
+              <td class="left">SOUS-TOTAL NET :</td>
+              <td class="right">${format(subtotalAfterDiscount)}</td>
+            </tr>
+            ` : ''}
             <tr>
               <td class="left">TVA (${taxRate}%) :</td>
               <td class="right">${format(tax)}</td>
@@ -682,6 +701,7 @@ export const SellerCaisseScreen = () => {
       
       // Vider le panier
       setCart([]);
+      setCartDiscount('');
       setShowCheckoutModal(false);
       setCashReceived('');
       
@@ -1001,6 +1021,37 @@ export const SellerCaisseScreen = () => {
                     <Text style={styles.summaryLabel}>Sous-total</Text>
                     <Text style={styles.summaryValue}>{format(subtotal)}</Text>
                   </View>
+                  
+                  <View style={[styles.summaryItem, { alignItems: 'center' }]}>
+                    <Text style={styles.summaryLabel}>Réduction (Négociation)</Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: COLORS.card,
+                        borderWidth: 1,
+                        borderColor: COLORS.border,
+                        borderRadius: RADIUS.sm,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        color: COLORS.text,
+                        width: 120,
+                        textAlign: 'right',
+                        fontWeight: 'bold',
+                        fontSize: 14
+                      }}
+                      keyboardType="numeric"
+                      placeholder="0 FCFA"
+                      placeholderTextColor={COLORS.textMuted}
+                      value={cartDiscount}
+                      onChangeText={setCartDiscount}
+                    />
+                  </View>
+
+                  {discountAmount > 0 && (
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Sous-total après réduction</Text>
+                      <Text style={styles.summaryValue}>{format(subtotalAfterDiscount)}</Text>
+                    </View>
+                  )}
                   
                   <View style={styles.summaryItem}>
                     <Text style={styles.summaryLabel}>TVA ({taxRate}%)</Text>

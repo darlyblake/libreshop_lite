@@ -1387,13 +1387,64 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const totalSteps = categorySchema.length > 0 ? 4 : 3;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-    >
+    <>
+      {/* MODAL SCANNER CAMÉRA - PLEIN ÉCRAN INDÉPENDANT (fix flou) */}
+      <Modal
+        visible={showCameraScanner}
+        animationType="fade"
+        transparent={false}
+        statusBarTranslucent
+        onRequestClose={() => {
+          barcodeScanLock.current = false;
+          setCameraReady(false);
+          setShowCameraScanner(false);
+        }}
+      >
+        <View style={styles.cameraContainer}>
+          {cameraReady && (
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing="back"
+              autofocus="on"
+              onBarcodeScanned={barcodeScanLock.current ? undefined : handleBarcodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+              }}
+            />
+          )}
+          <View style={styles.cameraOverlay}>
+            <View style={styles.cameraHeader}>
+              <TouchableOpacity
+                style={styles.closeCameraButton}
+                onPress={() => {
+                  barcodeScanLock.current = false;
+                  setCameraReady(false);
+                  setShowCameraScanner(false);
+                }}
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.cameraTargetContainer}>
+              <View style={styles.cameraTarget} />
+            </View>
+            <View style={styles.cameraFooter}>
+              <Text style={styles.cameraHint}>
+                {cameraReady ? 'Placez le code-barres dans le cadre' : 'Initialisation...'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL PRINCIPAL - masqué quand le scanner est ouvert */}
+      <Modal
+        visible={visible && !showCameraScanner}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+        presentationStyle="overFullScreen"
+      >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalOverlay}
@@ -2014,6 +2065,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           </View>
         </View>
       </KeyboardAvoidingView>
+      </Modal>
 
       {/* SELECTOR : COLLECTION */}
       <Modal visible={showCollectionPicker} animationType="slide" transparent={true} onRequestClose={() => setShowCollectionPicker(false)}>
@@ -2202,6 +2254,6 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           </View>
         </View>
       </Modal>
-    </Modal>
+    </>
   );
 };
