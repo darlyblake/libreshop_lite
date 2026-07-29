@@ -10,7 +10,7 @@ interface ShareButtonProps {
   url: string;
   imageUrl?: string;
   price?: string;
-  type?: 'product' | 'store';
+  type?: 'product' | 'store' | 'receipt';
   style?: any;
 }
 
@@ -20,7 +20,7 @@ interface ShareOptions {
   url: string;
   imageUrl?: string;
   price?: string;
-  type?: 'product' | 'store';
+  type?: 'product' | 'store' | 'receipt';
 }
 
 // Function for programmatic sharing
@@ -29,9 +29,12 @@ export const shareContent = async (options: ShareOptions) => {
   
   try {
     // Générer l'URL web pour le partage (pour les aperçus riches sur WhatsApp/Facebook)
-    const webUrl = type === 'product' 
-      ? `https://libreshop.shop/api/product?id=${url.split('/').pop()}`
-      : `https://libreshop.shop/api/store?id=${url.split('/').pop()}`;
+    let webUrl = url;
+    if (type === 'product') {
+      webUrl = `https://libreshop.shop/api/product?id=${url.split('/').pop()}`;
+    } else if (type === 'store') {
+      webUrl = `https://libreshop.shop/api/store?id=${url.split('/').pop()}`;
+    }
 
     // Créer le message de partage selon le type
     let shareMessage = '';
@@ -42,11 +45,17 @@ export const shareContent = async (options: ShareOptions) => {
       shareMessage += `📝 ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n\n`;
       shareMessage += `🔗 ${webUrl}\n\n`;
       shareMessage += `Découvrez sur LibreShop 🛒`;
-    } else {
+    } else if (type === 'store') {
       shareMessage = `🏪 ${title}\n`;
       shareMessage += `📝 ${description.substring(0, 100)}${description.length > 100 ? '...' : ''}\n\n`;
       shareMessage += `🔗 ${webUrl}\n\n`;
       shareMessage += `Découvrez cette boutique sur LibreShop 🛒`;
+    } else if (type === 'receipt') {
+      shareMessage = `🧾 ${title}\n`;
+      if (price) shareMessage += `Total: ${price}\n`;
+      shareMessage += `📝 ${description}\n\n`;
+      shareMessage += `🔗 Consultez votre reçu en ligne : ${webUrl}\n\n`;
+      shareMessage += `Merci de votre visite ! 🛒`;
     }
 
     console.log('[shareContent] platform=', Platform.OS, 'navigator.share=', typeof navigator !== 'undefined' && !!(navigator as any).share, 'imageUrl=', options.imageUrl, 'webUrl=', webUrl);

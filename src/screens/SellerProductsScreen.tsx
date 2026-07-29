@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { errorHandler } from '../utils/errorHandler';
 import {
   View,
@@ -27,6 +27,7 @@ import * as Linking from 'expo-linking';
 import * as Sharing from 'expo-sharing';
 import { useTheme } from '../hooks/useTheme';
 import { AddProductModal } from '../components/AddProductModal';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import { SellerFiltersRow } from '../components/SellerFiltersRow';
 import { useResponsive } from '../utils/useResponsive';
 import { type Collection, type Store } from '../lib/supabase';
@@ -115,7 +116,7 @@ export const SellerProductsScreen: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
+  const handleBarcodeScanned = useCallback((data: string) => {
     if (!showCameraScanner) return;
     setSearchQuery(data);
     setShowCameraScanner(false);
@@ -1420,41 +1421,12 @@ export const SellerProductsScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* MODAL SCANNER CAMÉRA */}
-      <Modal
+      {/* MODAL SCANNER CAMÉRA CENTRALISÉ */}
+      <BarcodeScannerModal
         visible={showCameraScanner}
-        animationType="slide"
-        onRequestClose={() => setShowCameraScanner(false)}
-      >
-        <View style={styles.cameraContainer}>
-          <CameraView
-            style={styles.camera}
-            onBarcodeScanned={handleBarcodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
-            }}
-          >
-            <View style={styles.cameraOverlay}>
-              <View style={styles.cameraHeader}>
-                <TouchableOpacity 
-                  style={styles.closeCameraButton}
-                  onPress={() => setShowCameraScanner(false)}
-                >
-                  <Ionicons name="close" size={28} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.cameraTargetContainer}>
-                <View style={styles.cameraTarget} />
-              </View>
-
-              <View style={styles.cameraFooter}>
-                <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
-              </View>
-            </View>
-          </CameraView>
-        </View>
-      </Modal>
+        onClose={() => setShowCameraScanner(false)}
+        onScan={handleBarcodeScanned}
+      />
     </View>
   );
 };

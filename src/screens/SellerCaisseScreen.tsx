@@ -23,7 +23,7 @@ import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { useAuthStore } from '../store';
 import { type Order, useSupabase } from '../lib/supabase';
 import { productService } from '../services/productService';
@@ -35,6 +35,7 @@ import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { SearchBar } from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
 import { PosReturnModal } from '../components/PosReturnModal';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 
 type Product = {
   id: string;
@@ -87,6 +88,7 @@ export const SellerCaisseScreen = () => {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptHtml, setReceiptHtml] = useState('');
+  const [currentOrderShareInfo, setCurrentOrderShareInfo] = useState<{ id: string, total: string, url: string, storeName: string } | null>(null);
 
   // Initialiser le client si passé en paramètre
   useEffect(() => {
@@ -449,7 +451,11 @@ export const SellerCaisseScreen = () => {
     if (cart.length === 0) return;
     
     if (paymentMethod === 'cash') {
-      const received = cashReceived ? parseFloat(cashReceived) : total;
+      if (!cashReceived) {
+        Alert.alert('Erreur', 'Veuillez saisir le montant remis par le client.');
+        return;
+      }
+      const received = parseFloat(cashReceived);
       if (isNaN(received) || received < total) {
         Alert.alert('Erreur', 'Le montant reçu est insuffisant ou invalide.');
         return;
@@ -536,6 +542,13 @@ export const SellerCaisseScreen = () => {
       // Préchargement du QR code en base64 pour garantir son affichage dans le reçu
       const orderUrl = qrCodeService.getOrderUrl(order.id);
       const qrBase64 = await qrCodeService.getQrImageBase64(orderUrl, 100);
+
+      setCurrentOrderShareInfo({
+        id: order.id,
+        total: format(total),
+        url: orderUrl,
+        storeName: store?.name || 'LibreShop'
+      });
 
       // Génération du ticket format thermique (58/80mm)
       const html = `
@@ -719,7 +732,15 @@ export const SellerCaisseScreen = () => {
   const handleShareReceipt = async () => {
     try {
       if (Platform.OS === 'web') {
-        Alert.alert('Info', 'Le partage natif n\'est pas supporté sur le web. Veuillez utiliser l\'impression.');
+        if (!currentOrderShareInfo) return;
+        const { shareContent } = await import('../components/ShareButton');
+        await shareContent({
+          title: `Ticket de caisse - ${currentOrderShareInfo.storeName}`,
+          description: `Commande #${currentOrderShareInfo.id.slice(0,8).toUpperCase()}`,
+          url: currentOrderShareInfo.url,
+          price: currentOrderShareInfo.total,
+          type: 'receipt',
+        });
       } else {
         const { uri } = await Print.printToFileAsync({ html: receiptHtml });
         await Sharing.shareAsync(uri);
@@ -867,7 +888,7 @@ export const SellerCaisseScreen = () => {
               onSubmitEditing={() => {
                 const q = productSearch.trim().toLowerCase();
                 if (q) {
-                  const match = products.find(p => p.reference?.toLowerCase() === q);
+                  const match = products.find(p => p.reference?.toLowerCase() === q || p.name.toLowerCase() === q);
                   if (match) {
                     addToCart(match);
                     setProductSearch('');
@@ -1339,41 +1360,23 @@ export const SellerCaisseScreen = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* MODAL SCANNER CAMÉRA */}
-      <Modal
+      {/* MODAL SCANNER CAMÉRA CENTRALISÉ */}
+      <BarcodeScannerModal
         visible={showCameraScanner}
-        animationType="slide"
-        onRequestClose={() => setShowCameraScanner(false)}
-      >
-        <View style={styles.cameraContainer}>
-          <CameraView
-            style={styles.camera}
-            onBarcodeScanned={handleBarcodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
-            }}
-          >
-            <View style={styles.cameraOverlay}>
-              <View style={styles.cameraHeader}>
-                <TouchableOpacity 
-                  style={styles.closeCameraButton}
-                  onPress={() => setShowCameraScanner(false)}
-                >
-                  <Ionicons name="close" size={28} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.cameraTargetContainer}>
-                <View style={styles.cameraTarget} />
-              </View>
-
-              <View style={styles.cameraFooter}>
-                <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
-              </View>
-            </View>
-          </CameraView>
-        </View>
-      </Modal>
+        onClose={() => setShowCameraScanner(false)}
+        onScan={(data) => {
+          // On set the search query which will trigger the product filter
+          setProductSearch(data);
+          setShowCameraScanner(false);
+          
+          // Auto-add if exact match
+          const match = products.find(p => p.reference?.toLowerCase() === data.toLowerCase() || p.name.toLowerCase() === data.toLowerCase());
+          if (match) {
+            addToCart(match);
+            setProductSearch('');
+          }
+        }}
+      />
 
       {/* Modal de Retour Caisse (POS Return) */}
       {showReturnModal && storeId && user?.id && (

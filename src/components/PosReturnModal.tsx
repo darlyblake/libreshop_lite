@@ -12,7 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { orderService } from '../services/orderService';
 import { refundService } from '../services/refundService';
@@ -46,7 +47,7 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
 
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false); // Délai de montage caméra
+
 
   useEffect(() => {
     if (visible && storeId) {
@@ -93,22 +94,15 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
       }
     }
     scannedRef.current = false;
-    setCameraReady(false); // reset
     setShowCamera(true);
-    // Délai pour laisser le Modal se monter complètement avant d'activer la caméra
-    setTimeout(() => setCameraReady(true), 400);
   };
 
-  const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
-    // 🔒 Verrou anti-spam : ignorer tous les scans après le premier
-    if (scannedRef.current) return;
+  // Callback depuis BarcodeScannerModal - reçoit directement la chaîne scannée
+  const handleBarcodeScanned = useCallback((data: string) => {
+    setShowCamera(false);
     scannedRef.current = true;
 
-    // Fermer la caméra immédiatement pour stopper les callbacks
-    setShowCamera(false);
-    
     // Le QR code du ticket est une URL (ex: https://libreshop.shop/api/order?id=ORDER_ID)
-    // On peut aussi recevoir directement un UUID ou un code-barre produit
     let scannedId = data.trim();
     try {
       if (data.includes('id=')) {
@@ -116,14 +110,10 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
         const id = url.searchParams.get('id');
         if (id) scannedId = id.trim();
       } else if (data.includes('/')) {
-        // Fallback pour les anciens QR codes sous forme de chemin
         const parts = data.split('/');
         scannedId = parts[parts.length - 1]?.trim() || data.trim();
       }
-      // Si c'est un code-barre produit brut, on le garde tel quel
-    } catch (e) {
-      // Si ce n'est pas une URL valide, on garde le texte brut
-    }
+    } catch (e) {}
     
     setSearchQuery(scannedId);
     searchOrder(scannedId);
@@ -336,50 +326,16 @@ export const PosReturnModal: React.FC<PosReturnModalProps> = ({
 
   return (
     <>
-      {/* Modal Scanner caméra - Modal PLEIN ÉCRAN séparé pour éviter le flou */}
-      <Modal
+      {/* Scanner QR centralisé (autofocus natif, plein écran) */}
+      <BarcodeScannerModal
         visible={showCamera}
-        animationType="fade"
-        transparent={false}
-        statusBarTranslucent
-        onRequestClose={() => {
+        onClose={() => {
           scannedRef.current = false;
-          setCameraReady(false);
           setShowCamera(false);
         }}
-      >
-        <View style={{ flex: 1, backgroundColor: '#000' }}>
-          {cameraReady && (
-            <CameraView
-              style={StyleSheet.absoluteFillObject}
-              autofocus="on"
-              barcodeScannerSettings={{
-                barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
-              }}
-              onBarcodeScanned={scannedRef.current ? undefined : handleBarcodeScanned}
-            />
-          )}
-          {/* Overlay de visée */}
-          <View style={styles.scannerOverlay}>
-            <View style={styles.scannerTarget} />
-            <Text style={styles.scannerText}>
-              {cameraReady ? 'Visez le QR Code du reçu ou le code-barre' : 'Initialisation...'}
-            </Text>
-          </View>
-          {/* Bouton Annuler */}
-          <TouchableOpacity
-            style={styles.cancelCameraBtn}
-            onPress={() => {
-              scannedRef.current = false;
-              setCameraReady(false);
-              setShowCamera(false);
-            }}
-          >
-            <Ionicons name="close-circle" size={28} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Annuler le scan</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+        onScan={handleBarcodeScanned}
+        hintText="Visez le QR Code du reçu ou le code-barres"
+      />
 
       {/* Modal principal (bottom sheet) - masqué pendant le scan */}
       <Modal

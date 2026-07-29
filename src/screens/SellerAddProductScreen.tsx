@@ -13,7 +13,8 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { type Category, type Collection } from '../lib/supabase';
@@ -50,8 +51,8 @@ export const SellerAddProductScreen: React.FC = () => {
   const [showCameraScanner, setShowCameraScanner] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
-    if (!showCameraScanner) return;
+  // Callback depuis BarcodeScannerModal
+  const handleBarcodeScanned = (data: string) => {
     updateField('reference', data);
     setShowCameraScanner(false);
   };
@@ -684,41 +685,12 @@ export const SellerAddProductScreen: React.FC = () => {
       </View>
     </ScrollView>
 
-    {/* MODAL SCANNER CAMÉRA */}
-    <Modal
+    <BarcodeScannerModal
       visible={showCameraScanner}
-      animationType="slide"
-      onRequestClose={() => setShowCameraScanner(false)}
-    >
-      <View style={styles.cameraContainer}>
-        <CameraView
-          style={styles.camera}
-          onBarcodeScanned={handleBarcodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
-          }}
-        >
-          <View style={styles.cameraOverlay}>
-            <View style={styles.cameraHeader}>
-              <TouchableOpacity 
-                style={styles.closeCameraButton}
-                onPress={() => setShowCameraScanner(false)}
-              >
-                <Ionicons name="close" size={28} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.cameraTargetContainer}>
-              <View style={styles.cameraTarget} />
-            </View>
-
-            <View style={styles.cameraFooter}>
-              <Text style={styles.cameraHint}>Placez le code-barres dans le cadre</Text>
-            </View>
-          </View>
-        </CameraView>
-      </View>
-    </Modal>
+      onClose={() => setShowCameraScanner(false)}
+      onScan={handleBarcodeScanned}
+      hintText="Placez la référence / code-barres dans le cadre"
+    />
   </>
 );
 };
