@@ -117,10 +117,9 @@ export const SellerProductsScreen: React.FC = () => {
   }, []);
 
   const handleBarcodeScanned = useCallback((data: string) => {
-    if (!showCameraScanner) return;
     setSearchQuery(data);
     setShowCameraScanner(false);
-  }, [showCameraScanner]);
+  }, []);
 
   const exportCatalogueCSV = useCallback(async () => {
     if (!products || products.length === 0) {

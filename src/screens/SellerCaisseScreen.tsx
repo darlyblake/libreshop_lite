@@ -801,11 +801,9 @@ export const SellerCaisseScreen = () => {
     }
   };
 
-  const handleBarcodeScanned = useCallback(({ data }: { data: string }) => {
-    if (!showCameraScanner) return;
-    
+  const handleBarcodeScanned = useCallback((data: string) => {
     const q = data.trim().toLowerCase();
-    const match = products.find(p => p.reference?.toLowerCase() === q);
+    const match = products.find(p => p.reference?.toLowerCase() === q || p.name.toLowerCase() === q);
     
     if (match) {
       addToCart(match);
@@ -820,7 +818,7 @@ export const SellerCaisseScreen = () => {
       Alert.alert('Non trouvé', `Aucun produit avec la référence ${data} n'a été trouvé.`);
       setShowCameraScanner(false);
     }
-  }, [showCameraScanner, products, addToCart]);
+  }, [products, addToCart]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1364,18 +1362,8 @@ export const SellerCaisseScreen = () => {
       <BarcodeScannerModal
         visible={showCameraScanner}
         onClose={() => setShowCameraScanner(false)}
-        onScan={(data) => {
-          // On set the search query which will trigger the product filter
-          setProductSearch(data);
-          setShowCameraScanner(false);
-          
-          // Auto-add if exact match
-          const match = products.find(p => p.reference?.toLowerCase() === data.toLowerCase() || p.name.toLowerCase() === data.toLowerCase());
-          if (match) {
-            addToCart(match);
-            setProductSearch('');
-          }
-        }}
+        onScan={handleBarcodeScanned}
+        hintText="Scannez le code-barres d'un produit"
       />
 
       {/* Modal de Retour Caisse (POS Return) */}
