@@ -16,7 +16,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   visible,
   onScan,
   onClose,
-  barcodeTypes = ["qr", "ean13", "ean8", "code128", "code39", "upc_a", "upc_e"],
+  barcodeTypes,
   hintText = 'Placez le code-barres dans le cadre'
 }) => {
   const themeContext = useTheme();
@@ -88,9 +88,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             facing="back"
             autofocus="on"
             onBarcodeScanned={scanLock.current ? undefined : handleBarcodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: barcodeTypes as any,
-            }}
+            {...(barcodeTypes ? { barcodeScannerSettings: { barcodeTypes: barcodeTypes as any } } : {})}
           />
         )}
         <View style={styles.cameraOverlay}>
