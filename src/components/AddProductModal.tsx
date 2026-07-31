@@ -1647,11 +1647,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                             return;
                           }
                         }
-                        barcodeScanLock.current = false;
-                        setCameraReady(false);
                         setShowCameraScanner(true);
-                        // Attendre que le Modal soit monté avant d'activer la caméra
-                        setTimeout(() => setCameraReady(true), 400);
                       }}
                     >
                       <Ionicons name="barcode-outline" size={24} color={COLORS.accent} />
