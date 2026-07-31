@@ -41,13 +41,29 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
     }
   }, [visible]);
 
-  const handleBarcodeScanned = ({ data }: { data: string }) => {
+  const handleBarcodeScanned = (result: any) => {
     if (scanLock.current) return;
     scanLock.current = true; // Lock immédiatement pour éviter le multi-trigger
     
+    // Extraction sécurisée selon la plateforme (Web / Native)
+    let scannedData = '';
+    if (result && typeof result.data === 'string') {
+      scannedData = result.data;
+    } else if (result && result.nativeEvent && typeof result.nativeEvent.data === 'string') {
+      scannedData = result.nativeEvent.data;
+    } else if (typeof result === 'string') {
+      scannedData = result;
+    }
+
+    if (!scannedData) {
+      console.warn('[BarcodeScannerModal] Impossible d\'extraire les données du code-barres', result);
+      scanLock.current = false;
+      return;
+    }
+
     // Ferme la caméra et retourne la donnée
     setTimeout(() => {
-      onScan(data);
+      onScan(scannedData);
     }, 100);
   };
 
@@ -73,7 +89,7 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
             autofocus="on"
             onBarcodeScanned={scanLock.current ? undefined : handleBarcodeScanned}
             barcodeScannerSettings={{
-              barcodeTypes,
+              barcodeTypes: barcodeTypes as any,
             }}
           />
         )}
