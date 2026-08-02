@@ -30,6 +30,8 @@ import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { orderService } from '../services/orderService';
 import { qrCodeService } from '../services/qrCodeService';
+import { networkService } from '../services/networkService';
+import { offlineSyncManager } from '../services/offlineSyncManager';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
 import { COLORS, SPACING, FONT_SIZE, RADIUS } from '../config/theme';
 import { SearchBar } from '../components/SearchBar';
@@ -42,6 +44,7 @@ type Product = {
   name: string;
   price: number;
   stock: number;
+  maxStock?: number;
   category?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   reference?: string;
@@ -50,6 +53,7 @@ type Product = {
 
 type CartItem = Product & {
   quantity: number;
+  maxStock: number;
 };
 
 export const SellerCaisseScreen = () => {
@@ -89,6 +93,29 @@ export const SellerCaisseScreen = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptHtml, setReceiptHtml] = useState('');
   const [currentOrderShareInfo, setCurrentOrderShareInfo] = useState<{ id: string, total: string, url: string, storeName: string } | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(networkService.isOnline());
+
+  // Écoute de l'état du réseau & Synchronisation Automatique
+  useEffect(() => {
+    const unsubscribe = networkService.subscribe((status) => {
+      setIsOnline(status);
+      if (status) {
+        offlineSyncManager.syncPendingOrders().then(({ syncedCount }) => {
+          if (syncedCount > 0) {
+            if (Platform.OS === 'web') {
+              window.alert(`🟢 ${syncedCount} vente(s) enregistrée(s) hors-ligne ont été synchronisées avec la base de données !`);
+            } else {
+              Alert.alert(
+                '🟢 Synchronisation Réussie',
+                `${syncedCount} vente(s) enregistrée(s) hors-ligne ont été synchronisées avec la base de données !`
+              );
+            }
+          }
+        }).catch(console.error);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Initialiser le client si passé en paramètre
   useEffect(() => {
@@ -98,24 +125,40 @@ export const SellerCaisseScreen = () => {
 
   const format = (v: number) => v.toLocaleString('fr-FR') + ' FCFA';
 
-  // Charger les produits depuis Supabase
+  // Charger les produits (depuis Supabase si en ligne, ou depuis le cache local si hors-ligne)
   useEffect(() => {
     const loadProducts = async () => {
       if (!user?.id) return;
       try {
         setLoading(true);
-        const store = await storeService.getByUser(user.id);
-        if (!store?.id) {
+        let currentStore = store;
+
+        if (networkService.isOnline()) {
+          try {
+            currentStore = await storeService.getByUser(user.id);
+            if (currentStore?.id) {
+              await offlineSyncManager.saveOfflineStore(currentStore.id, currentStore);
+            }
+          } catch (stErr) {
+            console.warn('Erreur chargement boutique en ligne, tentative cache local:', stErr);
+          }
+        }
+
+        if (!currentStore?.id && storeId) {
+          currentStore = await offlineSyncManager.getOfflineStore(storeId);
+        }
+
+        if (!currentStore?.id) {
           setStoreId(null);
           setStore(null);
           setProducts([]);
           return;
         }
 
-        if (!storeService.isSubscriptionActive(store)) {
+        if (!storeService.isSubscriptionActive(currentStore)) {
           Alert.alert(
             'Abonnement expiré',
-            `Votre abonnement pour "${store.name}" a expiré. Veuillez le renouveler pour accéder à la caisse.`,
+            `Votre abonnement pour "${currentStore.name}" a expiré. Veuillez le renouveler pour accéder à la caisse.`,
             [
               {
                 text: 'Renouveler',
@@ -127,10 +170,10 @@ export const SellerCaisseScreen = () => {
           return;
         }
 
-        if (store.cashier_active === false) {
+        if (currentStore.cashier_active === false) {
           Alert.alert(
             'Non inclus',
-            `Le Point de Vente n'est pas inclus dans votre abonnement "${store.subscription_plan || 'actuel'}".`,
+            `Le Point de Vente n'est pas inclus dans votre abonnement "${currentStore.subscription_plan || 'actuel'}".`,
             [
               { text: 'Retour', onPress: () => navigation.goBack() },
               { text: 'Changer d\'offre', onPress: () => navigation.navigate('SellerChangePlan') }
@@ -140,20 +183,42 @@ export const SellerCaisseScreen = () => {
           return;
         }
 
-        setStoreId(store.id);
-        setStore(store);
-        const data = await productService.getByStoreAvailable(store.id);
-        setProducts(data as Product[] || []);
+        setStoreId(currentStore.id);
+        setStore(currentStore);
+
+        let rawProducts: any[] = [];
+        if (networkService.isOnline()) {
+          try {
+            rawProducts = await productService.getByStoreAvailable(currentStore.id);
+            await offlineSyncManager.saveOfflineProducts(currentStore.id, rawProducts);
+          } catch (pErr) {
+            console.warn('Réseau indisponible pour charger les produits, bascule sur le cache local:', pErr);
+            rawProducts = await offlineSyncManager.getOfflineProducts(currentStore.id);
+          }
+        } else {
+          rawProducts = await offlineSyncManager.getOfflineProducts(currentStore.id);
+        }
+
+        const formattedProducts: Product[] = (rawProducts || []).map(p => ({
+          ...p,
+          maxStock: p.stock ?? 0,
+          stock: p.stock ?? 0,
+        }));
+        setProducts(formattedProducts);
       } catch (e) {
-        errorHandler.handleDatabaseError(e as any, 'Erreur chargement produits caisse');
-        Alert.alert('Erreur', 'Impossible de charger les produits');
-        setProducts([]);
+        console.error('Erreur chargement produits caisse:', e);
+        if (storeId) {
+          const cached = await offlineSyncManager.getOfflineProducts(storeId);
+          if (cached && cached.length > 0) {
+            setProducts(cached.map(p => ({ ...p, maxStock: p.stock ?? 0, stock: p.stock ?? 0 })));
+          }
+        }
       } finally {
         setLoading(false);
       }
     };
     loadProducts();
-  }, [user?.id]);
+  }, [user?.id, isOnline]);
 
   // Animation du panier
   useEffect(() => {
@@ -174,14 +239,25 @@ export const SellerCaisseScreen = () => {
   ====================== */
 
   const addToCart = useCallback((product: Product) => {
-    if (product.stock <= 0) {
-      Alert.alert('Stock épuisé', `Le produit ${product.name} n'est plus disponible.`);
+    const targetProduct = products.find(p => p.id === product.id) || product;
+    const existingInCart = cart.find(i => i.id === product.id);
+    const currentQty = existingInCart ? existingInCart.quantity : 0;
+    const maxStock = targetProduct.maxStock ?? (product as any).maxStock ?? (targetProduct.stock + currentQty);
+
+    // BLOQUER LA QUANTITÉ SI LE STOCK DISPONIBLE EST ATTEINT OU DÉPASSÉ
+    if (currentQty >= maxStock || targetProduct.stock <= 0) {
+      const msg = `Stock insuffisant pour "${product.name}". La quantité disponible est limitée à ${maxStock}.`;
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Stock insuffisant', msg);
+      }
       return;
     }
 
     setProducts(prev =>
       prev.map(p =>
-        p.id === product.id ? { ...p, stock: p.stock - 1 } : p
+        p.id === product.id ? { ...p, stock: Math.max(0, p.stock - 1) } : p
       )
     );
 
@@ -194,14 +270,14 @@ export const SellerCaisseScreen = () => {
             : i
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, maxStock, quantity: 1 }];
     });
 
     // Feedback haptique
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  }, []);
+  }, [products, cart]);
 
   const removeFromCart = useCallback((id: string) => {
     const item = cart.find(i => i.id === id);
@@ -270,28 +346,37 @@ export const SellerCaisseScreen = () => {
     if (!storeId) return;
     const loadClients = async () => {
       try {
-        const res = await orderService.getByStore(storeId, { includeUser: true });
-        const orders = res.orders || [];
-        const map = new Map<string, {id: string, name: string, phone: string}>();
-        (orders as any[]).forEach((o: any) => {
-          const cPhone = String(o?.customer_phone || '').trim();
-          const cName = String(o?.customer_name || '').trim();
-          const uId = String(o?.user_id || '').trim();
-          const id = String(cPhone || cName || uId || o?.id || '');
-          if (!id) return;
-          const name = String(cName || o?.users?.full_name || '').trim();
-          const phone = String(cPhone || o?.users?.phone || '').trim();
-          if (!map.has(id) && name && name.toLowerCase() !== 'client') {
-            map.set(id, { id, name, phone });
-          }
-        });
-        setClients(Array.from(map.values()));
+        if (networkService.isOnline()) {
+          const res = await orderService.getByStore(storeId, { includeUser: true });
+          const orders = res.orders || [];
+          const map = new Map<string, {id: string, name: string, phone: string}>();
+          (orders as any[]).forEach((o: any) => {
+            const cPhone = String(o?.customer_phone || '').trim();
+            const cName = String(o?.customer_name || '').trim();
+            const uId = String(o?.user_id || '').trim();
+            const id = String(cPhone || cName || uId || o?.id || '');
+            if (!id) return;
+            const name = String(cName || o?.users?.full_name || '').trim();
+            const phone = String(cPhone || o?.users?.phone || '').trim();
+            if (!map.has(id) && name && name.toLowerCase() !== 'client') {
+              map.set(id, { id, name, phone });
+            }
+          });
+          const list = Array.from(map.values());
+          setClients(list);
+          await offlineSyncManager.saveOfflineClients(storeId, list);
+        } else {
+          const cachedClients = await offlineSyncManager.getOfflineClients(storeId);
+          setClients(cachedClients || []);
+        }
       } catch (e) {
-        console.warn('Erreur chargement clients:', e);
+        console.warn('Erreur chargement clients caisse, tentative cache local:', e);
+        const cachedClients = await offlineSyncManager.getOfflineClients(storeId);
+        setClients(cachedClients || []);
       }
     };
     loadClients();
-  }, [storeId]);
+  }, [storeId, isOnline]);
 
   const cartTotalElements = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
@@ -405,43 +490,58 @@ export const SellerCaisseScreen = () => {
      RENDER CART ITEM
   ====================== */
 
-  const renderCartItem = useCallback(({ item }: { item: CartItem }) => (
-    <View style={styles.cartItem}>
-      <View style={styles.cartItemLeft}>
-        <View style={styles.cartItemIcon}>
-          <Ionicons name={item.icon || 'cube'} size={20} color={COLORS.info} />
-        </View>
-        <View style={styles.cartItemInfo}>
-          <Text style={styles.cartItemName}>{item.name}</Text>
-          <Text style={styles.cartItemPrice}>{format(item.price)}</Text>
-        </View>
-      </View>
+  const renderCartItem = useCallback(({ item }: { item: CartItem }) => {
+    const maxStock = item.maxStock ?? (item.stock + item.quantity);
+    const isMaxReached = item.quantity >= maxStock;
 
-      <View style={styles.cartItemRight}>
-        <View style={styles.quantityControls}>
-          <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => removeFromCart(item.id)}
-          >
-            <Ionicons name="remove" size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
-          
-          <Text style={styles.quantityText}>{item.quantity}</Text>
-          
-          <TouchableOpacity
-            style={[styles.quantityButton, styles.quantityButtonAdd]}
-            onPress={() => addToCart(item)}
-          >
-            <Ionicons name="add" size={18} color="white" />
-          </TouchableOpacity>
+    return (
+      <View style={styles.cartItem}>
+        <View style={styles.cartItemLeft}>
+          <View style={styles.cartItemIcon}>
+            <Ionicons name={item.icon || 'cube'} size={20} color={COLORS.info} />
+          </View>
+          <View style={styles.cartItemInfo}>
+            <Text style={styles.cartItemName}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.cartItemPrice}>{format(item.price)}</Text>
+              <Text style={{ fontSize: 10, color: isMaxReached ? COLORS.danger : COLORS.textMuted, fontWeight: isMaxReached ? '700' : '400' }}>
+                (Max dispo: {maxStock})
+              </Text>
+            </View>
+          </View>
         </View>
-        
-        <Text style={styles.cartItemTotal}>
-          {format(item.price * item.quantity)}
-        </Text>
+
+        <View style={styles.cartItemRight}>
+          <View style={styles.quantityControls}>
+            <TouchableOpacity
+              style={styles.quantityButton}
+              onPress={() => removeFromCart(item.id)}
+            >
+              <Ionicons name="remove" size={18} color={COLORS.textMuted} />
+            </TouchableOpacity>
+            
+            <Text style={styles.quantityText}>{item.quantity}</Text>
+            
+            <TouchableOpacity
+              style={[
+                styles.quantityButton,
+                styles.quantityButtonAdd,
+                isMaxReached && { backgroundColor: COLORS.border, opacity: 0.5 }
+              ]}
+              onPress={() => addToCart(item)}
+              disabled={isMaxReached}
+            >
+              <Ionicons name="add" size={18} color={isMaxReached ? COLORS.textMuted : "white"} />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={styles.cartItemTotal}>
+            {format(item.price * item.quantity)}
+          </Text>
+        </View>
       </View>
-    </View>
-  ), [removeFromCart, addToCart]);
+    );
+  }, [removeFromCart, addToCart]);
 
   /* ======================
      CHECKOUT
@@ -489,7 +589,6 @@ export const SellerCaisseScreen = () => {
     }
 
     try {
-      // Créer la commande dans Supabase
       const orderPayload: any = {
         user_id: user?.id || '',
         store_id: storeId,
@@ -505,46 +604,74 @@ export const SellerCaisseScreen = () => {
         customer_phone: customerPhone.trim() || undefined,
       };
 
-      const order = await orderService.create(orderPayload);
-
-      // Insérer les order_items
       const itemsPayload = cart.map(item => ({
-        order_id: order.id,
         product_id: item.id,
         quantity: item.quantity,
         price: item.price,
         cost_price: item.cost_price,
+        product_name: item.name,
       }));
-      await orderService.createItems(itemsPayload);
 
-      // Log stock movements to stock_movements table before updating stocks
-      const client = useSupabase();
-      for (const item of cart) {
-        try {
-          await client.from('stock_movements').insert({
-            product_id: item.id,
-            quantity_changed: -item.quantity,
-            previous_stock: item.stock, // original stock
-            new_stock: item.stock - item.quantity,
-            type: 'sale',
-            reason: 'Vente caisse',
-            notes: `Vente caisse - Ticket #${order.id.slice(0, 8).toUpperCase()} - Paiement : ${paymentMethod}`,
-            created_by: user?.id,
-          });
-        } catch (mErr) {
-          console.warn('Failed to log stock movement for caisse item:', mErr);
+      let orderId = '';
+
+      if (!networkService.isOnline()) {
+        // MODE HORS-LIGNE : Sauvegarde en file d'attente locale
+        const offlineOrder = await offlineSyncManager.queueOfflineOrder(
+          storeId,
+          orderPayload,
+          itemsPayload
+        );
+        orderId = offlineOrder.id;
+
+        if (Platform.OS === 'web') {
+          window.alert('⚡ Vente enregistrée en Mode Hors-Ligne ! Elle sera automatiquement synchronisée dès le retour d\'Internet.');
+        } else {
+          Alert.alert(
+            '⚡ Vente Hors-Ligne',
+            'Vente enregistrée localement avec succès ! Elle sera automatiquement synchronisée avec la base de données dès le retour de votre connexion Internet.'
+          );
         }
+      } else {
+        // MODE EN LIGNE : Envoi Supabase direct
+        const order = await orderService.create(orderPayload);
+        orderId = order.id;
+
+        const formattedItems = itemsPayload.map(i => ({
+          order_id: order.id,
+          product_id: i.product_id,
+          quantity: i.quantity,
+          price: i.price,
+          cost_price: i.cost_price,
+        }));
+        await orderService.createItems(formattedItems);
+
+        const client = useSupabase();
+        for (const item of cart) {
+          try {
+            await client.from('stock_movements').insert({
+              product_id: item.id,
+              quantity_changed: -item.quantity,
+              previous_stock: item.stock,
+              new_stock: item.stock - item.quantity,
+              type: 'sale',
+              reason: 'Vente caisse',
+              notes: `Vente caisse - Ticket #${order.id.slice(0, 8).toUpperCase()} - Paiement : ${paymentMethod}`,
+              created_by: user?.id,
+            });
+          } catch (mErr) {
+            console.warn('Failed to log stock movement for caisse item:', mErr);
+          }
+        }
+
+        await orderService.processPayment(order.id);
       }
 
-      // Décrémenter le stock via le RPC
-      await orderService.processPayment(order.id);
-
       // Préchargement du QR code en base64 pour garantir son affichage dans le reçu
-      const orderUrl = qrCodeService.getOrderUrl(order.id);
+      const orderUrl = qrCodeService.getOrderUrl(orderId);
       const qrBase64 = await qrCodeService.getQrImageBase64(orderUrl, 100);
 
       setCurrentOrderShareInfo({
-        id: order.id,
+        id: orderId,
         total: format(total),
         url: orderUrl,
         storeName: store?.name || 'LibreShop'
@@ -846,6 +973,11 @@ export const SellerCaisseScreen = () => {
           </TouchableOpacity>
           <Ionicons name="cash-outline" size={28} color={COLORS.info} />
           <Text style={styles.headerTitle}>Smart Caisse</Text>
+          {!isOnline && (
+            <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, marginLeft: 8 }}>
+              <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>⚡ Mode Hors-Ligne</Text>
+            </View>
+          )}
         </View>
         
         <View style={styles.headerRight}>

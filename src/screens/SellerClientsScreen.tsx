@@ -25,6 +25,8 @@ import { useSearch } from '../hooks/useSearch';
 import { orderService } from '../services/orderService';
 import { storeService } from '../services/storeService';
 import { cacheService } from '../services/cacheService';
+import { networkService } from '../services/networkService';
+import { offlineSyncManager } from '../services/offlineSyncManager';
 import { useAuthStore } from '../store';
 
 /* =========================
@@ -109,6 +111,12 @@ export const SellerClientsScreen: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [lastCursor, setLastCursor] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(networkService.isOnline());
+
+  useEffect(() => {
+    const unsub = networkService.subscribe(setIsOnline);
+    return () => unsub();
+  }, []);
 
   const loadClients = useCallback(async (reset = true, cursor?: string) => {
     if (!user?.id) return;
@@ -156,6 +164,15 @@ export const SellerClientsScreen: React.FC = () => {
       }
 
       setStoreId(store.id);
+
+      let clientList: Client[] = [];
+      if (!networkService.isOnline()) {
+        const cached = await offlineSyncManager.getOfflineClients(store.id || '');
+        setClients(cached.map(c => ({ ...c, isActive: true })));
+        setLoading(false);
+        setLoadingMore(false);
+        return;
+      }
 
       // 🚀 Appel avec pagination cursor
       const orders = await orderService.getByStore(store.id, { 
@@ -221,15 +238,16 @@ export const SellerClientsScreen: React.FC = () => {
         });
       });
 
-      const newClients = Array.from(map.values());
+      clientList = Array.from(map.values());
       
       // 🚀 Mettre à jour les états de pagination
       if (!reset) {
-        setClients(prev => [...prev, ...newClients]);
+        setClients(prev => [...prev, ...clientList]);
       } else {
-        setClients(newClients);
+        setClients(clientList);
         // Cache first page / initial list (30 minutes)
-        cacheService.set(cacheKey, newClients, 30);
+        cacheService.set(cacheKey, clientList, 30);
+        if (store.id) offlineSyncManager.saveOfflineClients(store.id, clientList).catch(console.error);
       }
       setHasMore(hasMoreData);
       setLastCursor(nextCursor);
@@ -237,6 +255,10 @@ export const SellerClientsScreen: React.FC = () => {
     } catch (e: any) {
       console.error('❌ Erreur lors du chargement des clients:', e);
       errorHandler.handle(e, 'load clients failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+      if (storeId) {
+        const cached = await offlineSyncManager.getOfflineClients(storeId);
+        if (cached && cached.length > 0) setClients(cached.map(c => ({ ...c, isActive: true })));
+      }
       const rawMsg = String(e?.message || '');
       const isRls =
         rawMsg.toLowerCase().includes('permission denied') ||
@@ -253,7 +275,7 @@ export const SellerClientsScreen: React.FC = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [user?.id]);
+  }, [user?.id, loyaltyConfig, isOnline, storeId]);
 
   const loadMoreClients = useCallback(async () => {
     if (!hasMore || loadingMore || loading) return;
@@ -292,16 +314,30 @@ export const SellerClientsScreen: React.FC = () => {
   ========================= */
 
   // called when the reusable modal submits data
-  const handleAddClient = (data: UserData) => {
+  const handleAddClient = async (data: UserData) => {
     if (!data.name.trim() || !data.phone.trim()) {
       Alert.alert('Erreur', 'Le nom et le téléphone sont requis');
       return;
     }
 
-    Alert.alert('Succès', `Client "${data.name}" ajouté avec succès`);
-    // clear initial values so form resets when reopened
+    if (!isOnline && storeId) {
+      await offlineSyncManager.queueOfflineClient(storeId, {
+        name: data.name.trim(),
+        phone: data.phone.trim(),
+        email: data.email?.trim(),
+      });
+      if (Platform.OS === 'web') {
+        window.alert(`⚡ Client "${data.name}" enregistré en mode hors-ligne. Il sera synchronisé automatiquement à la reconnexion.`);
+      } else {
+        Alert.alert('⚡ Client Hors-Ligne', `Client "${data.name}" enregistré localement ! Il sera synchronisé automatiquement à la reconnexion.`);
+      }
+    } else {
+      Alert.alert('Succès', `Client "${data.name}" ajouté avec succès`);
+    }
+
     setNewClient({ name: '', phone: '', email: '' });
     setShowAddModal(false);
+    loadClients(true);
   };
 
   const toggleClientStatus = (id: string) => {
@@ -511,7 +547,21 @@ export const SellerClientsScreen: React.FC = () => {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Clients</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('SellerDashboard')} style={{ marginRight: 12 }}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.headerTitle}>Carnet Client</Text>
+              {!isOnline && (
+                <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                  <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>⚡ Hors-Ligne</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
 
         <View style={styles.headerActions}>
           <TouchableOpacity

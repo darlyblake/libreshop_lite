@@ -23,6 +23,8 @@ import { storeService } from '../services/storeService';
 import { productService } from '../services/productService';
 import { stockMovementService, StockMovement } from '../services/stockMovementService';
 import { lowStockAlertService } from '../services/lowStockAlertService';
+import { networkService } from '../services/networkService';
+import { offlineSyncManager } from '../services/offlineSyncManager';
 import { errorHandler } from '../utils/errorHandler';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -53,10 +55,16 @@ export const SellerStockHistoryScreen: React.FC = () => {
   const [quantityChanged, setQuantityChanged] = useState('');
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [isOnline, setIsOnline] = useState<boolean>(networkService.isOnline());
+
+  useEffect(() => {
+    const unsub = networkService.subscribe(setIsOnline);
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     loadStoreData();
-  }, [user?.id]);
+  }, [user?.id, isOnline]);
 
   useEffect(() => {
     if (route.params?.productId) {
@@ -90,17 +98,25 @@ export const SellerStockHistoryScreen: React.FC = () => {
         }
         setStoreId(store.id);
         
-        // Load products for dropdown
-        const pList = await productService.getByStoreAll(store.id);
-        setProducts(pList || []);
+        if (networkService.isOnline()) {
+          const pList = await productService.getByStoreAll(store.id);
+          setProducts(pList || []);
+          if (pList) offlineSyncManager.saveOfflineProducts(store.id, pList).catch(console.error);
 
-        // Load movements
-        const moveData = await stockMovementService.getByStore(store.id);
-        setMovements(moveData);
+          const moveData = await stockMovementService.getByStore(store.id);
+          setMovements(moveData || []);
+        } else {
+          const cachedProducts = await offlineSyncManager.getOfflineProducts(store.id);
+          setProducts(cachedProducts || []);
+          setMovements([]);
+        }
       }
     } catch (e) {
-      errorHandler.handleDatabaseError(e, 'Error loading stock history');
-      Alert.alert('Erreur', 'Impossible de charger l\'historique');
+      console.warn('Erreur chargement stocks, bascule cache local:', e);
+      if (storeId) {
+        const cachedProducts = await offlineSyncManager.getOfflineProducts(storeId);
+        if (cachedProducts) setProducts(cachedProducts);
+      }
     } finally {
       setLoading(false);
     }
@@ -157,37 +173,61 @@ export const SellerStockHistoryScreen: React.FC = () => {
         created_by: user?.id,
       });
 
-      await stockMovementService.create({
-        product_id: selectedProductId,
-        quantity_changed: finalQtyChanged,
-        previous_stock: currentStock,
-        new_stock: newStock,
-        type: adjustmentType,
-        reason: reason || undefined,
-        notes: notes || undefined,
-        created_by: user?.id,
-      });
+      if (!isOnline && storeId) {
+        // Enregistrer l'ajustement en mode hors-ligne
+        await offlineSyncManager.queueOfflineStockMovement(storeId, {
+          productId: selectedProductId,
+          quantityChanged: finalQtyChanged,
+          type: adjustmentType === 'restock' ? 'in' : 'out',
+          reason: reason || 'Ajustement Hors-Ligne',
+          notes: notes || undefined,
+          userId: user?.id,
+        });
 
-      // Reset low stock alert flag when product is restocked
-      if (adjustmentType === 'restock') {
-        try {
-          await lowStockAlertService.resetAlertFlag(selectedProductId);
-        } catch (alertErr) {
-          console.warn('Failed to reset low stock alert flag:', alertErr);
+        // Mettre à jour localement la liste des produits
+        setProducts(prev => prev.map(p => {
+          if (p.id === selectedProductId) {
+            const updatedStock = Math.max(0, (p.stock || 0) + finalQtyChanged);
+            return { ...p, stock: updatedStock };
+          }
+          return p;
+        }));
+
+        if (Platform.OS === 'web') {
+          window.alert(`⚡ Ajustement de stock enregistré en mode hors-ligne ! Il sera synchronisé à la reconnexion.`);
+        } else {
+          Alert.alert('⚡ Ajustement Hors-Ligne', 'Ajustement de stock enregistré localement ! Il sera synchronisé dès le retour d\'Internet.');
         }
+      } else {
+        await stockMovementService.create({
+          product_id: selectedProductId,
+          quantity_changed: finalQtyChanged,
+          previous_stock: currentStock,
+          new_stock: newStock,
+          type: adjustmentType,
+          reason: reason || undefined,
+          notes: notes || undefined,
+          created_by: user?.id,
+        });
+
+        if (adjustmentType === 'restock') {
+          try {
+            await lowStockAlertService.resetAlertFlag(selectedProductId);
+          } catch (alertErr) {
+            console.warn('Failed to reset low stock alert flag:', alertErr);
+          }
+        }
+
+        Alert.alert('Succès', 'Ajustement de stock enregistré');
       }
 
-      Alert.alert('Succès', 'Ajustement de stock enregistré');
       setAdjustmentModalVisible(false);
-      
-      // Reset form
       setSelectedProductId('');
       setAdjustmentType('restock');
       setQuantityChanged('');
       setReason('');
       setNotes('');
 
-      // Reload
       await loadStoreData();
     } catch (e) {
       console.error('Error saving stock adjustment:', e);

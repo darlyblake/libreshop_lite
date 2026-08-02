@@ -38,6 +38,8 @@ import { useTheme } from '../hooks/useTheme';
 import { cacheService } from '../services/cacheService';
 import { financeService } from '../services/financeService';
 import { errorHandler, ErrorCategory, ErrorSeverity } from '../utils/errorHandler';
+import { networkService } from '../services/networkService';
+import { offlineSyncManager } from '../services/offlineSyncManager';
 import { Card, LoadingSpinner } from '../components';
 import { useResponsive } from '../utils/useResponsive';
 
@@ -330,25 +332,29 @@ export const SellerDashboardScreen: React.FC = () => {
     }
   }, [isExpired, store?.id, navigation]);
 
+  const [isOnline, setIsOnline] = useState<boolean>(networkService.isOnline());
+
+  React.useEffect(() => {
+    const unsub = networkService.subscribe(setIsOnline);
+    return () => unsub();
+  }, []);
+
   const loadDashboardData = React.useCallback(async (isRefreshing = false) => {
     if (!store?.id) return;
     try {
-      const cacheKey = `seller_dashboard_${store.id}_${timeRange}`;
-      
-      // Try to load from cache if not refreshing (ignorer cache pour forcer recalcul)
-      if (false && !isRefreshing) {
-        const cached = await cacheService.get<any>(cacheKey);
-        if (cached) {
-          if (cached.stats) setStats(cached.stats);
-          if (cached.recentOrders) setRecentOrders(cached.recentOrders);
-          if (cached.activities) setActivities(cached.activities);
-          if (cached.summary) setSummary(cached.summary);
-          setLoading(false);
-          return;
-        }
-      }
-
       setLoading(true);
+
+      if (!networkService.isOnline()) {
+        const cachedOffline = await offlineSyncManager.getOfflineDashboard(store.id);
+        if (cachedOffline) {
+          if (cachedOffline.stats) setStats(cachedOffline.stats);
+          if (cachedOffline.recentOrders) setRecentOrders(cachedOffline.recentOrders);
+          if (cachedOffline.activities) setActivities(cachedOffline.activities);
+          if (cachedOffline.summary) setSummary(cachedOffline.summary);
+        }
+        setLoading(false);
+        return;
+      }
 
       const { start, prevStart, prevEnd } = getRangeBounds(timeRange);
 
@@ -1270,6 +1276,11 @@ export const SellerDashboardScreen: React.FC = () => {
                   {store?.name || 'Ma Boutique'}
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={COLORS.primary} />
+                {!isOnline && (
+                  <View style={{ backgroundColor: '#f59e0b', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginLeft: 4 }}>
+                    <Text style={{ color: '#FFF', fontSize: 9, fontWeight: '800' }}>⚡ Hors-Ligne</Text>
+                  </View>
+                )}
               </TouchableOpacity>
               <Text style={[styles.greeting, { fontSize: fontSize.titleLarge }]}>
                 Bonjour, {sellerName.split(' ')[0]} 👋

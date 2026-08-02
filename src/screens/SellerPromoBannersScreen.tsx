@@ -38,7 +38,6 @@ export const SellerPromoBannersScreen: React.FC = () => {
   const RADIUS = radius;
   const FONT_SIZE = fontSize;
 
-  const routeStoreId: string | undefined = route.params?.storeId;
   const routeAutoOpen: boolean | undefined = route.params?.autoOpenModal;
   const routeAutoImage: string | undefined = route.params?.autoImageUri;
   const routeAutoProductId: string | undefined = route.params?.autoProductId;
@@ -48,7 +47,6 @@ export const SellerPromoBannersScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [store, setStore] = useState<any>(null);
-  const [myStores, setMyStores] = useState<any[]>([]);
   const [promos, setPromos] = useState<PromoBanner[]>([]);
   const [storeProducts, setStoreProducts] = useState<any[]>([]);
   const [storeCollections, setStoreCollections] = useState<any[]>([]);
@@ -63,29 +61,19 @@ export const SellerPromoBannersScreen: React.FC = () => {
     target_url: '',
   });
 
-  const loadData = useCallback(async (forcedStoreId?: string) => {
+  const loadData = useCallback(async () => {
     try {
       if (!user?.id) return;
       setLoading(true);
-      const client = useSupabase();
 
-      // 1. Charger TOUTES les boutiques du vendeur
-      const { data: stores, error: storeErr } = await client
-        .from('stores')
-        .select('id, name, slug, user_id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (storeErr) throw storeErr;
-      if (!stores || stores.length === 0) { setLoading(false); return; }
-      setMyStores(stores);
-
-      // Déterminer la boutique à afficher (celle forcée, ou celle de l'URL, ou la première par défaut)
-      const targetStoreId = forcedStoreId || routeStoreId || stores[0].id;
-      const s = stores.find(st => st.id === targetStoreId) || stores[0];
+      // Récupérer la boutique active de l'utilisateur (comme les autres écrans)
+      const s = await storeService.getByUser(user.id);
+      if (!s?.id) { setLoading(false); return; }
       setStore(s);
 
-      // 2. Charger les bannières de CETTE boutique uniquement
+      const client = useSupabase();
+
+      // Charger les bannières, produits et collections de cette boutique
       const { data: promosData, error: promosErr } = await client
         .from('store_promos')
         .select('*')
@@ -95,14 +83,13 @@ export const SellerPromoBannersScreen: React.FC = () => {
       if (promosErr) console.warn('[SellerPromoBanners] promos error:', promosErr);
       setPromos(promosData || []);
 
-      // 3. Charger produits et collections de CETTE boutique
       const [prodRes, colRes] = await Promise.all([
         client.from('products').select('id, name').eq('store_id', s.id).is('deleted_at', null).order('name'),
         client.from('collections').select('id, name').eq('store_id', s.id).order('name'),
       ]);
       setStoreProducts(prodRes.data || []);
       setStoreCollections(colRes.data || []);
-      console.log('[SellerPromoBanners] Store:', s.name, '| Banners:', promosData?.length, '| Products:', prodRes.data?.length, '| Collections:', colRes.data?.length);
+
       // Handle auto-open modal from Marketing
       if (routeAutoOpen && !editModalVisible && promosData) {
         if (promosData.length >= 5) {
@@ -110,16 +97,15 @@ export const SellerPromoBannersScreen: React.FC = () => {
           navigation.setParams({ autoOpenModal: undefined, autoImageUri: undefined, autoProductId: undefined, autoTitle: undefined, autoSubtitle: undefined });
         } else {
           setEditingPromo(null);
-          setPromoData({ 
-            title: routeAutoTitle || 'Nouvelle Promotion', 
-            subtitle: routeAutoSubtitle || '', 
-            image_url: routeAutoImage || '', 
-            target_type: routeAutoProductId ? 'product' : 'collection', 
-            target_id: routeAutoProductId || '', 
-            target_url: '' 
+          setPromoData({
+            title: routeAutoTitle || 'Nouvelle Promotion',
+            subtitle: routeAutoSubtitle || '',
+            image_url: routeAutoImage || '',
+            target_type: routeAutoProductId ? 'product' : 'collection',
+            target_id: routeAutoProductId || '',
+            target_url: '',
           });
           setEditModalVisible(true);
-          // Clear params to avoid reopening on re-focus
           navigation.setParams({ autoOpenModal: undefined, autoImageUri: undefined, autoProductId: undefined, autoTitle: undefined, autoSubtitle: undefined });
         }
       }
@@ -129,7 +115,7 @@ export const SellerPromoBannersScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, routeStoreId, routeAutoOpen, routeAutoImage, routeAutoProductId, routeAutoTitle, routeAutoSubtitle, editModalVisible, navigation]);
+  }, [user?.id, routeAutoOpen, routeAutoImage, routeAutoProductId, routeAutoTitle, routeAutoSubtitle, editModalVisible, navigation]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -201,7 +187,7 @@ export const SellerPromoBannersScreen: React.FC = () => {
 
       Alert.alert('Succès', 'Bannière enregistrée !');
       setEditModalVisible(false);
-      loadData(store.id);
+      loadData();
     } catch (e: any) {
       Alert.alert('Erreur', e?.message || 'Impossible d\'enregistrer la bannière');
     } finally {
@@ -220,7 +206,7 @@ export const SellerPromoBannersScreen: React.FC = () => {
             const { error } = await client.from('store_promos').delete().eq('id', promoId).eq('store_id', store.id);
             if (error) throw error;
             Alert.alert('Succès', 'Bannière supprimée');
-            loadData(store.id);
+            loadData();
           } catch (e: any) {
             Alert.alert('Erreur', e?.message || 'Impossible de supprimer');
           }
@@ -271,27 +257,7 @@ export const SellerPromoBannersScreen: React.FC = () => {
         </TouchableOpacity>
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={[styles.headerTitle, { color: COLORS.text, fontSize: FONT_SIZE.lg }]}>Bannières Publicitaires</Text>
-          {myStores.length > 1 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 4 }}>
-              {myStores.map(st => (
-                <TouchableOpacity 
-                  key={st.id} 
-                  onPress={() => loadData(st.id)}
-                  style={{ 
-                    paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.sm,
-                    backgroundColor: store?.id === st.id ? COLORS.accent : COLORS.bg,
-                    borderWidth: 1, borderColor: store?.id === st.id ? COLORS.accent : COLORS.border
-                  }}
-                >
-                  <Text style={{ color: store?.id === st.id ? '#fff' : COLORS.text, fontSize: FONT_SIZE.xs }}>
-                    {st.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          ) : (
-            store && <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs, textAlign: 'center' }}>{store.name}</Text>
-          )}
+          {store && <Text style={{ color: COLORS.textMuted, fontSize: FONT_SIZE.xs, marginTop: 2 }}>{store.name}</Text>}
         </View>
         <TouchableOpacity onPress={openCreateModal}>
           <Ionicons name="add" size={28} color={promos.length >= 5 ? COLORS.textMuted : COLORS.accent} />
