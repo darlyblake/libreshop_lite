@@ -342,6 +342,7 @@ export const SellerDashboardScreen: React.FC = () => {
   const loadDashboardData = React.useCallback(async (isRefreshing = false) => {
     if (!store?.id) return;
     try {
+      const cacheKey = `seller_dashboard_${store.id}_${timeRange}`;
       setLoading(true);
 
       if (!networkService.isOnline()) {

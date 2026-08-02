@@ -637,7 +637,7 @@ export const SellerCaisseScreen = () => {
         orderId = order.id;
 
         const formattedItems = itemsPayload.map(i => ({
-          order_id: order.id,
+          order_id: orderId,
           product_id: i.product_id,
           quantity: i.quantity,
           price: i.price,
@@ -655,7 +655,7 @@ export const SellerCaisseScreen = () => {
               new_stock: item.stock - item.quantity,
               type: 'sale',
               reason: 'Vente caisse',
-              notes: `Vente caisse - Ticket #${order.id.slice(0, 8).toUpperCase()} - Paiement : ${paymentMethod}`,
+              notes: `Vente caisse - Ticket #${orderId.slice(0, 8).toUpperCase()} - Paiement : ${paymentMethod}`,
               created_by: user?.id,
             });
           } catch (mErr) {
@@ -663,7 +663,7 @@ export const SellerCaisseScreen = () => {
           }
         }
 
-        await orderService.processPayment(order.id);
+        await orderService.processPayment(orderId);
       }
 
       // Préchargement du QR code en base64 pour garantir son affichage dans le reçu
@@ -750,7 +750,7 @@ export const SellerCaisseScreen = () => {
 
           <div style="margin-bottom: 10px;">
             <div><span class="bold">Date :</span> ${new Date().toLocaleString('fr-FR')}</div>
-            <div><span class="bold">Ticket N° :</span> ${order.id.slice(0, 8).toUpperCase()}</div>
+            <div><span class="bold">Ticket N° :</span> ${orderId.slice(0, 8).toUpperCase()}</div>
             <div><span class="bold">Caissier :</span> ${(user as any)?.user_metadata?.full_name || user?.email || 'Admin'}</div>
             ${customerName.trim() ? `<div><span class="bold">Client :</span> ${customerName.trim()}</div>` : ''}
           </div>
@@ -859,15 +859,102 @@ export const SellerCaisseScreen = () => {
   const handleShareReceipt = async () => {
     try {
       if (Platform.OS === 'web') {
-        if (!currentOrderShareInfo) return;
-        const { shareContent } = await import('../components/ShareButton');
-        await shareContent({
-          title: `Ticket de caisse - ${currentOrderShareInfo.storeName}`,
-          description: `Commande #${currentOrderShareInfo.id.slice(0,8).toUpperCase()}`,
-          url: currentOrderShareInfo.url,
-          price: currentOrderShareInfo.total,
-          type: 'receipt',
-        });
+        // 1. Créer un conteneur HTML temporaire hors-écran pour effectuer le rendu du reçu thermique en PNG
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '-9999px';
+        container.style.width = '340px';
+        container.style.backgroundColor = '#ffffff';
+        container.style.padding = '0px';
+        container.innerHTML = receiptHtml;
+        document.body.appendChild(container);
+
+        try {
+          const htmlToImage = await import('html-to-image');
+          const blob = await htmlToImage.toBlob(container, {
+            backgroundColor: '#ffffff',
+            skipFonts: true,
+            fontEmbedCSS: '',
+            cacheBust: false,
+          });
+
+          if (document.body.contains(container)) {
+            document.body.removeChild(container);
+          }
+
+          if (!blob) {
+            throw new Error('Échec génération image du reçu');
+          }
+
+          const filename = `Ticket_Caisse_${currentOrderShareInfo?.id.slice(0, 8).toUpperCase() || 'LibreShop'}.png`;
+          const file = new File([blob], filename, { type: 'image/png' });
+
+          // 2. Tenter le partage natif par l'API Web Share si le navigateur autorise le partage de fichiers image (Mobile / Web Share API)
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: `Ticket de caisse - ${currentOrderShareInfo?.storeName || 'LibreShop'}`,
+              text: `Reçu de caisse #${currentOrderShareInfo?.id.slice(0, 8).toUpperCase()} - ${currentOrderShareInfo?.total || ''}`,
+            });
+            return;
+          }
+
+          // 3. En mode Web Desktop sans API natif de partage d'image :
+          // Copier l'image du reçu dans le presse-papier
+          let copiedToClipboard = false;
+          if (navigator.clipboard && (window as any).ClipboardItem) {
+            try {
+              await navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': blob })]);
+              copiedToClipboard = true;
+            } catch (clipErr) {
+              console.warn('Clipboard write error:', clipErr);
+            }
+          }
+
+          // Télécharger l'image PNG du reçu
+          const dataUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = dataUrl;
+          link.download = filename;
+          link.click();
+
+          // Formater le numéro de téléphone WhatsApp
+          let formattedPhone = customerPhone.replace(/\D/g, '');
+          if (formattedPhone && !formattedPhone.startsWith('225') && formattedPhone.length === 10) {
+            formattedPhone = '225' + formattedPhone;
+          }
+
+          const messageText = copiedToClipboard
+            ? `Bonjour ! Voici le reçu de votre achat (${currentOrderShareInfo?.total || ''}). 🖼️ L'image du reçu a été copiée dans le presse-papier !Faites simplement "Coller" (Ctrl+V / Cmd+V) ici pour l'envoyer.`
+            : `Bonjour ! Voici le reçu de votre achat (${currentOrderShareInfo?.total || ''}). 🖼️ L'image du reçu a été téléchargée sur votre appareil pour l'ajouter en pièce jointe.`;
+
+          const waUrl = formattedPhone
+            ? `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`
+            : `https://api.whatsapp.com/send?text=${encodeURIComponent(messageText)}`;
+
+          window.open(waUrl, '_blank');
+
+          if (copiedToClipboard) {
+            window.alert(`🖼️ L'image du reçu a été copiée dans le presse-papier et téléchargée ! Collez-la (Ctrl+V / Cmd+V) directement sur WhatsApp.`);
+          } else {
+            window.alert(`🖼️ L'image du reçu a été téléchargée ! Vous pouvez maintenant l'ajouter directement sur WhatsApp.`);
+          }
+        } catch (convErr) {
+          console.warn('Erreur conversion image receiptHtml:', convErr);
+          if (document.body.contains(container)) {
+            document.body.removeChild(container);
+          }
+          if (!currentOrderShareInfo) return;
+          const { shareContent } = await import('../components/ShareButton');
+          await shareContent({
+            title: `Ticket de caisse - ${currentOrderShareInfo.storeName}`,
+            description: `Commande #${currentOrderShareInfo.id.slice(0, 8).toUpperCase()}`,
+            url: currentOrderShareInfo.url,
+            price: currentOrderShareInfo.total,
+            type: 'receipt',
+          });
+        }
       } else {
         const { uri } = await Print.printToFileAsync({ html: receiptHtml });
         await Sharing.shareAsync(uri);

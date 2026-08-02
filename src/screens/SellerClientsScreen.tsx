@@ -800,6 +800,11 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.lg,
   },
 
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
   headerActions: {
     flexDirection: 'row',
     gap: SPACING.sm,
