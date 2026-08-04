@@ -114,6 +114,7 @@ export interface OrderFilters {
   limit?: number;
   cursor?: string;
   forceRefresh?: boolean;
+  onlineOnly?: boolean;
 }
 
 export interface GetByStoreOptions extends OrderFilters {

@@ -859,28 +859,54 @@ export const SellerCaisseScreen = () => {
   const handleShareReceipt = async () => {
     try {
       if (Platform.OS === 'web') {
-        // 1. Créer un conteneur HTML temporaire hors-écran pour effectuer le rendu du reçu thermique en PNG
-        const container = document.createElement('div');
-        container.style.position = 'absolute';
-        container.style.left = '-9999px';
-        container.style.top = '-9999px';
-        container.style.width = '340px';
-        container.style.backgroundColor = '#ffffff';
-        container.style.padding = '0px';
-        container.innerHTML = receiptHtml;
-        document.body.appendChild(container);
+        // 1. Créer un conteneur HTML temporaire visible mais hors viewport pour que le rendu soit complet
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'fixed';
+        wrapper.style.left = '0px';
+        wrapper.style.top = '0px';
+        wrapper.style.width = '340px';
+        wrapper.style.backgroundColor = '#ffffff';
+        wrapper.style.padding = '0px';
+        wrapper.style.zIndex = '-1';
+        wrapper.style.opacity = '0';
+        wrapper.style.pointerEvents = 'none';
+
+        // Retirer l'import de Google Fonts dans le HTML (bloque le rendu hors-ligne)
+        const cleanHtml = receiptHtml.replace(/@import url\(.*?google.*?\);/g, '');
+        wrapper.innerHTML = cleanHtml;
+        document.body.appendChild(wrapper);
+
+        // 2. Attendre que toutes les images soient chargées (QR code inclus)
+        const waitForImages = (el: HTMLElement): Promise<void> => {
+          const imgs = Array.from(el.querySelectorAll('img'));
+          if (imgs.length === 0) return Promise.resolve();
+          return Promise.all(
+            imgs.map(img => {
+              if (img.complete) return Promise.resolve();
+              return new Promise<void>(resolve => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve(); // continuer même si une image échoue
+              });
+            })
+          ).then(() => {});
+        };
+
+        await waitForImages(wrapper);
+
+        // 3. Laisser le navigateur effectuer un reflow complet (2 frames)
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
         try {
           const htmlToImage = await import('html-to-image');
-          const blob = await htmlToImage.toBlob(container, {
+          const blob = await htmlToImage.toBlob(wrapper, {
             backgroundColor: '#ffffff',
-            skipFonts: true,
-            fontEmbedCSS: '',
-            cacheBust: false,
+            pixelRatio: 2,
+            skipFonts: false,
+            cacheBust: true,
           });
 
-          if (document.body.contains(container)) {
-            document.body.removeChild(container);
+          if (document.body.contains(wrapper)) {
+            document.body.removeChild(wrapper);
           }
 
           if (!blob) {
@@ -890,7 +916,7 @@ export const SellerCaisseScreen = () => {
           const filename = `Ticket_Caisse_${currentOrderShareInfo?.id.slice(0, 8).toUpperCase() || 'LibreShop'}.png`;
           const file = new File([blob], filename, { type: 'image/png' });
 
-          // 2. Tenter le partage natif par l'API Web Share si le navigateur autorise le partage de fichiers image (Mobile / Web Share API)
+          // 4. Tenter le partage natif par l'API Web Share si le navigateur autorise le partage de fichiers image (Mobile / Web Share API)
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({
               files: [file],
@@ -900,8 +926,7 @@ export const SellerCaisseScreen = () => {
             return;
           }
 
-          // 3. En mode Web Desktop sans API natif de partage d'image :
-          // Copier l'image du reçu dans le presse-papier
+          // 5. En mode Web Desktop : copier l'image dans le presse-papier + télécharger
           let copiedToClipboard = false;
           if (navigator.clipboard && (window as any).ClipboardItem) {
             try {
@@ -918,6 +943,7 @@ export const SellerCaisseScreen = () => {
           link.href = dataUrl;
           link.download = filename;
           link.click();
+          setTimeout(() => URL.revokeObjectURL(dataUrl), 5000);
 
           // Formater le numéro de téléphone WhatsApp
           let formattedPhone = customerPhone.replace(/\D/g, '');
@@ -926,7 +952,7 @@ export const SellerCaisseScreen = () => {
           }
 
           const messageText = copiedToClipboard
-            ? `Bonjour ! Voici le reçu de votre achat (${currentOrderShareInfo?.total || ''}). 🖼️ L'image du reçu a été copiée dans le presse-papier !Faites simplement "Coller" (Ctrl+V / Cmd+V) ici pour l'envoyer.`
+            ? `Bonjour ! Voici le reçu de votre achat (${currentOrderShareInfo?.total || ''}). 🖼️ L'image du reçu a été copiée dans le presse-papier ! Faites simplement "Coller" (Ctrl+V / Cmd+V) ici pour l'envoyer.`
             : `Bonjour ! Voici le reçu de votre achat (${currentOrderShareInfo?.total || ''}). 🖼️ L'image du reçu a été téléchargée sur votre appareil pour l'ajouter en pièce jointe.`;
 
           const waUrl = formattedPhone
@@ -942,8 +968,8 @@ export const SellerCaisseScreen = () => {
           }
         } catch (convErr) {
           console.warn('Erreur conversion image receiptHtml:', convErr);
-          if (document.body.contains(container)) {
-            document.body.removeChild(container);
+          if (document.body.contains(wrapper)) {
+            document.body.removeChild(wrapper);
           }
           if (!currentOrderShareInfo) return;
           const { shareContent } = await import('../components/ShareButton');

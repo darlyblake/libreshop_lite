@@ -277,8 +277,8 @@ export const orderService = {
 
     // Projection sélective selon les besoins
     const projection = options?.includeUser
-      ? 'id, user_id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, status_changed_at, stores(id, name), users(id, email, full_name, phone), order_items(id)'
-      : 'id, user_id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, status_changed_at, stores(id, name), order_items(id)';
+      ? 'id, user_id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, notes, status_changed_at, stores(id, name), users(id, email, full_name, phone), order_items(id)'
+      : 'id, user_id, status, total_amount, created_at, customer_name, customer_phone, payment_method, payment_status, notes, status_changed_at, stores(id, name), order_items(id)';
 
     let query = client
       .from('orders')
@@ -286,6 +286,10 @@ export const orderService = {
       .eq('store_id', storeId)
       .order('created_at', { ascending: false })
       .limit(limit + 1); // +1 pour déterminer hasMore
+
+    if (options?.onlineOnly) {
+      query = query.or('notes.is.null,notes.not.ilike.%Vente caisse%');
+    }
 
     // Appliquer les filtres
     if (options?.status && options.status !== 'all') {

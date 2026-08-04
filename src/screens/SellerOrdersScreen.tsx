@@ -225,7 +225,7 @@ export const SellerOrdersScreen: React.FC = () => {
       customerName: o.customer,
       customerPhone: o.phone,
       shippingAddress: o.deliveryAddress || '',
-      items: o.items.map((it: any) => ({ name: it.name, quantity: it.quantity || 1, price: it.price || 0 })),
+      items: (o.items || []).map((it: any) => ({ name: it.name, quantity: it.quantity || 1, price: it.price || 0 })),
       totalAmount: o.total,
       paymentMethod: o.paymentMethod,
       paymentStatus: o.paymentStatus || 'pending',
@@ -247,7 +247,7 @@ export const SellerOrdersScreen: React.FC = () => {
       customerName: o.customer,
       customerPhone: o.phone,
       shippingAddress: o.deliveryAddress || '',
-      items: o.items.map((it: any) => ({ name: it.name, quantity: it.quantity || 1, price: it.price || 0 })),
+      items: (o.items || []).map((it: any) => ({ name: it.name, quantity: it.quantity || 1, price: it.price || 0 })),
       totalAmount: o.total,
       paymentMethod: o.paymentMethod,
       paymentStatus: o.paymentStatus || 'pending',
@@ -442,6 +442,7 @@ export const SellerOrdersScreen: React.FC = () => {
             cursor: (reset ? undefined : nextCursor) || undefined,
             status: selectedFilter !== 'all' ? selectedFilter : undefined,
             search: searchQuery || undefined,
+            onlineOnly: true,
           }),
           orderService.getStoreOrdersMetadata(store.id),
         ]);
@@ -480,8 +481,9 @@ export const SellerOrdersScreen: React.FC = () => {
         const returns = await returnService.getStoreReturns(store.id);
         const orderIdsWithReturns = new Set((returns || []).map((r: any) => r.order_id));
 
-        // 🔄 Mapping optimisé
-        const mapped: OrderDisplay[] = result.orders.map((o: any) => {
+        // 🔄 Mapping optimisé (filtrer uniquement les commandes en ligne)
+        const onlineOrders = (result.orders || []).filter((o: any) => !o.notes || !String(o.notes).toLowerCase().includes('vente caisse'));
+        const mapped: OrderDisplay[] = onlineOrders.map((o: any) => {
           const itemCount = Array.isArray(o.order_items) ? o.order_items.length : 0;
 
           const customerName = String(o?.customer_name || o?.users?.full_name || '').trim();
@@ -769,7 +771,7 @@ Merci.`;
         customerName: o.customer,
         customerPhone: o.phone,
         shippingAddress: o.deliveryAddress || undefined,
-        items: o.items.map((it: any) => ({ ...it, quantity: it.quantity || 1 })),
+        items: (o.items || []).map((it: any) => ({ ...it, quantity: it.quantity || 1 })),
         totalAmount: o.total,
         paymentMethod: o.paymentMethod,
         paymentStatus: o.paymentStatus,
@@ -787,7 +789,7 @@ Merci.`;
         customerName: order.customer,
         customerPhone: order.phone,
         shippingAddress: order.deliveryAddress || undefined,
-        items: order.items.map((it: any) => ({ ...it, quantity: it.quantity || 1 })),
+        items: (order.items || []).map((it: any) => ({ ...it, quantity: it.quantity || 1 })),
         totalAmount: order.total,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
@@ -1724,7 +1726,12 @@ Merci.`;
         >
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>Commandes</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.headerTitle}>Commandes</Text>
+                <View style={{ backgroundColor: COLORS.accent + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                  <Text style={{ fontSize: fontSize.xs, color: COLORS.accent, fontWeight: '700' }}>En ligne</Text>
+                </View>
+              </View>
               <View style={styles.headerStats}>
                 <View style={styles.statBadge}>
                   <Ionicons name="cart" size={fontSize.xs} color={COLORS.accent} />
