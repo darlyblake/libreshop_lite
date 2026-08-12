@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Pressable,
   Image,
+  Modal,
   StatusBar,
   ActivityIndicator,
   Alert,
@@ -27,6 +28,7 @@ import { notificationService } from '../services/notificationService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useAlertModal } from '../components/AlertModal';
 import OptimizedImage from '../components/OptimizedImage';
+import { qrCodeService } from '../services/qrCodeService';
 
 const EmptyCartAnimation = ({ color }: { color: string }) => {
   const translateY = useSharedValue(0);
@@ -60,11 +62,12 @@ export const CartScreen: React.FC = () => {
   const [loadingStore, setLoadingStore] = useState(false);
   const [storesData, setStoresData] = useState<any[]>([]);
 
-  const { items, removeItem, updateQuantity, getTotal, storeId } = useCartStore();
+  const { items, removeItem, updateQuantity, getTotal, storeId, table, setTable } = useCartStore();
   const subtotal = getTotal();
   const user = useAuthStore((s) => s.user);
   const clearCart = useCartStore((s) => s.clearCart);
   const [processingBulk, setProcessingBulk] = useState(false);
+  const [showTableQr, setShowTableQr] = useState(false);
   const { show: showAlert, AlertModalComponent } = useAlertModal();
 
   const palette = useLegacyPalette();
@@ -390,6 +393,42 @@ export const CartScreen: React.FC = () => {
         )}
       </ScrollView>
 
+      {/* ── Table QR Modal ─── */}
+      {table && (
+        <Modal visible={showTableQr} transparent animationType="fade" onRequestClose={() => setShowTableQr(false)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: SPACING.xl }}>
+            <View style={{ backgroundColor: palette.card, borderRadius: RADIUS.xl, padding: SPACING.xl, width: '100%', maxWidth: 360 }}>
+              <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', color: palette.text, marginBottom: 4 }}>📲 QR Code Commande</Text>
+              <Text style={{ fontSize: FONT_SIZE.sm, color: palette.textMuted, marginBottom: SPACING.lg }}>Table {table} · {items.length} article{items.length > 1 ? 's' : ''} · {grandTotal.toLocaleString()} FCFA</Text>
+              <View style={{ alignItems: 'center', backgroundColor: '#fff', borderRadius: RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.lg }}>
+                <Image
+                  source={{ uri: qrCodeService.getQrImageUrl(
+                    JSON.stringify({
+                      v: 1,
+                      table,
+                      items: items.map(i => ({ id: i.product.id, name: i.product.name, price: i.product.price, qty: i.quantity })),
+                      total: grandTotal,
+                    }),
+                    280
+                  )}}
+                  style={{ width: 240, height: 240 }}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, textAlign: 'center', marginBottom: SPACING.lg }}>
+                Montrez ce code au serveur pour passer votre commande.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: palette.accent, borderRadius: RADIUS.lg, paddingVertical: SPACING.md, alignItems: 'center' }}
+                onPress={() => setShowTableQr(false)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: FONT_SIZE.md }}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
       {items.length > 0 && (
         <View style={[styles.bottomBar, { paddingBottom: Math.max(SPACING.md, insets.bottom) }]}>
           <View style={styles.totalContainer}>
@@ -401,6 +440,16 @@ export const CartScreen: React.FC = () => {
               </Text>
             )}
           </View>
+          {/* Bouton Commander à table (QR) */}
+          {table ? (
+            <TouchableOpacity
+              style={[styles.checkoutButton, { backgroundColor: '#f97316', flexDirection: 'row', gap: 8 }]}
+              onPress={() => setShowTableQr(true)}
+            >
+              <Ionicons name="qr-code-outline" size={20} color="#fff" />
+              <Text style={styles.checkoutButtonText}>Commander à la table {table}</Text>
+            </TouchableOpacity>
+          ) : (
           <TouchableOpacity
             style={styles.checkoutButton}
             onPress={async () => {
@@ -479,6 +528,7 @@ export const CartScreen: React.FC = () => {
               </>
             )}
           </TouchableOpacity>
+          )}
         </View>
       )}
       {AlertModalComponent}

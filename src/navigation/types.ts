@@ -51,6 +51,8 @@ export type RootStackParamList = {
   SellerClients: undefined;
   SellerStore: undefined;
   SellerCaisse: undefined;
+  RestaurantCaisse: undefined;
+  BarCaisse: undefined;
   SellerAddProduct: undefined;
   SellerEditProduct: { productId: string };
   SellerAddStore: undefined;

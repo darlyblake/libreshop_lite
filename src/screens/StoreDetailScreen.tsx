@@ -35,7 +35,7 @@ import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { storeStatsService } from '../services/storeStatsService';
 import { storeReviewService } from '../services/storeReviewService';
-import { useAuthStore } from "../store";
+import { useAuthStore, useCartStore } from "../store";
 import { useResponsive } from "../utils/responsive";
 import { useTheme } from "../hooks/useTheme";
 import { StoreMap } from "../components/StoreMap";
@@ -230,6 +230,23 @@ export const StoreDetailScreen: React.FC = () => {
     }
     return null;
   }, []);
+
+  const tableParam = useMemo(() => {
+    let t = route.params?.table;
+    if (!t && Platform.OS === "web" && typeof window !== "undefined") {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        t = params.get("table");
+      } catch {}
+    }
+    return t ? String(t) : null;
+  }, [route.params?.table]);
+
+  // Persist table number into cart store so CartScreen can use it
+  const setTable = useCartStore((s) => s.setTable);
+  useEffect(() => {
+    if (tableParam) setTable(tableParam);
+  }, [tableParam, setTable]);
 
   const effectiveSlug = useMemo(() => {
     const s = slugParam != null ? String(slugParam) : "";
@@ -1106,15 +1123,22 @@ export const StoreDetailScreen: React.FC = () => {
               onReport={handleReportStore}
               onDirections={handleOpenDirections}
             />
-
             {/* NEW: Store Tabs Navigation */}
+            {tableParam && (
+              <View style={{ backgroundColor: COLORS.info + '20', padding: SPACING.md, borderRadius: RADIUS.md, marginHorizontal: SPACING.xl, marginBottom: SPACING.md, flexDirection: 'row', alignItems: 'center', gap: SPACING.sm }}>
+                <Ionicons name="restaurant-outline" size={20} color={COLORS.info} />
+                <Text style={{ color: COLORS.info, fontWeight: '600' }}>Vous commandez pour la table {tableParam}</Text>
+              </View>
+            )}
             <StoreTabs
               activeTab={activeTab}
               onTabChange={setActiveTab}
               tabs={[
                 { id: "accueil", label: "Accueil" },
-                { id: "produits", label: "Produits" },
-                { id: "promotions", label: "Promotions" },
+                ...(storeData?.category !== 'Bar' && storeData?.category !== 'Bars' ? [
+                  { id: "produits", label: "Produits" },
+                  { id: "promotions", label: "Promotions" },
+                ] : []),
                 { id: "apropos", label: "À propos" },
                 { id: "avis", label: "Avis" },
               ]}
@@ -1133,8 +1157,9 @@ export const StoreDetailScreen: React.FC = () => {
                 </View>
 
                 {/* Featured Products - only products marked as featured */}
-                <View style={styles.homepageProductsSection}>
-                  <Text style={styles.sectionTitle}>Produits en vedette</Text>
+                {storeData?.category !== 'Bar' && storeData?.category !== 'Bars' && (
+                  <View style={styles.homepageProductsSection}>
+                    <Text style={styles.sectionTitle}>Produits en vedette</Text>
                   {homepageProducts && homepageProducts.length > 0 ? (
                     <View style={styles.productsGrid}>
                       {homepageProducts.map((product, idx) => {
@@ -1165,6 +1190,7 @@ export const StoreDetailScreen: React.FC = () => {
                     </View>
                   )}
                 </View>
+                )}
               </>
             )}
 
@@ -1874,6 +1900,12 @@ const getStyles = (COLORS: any, isDark: boolean) => StyleSheet.create({
     textAlign: "center",
     fontSize: FONT_SIZE.sm,
     lineHeight: 22,
+  },
+  errorTitle: {
+    color: COLORS.text,
+    fontWeight: "700",
+    fontSize: FONT_SIZE.xl,
+    textAlign: "center",
   },
   retryButton: {
     marginTop: SPACING.sm,

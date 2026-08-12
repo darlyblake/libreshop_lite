@@ -26,6 +26,7 @@ import { type Category } from '../lib/supabase';
 import { collectionService } from '../services/collectionService';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
+import { RestaurantCollectionScreen, BarCollectionScreen } from './index';
 
 type UiCollection = {
   id: string;
@@ -51,7 +52,41 @@ const ICON_COLORS = [
   COLORS.danger,
 ];
 
+// ─── ROUTEUR : Collections ─────────────────────────────────────────────
 export const SellerCollectionScreen: React.FC = () => {
+  const { user } = useAuthStore();
+  const [storeType, setStoreType] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const detectAndRoute = async () => {
+      if (!user?.id) { setLoading(false); return; }
+      try {
+        const store = await storeService.getByUser(user.id);
+        if (cancelled) return;
+        setStoreType(store?.store_type || null);
+      } catch { /* ignore */ }
+      setLoading(false);
+    };
+    detectAndRoute();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  
+  if (storeType === 'restaurant') return <RestaurantCollectionScreen />;
+  if (storeType === 'bar') return <BarCollectionScreen />;
+  return <SellerCollectionScreenContent />;
+};
+
+const SellerCollectionScreenContent: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();

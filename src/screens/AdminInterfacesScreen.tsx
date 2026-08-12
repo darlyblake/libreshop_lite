@@ -27,8 +27,8 @@ export interface StoreType {
 
 const DEFAULT_STORE_TYPES: StoreType[] = [
   { id: 'general', title: '🛍️ Boutique', icon: 'storefront-outline', status: 'active' },
-  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline', status: 'avenir' },
-  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline', status: 'avenir' },
+  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline', status: 'active' },
+  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline', status: 'active' },
   { id: 'hotel', title: '🏨 Hôtel', icon: 'bed-outline', status: 'avenir' },
   { id: 'logement', title: '🏠 Logement', icon: 'home-outline', status: 'avenir' },
 ];

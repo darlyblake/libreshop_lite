@@ -349,11 +349,15 @@ export const ClientHomeScreen: React.FC = () => {
                 key={i} 
                 disabled={!!navigatingState}
                 style={{ alignItems: 'center', gap: 8 }}
-                onPress={() => {
+onPress={() => {
                   if (cat.name === 'Boutiques') {
                     handleNavigate('ClientAllStores', undefined, cat.name);
                   } else if (cat.name === 'Produits') {
                     handleNavigate('ClientAllProducts', undefined, cat.name);
+                  } else if (cat.name === 'Restaurants') {
+                    handleNavigate('ClientAllStores', { storeType: 'restaurant' }, cat.name);
+                  } else if (cat.name === 'Bars') {
+                    handleNavigate('ClientAllStores', { storeType: 'bar' }, cat.name);
                   } else {
                     Alert.alert('Bientôt disponible', `La catégorie ${cat.name} sera bientôt disponible !`);
                   }

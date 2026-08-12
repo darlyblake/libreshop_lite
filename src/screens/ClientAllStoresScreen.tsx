@@ -64,7 +64,11 @@ export const ClientAllStoresScreen: React.FC = () => {
     return 2; // Mobile
   };
 
-  const [numColumns, setNumColumns] = useState(getNumColumns());
+const [numColumns, setNumColumns] = useState(getNumColumns());
+
+  // Type de boutique ciblé (restaurant, bar, hotel, logement, general) passé en paramètre
+  const storeType = route.params?.storeType as string | undefined;
+  const storeTypeTitle = storeType === 'restaurant' ? 'Restaurants' : storeType === 'bar' ? 'Bars & Vie Nocturne' : undefined;
 
   // Mettre à jour le nombre de colonnes lors du redimensionnement
   useEffect(() => {
@@ -137,8 +141,14 @@ export const ClientAllStoresScreen: React.FC = () => {
       
       if (reset) {
         setStores(list);
+        
+        let typeFilteredList = list;
+        if (storeType) {
+          typeFilteredList = list.filter((s) => s.store_type === storeType);
+        }
+
         const uniqueCategories = Array.from(
-          new Set(list.map((s) => s.category).filter(Boolean))
+          new Set(typeFilteredList.map((s) => s.category).filter(Boolean))
         ) as string[];
         setCategories(['Toutes', ...uniqueCategories]);
       } else {
@@ -279,6 +289,11 @@ export const ClientAllStoresScreen: React.FC = () => {
 
     if (selectedCategory !== 'Toutes') {
       storesList = storesList.filter((store) => store.category === selectedCategory);
+    }
+
+    // Filtrer par type de boutique (restaurant, bar, hotel, logement, general) si précisé
+    if (storeType) {
+      storesList = storesList.filter((s) => s.store_type === storeType);
     }
 
     // apply modal filters
@@ -491,9 +506,9 @@ export const ClientAllStoresScreen: React.FC = () => {
                 <Ionicons name="arrow-back" size={22} color="white" />
               </TouchableOpacity>
 
-              <View style={styles.headerTitles}>
-                <Text style={styles.title}>Boutiques</Text>
-                <Text style={styles.subtitle}>Découvrez nos vendeurs partenaires</Text>
+<View style={styles.headerTitles}>
+                <Text style={styles.title}>{storeTypeTitle || 'Boutiques'}</Text>
+                <Text style={styles.subtitle}>Découvrez nos {storeTypeTitle ? storeTypeTitle.toLowerCase() : 'vendeurs partenaires'}</Text>
               </View>
 
               <TouchableOpacity style={styles.filterBtn} onPress={() => setShowFilters(true)}>

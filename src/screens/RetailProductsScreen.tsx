@@ -39,8 +39,6 @@ import { cacheService } from '../services/cacheService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useAuthStore } from '../store';
 import OptimizedImage from '../components/OptimizedImage';
-import { RestaurantProductsScreen } from './RestaurantProductsScreen';
-import { BarProductsScreen } from './BarProductsScreen';
 
 type SortOption = 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc' | 'date_desc' | 'date_asc';
 type ViewMode = 'list' | 'grid';
@@ -57,42 +55,7 @@ const SORT_OPTIONS: { id: SortOption; label: string; icon: keyof typeof Ionicons
   { id: 'stock_desc', label: 'Stock élevé d\'abord', icon: 'checkmark-circle-outline' },
 ];
 
-// ─── ROUTEUR : détecte le type de boutique et redirige ───────────────────────
-export const SellerProductsScreen: React.FC = () => {
-  const { user } = useAuthStore();
-  const [storeType, setStoreType] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    const detectAndRoute = async () => {
-      if (!user?.id) { setLoading(false); return; }
-      try {
-        const store = await storeService.getByUser(user.id);
-        if (cancelled) return;
-        setStoreType(store?.store_type || null);
-      } catch { /* ignore, show generic screen */ }
-      setLoading(false);
-    };
-    detectAndRoute();
-    return () => { cancelled = true; };
-  }, [user?.id]);
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (storeType === 'restaurant') return <RestaurantProductsScreen />;
-  if (storeType === 'bar') return <BarProductsScreen />;
-  return <SellerProductsScreenContent />;
-};
-
-// ─── CONTENU ORIGINAL (interface générale) ───────────────────────────────────
-const SellerProductsScreenContent: React.FC = () => {
+export const RetailProductsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();

@@ -750,7 +750,11 @@ export const SellerDashboardScreen: React.FC = () => {
               activeOpacity={0.7}
               onPress={() => {
                 if (index === 0) navigation.navigate('SellerOrders');
-                if (index === 1) navigation.navigate('SellerCaisse');
+                if (index === 1) {
+                  // Par défaut, la carte Caisse ouvre le Hub ou la Caisse Boutique
+                  // On va privilégier la Caisse Boutique par défaut ici, car l'utilisateur a 3 boutons spécifiques en dessous
+                  navigation.navigate('SellerCaisse');
+                }
                 if (index === 2) navigation.navigate('SellerProducts');
               }}
             >
@@ -977,10 +981,17 @@ export const SellerDashboardScreen: React.FC = () => {
 
     const financeActions = [
       { 
-        label: 'Caisse (POS)', 
+        label: 'Caisse Boutique', 
         icon: 'card', 
         color: COLORS.warning,
         screen: 'SellerCaisse',
+        inactive: store?.cashier_active === false
+      },
+      { 
+        label: 'Caisse (Tables)', 
+        icon: 'restaurant', 
+        color: COLORS.accent,
+        screen: 'RestaurantCaisse',
         inactive: store?.cashier_active === false
       },
       { 

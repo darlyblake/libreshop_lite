@@ -83,3 +83,12 @@ export { AccountSuspendedScreen } from './AccountSuspendedScreen';
 export * from './SellerCouponsScreen';
 export { SellerStockHistoryScreen } from './SellerStockHistoryScreen';
 
+// Nouveaux écrans Restaurant & Bar
+export { RestaurantProductsScreen } from './RestaurantProductsScreen';
+export { BarProductsScreen } from './BarProductsScreen';
+export { RestaurantOrdersScreen } from './RestaurantOrdersScreen';
+export { BarOrdersScreen } from './BarOrdersScreen';
+export { RestaurantCollectionScreen } from './RestaurantCollectionScreen';
+export { BarCollectionScreen } from './BarCollectionScreen';
+export { RestaurantClientsScreen } from './RestaurantClientsScreen';
+export { BarClientsScreen } from './BarClientsScreen';

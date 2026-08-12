@@ -82,8 +82,8 @@ const STORE_VALIDATION_RULES = {
 
 const DEFAULT_STORE_TYPES = [
   { id: 'general', title: '🛍️ Boutique', icon: 'storefront-outline', status: 'active' },
-  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline', status: 'avenir' },
-  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline', status: 'avenir' },
+  { id: 'restaurant', title: '🍳 Restaurant', icon: 'restaurant-outline', status: 'active' },
+  { id: 'bar', title: '🍹 Bar / Lounge', icon: 'beer-outline', status: 'active' },
   { id: 'hotel', title: '🏨 Hôtel', icon: 'bed-outline', status: 'avenir' },
   { id: 'logement', title: '🏠 Logement', icon: 'home-outline', status: 'avenir' },
 ];
@@ -204,10 +204,20 @@ const SellerAddStoreScreen: React.FC = () => {
     void loadCountries();
   }, []);
 
+// Types de boutique toujours disponibles (bar & restaurant sont des fonctionnalités actives)
+  const ALWAYS_ACTIVE_TYPES = ['general', 'restaurant', 'bar'];
+
   const loadStoreTypes = async () => {
     try {
       const types = await settingsService.getSetting('store_types', DEFAULT_STORE_TYPES);
-      const visibleTypes = types.filter((t: any) => t.status !== 'inactive');
+      // Forcer les types toujours actifs (general, restaurant, bar) en 'active'
+      // pour que la création de ces boutiques soit toujours débloquée.
+      const normalizedTypes = (types || []).map((t: any) =>
+        ALWAYS_ACTIVE_TYPES.includes(t.id)
+          ? { ...t, status: 'active' }
+          : t
+      );
+      const visibleTypes = normalizedTypes.filter((t: any) => t.status !== 'inactive');
       setStoreTypes(visibleTypes);
     } catch (e) {
       console.error('Error loading dynamic store types:', e);

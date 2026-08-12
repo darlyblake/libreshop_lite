@@ -91,6 +91,8 @@ const SellerProductActionsScreen = lazyLoad(() => import('../screens/SellerProdu
 const SellerSaleScreen = lazyLoad(() => import('../screens/SellerSaleScreen'), 'SellerSaleScreen');
 const SellerLowStockScreen = lazyLoad(() => import('../screens/SellerLowStockScreen'), 'SellerLowStockScreen');
 const SellerAnalyticsScreen = lazyLoad(() => import('../screens/SellerAnalyticsScreen'), 'SellerAnalyticsScreen');
+const RestaurantProfitScreen = lazyLoad(() => import('../screens/RestaurantProfitScreen'), 'RestaurantProfitScreen');
+const BarProfitScreen = lazyLoad(() => import('../screens/BarProfitScreen'), 'BarProfitScreen');
 const SellerReportsScreen = lazyLoad(() => import('../screens/SellerReportsScreen'), 'SellerReportsScreen');
 const SellerStockHistoryScreen = lazyLoad(() => import('../screens/SellerStockHistoryScreen'), 'SellerStockHistoryScreen');
 const SellerRefundsScreen = lazyLoad(() => import('../screens/SellerRefundsScreen'), 'SellerRefundsScreen');
@@ -102,6 +104,8 @@ const SellerKYCScreen = lazyLoad(() => import('../screens/SellerKYCScreen'), 'Se
 const SellerPromoBannersScreen = lazyLoad(() => import('../screens/SellerPromoBannersScreen'), 'SellerPromoBannersScreen');
 const SellerMarketingScreen = lazyLoad(() => import('../screens/SellerMarketingScreen'), 'SellerMarketingScreen');
 const SellerHubScreen = lazyLoad(() => import('../screens/SellerHubScreen'), 'SellerHubScreen');
+const RestaurantCaisseScreen = lazyLoad(() => import('../screens/RestaurantCaisseScreen'), 'RestaurantCaisseScreen');
+
 
 // Lazy loaded Admin screens
 const AdminDashboardScreen = lazyLoad(() => import('../screens/AdminDashboardScreen'), 'AdminDashboardScreen');
@@ -214,6 +218,8 @@ const linking = (() => {
         SellerKYC: 'SellerKYC',
         SellerPromoBanners: 'SellerPromoBanners',
         SellerMarketing: 'SellerMarketing',
+        RestaurantCaisse: 'RestaurantCaisse',
+
         Notifications: 'Notifications',
         Cart: 'Cart',
       },
@@ -928,6 +934,8 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerSale" component={SellerSaleScreen} />
         <Stack.Screen name="SellerLowStock" component={SellerLowStockScreen} />
         <Stack.Screen name="SellerAnalytics" component={SellerAnalyticsScreen} />
+        <Stack.Screen name="RestaurantProfit" component={RestaurantProfitScreen} options={{ title: 'Bénéfices Restaurant' }} />
+        <Stack.Screen name="BarProfit" component={BarProfitScreen} options={{ title: 'Bénéfices Bar' }} />
         <Stack.Screen name="SellerReports" component={SellerReportsScreen} />
         <Stack.Screen name="SellerStockHistory" component={SellerStockHistoryScreen} />
         <Stack.Screen name="SellerRefunds" component={SellerRefundsScreen} />
@@ -940,6 +948,8 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerPromoBanners" component={SellerPromoBannersScreen} />
         <Stack.Screen name="SellerMarketing" component={SellerMarketingScreen} />
         <Stack.Screen name="SellerHub" component={SellerHubScreen} />
+        <Stack.Screen name="RestaurantCaisse" component={RestaurantCaisseScreen} />
+
         
         {/* Routes admin */}
         <Stack.Screen name="AdminSettings" component={AdminSettingsScreen} />

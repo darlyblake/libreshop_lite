@@ -257,7 +257,9 @@ export const productService = {
       if (error) throw error;
 
       // ✅ Use productUtils ranking function
-      const mapped = (data || []).map(toProduct);
+      const mapped = (data || [])
+        .map(toProduct)
+        .filter(p => p.store?.category !== 'Bars' && p.store?.category !== 'Bar');
       const ranked = rankProductsByScore(mapped, sort);
       return ranked.slice(0, pageSize);
     };
@@ -336,7 +338,9 @@ export const productService = {
       if (prodError) throw prodError;
 
       // ✅ Use productUtils ranking
-      const mapped = (products || []).map(toProduct);
+      const mapped = (products || [])
+        .map(toProduct)
+        .filter(p => p.store?.category !== 'Bars' && p.store?.category !== 'Bar');
       const ranked = rankProductsByScore(mapped, sort);
 
       return ranked.slice(from, from + pageSize);
@@ -394,6 +398,9 @@ export const productService = {
           allData = (data || []).map(toProduct);
         }
       }
+
+      // Filtrer les produits de type Bar
+      allData = allData.filter(p => p.store?.category !== 'Bars' && p.store?.category !== 'Bar');
 
       // ✅ Use productUtils ranking
       const rankedData = rankProductsByScore(allData, sort);
@@ -689,7 +696,7 @@ export const productService = {
 
     let dbQuery = client
       .from('products')
-      .select('*, stores(name, logo_url)')
+      .select('*, stores(name, logo_url, category)')
       .or(
         `name.ilike.${searchPattern},description.ilike.${searchPattern},category.ilike.${searchPattern},reference.ilike.${searchPattern}`
       )
@@ -701,9 +708,11 @@ export const productService = {
 
     const { data, error } = await dbQuery
       .order('created_at', { ascending: false })
-      .range(from, to);
+      .limit(pageSize * 3); // Fetch more to compensate for client-side filtering
     if (error) throw error;
-    return (data || []) as Product[];
+    
+    const mapped = (data || []).filter((p: any) => p.stores?.category !== 'Bars' && p.stores?.category !== 'Bar');
+    return mapped.slice(from, to + 1) as Product[];
   },
 
   /**

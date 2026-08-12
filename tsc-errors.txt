@@ -1,0 +1,212 @@
+fix_images.ts(18,43): error TS7006: Parameter 'img' implicitly has an 'any' type.
+src/navigation/AppNavigator.tsx(852,7): error TS2322: Type '{ readonly prefixes: string[]; readonly config: { readonly screens: { readonly ClientTabs: { readonly screens: { readonly ClientHome: ""; readonly ClientOrders: "orders"; readonly ClientSearch: "search"; readonly Wishlist: "wishlist"; }; }; ... 26 more ...; readonly Cart: "Cart"; }; }; }' is not assignable to type 'LinkingOptions<{ readonly ClientTabs: unknown; readonly SellerTabs: unknown; readonly AdminDashboard: unknown; readonly Landing: unknown; readonly About: unknown; readonly SellerEmailConfirm: unknown; readonly Checkout: unknown; readonly Payment: unknown; ... 19 more ...; readonly Cart: unknown; }>'.
+  The types of 'config.screens.ClientTabs' are incompatible between these types.
+    Type '{ readonly screens: { readonly ClientHome: ""; readonly ClientOrders: "orders"; readonly ClientSearch: "search"; readonly Wishlist: "wishlist"; }; }' is not assignable to type 'string | Omit<PathConfig<{}>, "initialRouteName" | "screens"> | undefined'.
+src/navigation/AppNavigator.tsx(923,23): error TS2322: Type '"Review"' is not assignable to type 'keyof RootStackParamList'.
+src/navigation/AppNavigator.tsx(937,23): error TS2322: Type '"RestaurantProfit"' is not assignable to type 'keyof RootStackParamList'.
+src/navigation/AppNavigator.tsx(938,23): error TS2322: Type '"BarProfit"' is not assignable to type 'keyof RootStackParamList'.
+src/screens/AdminAnalyticsScreen.tsx(79,42): error TS18047: 'supabase' is possibly 'null'.
+src/screens/AdminStoresScreen.tsx(143,27): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(79,47): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(207,67): error TS7006: Parameter 'i' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(221,40): error TS7006: Parameter 'it' implicitly has an 'any' type.
+src/screens/CheckoutScreen.tsx(889,82): error TS7006: Parameter 'it' implicitly has an 'any' type.
+src/screens/ClientOrderDetailScreen.tsx(638,48): error TS2345: Argument of type '["Review", { orderId: string; storeId: string; storeName: any; }]' is not assignable to parameter of type '[screen: "Features", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | [screen: "Pricing", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | ... 88 more ... | [screen: ...]'.
+  Type '["Review", { orderId: string; storeId: string; storeName: any; }]' is not assignable to type '[screen: "ClientMap", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined]'.
+    Type at position 0 in source is not compatible with type at position 0 in target.
+      Type '"Review"' is not assignable to type '"ClientMap"'.
+src/screens/ClientOrderDetailScreen.tsx(641,33): error TS2551: Property 'stores' does not exist on type 'OrderWithDetails'. Did you mean 'store'?
+src/screens/ClientOrderDetailScreen.tsx(724,37): error TS2345: Argument of type '["Review", { orderId: string; storeId: string; storeName: any; }]' is not assignable to parameter of type '[screen: "Features", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | [screen: "Pricing", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined] | ... 88 more ... | [screen: ...]'.
+  Type '["Review", { orderId: string; storeId: string; storeName: any; }]' is not assignable to type '[screen: "ClientMap", params?: undefined, options?: { merge?: boolean | undefined; pop?: boolean | undefined; } | undefined]'.
+    Type at position 0 in source is not compatible with type at position 0 in target.
+      Type '"Review"' is not assignable to type '"ClientMap"'.
+src/screens/ClientOrderDetailScreen.tsx(727,37): error TS2551: Property 'stores' does not exist on type 'OrderWithDetails'. Did you mean 'store'?
+src/screens/ProductDetailScreen.tsx(1101,21): error TS2345: Argument of type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to parameter of type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+  Types of property 'collection_id' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/screens/SellerAddStoreScreen.tsx(331,15): error TS18047: 'client' is possibly 'null'.
+src/screens/SellerChangePlanScreen.tsx(131,11): error TS18047: 'client' is possibly 'null'.
+src/screens/SellerChangePlanScreen.tsx(134,11): error TS18047: 'client' is possibly 'null'.
+src/screens/SellerChangePlanScreen.tsx(137,11): error TS18047: 'client' is possibly 'null'.
+src/screens/SellerChangePlanScreen.tsx(219,15): error TS18047: 'client' is possibly 'null'.
+src/screens/SellerChangePlanScreen.tsx(231,17): error TS18047: 'client' is possibly 'null'.
+src/screens/SellerCollectionProductsScreen.tsx(42,19): error TS2345: Argument of type 'Product[]' is not assignable to parameter of type 'SetStateAction<Product[]>'.
+  Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product[]' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product[]'.
+    Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+      Types of property 'collection_id' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+src/screens/SellerCollectionScreen.tsx(163,13): error TS2322: Type '{ id: string; name: string; description: string; productCount: number; isActive: boolean; icon: string; createdAt: string; updatedAt: string; parentCategoryId: string | undefined; coverColor: string | undefined; customAttributes: any[]; }[]' is not assignable to type 'UiCollection[]'.
+  Type '{ id: string; name: string; description: string; productCount: number; isActive: boolean; icon: string; createdAt: string; updatedAt: string; parentCategoryId: string | undefined; coverColor: string | undefined; customAttributes: any[]; }' is not assignable to type 'UiCollection'.
+    Types of property 'icon' are incompatible.
+      Type 'string' is not assignable to type '"images" | "image" | "star" | "push" | "map" | "filter" | "at" | "text" | "time" | "body" | "code" | "link" | "menu" | "search" | "ellipse" | "stop" | "key" | "close" | "copy" | "cut" | ... 1336 more ... | "woman-sharp"'.
+src/screens/SellerCollectionScreen.tsx(247,9): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/screens/SellerCollectionScreen.tsx(249,9): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/screens/SellerCollectionScreen.tsx(260,9): error TS2322: Type 'string' is not assignable to type '"images" | "image" | "star" | "push" | "map" | "filter" | "at" | "text" | "time" | "body" | "code" | "link" | "menu" | "search" | "ellipse" | "stop" | "key" | "close" | "copy" | "cut" | ... 1336 more ... | "woman-sharp"'.
+src/screens/SellerEditCollectionScreen.tsx(95,9): error TS2322: Type 'any[]' is not assignable to type 'never[]'.
+  Type 'any' is not assignable to type 'never'.
+src/screens/SellerEditCollectionScreen.tsx(131,9): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/screens/SellerEditCollectionScreen.tsx(198,19): error TS2345: Argument of type '(prev: { name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; customAttributes: never[]; }) => { customAttributes: { name: string; label: string; type: "number" | ... 2 more ... | "switch"; options: string[] | undefined; required: boolean; isCustom: boolean; }[]; ......' is not assignable to parameter of type 'SetStateAction<{ name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; customAttributes: never[]; }>'.
+  Type '(prev: { name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; customAttributes: never[]; }) => { customAttributes: { name: string; label: string; type: "number" | ... 2 more ... | "switch"; options: string[] | undefined; required: boolean; isCustom: boolean; }[]; ......' is not assignable to type '(prevState: { name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; customAttributes: never[]; }) => { name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; customAttributes: never[]; }'.
+    Call signature return types '{ customAttributes: { name: string; label: string; type: "number" | "text" | "select" | "switch"; options: string[] | undefined; required: boolean; isCustom: boolean; }[]; name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; }' and '{ name: string; description: string; isActive: boolean; parentCategoryId: string; subCategoryId: string; customAttributes: never[]; }' are incompatible.
+      The types of 'customAttributes' are incompatible between these types.
+        Type '{ name: string; label: string; type: "number" | "text" | "select" | "switch"; options: string[] | undefined; required: boolean; isCustom: boolean; }[]' is not assignable to type 'never[]'.
+          Type '{ name: string; label: string; type: "number" | "text" | "select" | "switch"; options: string[] | undefined; required: boolean; isCustom: boolean; }' is not assignable to type 'never'.
+src/screens/SellerEditCollectionScreen.tsx(352,72): error TS2339: Property 'label' does not exist on type 'never'.
+src/screens/SellerEditCollectionScreen.tsx(354,40): error TS2339: Property 'type' does not exist on type 'never'.
+src/screens/SellerEditCollectionScreen.tsx(354,52): error TS2339: Property 'options' does not exist on type 'never'.
+src/screens/SellerEditCollectionScreen.tsx(354,71): error TS2339: Property 'options' does not exist on type 'never'.
+src/screens/SellerEditCollectionScreen.tsx(399,57): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SetStateAction<"number" | "text" | "select" | "switch">'.
+src/screens/SellerMarketingScreen.tsx(807,50): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(props: ViewProps): View', gave the following error.
+    Type '{ flex: number; position: "sticky"; top: number; }' is not assignable to type 'Falsy | ViewStyle | RegisteredStyle<ViewStyle> | RecursiveArray<Falsy | ViewStyle | RegisteredStyle<ViewStyle>> | readonly (Falsy | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Types of property 'position' are incompatible.
+        Type '"sticky"' is not assignable to type '"absolute" | "relative" | "static" | undefined'.
+  Overload 2 of 2, '(props: ViewProps, context: any): View', gave the following error.
+    Type '{ flex: number; position: "sticky"; top: number; }' is not assignable to type 'Falsy | ViewStyle | RegisteredStyle<ViewStyle> | RecursiveArray<Falsy | ViewStyle | RegisteredStyle<ViewStyle>> | readonly (Falsy | ... 1 more ... | RegisteredStyle<...>)[]'.
+      Types of property 'position' are incompatible.
+        Type '"sticky"' is not assignable to type '"absolute" | "relative" | "static" | undefined'.
+src/screens/SellerOrderDetailScreen.tsx(295,12): error TS2678: Type '"processing"' is not comparable to type 'OrderStatus'.
+src/screens/SellerOrderDetailScreen.tsx(308,12): error TS2678: Type '"processing"' is not comparable to type 'OrderStatus'.
+src/screens/SellerOrderDetailScreen.tsx(668,22): error TS2339: Property 'subtotal' does not exist on type 'OrderWithItems'.
+src/screens/SellerOrderDetailScreen.tsx(668,81): error TS2339: Property 'delivery_fee' does not exist on type 'OrderWithItems'.
+src/screens/SellerOrderDetailScreen.tsx(668,109): error TS2551: Property 'tax_amount' does not exist on type 'OrderWithItems'. Did you mean 'total_amount'?
+src/screens/SellerOrderDetailScreen.tsx(672,19): error TS2339: Property 'delivery_fee' does not exist on type 'OrderWithItems'.
+src/screens/SellerOrderDetailScreen.tsx(676,24): error TS2339: Property 'delivery_fee' does not exist on type 'OrderWithItems'.
+src/screens/SellerOrderDetailScreen.tsx(681,19): error TS2551: Property 'tax_amount' does not exist on type 'OrderWithItems'. Did you mean 'total_amount'?
+src/screens/SellerOrderDetailScreen.tsx(685,24): error TS2551: Property 'tax_amount' does not exist on type 'OrderWithItems'. Did you mean 'total_amount'?
+src/screens/SellerProductActionsScreen.tsx(57,18): error TS2345: Argument of type 'Product | null' is not assignable to parameter of type 'SetStateAction<Product | null>'.
+  Type 'Product' is not assignable to type 'SetStateAction<Product | null>'.
+    Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+      Types of property 'collection_id' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+src/screens/SellerSaleScreen.tsx(51,20): error TS2345: Argument of type 'Product | null' is not assignable to parameter of type 'SetStateAction<Product | null>'.
+  Type 'Product' is not assignable to type 'SetStateAction<Product | null>'.
+    Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+      Types of property 'collection_id' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+src/screens/SellerSubscriptionsScreen.tsx(20,40): error TS2709: Cannot use namespace 'Store' as a type.
+src/screens/SellerSubscriptionsScreen.tsx(29,40): error TS18047: 'supabase' is possibly 'null'.
+src/screens/SellerSubscriptionsScreen.tsx(32,37): error TS18047: 'supabase' is possibly 'null'.
+src/screens/SellerSubscriptionsScreen.tsx(46,31): error TS2709: Cannot use namespace 'Store' as a type.
+src/services/adminService.ts(14,38): error TS18047: 'supabase' is possibly 'null'.
+src/services/cache/core/__tests__/core-managers.test.ts(98,33): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(208,51): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(283,42): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,1): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/services/cache/core/__tests__/core-managers.test.ts(376,7): error TS1499: Unknown regular expression flag.
+src/services/cache/core/__tests__/core-managers.test.ts(376,8): error TS1499: Unknown regular expression flag.
+src/services/cache/core/__tests__/core-managers.test.ts(376,9): error TS1499: Unknown regular expression flag.
+src/services/cache/core/__tests__/core-managers.test.ts(376,13): error TS2304: Cannot find name 'blake'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,19): error TS2304: Cannot find name 'libreShop_lite'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,34): error TS2304: Cannot find name 'prototype'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,44): error TS2304: Cannot find name 'libreshop_lite'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,59): error TS2304: Cannot find name 'LibreShop'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,69): error TS2304: Cannot find name 'src'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,73): error TS2304: Cannot find name 'services'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,82): error TS2552: Cannot find name 'cache'. Did you mean 'Cache'?
+src/services/cache/core/__tests__/core-managers.test.ts(376,88): error TS2304: Cannot find name 'core'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,93): error TS2304: Cannot find name '__tests__'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,103): error TS2304: Cannot find name 'core'.
+src/services/cache/core/__tests__/core-managers.test.ts(376,108): error TS2304: Cannot find name 'managers'.
+src/services/cache/core/__tests__/core-managers.test.ts(388,49): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(477,39): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(478,57): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(499,55): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/core/__tests__/core-managers.test.ts(500,48): error TS2345: Argument of type 'MockAdapter' is not assignable to parameter of type 'IStorageAdapter'.
+  The types returned by 'set(...)' are incompatible between these types.
+    Type 'Promise<void>' is not assignable to type 'Promise<StorageOperationResult>'.
+      Type 'void' is not assignable to type 'StorageOperationResult'.
+src/services/cache/index.ts(24,3): error TS1205: Re-exporting a type when 'isolatedModules' is enabled requires using 'export type'.
+src/services/notificationService.ts(295,49): error TS2345: Argument of type 'string' is not assignable to parameter of type '"push" | "email" | "sms"'.
+src/services/pointsService.ts(37,37): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(56,37): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(75,37): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(102,31): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(119,31): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(139,60): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(155,44): error TS18047: 'supabase' is possibly 'null'.
+src/services/pointsService.ts(185,37): error TS18047: 'supabase' is possibly 'null'.
+src/services/productService.ts(262,24): error TS2551: Property 'store' does not exist on type 'Product'. Did you mean 'stores'?
+src/services/productService.ts(262,56): error TS2551: Property 'store' does not exist on type 'Product'. Did you mean 'stores'?
+src/services/productService.ts(343,24): error TS2551: Property 'store' does not exist on type 'Product'. Did you mean 'stores'?
+src/services/productService.ts(343,56): error TS2551: Property 'store' does not exist on type 'Product'. Did you mean 'stores'?
+src/services/productService.ts(403,39): error TS2551: Property 'store' does not exist on type 'Product'. Did you mean 'stores'?
+src/services/productService.ts(403,71): error TS2551: Property 'store' does not exist on type 'Product'. Did you mean 'stores'?
+src/services/productService.ts(531,30): error TS2339: Property 'images' does not exist on type '{ id: any; store_id: any; stores: { user_id: any; }[]; }'.
+src/services/productService.ts(531,48): error TS2339: Property 'images' does not exist on type '{ id: any; store_id: any; stores: { user_id: any; }[]; }'.
+src/services/productService.ts(533,48): error TS2339: Property 'images' does not exist on type '{ id: any; store_id: any; stores: { user_id: any; }[]; }'.
+src/services/recommendationService.ts(51,65): error TS2345: Argument of type 'never[] | Product[]' is not assignable to parameter of type 'Product[] | undefined'.
+  Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product[]' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product[]'.
+    Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+      Types of property 'collection_id' are incompatible.
+        Type 'string | undefined' is not assignable to type 'string'.
+          Type 'undefined' is not assignable to type 'string'.
+src/services/recommendationService.ts(132,13): error TS2322: Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+  Types of property 'collection_id' are incompatible.
+    Type 'string | undefined' is not assignable to type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+src/services/recommendationService.ts(161,13): error TS2322: Type '{ product: Product | Product; reason: string; }[]' is not assignable to type 'RecommendedProduct[]'.
+  Type '{ product: Product | Product; reason: string; }' is not assignable to type 'RecommendedProduct'.
+    Types of property 'product' are incompatible.
+      Type 'Product | Product' is not assignable to type 'Product'.
+        Type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/types/product").Product' is not assignable to type 'import("/home/freid-blake/libreShop_lite/prototype/libreshop_lite/LibreShop/src/lib/supabase").Product'.
+          Types of property 'collection_id' are incompatible.
+            Type 'string | undefined' is not assignable to type 'string'.
+              Type 'undefined' is not assignable to type 'string'.
+src/services/telemetryService.ts(40,13): error TS18047: 'supabase' is possibly 'null'.
+src/services/telemetryService.ts(58,13): error TS18047: 'supabase' is possibly 'null'.
+src/services/telemetryService.ts(79,37): error TS18047: 'supabase' is possibly 'null'.
+src/services/userService.ts(374,9): error TS2322: Type '"userProfileUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+src/services/userService.ts(650,9): error TS2322: Type '"userAddressesUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+src/services/userService.ts(706,9): error TS2322: Type '"userAddressesUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+src/services/userService.ts(773,9): error TS2322: Type '"userAddressesUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+src/services/userService.ts(838,9): error TS2322: Type '"userAddressesUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+src/services/userService.ts(1010,9): error TS2322: Type '"userPreferencesUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+src/services/userService.ts(1073,9): error TS2322: Type '"userPreferencesUpdated"' is not assignable to type '"productUpdated" | "stockUpdated" | "productViewed" | "productDeleted" | "storeUpdated"'.
+supabase/functions/broadcast-push-notification/index.ts(19,14): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/broadcast-push-notification/index.ts(27,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/broadcast-push-notification/index.ts(28,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/broadcast-push-notification/index.ts(56,45): error TS7006: Parameter 'u' implicitly has an 'any' type.
+supabase/functions/broadcast-push-notification/index.ts(73,31): error TS7006: Parameter 'u' implicitly has an 'any' type.
+supabase/functions/broadcast-push-notification/index.ts(86,17): error TS7006: Parameter 't' implicitly has an 'any' type.
+supabase/functions/broadcast-push-notification/index.ts(87,14): error TS7006: Parameter 't' implicitly has an 'any' type.
+supabase/functions/broadcast-push-notification/index.ts(136,43): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+supabase/functions/broadcast-push-notification/index.ts(166,31): error TS18046: 'error' is of type 'unknown'.
+supabase/functions/delete-cloudinary-image/index.ts(8,14): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/delete-cloudinary-image/index.ts(24,23): error TS2304: Cannot find name 'Deno'.
+supabase/functions/delete-cloudinary-image/index.ts(25,20): error TS2304: Cannot find name 'Deno'.
+supabase/functions/delete-cloudinary-image/index.ts(26,23): error TS2304: Cannot find name 'Deno'.
+supabase/functions/delete-cloudinary-image/index.ts(59,49): error TS18046: 'error' is of type 'unknown'.
+supabase/functions/send-push-notification/index.ts(19,14): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/send-push-notification/index.ts(27,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/send-push-notification/index.ts(28,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/send-push-notification/index.ts(101,43): error TS7006: Parameter 'sub' implicitly has an 'any' type.
+supabase/functions/send-push-notification/index.ts(138,31): error TS18046: 'error' is of type 'unknown'.

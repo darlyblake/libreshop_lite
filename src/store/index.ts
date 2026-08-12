@@ -84,11 +84,13 @@ interface CartItem {
 interface CartState {
   items: CartItem[];
   storeId: string | null;
+  table: string | null;
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
   getTotal: () => number;
+  setTable: (table: string | null) => void;
 }
 
 export const useCartStore = create<CartState>()(
@@ -96,6 +98,8 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       storeId: null,
+      table: null,
+      setTable: (table) => set({ table }),
       addItem: (product, quantity = 1) => {
         const { items, storeId } = get();
         const productStoreId = (product as any)?.store_id as string | undefined;

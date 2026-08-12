@@ -28,6 +28,7 @@ import { cacheService } from '../services/cacheService';
 import { networkService } from '../services/networkService';
 import { offlineSyncManager } from '../services/offlineSyncManager';
 import { useAuthStore } from '../store';
+import { RestaurantClientsScreen, BarClientsScreen } from './index';
 
 /* =========================
    TYPES
@@ -78,7 +79,41 @@ const calculateLoyaltyTier = (points: number, tiers: typeof DEFAULT_LOYALTY_CONF
    COMPONENT
 ========================= */
 
+// ─── ROUTEUR : Clients ───────────────────────────────────────────────────
 export const SellerClientsScreen: React.FC = () => {
+  const { user } = useAuthStore();
+  const [storeType, setStoreType] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const detectAndRoute = async () => {
+      if (!user?.id) { setLoading(false); return; }
+      try {
+        const store = await storeService.getByUser(user.id);
+        if (cancelled) return;
+        setStoreType(store?.store_type || null);
+      } catch { /* ignore */ }
+      setLoading(false);
+    };
+    detectAndRoute();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  
+  if (storeType === 'restaurant') return <RestaurantClientsScreen />;
+  if (storeType === 'bar') return <BarClientsScreen />;
+  return <SellerClientsScreenContent />;
+};
+
+const SellerClientsScreenContent: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();

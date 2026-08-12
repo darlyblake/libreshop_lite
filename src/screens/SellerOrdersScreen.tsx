@@ -32,6 +32,7 @@ import { notificationService } from '../services/notificationService';
 import type { Order, OrderStatus } from '../types/order';
 import { exportOrdersToPDF, exportOrderToPDF, exportBatchOrdersToPDF, exportPickingListPDF } from '../utils/pdfExport';
 import { OrderCardSkeleton } from '../components/SkeletonLoader';
+import { RestaurantOrdersScreen, BarOrdersScreen } from './index';
 
 // Local types (renamed to avoid conflict with imported Order from types/order.ts)
 interface OrderItemDisplay {
@@ -138,7 +139,41 @@ const getPaymentStatusLabel = (status?: Order['payment_status']) => {
   }
 };
 
+// ─── ROUTEUR : Orders ────────────────────────────────────────────────────────
 export const SellerOrdersScreen: React.FC = () => {
+  const { user } = useAuthStore();
+  const [storeType, setStoreType] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const detectAndRoute = async () => {
+      if (!user?.id) { setLoading(false); return; }
+      try {
+        const store = await storeService.getByUser(user.id);
+        if (cancelled) return;
+        setStoreType(store?.store_type || null);
+      } catch { /* ignore */ }
+      setLoading(false);
+    };
+    detectAndRoute();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  
+  if (storeType === 'restaurant') return <RestaurantOrdersScreen />;
+  if (storeType === 'bar') return <BarOrdersScreen />;
+  return <SellerOrdersScreenContent />;
+};
+
+const SellerOrdersScreenContent: React.FC = () => {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();

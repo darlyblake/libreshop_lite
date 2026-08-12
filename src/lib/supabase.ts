@@ -132,8 +132,9 @@ export interface Store {
   user_id: string;
   name: string;
   slug: string;
-  description?: string;
+description?: string;
   category: string;
+  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
   logo_url?: string;
   banner_url?: string;
   email?: string;
