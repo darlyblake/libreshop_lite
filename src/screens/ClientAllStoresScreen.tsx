@@ -36,6 +36,7 @@ import { SearchBar } from '../components/SearchBar';
 import { useSearch } from '../hooks/useSearch';
 import { locationService } from '../services/locationService';
 import OptimizedImage from '../components/OptimizedImage';
+import { navigateToStore } from '../utils/storeNavigation';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // No MAX_CONTENT_WIDTH anymore
@@ -371,7 +372,7 @@ const [numColumns, setNumColumns] = useState(getNumColumns());
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.storeCard}
-            onPress={() => navigation.navigate('StoreDetail', { storeId: item.id })}
+            onPress={() => navigateToStore(navigation, item)}
           >
             <View style={styles.storeMedia}>
               {bannerUrl ? (

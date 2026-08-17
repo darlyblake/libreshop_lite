@@ -40,6 +40,8 @@ export type RootStackParamList = {
   ClientTabs: NavigatorScreenParams<ClientTabParamList>;
   SellerTabs: NavigatorScreenParams<SellerTabParamList>;
   StoreDetail: { storeId?: string; slug?: string };
+  BarDetail: { storeId: string; slug?: string };
+  BarLive: { storeId: string; tableId?: string };
   ProductDetail: { productId: string };
   Cart: undefined;
   Checkout: undefined;
@@ -94,6 +96,13 @@ export type RootStackParamList = {
   ResetPassword: undefined;
   ClientMap: undefined;
   ClientProfile: undefined;
+  
+  // Bar Features (Vendeur)
+  BarEvents: undefined;
+  BarEventForm: { eventId?: string };
+  BarPhotos: { eventId?: string };
+  BarContest: { eventId?: string };
+  BarScreensControl: undefined;
 };
 
 export type ClientTabParamList = {

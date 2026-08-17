@@ -189,7 +189,7 @@ export const SellerAnalyticsScreen = () => {
         return Number.isFinite(t) && t >= start.getTime();
       });
 
-      const confirmedStatuses = new Set(['paid', 'shipped', 'delivered']);
+      const confirmedStatuses: Set<string> = new Set(['paid', 'shipped', 'delivered']);
       const confirmedOrdersInRange = ordersInRange.filter((o) => confirmedStatuses.has(o.status));
       const totalRevenue = confirmedOrdersInRange.reduce((sum: number, o) => sum + Number(o.total_amount || 0), 0);
       const cancelledOrders = ordersInRange.filter((o) => o.status === 'cancelled').length;

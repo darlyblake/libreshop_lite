@@ -7,6 +7,7 @@ import { COLORS, FONT_SIZE, SPACING } from '../config/theme';
 import { storeService } from '../services/storeService';
 import { WebMap } from '../components/WebMap';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { navigateToStore } from '../utils/storeNavigation';
 
 export const ClientMapScreen = () => {
   const navigation = useNavigation<any>();
@@ -67,7 +68,12 @@ export const ClientMapScreen = () => {
   };
 
   const handleStoreClick = (storeId: string) => {
-    navigation.navigate('StoreDetail', { storeId });
+    const store = stores.find((s: any) => s.id === storeId);
+    if (store) {
+      navigateToStore(navigation, store);
+    } else {
+      navigation.navigate('StoreDetail', { storeId });
+    }
   };
 
   return (

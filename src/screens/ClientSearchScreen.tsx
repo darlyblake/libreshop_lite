@@ -33,6 +33,7 @@ import { useSearchStore } from '../store/searchStore';
 import { SHADOWS } from '../config/theme';
 import { locationService } from '../services/locationService';
 import { cacheService } from '../services/cacheService';
+import { navigateToStore } from '../utils/storeNavigation';
 
 const { width, height } = Dimensions.get('window');
 const MAX_CONTENT_WIDTH = 1200;
@@ -634,8 +635,8 @@ export const ClientSearchScreen: React.FC = () => {
     navigation.navigate('ProductDetail', { productId: product.id });
   }, [navigation]);
 
-  const handleStorePress = useCallback((store: Store) => {
-    navigation.navigate('StoreDetail', { storeId: store.id });
+  const handleStorePress = useCallback((store: any) => {
+    navigateToStore(navigation, store);
   }, [navigation]);
 
   const handleClearSearch = useCallback(() => {

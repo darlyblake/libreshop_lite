@@ -14,12 +14,14 @@ import OptimizedImage from './OptimizedImage';
 import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 import { useNavigation } from '@react-navigation/native';
+import { navigateToStore } from '../utils/storeNavigation';
 
 interface ShowcaseItem {
   id: string;
   name: string;
   imageUrl?: string;
   subtitle?: string;
+  store_type?: string;
 }
 
 interface CategoryShowcaseSection {
@@ -197,6 +199,7 @@ export const CategoryShowcase: React.FC<CategoryShowcaseProps> = ({ categories, 
             name: s.name,
             subtitle: 'Populaire',
             imageUrl: s.logo_url || s.banner_url || undefined,
+            store_type: s.store_type,
           })),
         });
 
@@ -209,6 +212,7 @@ export const CategoryShowcase: React.FC<CategoryShowcaseProps> = ({ categories, 
             name: s.name,
             subtitle: 'Nouveau',
             imageUrl: s.logo_url || s.banner_url || undefined,
+            store_type: s.store_type,
           })),
         });
 
@@ -249,7 +253,7 @@ export const CategoryShowcase: React.FC<CategoryShowcaseProps> = ({ categories, 
     if (cat === 'products_sales') {
       navigation.navigate('ProductDetail', { productId: item.id });
     } else {
-      navigation.navigate('StoreDetail', { storeId: item.id });
+      navigateToStore(navigation, item);
     }
   };
 

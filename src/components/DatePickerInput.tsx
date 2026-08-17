@@ -108,6 +108,7 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
               placeholderText={placeholder}
               className="react-datepicker-wrapper"
               popperPlacement="bottom-start"
+              portalId="root"
               popperProps={{
                 strategy: 'fixed',
               }}
@@ -135,19 +136,22 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
             z-index: 9999 !important;
             position: fixed !important;
           }
-          .react-datepicker-calendar {
+          .react-datepicker {
             background-color: ${COLORS.card} !important;
             border: 1px solid ${COLORS.border} !important;
             border-radius: 8px !important;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+            font-family: inherit !important;
           }
           .react-datepicker__header {
             background-color: ${COLORS.accent} !important;
             border-bottom: 1px solid ${COLORS.border} !important;
+            border-top-left-radius: 8px !important;
+            border-top-right-radius: 8px !important;
           }
           .react-datepicker__current-month,
           .react-datepicker__day-name {
-            color: ${COLORS.text} !important;
+            color: #FFFFFF !important;
           }
           .react-datepicker__day {
             color: ${COLORS.text} !important;
@@ -157,10 +161,13 @@ export const DatePickerInput: React.FC<DatePickerInputProps> = ({
           }
           .react-datepicker__day--selected {
             background-color: ${COLORS.accent} !important;
-            color: ${COLORS.text} !important;
+            color: #FFFFFF !important;
           }
           .react-datepicker__day--keyboard-selected {
             background-color: ${COLORS.accent}30 !important;
+          }
+          .react-datepicker__triangle {
+            display: none !important;
           }
         `}</style>
       </View>

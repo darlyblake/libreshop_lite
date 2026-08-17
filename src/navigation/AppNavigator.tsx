@@ -105,6 +105,13 @@ const SellerPromoBannersScreen = lazyLoad(() => import('../screens/SellerPromoBa
 const SellerMarketingScreen = lazyLoad(() => import('../screens/SellerMarketingScreen'), 'SellerMarketingScreen');
 const SellerHubScreen = lazyLoad(() => import('../screens/SellerHubScreen'), 'SellerHubScreen');
 const RestaurantCaisseScreen = lazyLoad(() => import('../screens/RestaurantCaisseScreen'), 'RestaurantCaisseScreen');
+const BarEventsScreen = lazyLoad(() => import('../screens/BarEventsScreen'), 'BarEventsScreen');
+const BarEventFormScreen = lazyLoad(() => import('../screens/BarEventFormScreen'), 'BarEventFormScreen');
+const BarPhotosScreen = lazyLoad(() => import('../screens/BarPhotosScreen'), 'BarPhotosScreen');
+const BarContestScreen = lazyLoad(() => import('../screens/BarContestScreen'), 'BarContestScreen');
+const BarScreensControlScreen = lazyLoad(() => import('../screens/BarScreensControlScreen'), 'BarScreensControlScreen');
+const BarDetailScreen = lazyLoad(() => import('../screens/BarDetailScreen'), 'BarDetailScreen');
+const BarLiveScreen = lazyLoad(() => import('../screens/BarLiveScreen'), 'BarLiveScreen');
 
 
 // Lazy loaded Admin screens
@@ -504,7 +511,10 @@ export const AppNavigator: React.FC = () => {
   useEffect(() => {
     if (!supabase?.channel || !user?.id) return;
 
-    const channel = supabase
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    channel = supabase
       .channel(`notifications:${user.id}`)
       .on(
         'postgres_changes' as any,
@@ -524,14 +534,21 @@ export const AppNavigator: React.FC = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        // Channel subscribed successfully - nothing to do
+      });
 
     return () => {
-      if (supabase) {
-        supabase.removeChannel(channel).catch(() => {});
+      active = false;
+      if (supabase && channel) {
+        // Defer removal slightly to avoid "closed before established" race
+        setTimeout(() => {
+          supabase.removeChannel(channel!).catch(() => {});
+        }, 0);
       }
     };
   }, [user?.id, addNotification, playNotificationSound]);
+
 
   // Gestion de l'état de l'application
   useEffect(() => {
@@ -907,6 +924,8 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="ClientAllProducts" component={ClientAllProductsScreen} />
         <Stack.Screen name="ClientMap" component={ClientMapScreen} />
         <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
+        <Stack.Screen name="BarDetail" component={BarDetailScreen} />
+        <Stack.Screen name="BarLive" component={BarLiveScreen} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />
@@ -948,6 +967,13 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="SellerPromoBanners" component={SellerPromoBannersScreen} />
         <Stack.Screen name="SellerMarketing" component={SellerMarketingScreen} />
         <Stack.Screen name="SellerHub" component={SellerHubScreen} />
+        
+        {/* Bar Features (Vendeur) */}
+        <Stack.Screen name="BarEvents" component={BarEventsScreen} />
+        <Stack.Screen name="BarEventForm" component={BarEventFormScreen} />
+        <Stack.Screen name="BarPhotos" component={BarPhotosScreen} />
+        <Stack.Screen name="BarContest" component={BarContestScreen} />
+        <Stack.Screen name="BarScreensControl" component={BarScreensControlScreen} />
         <Stack.Screen name="RestaurantCaisse" component={RestaurantCaisseScreen} />
 
         

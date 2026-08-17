@@ -1050,6 +1050,33 @@ export const SellerDashboardScreen: React.FC = () => {
     ];
 
 
+    const barActions = [
+      { 
+        label: 'Événements', 
+        icon: 'calendar', 
+        color: COLORS.primary,
+        screen: 'BarEvents' 
+      },
+      { 
+        label: 'Mur Photo', 
+        icon: 'images', 
+        color: COLORS.accent,
+        screen: 'BarPhotos' 
+      },
+      { 
+        label: 'Concours', 
+        icon: 'trophy', 
+        color: COLORS.warning,
+        screen: 'BarContest' 
+      },
+      { 
+        label: 'Écrans', 
+        icon: 'tv', 
+        color: COLORS.info,
+        screen: 'BarScreensControl' 
+      },
+    ];
+
     const renderActionGrid = (title: string, icon: string, items: any[]) => (
       <View style={[styles.section, { marginBottom: spacing.xl }]}>
         <View style={styles.sectionHeader}>
@@ -1114,6 +1141,8 @@ export const SellerDashboardScreen: React.FC = () => {
       <>
         {renderActionGrid('Gestion Financière', 'cash-outline', financeActions)}
         {renderActionGrid('Opérations Boutique', 'storefront-outline', storeActions)}
+        {(store?.store_type === 'bar' || store?.store_type === 'restaurant') && 
+          renderActionGrid('Animation / Bar', 'beer-outline', barActions)}
       </>
     );
   };
