@@ -230,7 +230,7 @@ export const BarLiveScreen: React.FC = () => {
 
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -259,7 +259,7 @@ export const BarLiveScreen: React.FC = () => {
           await barService.uploadClientPhoto({
             store_id: storeId,
             user_id: user.id,
-            photo_url: photoUrl
+            image_url: photoUrl
           });
           Alert.alert('Succès', 'Votre photo a été envoyée ! Elle sera affichée après validation.');
         }
@@ -398,7 +398,7 @@ export const BarLiveScreen: React.FC = () => {
             <View style={styles.grid}>
               {(activeTab === 'contest' ? contestPhotos : photos).map((photo) => (
                 <View key={photo.id} style={styles.photoCard}>
-                  <Image source={{ uri: photo.photo_url }} style={styles.photoImage} />
+                  <Image source={{ uri: (photo as any).image_url || (photo as any).photo_url }} style={styles.photoImage} />
                   <LinearGradient
                     colors={['transparent', 'rgba(0,0,0,0.8)']}
                     style={styles.photoGradient}

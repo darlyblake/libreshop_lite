@@ -27,7 +27,7 @@ export interface BarPhoto {
   store_id: string;
   event_id?: string;
   user_id?: string;
-  photo_url: string;
+  image_url: string;
   status: 'pending' | 'approved' | 'rejected';
   featured_at?: string | null;
   created_at: string;
@@ -289,7 +289,7 @@ export const barService = {
     if (error) throw error;
   },
 
-  async uploadClientPhoto(photo: { store_id: string; event_id?: string; user_id?: string; photo_url: string }): Promise<BarPhoto> {
+  async uploadClientPhoto(photo: { store_id: string; event_id?: string; user_id?: string; image_url: string }): Promise<BarPhoto> {
     const { data, error } = await supabase
       .from('bar_photos')
       .insert({

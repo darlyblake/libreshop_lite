@@ -159,7 +159,7 @@ export const BarTVScreen: React.FC = () => {
       <View style={styles.grid}>
         {photos.slice(0, 12).map((photo) => (
           <View key={photo.id} style={styles.photoCardWall}>
-            <Image source={{ uri: photo.photo_url }} style={styles.photoImage} resizeMode="cover" />
+            <Image source={{ uri: (photo as any).image_url || (photo as any).photo_url }} style={styles.photoImage} resizeMode="cover" />
           </View>
         ))}
       </View>
