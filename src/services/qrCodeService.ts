@@ -34,6 +34,20 @@ export const qrCodeService = {
   },
 
   /**
+   * URL directe Live d'une table de bar.
+   * Ex: https://libreshop.shop/store/bar-test/live?table=1
+   * Ouvre directement l'interface Live (menu, mur photo, concours).
+   */
+  getTableLiveUrl(storeSlug: string, tableNumber: number | string): string {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      return `${window.location.origin.replace(/\/+$/, '')}/store/${storeSlug}/live?table=${tableNumber}`;
+    }
+    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    if (envBase) return `${envBase}/store/${storeSlug}/live?table=${tableNumber}`;
+    return `libreshop://store/${storeSlug}/live?table=${tableNumber}`;
+  },
+
+  /**
    * URL de l'image QR code (via api.qrserver.com).
    * @param data  La donnée à encoder (URL, texte, etc.)
    * @param size  Taille en pixels (défaut: 200)

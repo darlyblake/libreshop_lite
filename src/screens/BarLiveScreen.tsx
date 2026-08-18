@@ -39,7 +39,12 @@ export const BarLiveScreen: React.FC = () => {
   const { fontSize } = useResponsive();
   const { user } = useAuthStore();
 
-  const storeId = route.params?.storeId;
+  const paramStoreId = route.params?.storeId;
+  const slug = route.params?.slug;
+  const tableNumber = route.params?.table;
+
+  const [resolvedStoreId, setResolvedStoreId] = useState<string | null>(paramStoreId || null);
+  const storeId = resolvedStoreId; // alias for the rest of the code
 
   const [activeTab, setActiveTab] = useState<LiveTab>('menu');
   const [store, setStore] = useState<any>(null);
@@ -62,6 +67,15 @@ export const BarLiveScreen: React.FC = () => {
   const [userParticipated, setUserParticipated] = useState(false);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState<string | null>(null);
   const timerRef = useRef<any>(null);
+
+  // Résolution du storeId depuis le slug si nécessaire (accès web direct)
+  useEffect(() => {
+    if (!paramStoreId && slug) {
+      storeService.getBySlug(slug).then(s => {
+        if (s) setResolvedStoreId(s.id);
+      });
+    }
+  }, [paramStoreId, slug]);
 
   useEffect(() => {
     if (storeId) {

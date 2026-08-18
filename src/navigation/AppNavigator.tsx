@@ -210,6 +210,7 @@ const linking = (() => {
         Checkout: 'Checkout',
         Payment: 'Payment',
         StoreDetail: 'store/:slug?',
+        BarLive: 'store/:slug/live',
         BarTV: 'boutique/tv/:slug',
         ProductDetail: 'product/:productId',
         ClientOrderDetail: 'ClientOrderDetail/:orderId',

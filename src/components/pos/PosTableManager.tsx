@@ -351,7 +351,7 @@ export const PosTableManager = ({
               {qrTable && storeSlug ? (
                 <>
                   <Image
-                    source={{ uri: qrCodeService.getQrImageUrl(qrCodeService.getStoreUrl(storeSlug) + `?table=${qrTable.number}`, 280) }}
+                    source={{ uri: qrCodeService.getQrImageUrl(qrCodeService.getTableLiveUrl(storeSlug, qrTable.number), 280) }}
                     style={{ width: 220, height: 220 }}
                     resizeMode="contain"
                   />
@@ -378,7 +378,7 @@ export const PosTableManager = ({
                     setIsPrinting(true);
                     try {
                       const qrUrl = qrCodeService.getQrImageUrl(
-                        qrCodeService.getStoreUrl(storeSlug) + `?table=${qrTable.number}`, 280
+                        qrCodeService.getTableLiveUrl(storeSlug, qrTable.number), 280
                       );
                       const html = generateTableQrHtml({
                         tableNumber: qrTable.number,

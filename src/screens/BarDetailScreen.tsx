@@ -52,6 +52,7 @@ export const BarDetailScreen: React.FC = () => {
   const { user } = useAuthStore();
 
   const storeId = route.params?.storeId;
+  const tableParam = route.params?.table; // Passed when coming from QR code
 
   const [store, setStore] = useState<any>(null);
   const [events, setEvents] = useState<BarEvent[]>([]);
@@ -76,6 +77,13 @@ export const BarDetailScreen: React.FC = () => {
       loadBarData();
     }
   }, [storeId, user?.id]);
+
+  // 🔑 Si l'URL contient ?table= (lien QR code), on redirige directement vers BarLive
+  useEffect(() => {
+    if (storeId && tableParam !== undefined && tableParam !== null) {
+      navigation.replace('BarLive', { storeId, table: tableParam });
+    }
+  }, [storeId, tableParam]);
 
   // Auto-scroll carousel every 4 seconds
   useEffect(() => {
