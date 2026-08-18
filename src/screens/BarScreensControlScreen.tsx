@@ -11,6 +11,7 @@ import {
   TextInput
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,6 +36,7 @@ export const BarScreensControlScreen: React.FC = () => {
   const isFocused = useIsFocused();
 
   const [storeId, setStoreId] = useState<string | null>(null);
+  const [storeSlug, setStoreSlug] = useState<string>('');
   const [currentMode, setCurrentMode] = useState<string>('menu');
   const [customMessage, setCustomMessage] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,7 @@ export const BarScreensControlScreen: React.FC = () => {
       const s = await storeService.getByUser(user.id);
       if (s) {
         setStoreId(s.id);
+        setStoreSlug(s.slug || '');
         setCurrentMode(s.screen_current_mode || 'menu');
         setCustomMessage(s.screen_message || '');
       }
@@ -84,6 +87,14 @@ export const BarScreensControlScreen: React.FC = () => {
       return;
     }
     handleUpdateMode('custom_message');
+  };
+
+  const tvUrl = storeSlug ? `https://libreshop.shop/boutique/tv/${storeSlug}` : '';
+
+  const copyTvLink = async () => {
+    if (!tvUrl) return;
+    await Clipboard.setStringAsync(tvUrl);
+    Alert.alert('Copié !', "Le lien de l'écran TV a été copié dans le presse-papier.");
   };
 
   return (
@@ -137,6 +148,24 @@ export const BarScreensControlScreen: React.FC = () => {
                 </TouchableOpacity>
               );
             })}
+          </View>
+
+          <View style={[styles.messageSection, { marginBottom: SPACING.xl }]}>
+            <Text style={styles.sectionTitle}>Lien de votre écran TV</Text>
+            <Text style={{ color: COLORS.textMuted, marginBottom: SPACING.md, fontSize: 12 }}>
+              Copiez ce lien et ouvrez-le sur le navigateur web de la Smart TV de votre bar. Cet écran affichera en direct ce que vous choisissez ci-dessus.
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.bg, padding: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border }}>
+              <Text style={{ flex: 1, color: COLORS.text, fontSize: 12 }} numberOfLines={1}>
+                {tvUrl || 'Chargement...'}
+              </Text>
+              <TouchableOpacity
+                style={{ padding: SPACING.sm, backgroundColor: COLORS.primary, borderRadius: RADIUS.sm, marginLeft: SPACING.sm }}
+                onPress={copyTvLink}
+              >
+                <Ionicons name="copy-outline" size={16} color="#FFF" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.messageSection}>

@@ -1,0 +1,50 @@
+--- BarScreensControlScreen.tsx
++++ BarScreensControlScreen.tsx
+@@ -11,6 +11,7 @@
+   TextInput
+ } from 'react-native';
+ import { useSafeAreaInsets } from 'react-native-safe-area-context';
++import * as Clipboard from 'expo-clipboard';
+ import { useNavigation, useIsFocused } from '@react-navigation/native';
+ import { Ionicons } from '@expo/vector-icons';
+ import { LinearGradient } from 'expo-linear-gradient';
+@@ -87,6 +88,14 @@
+     handleUpdateMode('custom_message');
+   };
+ 
++  const tvUrl = storeId ? `https://app.libreshop.com/tv/${storeId}` : '';
++
++  const copyTvLink = async () => {
++    if (!tvUrl) return;
++    await Clipboard.setStringAsync(tvUrl);
++    Alert.alert('Copié !', 'Le lien de l\'écran TV a été copié dans le presse-papier.');
++  };
++
+   return (
+     <View style={[styles.container, { paddingTop: insets.top }]} >
+       <StatusBar barStyle="light-content" />
+@@ -140,6 +149,27 @@
+               );
+             })}
+           </View>
++
++          <View style={[styles.messageSection, { marginBottom: SPACING.xl }]}>
++            <Text style={styles.sectionTitle}>Lien de votre écran TV</Text>
++            <Text style={{ color: COLORS.textMuted, marginBottom: SPACING.md, fontSize: 12 }}>
++              Copiez ce lien et ouvrez-le sur le navigateur web de la Smart TV de votre bar. Cet écran affichera ce que vous choisissez ci-dessus, en plein écran.
++            </Text>
++            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.bg, padding: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border }}>
++              <Text style={{ flex: 1, color: COLORS.text, fontSize: 12 }} numberOfLines={1}>
++                {tvUrl || 'Chargement...'}
++              </Text>
++              <TouchableOpacity
++                style={{ padding: SPACING.sm, backgroundColor: COLORS.primary, borderRadius: RADIUS.sm, marginLeft: SPACING.sm }}
++                onPress={copyTvLink}
++              >
++                <Ionicons name="copy-outline" size={16} color="#FFF" />
++              </TouchableOpacity>
++            </View>
++          </View>
+ 
+           <View style={styles.messageSection}>
+             <Text style={styles.sectionTitle}>Diffuser un message flash</Text>

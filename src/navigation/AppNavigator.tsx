@@ -112,6 +112,7 @@ const BarContestScreen = lazyLoad(() => import('../screens/BarContestScreen'), '
 const BarScreensControlScreen = lazyLoad(() => import('../screens/BarScreensControlScreen'), 'BarScreensControlScreen');
 const BarDetailScreen = lazyLoad(() => import('../screens/BarDetailScreen'), 'BarDetailScreen');
 const BarLiveScreen = lazyLoad(() => import('../screens/BarLiveScreen'), 'BarLiveScreen');
+const BarTVScreen = lazyLoad(() => import('../screens/BarTVScreen'), 'BarTVScreen');
 
 
 // Lazy loaded Admin screens
@@ -209,6 +210,7 @@ const linking = (() => {
         Checkout: 'Checkout',
         Payment: 'Payment',
         StoreDetail: 'store/:slug?',
+        BarTV: 'boutique/tv/:slug',
         ProductDetail: 'product/:productId',
         ClientOrderDetail: 'ClientOrderDetail/:orderId',
         SellerOrderDetail: 'SellerOrderDetail/:orderId',
@@ -926,6 +928,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
         <Stack.Screen name="BarDetail" component={BarDetailScreen} />
         <Stack.Screen name="BarLive" component={BarLiveScreen} />
+        <Stack.Screen name="BarTV" component={BarTVScreen} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />

@@ -42,6 +42,7 @@ export type RootStackParamList = {
   StoreDetail: { storeId?: string; slug?: string };
   BarDetail: { storeId: string; slug?: string };
   BarLive: { storeId: string; tableId?: string };
+  BarTV: { storeId: string };
   ProductDetail: { productId: string };
   Cart: undefined;
   Checkout: undefined;
