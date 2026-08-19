@@ -22,6 +22,7 @@ import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
 import { barService, BarPhoto } from '../services/barService';
+import { supabase } from '../lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import { cloudinaryService } from '../services/cloudinaryService';
 
@@ -130,6 +131,18 @@ export const BarPhotosScreen: React.FC = () => {
     loadData(false);
   };
 
+  // ── Realtime subscription : detect new/updated photos live ──
+  useEffect(() => {
+    if (!storeId) return;
+    const channel = barService.subscribeToPhotos(storeId, () => {
+      // Reload without spinner to avoid flicker
+      loadData(false);
+    });
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [storeId]);
+
   const handleUpdateStatus = async (photoId: string, status: TabType) => {
     try {
       await barService.updatePhotoStatus(photoId, status);
@@ -157,7 +170,7 @@ export const BarPhotosScreen: React.FC = () => {
     if (!storeId) return;
     setIsAutoValidate(value);
     try {
-      await storeService.updateStore(storeId, { is_photo_auto_validate: value });
+      await barService.updateStoreAutoValidate(storeId, value);
     } catch (e) {
       Alert.alert('Erreur', 'Impossible de modifier ce réglage');
       setIsAutoValidate(!value);
@@ -310,7 +323,7 @@ export const BarPhotosScreen: React.FC = () => {
           <View style={styles.photoGrid}>
             {photos.map((photo) => (
               <View key={photo.id} style={styles.photoCard}>
-                <Image source={{ uri: photo.photo_url }} style={styles.photoImage} />
+                <Image source={{ uri: (photo as any).image_url || (photo as any).photo_url }} style={styles.photoImage} />
                 
                 {/* Overlay actions depending on tab */}
                 <View style={styles.actionOverlay}>

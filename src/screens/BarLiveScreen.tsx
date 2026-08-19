@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
+    flexDirection: 'column',
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
     backgroundColor: 'rgba(0,0,0,0.88)',
@@ -685,7 +685,6 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   cameraBtn: {
-    flex: 1,
     backgroundColor: COLORS.primary,
     flexDirection: 'row',
     alignItems: 'center',
@@ -741,10 +740,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   decorationPicker: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
-    marginBottom: SPACING.sm,
     flexGrow: 0,
+    marginBottom: SPACING.xs,
   },
   decorationChip: {
     paddingHorizontal: SPACING.md,

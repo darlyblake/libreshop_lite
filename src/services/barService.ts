@@ -257,6 +257,20 @@ export const barService = {
     return !!data;
   },
 
+  async getPhotosForEvent(eventId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('bar_event_photos')
+      .select('*')
+      .eq('event_id', eventId)
+      .order('votes_count', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching event photos:', error);
+      return [];
+    }
+    return data || [];
+  },
+
   async checkIfUserParticipated(eventId: string, userId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('bar_event_photos')
@@ -374,5 +388,29 @@ export const barService = {
 
     if (error) return [];
     return data || [];
+  },
+
+  // --- AUTO VALIDATE ---
+  async updateStoreAutoValidate(storeId: string, value: boolean): Promise<void> {
+    const { error } = await supabase
+      .from('stores')
+      .update({ is_photo_auto_validate: value })
+      .eq('id', storeId);
+    if (error) throw error;
+  },
+
+  // --- REALTIME ---
+  subscribeToPhotos(storeId: string, callback: (photo: any) => void) {
+    return supabase
+      .channel(`bar_photos_${storeId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'bar_photos',
+        filter: `store_id=eq.${storeId}`,
+      }, (payload) => {
+        callback(payload);
+      })
+      .subscribe();
   },
 };

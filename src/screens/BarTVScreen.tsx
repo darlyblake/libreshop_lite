@@ -24,6 +24,12 @@ import { PhotoDecoration } from '../components/PhotoDecoration';
 
 const { width, height } = Dimensions.get('window');
 
+// Import conditionnel web uniquement
+const ParticlesBackground =
+  Platform.OS === 'web'
+    ? require('../components/ParticlesBackground.web').ParticlesBackground
+    : null;
+
 export const BarTVScreen: React.FC = () => {
   const route = useRoute<any>();
   const slug = route.params?.slug;
@@ -39,11 +45,47 @@ export const BarTVScreen: React.FC = () => {
   const [photos, setPhotos] = useState<BarPhoto[]>([]);
   const [contestPhotos, setContestPhotos] = useState<BarPhoto[]>([]);
 
+  // Refs for particles
+  const prevPhotosCount = React.useRef(0);
+  const particlesRef = React.useRef<any>(null);
+
   // Slideshow state
   const [slideState, setSlideState] = useState<{ isWall: boolean, photoIndex: number }>({ isWall: true, photoIndex: 0 });
 
   // Animation for photos
   const fadeAnim = useState(new Animated.Value(0))[0];
+  const kenBurnsAnim = useState(new Animated.Value(1))[0];
+
+  useEffect(() => {
+    if (!slideState.isWall) {
+      kenBurnsAnim.setValue(1);
+      Animated.timing(kenBurnsAnim, {
+        toValue: 1.1,
+        duration: 7000,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [slideState.isWall]);
+
+  // Détecter l'arrivée d'une nouvelle photo → burst
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const currentCount = photos.length;
+    if (currentCount > prevPhotosCount.current && prevPhotosCount.current > 0) {
+      // Nouvelle photo arrivée → explosion au centre
+      particlesRef.current?.triggerBurst(0, 0);
+
+      // Optionnel : 2e burst un peu décalé pour plus d'impact
+      setTimeout(() => {
+        particlesRef.current?.triggerBurst(
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 15
+        );
+      }, 180);
+    }
+    prevPhotosCount.current = currentCount;
+  }, [photos.length]);
 
   const toggleFullscreen = () => {
     if (Platform.OS === 'web') {
@@ -265,12 +307,17 @@ export const BarTVScreen: React.FC = () => {
       const highlightedPhoto = photos[slideState.photoIndex];
       return (
         <View style={styles.highlightedPhotoContainer}>
-          <Image 
+          <Animated.Image 
             source={{ uri: (highlightedPhoto as any).image_url || (highlightedPhoto as any).photo_url }} 
-            style={styles.highlightedPhoto} 
+            style={[styles.highlightedPhoto, { transform: [{ scale: kenBurnsAnim }] }]} 
             resizeMode="contain" 
           />
           <PhotoDecoration type={(highlightedPhoto as any).decoration_type || 'none'} />
+          {/* Likes badge on highlighted photo */}
+          <View style={styles.highlightedLikesBadge}>
+            <Ionicons name="heart" size={32} color={COLORS.danger} />
+            <Text style={styles.highlightedLikesText}>{highlightedPhoto.likes_count || 0}</Text>
+          </View>
         </View>
       );
     }
@@ -317,6 +364,13 @@ export const BarTVScreen: React.FC = () => {
                 resizeMode="cover" 
               />
               <PhotoDecoration type={(photo as any).decoration_type || 'none'} />
+              {/* Likes badge visible on the wall */}
+              {(photo.likes_count || 0) > 0 && (
+                <View style={styles.wallLikesBadge}>
+                  <Ionicons name="heart" size={12} color="#FFF" />
+                  <Text style={styles.wallLikesText}>{photo.likes_count}</Text>
+                </View>
+              )}
             </View>
           );
         })}
@@ -381,10 +435,21 @@ export const BarTVScreen: React.FC = () => {
         ]} />
       </View>
       
+      {/* Fond particules */}
+      {ParticlesBackground && (
+        <ParticlesBackground
+          ref={particlesRef}
+          intensity={currentScreenMode === 'contest' || activeEvent?.is_contest_active ? 1.6 : 1}
+          style={activeEvent?.is_contest_active ? 'stars' : 'confetti'}
+          color="#a78bfa"
+        />
+      )}
+      
       {/* Dynamic Animated Particles based on Theme */}
       <AnimatedBackground theme={store?.tv_wall_theme || 'default'} />
-
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+      
+      {/* Contenu existant (header, photos, footer) */}
+      <Animated.View style={[styles.content, { opacity: fadeAnim, zIndex: 1 }]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -545,6 +610,41 @@ const styles = StyleSheet.create({
   highlightedPhoto: {
     width: '100%',
     height: '100%',
+  },
+  // Badges likes
+  highlightedLikesBadge: {
+    position: 'absolute',
+    bottom: SPACING.xl,
+    left: SPACING.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  highlightedLikesText: {
+    color: '#FFF',
+    fontSize: 32,
+    fontWeight: 'bold',
+  },
+  wallLikesBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  wallLikesText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   footerContainer: {
     flexDirection: 'row',
