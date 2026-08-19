@@ -300,7 +300,7 @@ export const barService = {
     if (error) throw error;
   },
 
-  async uploadClientPhoto(photo: { store_id: string; event_id?: string; user_id?: string; image_url: string }): Promise<BarPhoto> {
+  async uploadClientPhoto(photo: { store_id: string; event_id?: string; user_id?: string; image_url: string; decoration_type?: string }): Promise<BarPhoto> {
     // Check if store has auto-validation enabled
     let finalStatus = 'pending';
     const { data: storeData } = await supabase
@@ -324,6 +324,15 @@ export const barService = {
 
     if (error) throw error;
     return data;
+  },
+
+  async updateStoreTheme(storeId: string, themeData: { tv_wall_theme: string; tv_primary_color?: string; tv_secondary_color?: string }): Promise<void> {
+    const { error } = await supabase
+      .from('stores')
+      .update(themeData)
+      .eq('id', storeId);
+      
+    if (error) throw error;
   },
 
   async checkUserLike(photoId: string, userId: string): Promise<boolean> {

@@ -46,8 +46,9 @@ export const BarLiveScreen: React.FC = () => {
   const [resolvedStoreId, setResolvedStoreId] = useState<string | null>(paramStoreId || null);
   const storeId = resolvedStoreId; // alias for the rest of the code
 
-  const [activeTab, setActiveTab] = useState<LiveTab>('menu');
-  const [store, setStore] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'menu' | 'wall' | 'contest'>('menu');
+  const [decorationType, setDecorationType] = useState<string>('none');
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [photos, setPhotos] = useState<BarPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -259,7 +260,8 @@ export const BarLiveScreen: React.FC = () => {
           await barService.uploadClientPhoto({
             store_id: storeId,
             user_id: user.id,
-            image_url: photoUrl
+            image_url: photoUrl,
+            decoration_type: decorationType
           });
           Alert.alert('Succès', 'Votre photo a été envoyée ! Elle sera affichée après validation.');
         }
@@ -462,6 +464,29 @@ export const BarLiveScreen: React.FC = () => {
         ) : null
       ) : activeTab === 'wall' || (activeTab === 'contest' && activeEvent?.contest_phase === 'participation') ? (
         <View style={[styles.bottomActions, { paddingBottom: insets.bottom || SPACING.md }]}>
+          
+          {activeTab === 'wall' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.decorationPicker}>
+              {[
+                { id: 'none', label: 'Aucun', icon: '📷' },
+                { id: 'birthday', label: 'Anniv.', icon: '🎂' },
+                { id: 'wedding', label: 'Mariage', icon: '💍' },
+                { id: 'graduation', label: 'Diplôme', icon: '🎓' },
+                { id: 'party', label: 'Fête', icon: '🎉' },
+              ].map(dec => (
+                <TouchableOpacity 
+                  key={dec.id} 
+                  style={[styles.decorationChip, decorationType === dec.id && styles.decorationChipActive]}
+                  onPress={() => setDecorationType(dec.id)}
+                >
+                  <Text style={[styles.decorationChipText, decorationType === dec.id && styles.decorationChipTextActive]}>
+                    {dec.icon} {dec.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
           <TouchableOpacity 
             style={styles.cameraBtn}
             onPress={handleUploadPhoto}
@@ -714,6 +739,33 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '800',
     fontSize: 15,
+  },
+  decorationPicker: {
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.sm,
+    flexGrow: 0,
+  },
+  decorationChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    marginRight: SPACING.sm,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  decorationChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '30',
+  },
+  decorationChipText: {
+    color: '#ccc',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  decorationChipTextActive: {
+    color: COLORS.primary,
   },
 });
 

@@ -45,6 +45,10 @@ export const BarPhotosScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('pending');
   const [isAutoValidate, setIsAutoValidate] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedDecoration, setSelectedDecoration] = useState<string>('none');
+  const [selectedTheme, setSelectedTheme] = useState<string>('default');
+  const [customPrimaryColor, setCustomPrimaryColor] = useState<string>('#000000');
+  const [showThemePanel, setShowThemePanel] = useState(false);
 
   const handleUploadPhoto = async () => {
     if (!storeId || !user) return;
@@ -64,7 +68,8 @@ export const BarPhotosScreen: React.FC = () => {
         await barService.uploadClientPhoto({
           store_id: storeId,
           user_id: user.id,
-          image_url: photoUrl
+          image_url: photoUrl,
+          decoration_type: selectedDecoration
         });
 
         Alert.alert('Succès', 'Photo ajoutée au mur avec succès !');
@@ -75,6 +80,21 @@ export const BarPhotosScreen: React.FC = () => {
       Alert.alert('Erreur', 'Impossible d\'ajouter la photo.');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSaveTheme = async () => {
+    if (!storeId) return;
+    try {
+      await barService.updateStoreTheme(storeId, {
+        tv_wall_theme: selectedTheme,
+        tv_primary_color: selectedTheme === 'custom' ? customPrimaryColor : undefined,
+      });
+      Alert.alert('Thème mis à jour', 'Le thème de la TV a été changé !');
+      setShowThemePanel(false);
+    } catch (error) {
+      console.error('Theme update error:', error);
+      Alert.alert('Erreur', 'Impossible de changer le thème.');
     }
   };
 
@@ -200,6 +220,63 @@ export const BarPhotosScreen: React.FC = () => {
           onValueChange={handleToggleAutoValidate}
           trackColor={{ false: COLORS.border, true: COLORS.primary }}
         />
+      </View>
+
+      {/* Theme Selector Button */}
+      <TouchableOpacity style={styles.themeSelectorBtn} onPress={() => setShowThemePanel(p => !p)}>
+        <Ionicons name="color-palette" size={20} color="#FFF" />
+        <Text style={styles.addPhotoBtnText}>Thème de la TV</Text>
+        <Ionicons name={showThemePanel ? 'chevron-up' : 'chevron-down'} size={18} color="#FFF" />
+      </TouchableOpacity>
+
+      {/* Theme Panel (collapsible) */}
+      {showThemePanel && (
+        <View style={styles.themePanel}>
+          <Text style={styles.themePanelTitle}>🎨 Choisir le thème</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.md }}>
+            {[
+              { id: 'default', label: 'Défaut', icon: '🌑' },
+              { id: 'christmas', label: 'Noël', icon: '🎄' },
+              { id: 'halloween', label: 'Halloween', icon: '🎃' },
+              { id: 'valentine', label: 'St-Valentin', icon: '❤️' },
+              { id: 'newyear', label: 'Nouvel An', icon: '🎆' },
+            ].map(t => (
+              <TouchableOpacity
+                key={t.id}
+                style={[styles.themeChip, selectedTheme === t.id && styles.themeChipActive]}
+                onPress={() => setSelectedTheme(t.id)}
+              >
+                <Text style={styles.themeChipIcon}>{t.icon}</Text>
+                <Text style={[styles.themeChipLabel, selectedTheme === t.id && styles.themeChipLabelActive]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <TouchableOpacity style={styles.themeApplyBtn} onPress={handleSaveTheme}>
+            <Text style={styles.themeApplyBtnText}>✅ Appliquer ce thème</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Decoration Picker for manager uploads */}
+      <View style={styles.decorationBar}>
+        <Text style={styles.decorationBarLabel}>Occasion :</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {[
+            { id: 'none', icon: '📷', label: 'Aucune' },
+            { id: 'birthday', icon: '🎂', label: 'Anniversaire' },
+            { id: 'wedding', icon: '💍', label: 'Mariage' },
+            { id: 'graduation', icon: '🎓', label: 'Diplôme' },
+            { id: 'party', icon: '🎉', label: 'Fête' },
+          ].map(dec => (
+            <TouchableOpacity
+              key={dec.id}
+              style={[styles.decorationChip, selectedDecoration === dec.id && styles.decorationChipActive]}
+              onPress={() => setSelectedDecoration(dec.id)}
+            >
+              <Text style={styles.decorationChipText}>{dec.icon} {dec.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <TouchableOpacity
@@ -480,6 +557,102 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  themeSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366f1',
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  themePanel: {
+    backgroundColor: '#1a1a2e',
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  themePanelTitle: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: SPACING.md,
+  },
+  themeChip: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginRight: SPACING.sm,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    minWidth: 70,
+  },
+  themeChipActive: {
+    borderColor: '#6366f1',
+    backgroundColor: 'rgba(99,102,241,0.3)',
+  },
+  themeChipIcon: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  themeChipLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  themeChipLabelActive: {
+    color: '#FFF',
+  },
+  themeApplyBtn: {
+    backgroundColor: '#6366f1',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+  },
+  themeApplyBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  decorationBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  decorationBarLabel: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    flexShrink: 0,
+  },
+  decorationChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginRight: SPACING.sm,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  decorationChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '30',
+  },
+  decorationChipText: {
+    color: '#ccc',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 export default BarPhotosScreen;
