@@ -22,6 +22,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useCartStore, useAuthStore } from '../store';
 import { useClientHomeState } from '../hooks/useClientHomeState';
 import { ProductCard, ProductCardSkeleton, StoreCard, StoreCardSkeleton } from '../components';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import OptimizedImage from '../components/OptimizedImage';
 import { useResponsive } from '../utils/responsive';
 import { storeService } from '../services/storeService';
@@ -148,6 +149,7 @@ export const ClientHomeScreen: React.FC = () => {
   const [storesPage, setStoresPage] = useState(0);
   const [loadingStores, setLoadingStores] = useState(true);
   const [loadingMoreStores, setLoadingMoreStores] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [navigatingState, setNavigatingState] = useState<string | null>(null);
   
   const handleNavigate = useCallback((screen: string, params?: any, id?: string) => {
@@ -281,6 +283,9 @@ export const ClientHomeScreen: React.FC = () => {
               ) : (
                 <Ionicons name="briefcase-outline" size={24} color={palette.textMuted} />
               )}
+            </TouchableOpacity>
+            <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => setShowScanner(true)}>
+              <Ionicons name="qr-code-outline" size={24} color={palette.textMuted} />
             </TouchableOpacity>
             <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => navigation.navigate('ClientMap')}>
               <Ionicons name="location-outline" size={24} color={palette.textMuted} />
@@ -445,6 +450,55 @@ onPress={() => {
       {loadingMoreStores && (
         <ActivityIndicator size="large" color={palette.accent} style={{ marginVertical: SPACING.lg }} />
       )}
+
+      <BarcodeScannerModal
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        hintText="Scannez le QR code de la table ou de la boutique"
+        onScan={(data) => {
+          setShowScanner(false);
+          try {
+            const url = new URL(data);
+            
+            // Check if it's a libreshop link
+            if (url.hostname.includes('libreshop') || url.hostname === 'localhost') {
+              const path = url.pathname; // e.g. /store/bar-test/live
+              
+              if (path.includes('/live')) {
+                // Table QR code: /store/:slug/live?table=...
+                const slugMatch = path.match(/\/store\/([^\/]+)\/live/);
+                const table = url.searchParams.get('table');
+                if (slugMatch) {
+                  const slug = slugMatch[1];
+                  // If we need the storeId, we might need to fetch it first, but BarLive can handle slug only if modified, 
+                  // or we can redirect to web route if on web:
+                  if (Platform.OS === 'web') {
+                    window.location.href = data;
+                  } else {
+                    // Mobile navigation
+                    navigation.navigate('BarLive', { slug, table });
+                  }
+                  return;
+                }
+              }
+            }
+            
+            // Fallback for web
+            if (Platform.OS === 'web') {
+              window.location.href = data;
+            } else {
+              import('react-native').then(({ Linking }) => {
+                Linking.openURL(data).catch(() => {
+                  Alert.alert("Erreur", "Lien non supporté.");
+                });
+              });
+            }
+          } catch (e) {
+            // Not a URL, do nothing or show error
+            Alert.alert("Erreur", "Code invalide.");
+          }
+        }}
+      />
     </ScrollView>
   );
 };

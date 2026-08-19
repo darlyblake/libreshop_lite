@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   StatusBar,
   Dimensions,
-  Animated
+  Animated,
+  Platform,
+  TouchableOpacity
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,6 +44,43 @@ export const BarTVScreen: React.FC = () => {
 
   // Animation for photos
   const fadeAnim = useState(new Animated.Value(0))[0];
+
+  const toggleFullscreen = () => {
+    if (Platform.OS === 'web') {
+      const doc = window.document as any;
+      const elem = doc.documentElement;
+      
+      if (!doc.fullscreenElement && !doc.mozFullScreenElement && !doc.webkitFullscreenElement && !doc.msFullscreenElement) {
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) { /* Safari */
+          elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) { /* IE11 */
+          elem.msRequestFullscreen();
+        }
+      } else {
+        if (doc.exitFullscreen) {
+          doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen) { /* Safari */
+          doc.webkitExitFullscreen();
+        } else if (doc.msExitFullscreen) { /* IE11 */
+          doc.msExitFullscreen();
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'f' || e.key === 'F') {
+          toggleFullscreen();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, []);
 
   useEffect(() => {
     if (!slug && !storeId) return;
@@ -348,12 +387,21 @@ export const BarTVScreen: React.FC = () => {
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
         <View style={styles.header}>
-          {store?.logo_url ? (
-            <Image source={{ uri: store.logo_url }} style={styles.logo} />
-          ) : (
-            <Ionicons name="wine" size={40} color={COLORS.primary} />
+          <View style={styles.headerLeft}>
+            {store?.logo_url ? (
+              <Image source={{ uri: store.logo_url }} style={styles.logo} />
+            ) : (
+              <Ionicons name="wine" size={40} color={COLORS.primary} />
+            )}
+            <Text style={styles.storeName}>{store?.name || 'Live'}</Text>
+          </View>
+          
+          {Platform.OS === 'web' && (
+            <TouchableOpacity onPress={toggleFullscreen} style={styles.fullscreenBtn}>
+              <Ionicons name="expand" size={24} color="#FFF" />
+              <Text style={styles.fullscreenText}>Plein écran (F)</Text>
+            </TouchableOpacity>
           )}
-          <Text style={styles.storeName}>{store?.name || 'Live'}</Text>
         </View>
 
         {/* Dynamic Content */}
@@ -399,8 +447,29 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: SPACING.xl,
     paddingHorizontal: SPACING.xl,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fullscreenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    gap: SPACING.sm,
+  },
+  fullscreenText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   logo: {
     width: 60,

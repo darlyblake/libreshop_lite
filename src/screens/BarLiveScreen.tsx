@@ -47,6 +47,7 @@ export const BarLiveScreen: React.FC = () => {
   const storeId = resolvedStoreId; // alias for the rest of the code
 
   const [activeTab, setActiveTab] = useState<'menu' | 'wall' | 'contest'>('menu');
+  const [store, setStore] = useState<any>(null);
   const [decorationType, setDecorationType] = useState<string>('none');
   const [photos, setPhotos] = useState<BarPhoto[]>([]);
   const [loading, setLoading] = useState(true);
