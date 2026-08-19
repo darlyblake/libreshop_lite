@@ -17,6 +17,8 @@ import { COLORS, SPACING, RADIUS } from '../config/theme';
 import { barService, BarPhoto, BarEvent } from '../services/barService';
 import { storeService } from '../services/storeService';
 import { supabase } from '../lib/supabase';
+import { AnimatedBackground } from '../components/AnimatedBackground';
+import { PhotoDecoration } from '../components/PhotoDecoration';
 
 const { width, height } = Dimensions.get('window');
 
@@ -229,38 +231,56 @@ export const BarTVScreen: React.FC = () => {
             style={styles.highlightedPhoto} 
             resizeMode="contain" 
           />
+          <PhotoDecoration type={(highlightedPhoto as any).decoration_type || 'none'} />
         </View>
       );
     }
 
-    // Dynamic sizing based on the number of photos
-    let numColumns = 4;
-    if (photos.length <= 2) {
-      numColumns = 2;
-    } else if (photos.length <= 6) {
-      numColumns = 3;
-    }
+    // Optimal sizing so all photos fit on screen without scrolling
+    const N = Math.min(photos.length, 12);
+    let c = 1, r = 1;
+    if (N === 1) { c = 1; r = 1; }
+    else if (N === 2) { c = 2; r = 1; }
+    else if (N <= 4) { c = 2; r = 2; }
+    else if (N <= 6) { c = 3; r = 2; }
+    else if (N <= 9) { c = 3; r = 3; }
+    else { c = 4; r = 3; }
+
+    const availableW = width - SPACING.xl * 2;
+    const availableH = height * 0.65; // Leave room for header/footer
     
-    // Calculate the size taking margins into account
-    const dynamicSize = (width / numColumns) - (SPACING.md * 2);
+    // We want the squares to fit in both dimensions
+    const maxWidth = availableW / c;
+    const maxHeight = availableH / r;
+    const dynamicSize = Math.floor(Math.min(maxWidth, maxHeight)) - SPACING.md * 2;
 
     return (
       <View style={styles.grid}>
-        {photos.slice(0, 12).map((photo) => (
-          <View 
-            key={photo.id} 
-            style={[
-              styles.photoCardWall, 
-              { width: dynamicSize, height: dynamicSize }
-            ]}
-          >
-            <Image 
-              source={{ uri: (photo as any).image_url || (photo as any).photo_url }} 
-              style={styles.photoImage} 
-              resizeMode="cover" 
-            />
-          </View>
-        ))}
+        {photos.slice(0, 12).map((photo, index) => {
+          const isHighlighted = slideState.isWall && index === slideState.photoIndex;
+          return (
+            <View 
+              key={photo.id} 
+              style={[
+                styles.photoCardWall, 
+                { 
+                  width: dynamicSize, 
+                  height: dynamicSize,
+                  borderColor: isHighlighted ? COLORS.primary : 'rgba(255,255,255,0.2)',
+                  borderWidth: isHighlighted ? 6 : 3,
+                  transform: [{ scale: isHighlighted ? 1.05 : 1 }]
+                }
+              ]}
+            >
+              <Image 
+                source={{ uri: (photo as any).image_url || (photo as any).photo_url }} 
+                style={styles.photoImage} 
+                resizeMode="cover" 
+              />
+              <PhotoDecoration type={(photo as any).decoration_type || 'none'} />
+            </View>
+          );
+        })}
       </View>
     );
   };
@@ -309,15 +329,21 @@ export const BarTVScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, store?.tv_primary_color ? { backgroundColor: store.tv_primary_color } : {}]}>
       <StatusBar hidden={true} />
       {/* Background */}
       <View style={StyleSheet.absoluteFill}>
         {store?.banner_url && (
           <Image source={{ uri: store.banner_url }} style={StyleSheet.absoluteFillObject} blurRadius={10} />
         )}
-        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.85)' }]} />
+        <View style={[
+          StyleSheet.absoluteFillObject, 
+          { backgroundColor: store?.tv_primary_color ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.85)' }
+        ]} />
       </View>
+      
+      {/* Dynamic Animated Particles based on Theme */}
+      <AnimatedBackground theme={store?.tv_wall_theme || 'default'} />
 
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header */}
