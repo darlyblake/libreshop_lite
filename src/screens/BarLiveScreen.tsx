@@ -101,10 +101,10 @@ export const BarLiveScreen: React.FC = () => {
         const prods = await productService.getByStore(storeId);
         setProducts(prods || []);
       } else if (activeTab === 'wall') {
-        const pts = await barService.getPhotosByStore(storeId, 'approved');
+        const pts = await barService.getPhotosByStore(storeId, 'approved', user?.id);
         setPhotos(pts);
       } else if (activeTab === 'contest' && currentEvent) {
-        const pts = await barService.getContestPhotos(currentEvent.id);
+        const pts = await barService.getContestPhotos(currentEvent.id, user?.id);
         setContestPhotos(pts);
         
         if (user) {
@@ -399,11 +399,23 @@ export const BarLiveScreen: React.FC = () => {
               {(activeTab === 'contest' ? contestPhotos : photos).map((photo) => (
                 <View key={photo.id} style={styles.photoCard}>
                   <Image source={{ uri: (photo as any).image_url || (photo as any).photo_url }} style={styles.photoImage} />
+                  
+                  {photo.status === 'pending' && (
+                    <View style={[styles.statusBadge, { backgroundColor: COLORS.warning }]}>
+                      <Text style={styles.statusBadgeText}>En attente</Text>
+                    </View>
+                  )}
+                  {photo.status === 'rejected' && (
+                    <View style={[styles.statusBadge, { backgroundColor: COLORS.danger }]}>
+                      <Text style={styles.statusBadgeText}>Rejetée</Text>
+                    </View>
+                  )}
+
                   <LinearGradient
                     colors={['transparent', 'rgba(0,0,0,0.8)']}
                     style={styles.photoGradient}
                   />
-                  {activeTab === 'contest' && activeEvent?.contest_phase === 'voting' && (
+                  {activeTab === 'contest' && activeEvent?.contest_phase === 'voting' && photo.status === 'approved' && (
                     <View style={styles.photoActions}>
                       <Text style={styles.likesText}>{photo.votes_count || 0} votes</Text>
                       <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike(photo, true)}>
@@ -411,7 +423,7 @@ export const BarLiveScreen: React.FC = () => {
                       </TouchableOpacity>
                     </View>
                   )}
-                  {activeTab === 'wall' && (
+                  {activeTab === 'wall' && photo.status === 'approved' && (
                     <View style={styles.photoActions}>
                       <Text style={styles.likesText}>{photo.likes_count || 0} likes</Text>
                       <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike(photo, false)}>
@@ -419,7 +431,7 @@ export const BarLiveScreen: React.FC = () => {
                       </TouchableOpacity>
                     </View>
                   )}
-                  {photo.featured_at && (
+                  {photo.featured_at && photo.status === 'approved' && (
                     <View style={styles.featuredBadge}>
                       <Ionicons name="star" size={12} color="#FFF" />
                       <Text style={styles.featuredText}>Gagnant</Text>
@@ -516,6 +528,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  statusBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    zIndex: 2,
+  },
+  statusBadgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   liveDot: {
     width: 6,

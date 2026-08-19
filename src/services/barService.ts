@@ -92,14 +92,17 @@ export const barService = {
   },
 
   // --- PHOTOS ---
-  async getPhotosByStore(storeId: string, status?: BarPhoto['status']): Promise<BarPhoto[]> {
+  async getPhotosByStore(storeId: string, status?: BarPhoto['status'], currentUserId?: string): Promise<BarPhoto[]> {
     let query = supabase
       .from('bar_photos')
       .select('*, likes:bar_photo_likes(count)')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false });
 
-    if (status) {
+    if (currentUserId && status === 'approved') {
+      // Show approved photos OR user's own photos
+      query = query.or(`status.eq.approved,user_id.eq.${currentUserId}`);
+    } else if (status) {
       query = query.eq('status', status);
     }
 
@@ -145,12 +148,20 @@ export const barService = {
   },
 
   // --- CONTEST (CLIENT) ---
-  async getContestPhotos(eventId: string): Promise<BarEventPhoto[]> {
-    const { data, error } = await supabase
+  async getContestPhotos(eventId: string, currentUserId?: string): Promise<BarEventPhoto[]> {
+    let query = supabase
       .from('bar_event_photos')
       .select('*')
       .eq('event_id', eventId)
       .order('votes_count', { ascending: false });
+
+    if (currentUserId) {
+      query = query.or(`status.eq.approved,user_id.eq.${currentUserId}`);
+    } else {
+      query = query.eq('status', 'approved');
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];
@@ -290,11 +301,23 @@ export const barService = {
   },
 
   async uploadClientPhoto(photo: { store_id: string; event_id?: string; user_id?: string; image_url: string }): Promise<BarPhoto> {
+    // Check if store has auto-validation enabled
+    let finalStatus = 'pending';
+    const { data: storeData } = await supabase
+      .from('stores')
+      .select('is_photo_auto_validate')
+      .eq('id', photo.store_id)
+      .single();
+      
+    if (storeData?.is_photo_auto_validate) {
+      finalStatus = 'approved';
+    }
+
     const { data, error } = await supabase
       .from('bar_photos')
       .insert({
         ...photo,
-        status: 'pending' // Always pending by default
+        status: finalStatus
       })
       .select()
       .single();

@@ -43,25 +43,49 @@ export const BarTVScreen: React.FC = () => {
     loadData();
   }, [slug, storeId]);
 
+  // Polling fallback every 10 seconds in case Supabase Realtime is not active on this table
+  useEffect(() => {
+    if (!storeId) return;
+    const interval = setInterval(() => {
+      // Re-fetch store settings silently to detect mode changes
+      storeService.getById(storeId).then(s => {
+        if (s) {
+          setCurrentMode(s.screen_current_mode || 'photo_wall');
+          setScreenMessage(s.screen_message || '');
+        }
+      }).catch(() => {});
+    }, 10000); // every 10 seconds
+    return () => clearInterval(interval);
+  }, [storeId]);
+
   useEffect(() => {
     if (!storeId) return;
 
-    const channel = supabase.channel(`public:stores:id=eq.${storeId}`)
+    // Store screen mode changes
+    const storeChannel = supabase.channel(`tv:stores:${storeId}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stores', filter: `id=eq.${storeId}` }, (payload) => {
         const newDoc = payload.new as any;
-        if (newDoc.screen_current_mode !== currentScreenMode) {
-          setCurrentMode(newDoc.screen_current_mode);
-        }
-        if (newDoc.screen_message !== screenMessage) {
-          setScreenMessage(newDoc.screen_message);
-        }
+        setCurrentMode(newDoc.screen_current_mode || 'photo_wall');
+        setScreenMessage(newDoc.screen_message || '');
       })
       .subscribe();
 
-    const contestChannel = supabase.channel(`public:bar_events:store_id=eq.${storeId}`)
+    // Bar events changes (contest start/stop, phase change)
+    const eventsChannel = supabase.channel(`tv:bar_events:${storeId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bar_events', filter: `store_id=eq.${storeId}` }, () => {
-        if (storeId) loadEvents(storeId);
+        loadEvents(storeId);
       })
+      .subscribe();
+
+    // Wall photos changes (INSERT/UPDATE/DELETE on bar_photos)
+    const wallPhotosChannel = supabase.channel(`tv:bar_photos:${storeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bar_photos', filter: `store_id=eq.${storeId}` }, () => {
+        loadWallPhotos(storeId);
+      })
+      .subscribe();
+
+    // Contest photos and votes changes
+    const contestChannel = supabase.channel(`tv:bar_event_photos:${storeId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bar_event_photos' }, () => {
         loadPhotos();
       })
@@ -71,10 +95,12 @@ export const BarTVScreen: React.FC = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(storeChannel);
+      supabase.removeChannel(eventsChannel);
+      supabase.removeChannel(wallPhotosChannel);
       supabase.removeChannel(contestChannel);
     };
-  }, [storeId, currentScreenMode, screenMessage, activeEvent]); // Add dependencies appropriately
+  }, [storeId, activeEvent]);
 
   useEffect(() => {
     // Fade in effect when mode changes
@@ -112,29 +138,41 @@ export const BarTVScreen: React.FC = () => {
   };
 
   const loadEvents = async (sId: string) => {
+    // Always load general wall photos for the photo wall mode
+    await loadWallPhotos(sId);
+
     const storeEvents = await barService.getEventsByStore(sId);
     const active = storeEvents.find(e => e.status === 'published' && (e.is_photo_wall_active || e.is_contest_active));
     setActiveEvent(active || null);
+    
     if (active) {
-      const allPhotos = await barService.getPhotosForEvent(active.id);
-      const approvedPhotos = allPhotos.filter(p => p.status === 'approved');
-      
-      setPhotos(approvedPhotos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-      
-      const contest = [...approvedPhotos].sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
+      const allContestPhotos = await barService.getPhotosForEvent(active.id);
+      const approvedContestPhotos = allContestPhotos.filter(p => p.status === 'approved');
+      const contest = [...approvedContestPhotos].sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
       setContestPhotos(contest);
     }
   };
 
+  const loadWallPhotos = async (sId: string) => {
+    try {
+      const wallPhotos = await barService.getPhotosByStore(sId, 'approved');
+      setPhotos(wallPhotos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    } catch (e) {
+      console.error('Error loading wall photos:', e);
+    }
+  };
+
   const loadPhotos = async () => {
-    if (!activeEvent?.id) return;
-    const allPhotos = await barService.getPhotosForEvent(activeEvent.id);
-    const approvedPhotos = allPhotos.filter(p => p.status === 'approved');
+    if (storeId) {
+      await loadWallPhotos(storeId);
+    }
     
-    setPhotos(approvedPhotos.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
-    
-    const contest = [...approvedPhotos].sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
-    setContestPhotos(contest);
+    if (activeEvent?.id) {
+      const allContestPhotos = await barService.getPhotosForEvent(activeEvent.id);
+      const approvedContestPhotos = allContestPhotos.filter(p => p.status === 'approved');
+      const contest = [...approvedContestPhotos].sort((a, b) => (b.votes_count || 0) - (a.votes_count || 0));
+      setContestPhotos(contest);
+    }
   };
 
   if (loading) {

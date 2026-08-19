@@ -10,7 +10,8 @@ import {
   Alert,
   StatusBar,
   Image,
-  Dimensions
+  Dimensions,
+  Switch
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -21,9 +22,11 @@ import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
 import { barService, BarPhoto } from '../services/barService';
+import * as ImagePicker from 'expo-image-picker';
+import { cloudinaryService } from '../services/cloudinaryService';
 
-const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - SPACING.md * 3) / 2; // 2 columns
+// Fixed size so it doesn't get huge on desktop web browsers
+const PHOTO_SIZE = 150; 
 
 type TabType = 'pending' | 'approved' | 'rejected';
 
@@ -34,11 +37,46 @@ export const BarPhotosScreen: React.FC = () => {
   const { fontSize } = useResponsive();
   const isFocused = useIsFocused();
 
+  const [store, setStore] = useState<any>(null);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<BarPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('pending');
+  const [isAutoValidate, setIsAutoValidate] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUploadPhoto = async () => {
+    if (!storeId || !user) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIsUploading(true);
+        const photoUrl = await cloudinaryService.uploadImage(result.assets[0].uri);
+        if (!photoUrl) throw new Error("Upload failed");
+
+        await barService.uploadClientPhoto({
+          store_id: storeId,
+          user_id: user.id,
+          image_url: photoUrl
+        });
+
+        Alert.alert('Succès', 'Photo ajoutée au mur avec succès !');
+        loadData(false);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Erreur', 'Impossible d\'ajouter la photo.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const loadData = async (showLoading = true) => {
     if (!user?.id) return;
@@ -46,7 +84,9 @@ export const BarPhotosScreen: React.FC = () => {
       if (showLoading) setLoading(true);
       const s = await storeService.getByUser(user.id);
       if (s) {
+        setStore(s);
         setStoreId(s.id);
+        setIsAutoValidate(!!s.is_photo_auto_validate);
         const storePhotos = await barService.getPhotosByStore(s.id, activeTab);
         setPhotos(storePhotos);
       }
@@ -93,6 +133,17 @@ export const BarPhotosScreen: React.FC = () => {
     }
   };
 
+  const handleToggleAutoValidate = async (value: boolean) => {
+    if (!storeId) return;
+    setIsAutoValidate(value);
+    try {
+      await storeService.updateStore(storeId, { is_photo_auto_validate: value });
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible de modifier ce réglage');
+      setIsAutoValidate(!value);
+    }
+  };
+
   const renderTab = (tab: TabType, label: string) => (
     <TouchableOpacity
       style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -120,7 +171,17 @@ export const BarPhotosScreen: React.FC = () => {
         <Text style={[styles.headerTitle, { fontSize: fontSize.xl }]}>
           Modération Photos
         </Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleUploadPhoto}
+          disabled={isUploading}
+        >
+          {isUploading ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Ionicons name="camera" size={24} color="#FFF" />
+          )}
+        </TouchableOpacity>
       </LinearGradient>
 
       <View style={styles.tabsContainer}>
@@ -129,6 +190,32 @@ export const BarPhotosScreen: React.FC = () => {
         {renderTab('rejected', 'Refusées')}
       </View>
 
+      <View style={styles.autoValidateContainer}>
+        <View>
+          <Text style={styles.autoValidateTitle}>Auto-validation</Text>
+          <Text style={styles.autoValidateSubtitle}>Publier les photos sans modération</Text>
+        </View>
+        <Switch
+          value={isAutoValidate}
+          onValueChange={handleToggleAutoValidate}
+          trackColor={{ false: COLORS.border, true: COLORS.primary }}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={styles.addPhotoBtn}
+        onPress={handleUploadPhoto}
+        disabled={isUploading}
+      >
+        {isUploading ? (
+          <ActivityIndicator size="small" color="#FFF" />
+        ) : (
+          <Ionicons name="camera" size={20} color="#FFF" />
+        )}
+        <Text style={styles.addPhotoBtnText}>
+          {isUploading ? 'Envoi...' : 'Ajouter une photo sur le mur'}
+        </Text>
+      </TouchableOpacity>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -256,6 +343,40 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: COLORS.primary,
+  },
+  autoValidateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    backgroundColor: COLORS.card,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  autoValidateTitle: {
+    fontWeight: 'bold',
+    color: COLORS.text,
+    fontSize: 16,
+  },
+  autoValidateSubtitle: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  addPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    margin: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+  },
+  addPhotoBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
   scrollContent: {
     padding: SPACING.md,
