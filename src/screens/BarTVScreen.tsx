@@ -35,6 +35,9 @@ export const BarTVScreen: React.FC = () => {
   const [photos, setPhotos] = useState<BarPhoto[]>([]);
   const [contestPhotos, setContestPhotos] = useState<BarPhoto[]>([]);
 
+  // Slideshow state
+  const [slideState, setSlideState] = useState<{ isWall: boolean, photoIndex: number }>({ isWall: true, photoIndex: 0 });
+
   // Animation for photos
   const fadeAnim = useState(new Animated.Value(0))[0];
 
@@ -42,6 +45,30 @@ export const BarTVScreen: React.FC = () => {
     if (!slug && !storeId) return;
     loadData();
   }, [slug, storeId]);
+
+  // Slideshow interval
+  useEffect(() => {
+    if (currentScreenMode !== 'photo_wall' || photos.length === 0) {
+      setSlideState({ isWall: true, photoIndex: 0 });
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setSlideState(prev => {
+        if (!prev.isWall) {
+          // Switch back to wall, increment index for next time
+          let nextIndex = prev.photoIndex + 1;
+          if (nextIndex >= photos.length) nextIndex = 0;
+          return { isWall: true, photoIndex: nextIndex };
+        } else {
+          // Switch to single highlighted photo
+          return { isWall: false, photoIndex: prev.photoIndex };
+        }
+      });
+    }, 7000); // cycle every 7 seconds
+
+    return () => clearInterval(interval);
+  }, [currentScreenMode, photos.length]);
 
   // Polling fallback every 10 seconds in case Supabase Realtime is not active on this table
   useEffect(() => {
@@ -188,16 +215,50 @@ export const BarTVScreen: React.FC = () => {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="images-outline" size={100} color={COLORS.textMuted} />
-          <Text style={styles.emptyText}>Scannez le QR Code pour envoyer la première photo !</Text>
+          <Text style={styles.emptyText}>Soyez le premier à envoyer une photo !</Text>
         </View>
       );
     }
 
+    if (!slideState.isWall && photos[slideState.photoIndex]) {
+      const highlightedPhoto = photos[slideState.photoIndex];
+      return (
+        <View style={styles.highlightedPhotoContainer}>
+          <Image 
+            source={{ uri: (highlightedPhoto as any).image_url || (highlightedPhoto as any).photo_url }} 
+            style={styles.highlightedPhoto} 
+            resizeMode="contain" 
+          />
+        </View>
+      );
+    }
+
+    // Dynamic sizing based on the number of photos
+    let numColumns = 4;
+    if (photos.length <= 2) {
+      numColumns = 2;
+    } else if (photos.length <= 6) {
+      numColumns = 3;
+    }
+    
+    // Calculate the size taking margins into account
+    const dynamicSize = (width / numColumns) - (SPACING.md * 2);
+
     return (
       <View style={styles.grid}>
         {photos.slice(0, 12).map((photo) => (
-          <View key={photo.id} style={styles.photoCardWall}>
-            <Image source={{ uri: (photo as any).image_url || (photo as any).photo_url }} style={styles.photoImage} resizeMode="cover" />
+          <View 
+            key={photo.id} 
+            style={[
+              styles.photoCardWall, 
+              { width: dynamicSize, height: dynamicSize }
+            ]}
+          >
+            <Image 
+              source={{ uri: (photo as any).image_url || (photo as any).photo_url }} 
+              style={styles.photoImage} 
+              resizeMode="cover" 
+            />
           </View>
         ))}
       </View>
@@ -280,6 +341,14 @@ export const BarTVScreen: React.FC = () => {
               <Text style={styles.emptyText}>Menu affiché sur les téléphones des clients</Text>
             </View>
           )}
+        </View>
+
+        {/* Permanent footer instruction */}
+        <View style={styles.footerContainer}>
+          <Ionicons name="qr-code-outline" size={32} color="#FFF" style={{ marginRight: SPACING.md }} />
+          <Text style={styles.footerText}>
+            Scannez le QR code sur votre table pour envoyer une photo au mur !
+          </Text>
         </View>
       </Animated.View>
     </View>
@@ -368,6 +437,35 @@ const styles = StyleSheet.create({
   photoImage: {
     width: '100%',
     height: '100%',
+  },
+  highlightedPhotoContainer: {
+    width: width * 0.8,
+    height: height * 0.6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: RADIUS.xl,
+    overflow: 'hidden',
+  },
+  highlightedPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  footerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: RADIUS.full,
+    marginTop: SPACING.xl,
+    alignSelf: 'center',
+    paddingHorizontal: SPACING.xxl,
+  },
+  footerText: {
+    color: '#FFF',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   contestContainer: {
     alignItems: 'center',
