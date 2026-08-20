@@ -259,7 +259,7 @@ export const productService = {
       // ✅ Use productUtils ranking function
       const mapped = (data || [])
         .map(toProduct)
-        .filter(p => p.store?.category !== 'Bars' && p.store?.category !== 'Bar');
+        .filter(p => p.stores?.category !== 'Bars' && p.stores?.category !== 'Bar');
       const ranked = rankProductsByScore(mapped, sort);
       return ranked.slice(0, pageSize);
     };
@@ -340,7 +340,7 @@ export const productService = {
       // ✅ Use productUtils ranking
       const mapped = (products || [])
         .map(toProduct)
-        .filter(p => p.store?.category !== 'Bars' && p.store?.category !== 'Bar');
+        .filter(p => p.stores?.category !== 'Bars' && p.stores?.category !== 'Bar');
       const ranked = rankProductsByScore(mapped, sort);
 
       return ranked.slice(from, from + pageSize);
@@ -400,7 +400,7 @@ export const productService = {
       }
 
       // Filtrer les produits de type Bar
-      allData = allData.filter(p => p.store?.category !== 'Bars' && p.store?.category !== 'Bar');
+      allData = allData.filter(p => p.stores?.category !== 'Bars' && p.stores?.category !== 'Bar');
 
       // ✅ Use productUtils ranking
       const rankedData = rankProductsByScore(allData, sort);

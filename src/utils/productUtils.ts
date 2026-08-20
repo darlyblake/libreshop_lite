@@ -87,7 +87,7 @@ export async function getProductAndValidateOwnership(productId: string) {
   // Fetch product with store owner info
   const { data: product, error } = await client
     .from('products')
-    .select('id, store_id, stores!inner(user_id)')
+    .select('id, store_id, images, stores!inner(user_id)')
     .eq('id', productId)
     .single();
 

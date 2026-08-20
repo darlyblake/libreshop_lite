@@ -55,7 +55,7 @@ export const NewOrderAlert: React.FC = () => {
     try {
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const { sound } = await Audio.Sound.createAsync(
-        require('../assets/sounds/new_order.mp3'),
+        { uri: 'https://cdn.freesound.org/previews/415/415763_5121236-lq.mp3' },
         { shouldPlay: true, volume: 1.0 }
       );
       soundRef.current = sound;
@@ -91,18 +91,21 @@ export const NewOrderAlert: React.FC = () => {
 
   useEffect(() => {
     const storeId = store?.id;
+    console.log('[NewOrderAlert] Store ID:', storeId);
     if (!storeId) return;
 
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
 
+    console.log('[NewOrderAlert] Subscribing to new orders for store:', storeId);
     const channel = supabase
       .channel(`new_order_alert:${storeId}`)
       .on(
         'postgres_changes' as any,
         { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
         async (payload: any) => {
+          console.log('[NewOrderAlert] Received payload:', payload);
           const order = payload.new as NewOrder;
           if (!order?.id) return;
 

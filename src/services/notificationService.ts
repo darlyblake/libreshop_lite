@@ -281,7 +281,7 @@ class NotificationService {
     targetRole?: 'client' | 'seller' | 'admin';
     priority?: 'low' | 'medium' | 'high';
   }) {
-    const channels = ['push', 'sms', 'email'];
+    const channels: ('push' | 'sms' | 'email')[] = ['push', 'sms', 'email'];
     const priority = notification.priority || 'medium';
 
     // Pour les notifications de faible priorité, on essaie seulement push
