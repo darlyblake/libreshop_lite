@@ -405,6 +405,8 @@ const ClientTabs: React.FC = React.memo(() => {
 });
 
 // Navigation Vendeur
+import { NewOrderAlert } from '../components/NewOrderAlert';
+
 const SellerTabs: React.FC = React.memo(() => {
   const { getColor } = useTheme();
   const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels, isLandscape } = useResponsiveTabBar();
@@ -426,7 +428,9 @@ const SellerTabs: React.FC = React.memo(() => {
   const isLandscapeIOS = isLandscape && Platform.OS === 'ios';
 
   return (
-    <SellerTab.Navigator
+    <>
+      <NewOrderAlert />
+      <SellerTab.Navigator
       screenOptions={({ route }: { route: { name: string } }) => ({
         tabBarIcon: ({ focused, color }: { focused: boolean; color: string }) => (
           <Ionicons 
@@ -476,6 +480,7 @@ const SellerTabs: React.FC = React.memo(() => {
       <SellerTab.Screen name="SellerClients" component={SellerClientsScreen} options={{ title: 'Clients' }} />
       <SellerTab.Screen name="SellerStore" component={SellerStoreScreen} options={{ title: 'Boutique' }} />
     </SellerTab.Navigator>
+    </>
   );
 });
 

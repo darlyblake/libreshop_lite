@@ -38,6 +38,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { shareContent } from '../components';
 import { qrCodeService } from '../services/qrCodeService';
 import { LocationPicker } from '../components/LocationPicker';
+import { SellerBarSettings } from '../components/SellerBarSettings';
 
 /* =========================
    TYPES & MOCK DATA
@@ -74,6 +75,10 @@ type StoreData = {
   announcementBannerEnabled?: boolean;
   announcementPopup?: string;
   announcementPopupEnabled?: boolean;
+  store_type?: 'general' | 'restaurant' | 'bar' | 'hotel' | 'logement';
+  slug?: string;
+  id?: string;
+  tv_code?: string | null;
 };
 
 const STORE_DATA: StoreData = {};
@@ -88,7 +93,7 @@ export const SellerStoreScreen: React.FC = () => {
   const { user, signOut } = useAuthStore();
   const { getColor, spacing, radius, fontSize, isDark } = useTheme();
   
-  const [activeTab, setActiveTab] = useState<'info' | 'settings' | 'analytics'>(
+  const [activeTab, setActiveTab] = useState<'info' | 'bar' | 'settings' | 'analytics'>(
     'info'
   );
 
@@ -113,13 +118,17 @@ export const SellerStoreScreen: React.FC = () => {
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [updatingLocation, setUpdatingLocation] = useState(false);
 
-  const tabs = useMemo(
-    () => [
+  const TABS = useMemo(() => {
+    const isBarOrResto = storeData?.store_type === 'bar' || storeData?.store_type === 'restaurant';
+    const tabs = [
       { id: 'info', label: 'Informations' },
-      { id: 'settings', label: 'Paramètres' },
-    ],
-    []
-  );
+    ];
+    if (isBarOrResto) {
+      tabs.push({ id: 'bar', label: 'Écran TV & Tables' });
+    }
+    tabs.push({ id: 'settings', label: 'Paramètres' });
+    return tabs;
+  }, [storeData?.store_type]);
 
   const storePublicUrl = useMemo(() => {
     if (!store?.slug) return null;
@@ -206,6 +215,10 @@ export const SellerStoreScreen: React.FC = () => {
         announcementBannerEnabled: Boolean(s.announcement_banner_enabled),
         announcementPopup: s.announcement_popup || '',
         announcementPopupEnabled: Boolean(s.announcement_popup_enabled),
+        store_type: s.store_type || 'general',
+        slug: s.slug || '',
+        id: s.id,
+        tv_code: (s as any).tv_code || null,
       });
     } catch (e: any) {
       errorHandler.handleDatabaseError(e, 'LoadStore');
@@ -1150,7 +1163,7 @@ export const SellerStoreScreen: React.FC = () => {
             </View>
 
             <View style={styles.tabsContainer}>
-              {tabs.map(t => (
+              {TABS.map(t => (
                 <TouchableOpacity key={t.id} style={[styles.tab, activeTab === t.id && styles.tabActive]} onPress={() => setActiveTab(t.id as any)}>
                   <Text style={[styles.tabText, activeTab === t.id && styles.tabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
@@ -1164,6 +1177,12 @@ export const SellerStoreScreen: React.FC = () => {
                   {renderInfoItem('logo-whatsapp', 'WhatsApp', storeData.whatsapp)}
                   {renderInfoItem('mail-outline', 'Email', storeData.email)}
                   {renderInfoItem('location-outline', 'Adresse', storeData.address)}
+                </View>
+              )}
+
+              {activeTab === 'bar' && (
+                <View style={styles.card}>
+                  <SellerBarSettings storeData={storeData} onRefresh={fetchStore} />
                 </View>
               )}
 
@@ -1184,13 +1203,17 @@ export const SellerStoreScreen: React.FC = () => {
                     <ThemeToggle />
                   </View>
 
-                  {renderSettingItem('cash-outline', `TVA: ${storeData.taxRate || 0}%`, false, () => setShowEditModal(true))}
-                  {storeData.deliveryMode === 'km' ? (
-                    renderSettingItem('map-outline', `Livraison: ${storeData.deliveryPriceKm || 0} FCFA/KM`, false, () => setShowEditModal(true))
-                  ) : storeData.deliveryMode === 'city' ? (
-                    renderSettingItem('business-outline', `Livraison: Par Ville (${Object.keys(storeData.deliveryCityFees || {}).length})`, false, () => setShowEditModal(true))
-                  ) : (
-                    renderSettingItem('pin-outline', `Livraison: ${storeData.shippingPrice || 0} FCFA`, false, () => setShowEditModal(true))
+                  {storeData.store_type !== 'bar' && (
+                    <>
+                      {renderSettingItem('cash-outline', `TVA: ${storeData.taxRate || 0}%`, false, () => setShowEditModal(true))}
+                      {storeData.deliveryMode === 'km' ? (
+                        renderSettingItem('map-outline', `Livraison: ${storeData.deliveryPriceKm || 0} FCFA/KM`, false, () => setShowEditModal(true))
+                      ) : storeData.deliveryMode === 'city' ? (
+                        renderSettingItem('business-outline', `Livraison: Par Ville (${Object.keys(storeData.deliveryCityFees || {}).length})`, false, () => setShowEditModal(true))
+                      ) : (
+                        renderSettingItem('pin-outline', `Livraison: ${storeData.shippingPrice || 0} FCFA`, false, () => setShowEditModal(true))
+                      )}
+                    </>
                   )}
 
                   {renderSettingItem('key-outline', 'Changer le mot de passe', false, () => setShowPasswordModal(true))}

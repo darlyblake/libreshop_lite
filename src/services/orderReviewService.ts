@@ -91,6 +91,22 @@ export const orderReviewService = {
   },
 
   /**
+   * Crée un avis bar direct (sans commande liée)
+   */
+  async createBarReview(payload: { user_id: string; store_id: string; rating: number; comment?: string; order_id?: string }): Promise<any> {
+    const client = useSupabase();
+    const { data, error } = await client
+      .from('order_reviews')
+      .insert(payload)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+
+  /**
    * Met à jour une évaluation (réponse du vendeur)
    */
   async update(id: string, payload: UpdateReviewPayload): Promise<OrderReview> {

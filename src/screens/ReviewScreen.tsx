@@ -19,7 +19,7 @@ export default function ReviewScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const { orderId, storeId, storeName } = route.params as {
-    orderId: string;
+    orderId: string | null;
     storeId: string;
     storeName: string;
   };
@@ -47,17 +47,22 @@ export default function ReviewScreen() {
 
     setLoading(true);
     try {
-      await orderReviewService.create({
-        order_id: orderId,
+      const payload: any = {
         user_id: user.id,
         store_id: storeId,
         rating,
         comment: comment.trim() || undefined,
-      });
+      };
+      // order_id is optional – only include when a real orderId is provided
+      if (orderId && orderId !== 'null') {
+        payload.order_id = orderId;
+      }
+
+      await orderReviewService.createBarReview(payload);
 
       Alert.alert(
         'Merci !',
-        'Votre évaluation a été enregistrée avec succès',
+        'Votre avis a été enregistré avec succès',
         [
           {
             text: 'OK',
@@ -66,11 +71,12 @@ export default function ReviewScreen() {
         ]
       );
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'enregistrer votre évaluation');
+      Alert.alert('Erreur', 'Impossible d\'enregistrer votre avis');
     } finally {
       setLoading(false);
     }
   };
+
 
   const renderStar = (star: number) => {
     const isFilled = star <= (hoveredRating || rating);
@@ -96,7 +102,9 @@ export default function ReviewScreen() {
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Text style={styles.title}>Évaluer la commande</Text>
+          <Text style={styles.title}>
+            {orderId && orderId !== 'null' ? 'Évaluer la commande' : 'Laisser un avis'}
+          </Text>
           <Text style={styles.subtitle}>{storeName}</Text>
         </View>
 

@@ -9,7 +9,9 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  StatusBar
+  StatusBar,
+  Modal,
+  TextInput
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +26,7 @@ import { barService, BarPhoto } from '../services/barService';
 import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { productService } from '../services/productService';
+import { orderService } from '../services/orderService';
 import { Product } from '../types/product';
 import { supabase } from '../lib/supabase';
 import { BarMenuSection } from '../components/BarMenuSection';
@@ -140,6 +143,62 @@ export const BarLiveScreen: React.FC = () => {
     const p = products.find(prod => prod.id === id);
     return sum + (p ? p.price * qty : 0);
   }, 0);
+
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [showGuestNameModal, setShowGuestNameModal] = useState(false);
+  const [guestName, setGuestName] = useState('');
+
+  const handleCheckout = async () => {
+    if (!storeId) {
+      Alert.alert('Erreur', 'Boutique introuvable.');
+      return;
+    }
+
+    if (!user?.full_name && !guestName.trim()) {
+      setShowGuestNameModal(true);
+      return;
+    }
+
+    setCheckoutLoading(true);
+    try {
+      // Create the order
+      const order = await orderService.create({
+        user_id: user?.id || null,
+        store_id: storeId,
+        total_amount: cartTotal,
+        status: 'pending',
+        payment_method: 'cash',
+        payment_status: 'pending',
+        shipping_address: tableNumber ? `Table ${tableNumber}` : 'Comptoir',
+        customer_phone: user?.phone || '',
+        customer_name: user?.full_name || guestName.trim(),
+        delivery_fee: 0,
+        tax_amount: 0,
+      });
+
+      // Create the order items
+      const orderItems = Object.entries(cart).map(([productId, qty]) => {
+        const p = products.find(prod => prod.id === productId);
+        return {
+          order_id: order.id,
+          product_id: productId,
+          quantity: qty,
+          price: p?.price || 0,
+        };
+      });
+
+      await orderService.createItems(orderItems as any); // using as any since order_id isn't in OrderItemPayload but works via RPC
+
+      setCart({});
+      Alert.alert('Commande envoyée !', 'Le bar a bien reçu votre commande.');
+    } catch (error) {
+      console.error('Error placing order:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la commande.');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
 
   // Timer: auto-advance phases based on configured durations
   useEffect(() => {
@@ -455,10 +514,15 @@ export const BarLiveScreen: React.FC = () => {
               <Text style={styles.cartTotal}>{cartTotal.toLocaleString('fr-FR')} FCFA</Text>
             </View>
             <TouchableOpacity
-              style={styles.cartBtn}
-              onPress={() => Alert.alert('Commande envoyée !', 'Le bar a bien reçu votre commande.')}
+              style={[styles.cartBtn, checkoutLoading && { opacity: 0.7 }]}
+              onPress={handleCheckout}
+              disabled={checkoutLoading}
             >
-              <Text style={styles.cartBtnText}>Commander →</Text>
+              {checkoutLoading ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={styles.cartBtnText}>Commander →</Text>
+              )}
             </TouchableOpacity>
           </View>
         ) : null
@@ -505,6 +569,46 @@ export const BarLiveScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      <Modal visible={showGuestNameModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Qui commande ?</Text>
+            <Text style={styles.modalDesc}>
+              Veuillez entrer votre prénom pour que le serveur sache à qui apporter la commande.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Votre prénom"
+              placeholderTextColor="#888"
+              value={guestName}
+              onChangeText={setGuestName}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setShowGuestNameModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSubmit}
+                onPress={() => {
+                  setShowGuestNameModal(false);
+                  if (guestName.trim()) {
+                    handleCheckout();
+                  } else {
+                    Alert.alert('Erreur', 'Veuillez entrer un prénom valide.');
+                  }
+                }}
+              >
+                <Text style={styles.modalSubmitText}>Valider</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -763,6 +867,69 @@ const styles = StyleSheet.create({
   },
   decorationChipTextActive: {
     color: COLORS.primary,
+  },
+  // ── Guest Name Modal ──
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1a1a2e',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 28,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  modalDesc: {
+    color: '#94a3b8',
+    fontSize: 14,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalInput: {
+    backgroundColor: '#0f0f1a',
+    borderWidth: 1,
+    borderColor: '#2a2d3a',
+    borderRadius: 12,
+    padding: 16,
+    color: '#FFF',
+    fontSize: 16,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancel: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2a2d3a',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#94a3b8',
+    fontWeight: '600',
+  },
+  modalSubmit: {
+    flex: 2,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+  },
+  modalSubmitText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
 

@@ -11,26 +11,21 @@ import {
   Share,
   Platform,
   StatusBar,
-  FlatList,
-  Modal,
-  TextInput,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Alert,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ExpoLinking from 'expo-linking';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 import { storeService } from '../services/storeService';
 import { barService, BarEvent } from '../services/barService';
+import { orderReviewService } from '../services/orderReviewService';
 import { useAuthStore } from '../store';
 import { openURL } from '../utils/platformUtils';
+import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 
 const { width } = Dimensions.get('window');
 const BANNER_HEIGHT = 260;
@@ -52,25 +47,19 @@ export const BarDetailScreen: React.FC = () => {
   const { user } = useAuthStore();
 
   const storeId = route.params?.storeId;
-  const tableParam = route.params?.table; // Passed when coming from QR code
+  const tableParam = route.params?.table;
 
   const [store, setStore] = useState<any>(null);
   const [events, setEvents] = useState<BarEvent[]>([]);
   const [promos, setPromos] = useState<PromoBanner[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewStats, setReviewStats] = useState<{ average: number; count: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
 
   // QR Scanner
   const [scannerVisible, setScannerVisible] = useState(false);
-  const [scanned, setScanned] = useState(false);
-  const [webTableInput, setWebTableInput] = useState('');
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-
-  // Carousel state
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const carouselRef = useRef<FlatList>(null);
-  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (storeId) {
@@ -85,35 +74,24 @@ export const BarDetailScreen: React.FC = () => {
     }
   }, [storeId, tableParam]);
 
-  // Auto-scroll carousel every 4 seconds
-  useEffect(() => {
-    const slides = promos.length > 0 ? promos : [null];
-    if (slides.length <= 1) return;
-
-    autoScrollTimer.current = setInterval(() => {
-      setCurrentSlide(prev => {
-        const next = (prev + 1) % slides.length;
-        carouselRef.current?.scrollToIndex({ index: next, animated: true });
-        return next;
-      });
-    }, 4000);
-
-    return () => {
-      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
-    };
-  }, [promos]);
-
   const loadBarData = async () => {
     try {
       setLoading(true);
-      const [storeData, eventsData, promosData] = await Promise.all([
+      const [storeData, eventsData, promosData, reviewsData] = await Promise.all([
         storeService.getById(storeId),
         barService.getEventsByStore(storeId),
         barService.getPromosByStore(storeId),
+        orderReviewService.getByStore(storeId).catch(() => []),
       ]);
       setStore(storeData);
       setEvents(eventsData.filter(e => e.status === 'published'));
       setPromos(promosData);
+      setReviews(reviewsData.slice(0, 5)); // show latest 5
+
+      if (reviewsData.length > 0) {
+        const avg = reviewsData.reduce((sum: number, r: any) => sum + r.rating, 0) / reviewsData.length;
+        setReviewStats({ average: Math.round(avg * 10) / 10, count: reviewsData.length });
+      }
 
       if (user?.id) {
         const following = await barService.checkIsFollowing(storeId, user.id);
@@ -176,24 +154,7 @@ export const BarDetailScreen: React.FC = () => {
   };
 
   // ── QR Scanner logic ──────────────────────────────────
-  const handlePressSurPlace = async () => {
-    if (Platform.OS === 'web') {
-      // Web: fallback modal avec saisie manuelle du numéro de table
-      setScannerVisible(true);
-      return;
-    }
-    if (!cameraPermission?.granted) {
-      const result = await requestCameraPermission();
-      if (!result.granted) {
-        Alert.alert(
-          'Permission caméra requise',
-          'Veuillez autoriser l\'accès à la caméra pour scanner le QR code de votre table.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-    }
-    setScanned(false);
+  const handlePressSurPlace = () => {
     setScannerVisible(true);
   };
 
@@ -201,9 +162,7 @@ export const BarDetailScreen: React.FC = () => {
    * Parse the scanned QR URL and extract the table number.
    * Expected format: https://.../{slug}?table={number}  or  libreshop://store/{slug}?table={number}
    */
-  const handleQRScanned = ({ data }: { data: string }) => {
-    if (scanned) return;
-    setScanned(true);
+  const handleQRScanned = (data: string) => {
     setScannerVisible(false);
 
     try {
@@ -216,13 +175,6 @@ export const BarDetailScreen: React.FC = () => {
     } catch {
       Alert.alert('QR invalide', 'Ce QR code ne correspond pas à une table de ce bar.');
     }
-  };
-
-  const handleWebTableSubmit = () => {
-    const t = webTableInput.trim();
-    setScannerVisible(false);
-    setWebTableInput('');
-    navigation.navigate('BarLive', { storeId: store.id, table: t || null });
   };
 
   const handleCarouselScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -260,43 +212,19 @@ export const BarDetailScreen: React.FC = () => {
       <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
 
         {/* ═══════════════════════════════════════
-            CARROUSEL PUBLICITAIRE
+            HERO BACKGROUND (IMAGE OR GRADIENT)
         ═══════════════════════════════════════ */}
-        <View style={styles.carouselContainer}>
-          <FlatList
-            ref={carouselRef}
-            data={slides}
-            keyExtractor={item => item.id}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={handleCarouselScroll}
-            scrollEventThrottle={16}
-            renderItem={({ item }) => (
-              <View style={styles.slide}>
-                <Image
-                  source={{ uri: item.image_url || FALLBACK_BANNER }}
-                  style={styles.slideImage}
-                  resizeMode="cover"
-                />
-                <LinearGradient
-                  colors={['rgba(0,0,0,0.0)', 'rgba(15,15,19,0.6)', '#0f0f13']}
-                  style={styles.slideGradient}
-                />
-                {(item.title || item.subtitle) && (
-                  <View style={styles.slideTextContainer}>
-                    {item.title ? (
-                      <Text style={styles.slideTitle} numberOfLines={2}>{item.title}</Text>
-                    ) : null}
-                    {item.subtitle ? (
-                      <Text style={styles.slideSubtitle} numberOfLines={2}>{item.subtitle}</Text>
-                    ) : null}
-                  </View>
-                )}
-              </View>
-            )}
+        <View style={styles.heroContainer}>
+          <Image
+            source={{ uri: store.banner_url || FALLBACK_BANNER }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
           />
-
+          <LinearGradient
+            colors={['rgba(10,12,18,0.1)', 'rgba(10,12,18,0.95)']}
+            style={StyleSheet.absoluteFillObject}
+          />
+          
           {/* Back + Share buttons */}
           <View style={[styles.headerActions, { top: insets.top + SPACING.sm }]}>
             <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()}>
@@ -307,79 +235,77 @@ export const BarDetailScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Dots indicator */}
-          {slides.length > 1 && (
-            <View style={styles.dotsRow}>
-              {slides.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, i === currentSlide ? styles.dotActive : styles.dotInactive]}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* ═══════════════════════════════════════
-            BAR NAME + BADGES
-        ═══════════════════════════════════════ */}
-        <View style={styles.heroContent}>
-          <Text style={[styles.storeName, { fontSize: fontSize.xxxl }]}>{store.name}</Text>
-          <View style={styles.badgesRow}>
+          {/* Hero Content */}
+          <View style={styles.heroContent}>
             <View style={styles.statusBadge}>
               <View style={styles.statusDot} />
-              <Text style={styles.statusText}>Ouvert</Text>
+              <Text style={styles.statusText}>Ouvert maintenant</Text>
             </View>
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={13} color="#FFD700" />
-              <Text style={styles.ratingText}>4.8 · 128 avis</Text>
+            <Text style={[styles.storeName, { fontSize: fontSize.xxl }]}>{store.name}</Text>
+            
+            <Text style={styles.heroMeta}>★ 4.8 (128 avis) • Lounge • Musique live</Text>
+            <Text style={styles.heroMeta}>📍 1,2 km • {store.address}</Text>
+            
+            {/* ─── ACTION BUTTONS (PILLS) ─── */}
+            <View style={styles.actionsRow}>
+              <TouchableOpacity style={styles.btnGhost} onPress={handleItinerary}>
+                <Ionicons name="location-outline" size={16} color="#FFF" />
+                <Text style={styles.btnGhostText}>Itinéraire</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.btnGhost} onPress={handleCall}>
+                <Ionicons name="call-outline" size={16} color="#FFF" />
+                <Text style={styles.btnGhostText}>Appeler</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.btnPrimary, isFollowing && { backgroundColor: '#10b981' }]} 
+                onPress={handleFollowToggle}
+                disabled={followLoading}
+              >
+                {followLoading ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <>
+                    <Ionicons name={isFollowing ? 'checkmark' : 'add'} size={16} color="#FFF" />
+                    <Text style={styles.btnPrimaryText}>{isFollowing ? 'Suivi' : 'Suivre'}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.btnGhost} onPress={handleShare}>
+                <Ionicons name="share-social-outline" size={16} color="#FFF" />
+                <Text style={styles.btnGhostText}>Partager</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
         <View style={styles.contentContainer}>
-
-          {/* ─── ACTION BUTTONS ─── */}
-          <View style={styles.mainActionsRow}>
-            <TouchableOpacity style={styles.mainActionBtn} onPress={handleItinerary}>
-              <View style={styles.actionIconWrap}>
-                <Ionicons name="navigate" size={22} color="#8b5cf6" />
+          
+          {/* ─── CONCOURS BANNER (If active) ─── */}
+          {events.some(e => e.is_contest_active) && (
+            <View style={styles.contestBanner}>
+              <Text style={styles.contestBannerTitle}>🔥 Concours Photo en cours</Text>
+              <Text style={styles.contestBannerDesc}>La plus belle photo gagne 1 cocktail offert</Text>
+              <View style={styles.contestActions}>
+                <TouchableOpacity style={styles.btnPrimaryLg} onPress={handlePressSurPlace}>
+                  <Text style={styles.btnPrimaryText}>Voir le classement</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnGhostLg} onPress={handlePressSurPlace}>
+                  <Text style={styles.btnGhostText}>Ajouter ma photo</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.mainActionText}>Y aller</Text>
-            </TouchableOpacity>
+            </View>
+          )}
 
-            <TouchableOpacity style={styles.mainActionBtn} onPress={handleCall}>
-              <View style={styles.actionIconWrap}>
-                <Ionicons name="call" size={22} color="#8b5cf6" />
-              </View>
-              <Text style={styles.mainActionText}>Appeler</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.mainActionBtn}
-              onPress={handleFollowToggle}
-              disabled={followLoading}
-            >
-              <View style={[styles.actionIconWrap, isFollowing && styles.actionIconWrapActive]}>
-                {followLoading ? (
-                  <ActivityIndicator size="small" color={isFollowing ? '#FFF' : '#8b5cf6'} />
-                ) : (
-                  <Ionicons
-                    name={isFollowing ? 'notifications' : 'notifications-outline'}
-                    size={22}
-                    color={isFollowing ? '#FFF' : '#8b5cf6'}
-                  />
-                )}
-              </View>
-              <Text style={styles.mainActionText}>{isFollowing ? 'Suivi ✓' : 'Suivre'}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ─── ÉVÉNEMENTS À VENIR ─── */}
+          {/* ─── ÉVÉNEMENTS ─── */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="calendar" size={18} color="#8b5cf6" />
-              <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>Événements à venir</Text>
+              <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>Ce soir / Cette semaine</Text>
+              <TouchableOpacity onPress={() => {}}>
+                <Text style={styles.sectionLink}>Voir tout</Text>
+              </TouchableOpacity>
             </View>
 
             {events.length === 0 ? (
@@ -454,6 +380,63 @@ export const BarDetailScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* ─── AVIS CLIENTS ─── */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="star" size={18} color="#f59e0b" />
+                <Text style={[styles.sectionTitle, { fontSize: fontSize.lg }]}>Avis clients</Text>
+                {reviewStats && (
+                  <Text style={styles.reviewAvgChip}>
+                    {reviewStats.average} / 5 ({reviewStats.count})
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('Review', { storeId, storeName: store.name, orderId: null })}>
+                <Text style={styles.sectionLink}>Laisser un avis</Text>
+              </TouchableOpacity>
+            </View>
+
+            {reviews.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="chatbubble-outline" size={36} color="#444" />
+                <Text style={styles.emptyText}>Aucun avis pour le moment</Text>
+                <Text style={styles.emptySubText}>Soyez le premier à laisser un avis !</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {reviews.map((review: any) => (
+                  <View key={review.id} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <View style={styles.reviewAvatar}>
+                        <Ionicons name="person" size={16} color="#8b5cf6" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.reviewAuthor}>{review.author_name || 'Anonyme'}</Text>
+                        <Text style={styles.reviewDate}>
+                          {new Date(review.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Text>
+                      </View>
+                      <View style={styles.reviewStars}>
+                        {[1,2,3,4,5].map(s => (
+                          <Ionicons
+                            key={s}
+                            name={s <= review.rating ? 'star' : 'star-outline'}
+                            size={14}
+                            color={s <= review.rating ? '#f59e0b' : '#444'}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                    {review.comment ? (
+                      <Text style={styles.reviewComment}>{review.comment}</Text>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
           {/* ─── INVITATION QR CODE ─── */}
           <View style={styles.section}>
             <TouchableOpacity
@@ -481,6 +464,7 @@ export const BarDetailScreen: React.FC = () => {
           </View>
 
           <View style={{ height: 100 }} />
+
         </View>
       </ScrollView>
 
@@ -498,47 +482,12 @@ export const BarDetailScreen: React.FC = () => {
       </View>
 
       {/* ── MODAL SCANNER QR ── */}
-      <Modal visible={scannerVisible} transparent animationType="slide" onRequestClose={() => setScannerVisible(false)}>
-        <View style={styles.scannerModalOverlay}>
-          <View style={[styles.scannerHeader, { top: Math.max(insets.top, 20) }]}>
-            <TouchableOpacity onPress={() => setScannerVisible(false)} style={styles.scannerCloseBtn}>
-              <Ionicons name="close" size={24} color="#FFF" />
-            </TouchableOpacity>
-            <Text style={styles.scannerTitle}>Scannez le QR</Text>
-            <View style={{ width: 40 }} />
-          </View>
-          
-          {Platform.OS === 'web' ? (
-            <View style={styles.webScannerFallback}>
-              <Text style={styles.webScannerText}>Sur web, entrez le numéro de votre table :</Text>
-              <TextInput 
-                style={styles.webScannerInput} 
-                value={webTableInput} 
-                onChangeText={setWebTableInput} 
-                placeholder="Ex: 12"
-                keyboardType="numeric"
-                placeholderTextColor="#666"
-              />
-              <TouchableOpacity style={styles.webScannerBtn} onPress={handleWebTableSubmit}>
-                <Text style={styles.webScannerBtnText}>Valider</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <CameraView
-              style={StyleSheet.absoluteFillObject}
-              facing="back"
-              onBarcodeScanned={scanned ? undefined : handleQRScanned}
-              barcodeScannerSettings={{
-                barcodeTypes: ["qr"],
-              }}
-            >
-              <View style={styles.scannerTarget}>
-                <View style={styles.scannerBox} />
-              </View>
-            </CameraView>
-          )}
-        </View>
-      </Modal>
+      <BarcodeScannerModal
+        visible={scannerVisible}
+        onScan={handleQRScanned}
+        onClose={() => setScannerVisible(false)}
+        hintText="Scannez le QR de votre table"
+      />
     </View>
   );
 };
@@ -580,9 +529,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 20,
     fontWeight: '800',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadow: '0px 1px 4px rgba(0,0,0,0.8)',
   },
   slideSubtitle: {
     color: 'rgba(255,255,255,0.8)',
@@ -626,33 +573,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.35)',
   },
 
-  // ── Hero text ──
+  // ── Hero ──
+  heroContainer: {
+    height: 280,
+    justifyContent: 'flex-end',
+  },
   heroContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 4,
-  },
-  storeName: {
-    color: '#FFF',
-    fontWeight: '900',
-    letterSpacing: -0.5,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 8,
+    paddingBottom: 20,
+    zIndex: 2,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     backgroundColor: 'rgba(16,185,129,0.15)',
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.3)',
+    alignSelf: 'flex-start',
+    marginBottom: 12,
   },
   statusDot: {
     width: 7,
@@ -665,21 +605,97 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  ratingBadge: {
+  storeName: {
+    color: '#FFF',
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  heroMeta: {
+    color: '#94a3b8',
+    fontSize: 13,
+    marginBottom: 4,
+  },
+
+  // ── Actions Row ──
+  actionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  btnGhost: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,215,0,0.1)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.2)',
+    borderColor: '#2a2d3a',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
   },
-  ratingText: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: '600',
+  btnGhostText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  btnPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#8b5cf6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  btnPrimaryText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── Contest Banner ──
+  contestBanner: {
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderWidth: 1,
+    borderColor: '#8b5cf6',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  contestBannerTitle: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  contestBannerDesc: {
+    color: '#94a3b8',
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  contestActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  btnPrimaryLg: {
+    backgroundColor: '#8b5cf6',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnGhostLg: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: '#2a2d3a',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // ── Content ──
@@ -687,41 +703,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
   },
-
-  // ── Action buttons ──
-  mainActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-    marginBottom: 8,
-    gap: 8,
-  },
-  mainActionBtn: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(139,92,246,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(139,92,246,0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionIconWrapActive: {
-    backgroundColor: '#8b5cf6',
-    borderColor: '#8b5cf6',
-  },
-  mainActionText: {
-    color: '#a1a1aa',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-
-  // ── Sections ──
   section: {
     marginTop: 28,
   },
@@ -734,6 +715,66 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: '#FFF',
     fontWeight: '700',
+  },
+  sectionLink: {
+    color: '#8b5cf6',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // ── Reviews ──
+  reviewAvgChip: {
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    color: '#f59e0b',
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.25)',
+  },
+  reviewCard: {
+    backgroundColor: '#1a1a24',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#2e2e3a',
+    gap: 8,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  reviewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(139,92,246,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewAuthor: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reviewDate: {
+    color: '#52525b',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  reviewStars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewComment: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    lineHeight: 20,
   },
 
   // ── Events ──

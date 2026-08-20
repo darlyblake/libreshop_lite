@@ -164,7 +164,7 @@ export interface StockMovement {
 
 // RPC Payloads
 export interface OrderPayload {
-  user_id: string;
+  user_id: string | null;
   store_id: string | null;
   total_amount: number;
   status: OrderStatus;
