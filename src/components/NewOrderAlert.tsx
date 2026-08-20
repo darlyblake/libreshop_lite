@@ -103,9 +103,10 @@ export const NewOrderAlert: React.FC = () => {
       .channel(`new_order_alert:${storeId}`)
       .on(
         'postgres_changes' as any,
-        { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
+        { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
         async (payload: any) => {
           console.log('[NewOrderAlert] Received payload:', payload);
+          if (payload.eventType !== 'INSERT') return;
           const order = payload.new as NewOrder;
           if (!order?.id) return;
 
@@ -129,7 +130,9 @@ export const NewOrderAlert: React.FC = () => {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[NewOrderAlert] Subscription status:', status, err);
+      });
 
     channelRef.current = channel;
     return () => { supabase.removeChannel(channel); };
