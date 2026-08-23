@@ -108,9 +108,12 @@ export const NewOrderAlert: React.FC = () => {
     let mounted = true;
     
     const initStore = async () => {
-      if (!storeId && user?.id) {
+      const role = (user as any)?.user_metadata?.role || (user as any)?.app_metadata?.role;
+      const isSellerOrAdmin = role === 'seller' || role === 'admin';
+
+      if (!storeId && user?.id && isSellerOrAdmin) {
         try {
-          const { data } = await supabase.from('stores').select('id').eq('user_id', user.id).single();
+          const { data } = await supabase.from('stores').select('id').eq('user_id', user.id).maybeSingle();
           if (mounted && data?.id) {
             storeId = data.id;
             subscribeToOrders(data.id);
