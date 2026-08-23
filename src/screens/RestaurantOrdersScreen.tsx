@@ -155,7 +155,7 @@ export const RestaurantOrdersScreen: React.FC = () => {
                 {order.customer_name || 'Client anonyme'} • {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </Text>
               <Text style={{ color: COLORS.text, fontWeight: '700', fontSize: 18, marginTop: 8 }}>
-                {Number(order.total || 0).toLocaleString()} FCFA
+                {Number(order.total_amount || 0).toLocaleString()} FCFA
               </Text>
             </TouchableOpacity>
           ))}

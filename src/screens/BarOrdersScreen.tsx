@@ -150,8 +150,13 @@ export const BarOrdersScreen: React.FC = () => {
               <Text style={{ color: COLORS.textSoft, fontSize: 13, marginTop: 6 }}>
                 {order.customer_name || 'Client anonyme'} • {new Date(order.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
               </Text>
+              {!!order.shipping_address && (
+                <Text style={{ color: COLORS.primary, fontWeight: '700', fontSize: 14, marginTop: 4 }}>
+                  📍 {order.shipping_address}
+                </Text>
+              )}
               <Text style={{ color: COLORS.text, fontWeight: '700', fontSize: 18, marginTop: 8 }}>
-                {Number(order.total || 0).toLocaleString()} FCFA
+                {Number(order.total_amount || 0).toLocaleString()} FCFA
               </Text>
             </TouchableOpacity>
           ))}

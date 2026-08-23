@@ -17,6 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useStoreStore, useAuthStore } from '../store';
 import { notificationService } from '../services/notificationService';
+import { tableService } from '../services/tableService';
 import { COLORS } from '../config/theme';
 
 interface NewOrder {
@@ -107,34 +108,24 @@ export const NewOrderAlert: React.FC = () => {
     let storeId = store?.id;
     let mounted = true;
     
-    const initStore = async () => {
-      const role = (user as any)?.user_metadata?.role || (user as any)?.app_metadata?.role;
-      const isSellerOrAdmin = role === 'seller' || role === 'admin';
-
-      if (!storeId && user?.id && isSellerOrAdmin) {
-        try {
-          const { data } = await supabase.from('stores').select('id').eq('user_id', user.id).maybeSingle();
-          if (mounted && data?.id) {
-            storeId = data.id;
-            subscribeToOrders(data.id);
-          }
-        } catch (e) {}
-      } else if (storeId) {
-        subscribeToOrders(storeId);
-      }
-    };
-    
     const subscribeToOrders = (sId: string) => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      if (callChannelRef.current) supabase.removeChannel(callChannelRef.current);
+      // Clean up previous channels before creating new ones
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      if (callChannelRef.current) {
+        supabase.removeChannel(callChannelRef.current);
+        callChannelRef.current = null;
+      }
 
       const channel = supabase
         .channel(`new_order_alert:${sId}`)
         .on(
           'postgres_changes' as any,
-          { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${sId}` },
+          { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${sId}` },
           async (payload: any) => {
-            if (payload.eventType !== 'INSERT') return;
+            if (!mounted) return;
             const order = payload.new as NewOrder;
             if (!order?.id) return;
 
@@ -164,12 +155,19 @@ export const NewOrderAlert: React.FC = () => {
         .channel(`new_waiter_call:${sId}`)
         .on(
           'postgres_changes' as any,
-          { event: '*', schema: 'public', table: 'waiter_calls', filter: `store_id=eq.${sId}` },
+          { event: 'INSERT', schema: 'public', table: 'waiter_calls', filter: `store_id=eq.${sId}` },
           async (payload: any) => {
-            if (payload.eventType !== 'INSERT') return;
+            if (!mounted) return;
             const call = payload.new;
-            if (!call?.id || call.status !== 'pending') return;
+            if (!call?.id) return;
 
+            // Mark table as occupied in the local POS state
+            if (call.table_number) {
+              const tableId = `table_${sId}_${call.table_number}`;
+              tableService.openTable(sId, tableId, 1);
+            }
+
+            // Show alert
             setPendingCall(call);
             setVisibleCall(true);
             startPulse();
@@ -182,6 +180,26 @@ export const NewOrderAlert: React.FC = () => {
       callChannelRef.current = callChannel;
     };
 
+    const initStore = async () => {
+      // If storeId is already known (vendor selected store), subscribe directly
+      if (storeId) {
+        subscribeToOrders(storeId);
+        return;
+      }
+
+      // Fallback: try to find the seller's store by user_id
+      if (!user?.id) return;
+      
+      try {
+        const { data } = await supabase.from('stores').select('id').eq('user_id', user.id).maybeSingle();
+        if (mounted && data?.id) {
+          subscribeToOrders(data.id);
+        }
+      } catch (e) {
+        console.warn('[NewOrderAlert] Could not find store for user:', e);
+      }
+    };
+    
     initStore();
 
     return () => { 
@@ -199,12 +217,14 @@ export const NewOrderAlert: React.FC = () => {
         <Animated.View style={[styles.card, { transform: [{ scale: pulseAnim }] }]}>
           <LinearGradient colors={[COLORS.primary, '#9333ea']} style={styles.header}>
             <Ionicons 
-              name={visibleCall ? "hand-right" : "notifications"} 
+              name={visibleCall ? (pendingCall?.customer_name === 'OCCUPY_EVENT' ? "log-in" : "hand-right") : "notifications"} 
               size={32} 
               color="#FFF" 
             />
             <Text style={styles.title}>
-              {visibleCall ? 'Appel Serveur !' : 'Nouvelle commande !'}
+              {visibleCall 
+                ? (pendingCall?.customer_name === 'OCCUPY_EVENT' ? 'Table Occupée !' : 'Appel Serveur !') 
+                : 'Nouvelle commande !'}
             </Text>
           </LinearGradient>
 
@@ -214,10 +234,12 @@ export const NewOrderAlert: React.FC = () => {
                 <Ionicons name="restaurant" size={20} color={COLORS.textMuted} />
                 <Text style={styles.text}>Table : {pendingCall.table_number}</Text>
               </View>
-              <View style={styles.row}>
-                <Ionicons name="person" size={20} color={COLORS.textMuted} />
-                <Text style={styles.text}>Client : {pendingCall.customer_name || 'Inconnu'}</Text>
-              </View>
+              {pendingCall.customer_name !== 'OCCUPY_EVENT' && (
+                <View style={styles.row}>
+                  <Ionicons name="person" size={20} color={COLORS.textMuted} />
+                  <Text style={styles.text}>Client : {pendingCall.customer_name || 'Inconnu'}</Text>
+                </View>
+              )}
               <View style={styles.row}>
                 <Ionicons name="time" size={20} color={COLORS.textMuted} />
                 <Text style={styles.text}>{new Date(pendingCall.created_at).toLocaleTimeString()}</Text>

@@ -13,6 +13,7 @@ import {
   Modal,
   TextInput,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,15 +45,32 @@ export const BarLiveScreen: React.FC = () => {
   const { user } = useAuthStore();
 
   const paramStoreId = route.params?.storeId;
-  const slug = route.params?.slug;
+  const paramSlug = route.params?.slug;
+  let slug = (paramSlug && paramSlug !== 'undefined') ? paramSlug : undefined;
+
+  // Fallback: extract slug from URL path on web (e.g. /store/bar-test/live)
+  if (Platform.OS === 'web' && !slug) {
+    try {
+      const pathParts = window.location.pathname.split('/');
+      const storeIdx = pathParts.indexOf('store');
+      if (storeIdx !== -1 && pathParts[storeIdx + 1]) {
+        slug = pathParts[storeIdx + 1];
+      }
+    } catch (e) {}
+  }
+
   let tableNumber = route.params?.table;
 
-  if (Platform.OS === 'web' && !tableNumber) {
+  if (Platform.OS === 'web' && (!tableNumber || tableNumber === 'null')) {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const t = urlParams.get('table');
-      if (t) tableNumber = t;
+      if (t && t !== 'null') tableNumber = t;
     } catch (e) {}
+  }
+
+  if (tableNumber === 'null') {
+    tableNumber = null;
   }
 
   const [resolvedStoreId, setResolvedStoreId] = useState<string | null>(paramStoreId || null);
@@ -89,6 +107,73 @@ export const BarLiveScreen: React.FC = () => {
       });
     }
   }, [paramStoreId, slug]);
+
+  // --- Event: Table Occupied / Table Transfer ---
+  useEffect(() => {
+    if (!storeId || !tableNumber) return;
+
+    const storageKey = `table_occupied_${storeId}_${tableNumber}`;
+    const alreadyFired = Platform.OS === 'web'
+      ? sessionStorage.getItem(storageKey)
+      : null; // On mobile, always fire (no sessionStorage)
+
+    if (Platform.OS === 'web' && alreadyFired) return;
+
+    const handleTableArrival = async () => {
+      // Check if the client already has unpaid orders on a DIFFERENT table
+      let previousTable: string | null = null;
+      let clientName = '';
+
+      if (user?.id) {
+        const { data: existingOrders } = await supabase
+          .from('orders')
+          .select('id, shipping_address, customer_name, status')
+          .eq('user_id', user.id)
+          .eq('store_id', storeId)
+          .in('status', ['pending', 'accepted', 'processing', 'ready']);
+
+        if (existingOrders && existingOrders.length > 0) {
+          const order = existingOrders[0];
+          clientName = order.customer_name || '';
+          const match = (order.shipping_address || '').match(/Table\s+(\S+)/i);
+          if (match && match[1] !== String(tableNumber)) {
+            previousTable = match[1];
+          }
+        }
+      }
+
+      if (previousTable) {
+        // ── TABLE TRANSFER ──
+        // Update all unpaid orders to the new table
+        await supabase
+          .from('orders')
+          .update({ shipping_address: `Table ${tableNumber}` })
+          .eq('user_id', user!.id)
+          .eq('store_id', storeId)
+          .in('status', ['pending', 'accepted', 'processing', 'ready']);
+
+        // Notify the seller with a TABLE_TRANSFER event
+        await supabase.from('waiter_calls').insert({
+          store_id: storeId,
+          table_number: String(tableNumber),
+          customer_name: `TABLE_TRANSFER|${clientName || 'Client'}|${previousTable}`,
+        });
+      } else {
+        // ── NEW OCCUPATION ──
+        await supabase.from('waiter_calls').insert({
+          store_id: storeId,
+          table_number: String(tableNumber),
+          customer_name: 'OCCUPY_EVENT',
+        });
+      }
+
+      if (Platform.OS === 'web') {
+        sessionStorage.setItem(storageKey, 'true');
+      }
+    };
+
+    handleTableArrival();
+  }, [storeId, tableNumber, user?.id]);
 
   useEffect(() => {
     if (storeId) {
@@ -176,6 +261,31 @@ export const BarLiveScreen: React.FC = () => {
   useEffect(() => {
     fetchMyOrders();
   }, [fetchMyOrders]);
+
+  const handleExit = useCallback(() => {
+    const hasUnpaidOrders = myOrders.some(order => order.status !== 'paid' && order.status !== 'cancelled');
+    if (hasUnpaidOrders) {
+      Alert.alert(
+        'Commande en cours',
+        'Vous avez une commande non payée. Veuillez attendre que le vendeur marque votre commande comme payée avant de quitter la table.'
+      );
+      return true;
+    }
+
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Home');
+    }
+    return true;
+  }, [myOrders, navigation]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', handleExit);
+      return () => backHandler.remove();
+    }
+  }, [handleExit]);
 
   const handleCallWaiter = async () => {
     if (!storeId || !tableNumber) {
@@ -485,7 +595,7 @@ export const BarLiveScreen: React.FC = () => {
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       
       <View style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.closeBtn} onPress={handleExit}>
           <Ionicons name="close" size={24} color="#FFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{store?.name || 'Live'}</Text>
