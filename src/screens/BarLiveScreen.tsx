@@ -259,6 +259,13 @@ export const BarLiveScreen: React.FC = () => {
 
       await orderService.createItems(orderItems as any); // using as any since order_id isn't in OrderItemPayload but works via RPC
 
+      // Send push notification to seller (works even if seller is not in app)
+      try {
+        await orderService.sendSellerNotification(order as any, 'new');
+      } catch (e) {
+        console.warn('[BarLive] sendSellerNotification failed:', e);
+      }
+
       setCart({});
       fetchMyOrders();
       Alert.alert('Commande envoyée !', 'Le bar a bien reçu votre commande.');
