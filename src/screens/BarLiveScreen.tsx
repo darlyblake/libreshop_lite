@@ -44,7 +44,15 @@ export const BarLiveScreen: React.FC = () => {
 
   const paramStoreId = route.params?.storeId;
   const slug = route.params?.slug;
-  const tableNumber = route.params?.table;
+  let tableNumber = route.params?.table;
+
+  if (Platform.OS === 'web' && !tableNumber) {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const t = urlParams.get('table');
+      if (t) tableNumber = t;
+    } catch (e) {}
+  }
 
   const [resolvedStoreId, setResolvedStoreId] = useState<string | null>(paramStoreId || null);
   const storeId = resolvedStoreId; // alias for the rest of the code
@@ -147,6 +155,47 @@ export const BarLiveScreen: React.FC = () => {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showGuestNameModal, setShowGuestNameModal] = useState(false);
   const [guestName, setGuestName] = useState('');
+  
+  // --- NOUVEAUTÉ : Historique et Appel Serveur ---
+  const [myOrders, setMyOrders] = useState<any[]>([]);
+  const [showOrdersModal, setShowOrdersModal] = useState(false);
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+
+  const fetchMyOrders = useCallback(async () => {
+    if (!user?.id || !storeId) return;
+    const { data } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false });
+    if (data) setMyOrders(data);
+  }, [user?.id, storeId]);
+
+  useEffect(() => {
+    fetchMyOrders();
+  }, [fetchMyOrders]);
+
+  const handleCallWaiter = async () => {
+    if (!storeId || !tableNumber) {
+      Alert.alert('Erreur', 'Impossible d\'appeler le serveur sans numéro de table.');
+      return;
+    }
+    setIsCallingWaiter(true);
+    try {
+      await supabase.from('waiter_calls').insert({
+        store_id: storeId,
+        table_number: String(tableNumber),
+        customer_name: user?.full_name || guestName || 'Client'
+      });
+      Alert.alert('Appel envoyé', 'Un serveur va arriver à votre table.');
+    } catch (e) {
+      Alert.alert('Erreur', 'Impossible d\'appeler le serveur.');
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
+  // ------------------------------------------------
 
   const handleCheckout = async () => {
     if (!storeId) {
@@ -211,6 +260,7 @@ export const BarLiveScreen: React.FC = () => {
       await orderService.createItems(orderItems as any); // using as any since order_id isn't in OrderItemPayload but works via RPC
 
       setCart({});
+      fetchMyOrders();
       Alert.alert('Commande envoyée !', 'Le bar a bien reçu votre commande.');
     } catch (error) {
       console.error('Error placing order:', error);
@@ -436,6 +486,20 @@ export const BarLiveScreen: React.FC = () => {
 
       {renderLiveStatus()}
 
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setShowOrdersModal(true)}>
+          <Ionicons name="receipt-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.actionBtnText}>Ma Note</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleCallWaiter} disabled={isCallingWaiter}>
+          {isCallingWaiter ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Ionicons name="hand-right-outline" size={20} color={COLORS.primary} />
+          )}
+          <Text style={styles.actionBtnText}>Appeler Serveur</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'menu' && styles.activeTab]}
@@ -590,6 +654,47 @@ export const BarLiveScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      {/* ── ORDERS MODAL ── */}
+      <Modal visible={showOrdersModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <Text style={styles.modalTitle}>Ma Note (Table {tableNumber})</Text>
+            
+            <ScrollView style={{ width: '100%', marginBottom: SPACING.md }}>
+              {myOrders.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: COLORS.textMuted, marginVertical: SPACING.lg }}>
+                  Aucune commande pour le moment.
+                </Text>
+              ) : (
+                myOrders.map(o => (
+                  <View key={o.id} style={styles.orderItem}>
+                    <View style={styles.orderItemHeader}>
+                      <Text style={styles.orderDate}>{new Date(o.created_at).toLocaleTimeString()}</Text>
+                      <Text style={styles.orderStatus}>
+                        {o.status === 'pending' ? 'En attente' : o.status === 'processing' ? 'En cours' : o.status === 'ready' ? 'Prêt' : o.status}
+                      </Text>
+                    </View>
+                    <Text style={styles.orderTotal}>{Number(o.total_amount).toLocaleString('fr-FR')} FCFA</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={{ width: '100%', borderTopWidth: 1, borderColor: COLORS.border, paddingTop: SPACING.md, marginBottom: SPACING.md }}>
+              <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', textAlign: 'center' }}>
+                Total: {myOrders.reduce((sum, o) => sum + Number(o.total_amount), 0).toLocaleString('fr-FR')} FCFA
+              </Text>
+            </View>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setShowOrdersModal(false)}>
+                <Text style={styles.modalCancelText}>Fermer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={showGuestNameModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -846,6 +951,60 @@ const styles = StyleSheet.create({
     color: '#d4d4d8',
     fontSize: 13,
     fontWeight: '500',
+  },
+  cameraBtnText: {
+    color: '#FFF',
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    marginLeft: SPACING.xs,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    padding: SPACING.sm,
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.card,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.bg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  actionBtnText: {
+    marginLeft: SPACING.xs,
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  orderItem: {
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  orderItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.xs,
+  },
+  orderDate: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textMuted,
+  },
+  orderTotal: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  orderStatus: {
+    fontSize: FONT_SIZE.sm,
+    fontWeight: '600',
+    color: COLORS.success,
   },
   cartTotal: {
     color: '#FFF',

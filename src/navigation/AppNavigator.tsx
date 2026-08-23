@@ -151,7 +151,9 @@ const SellerAgentChatScreen = lazyLoad(() => import('../screens/SellerAgentChatS
 import { RootStackParamList, ClientTabParamList, SellerTabParamList, UserRole, NotificationPayload } from './types';
 import { useAuthStore } from '../store';
 import { sessionStorage, onboardingStorage } from '../lib/storage';
+import { useStoreStore } from '../store';
 import { supabase } from '../lib/supabase';
+import { NewOrderAlert } from '../components/NewOrderAlert';
 import { authService } from '../services/authService';
 import { storeService } from '../services/storeService';
 import { useNotificationStore } from '../store/notificationStore';
@@ -405,8 +407,6 @@ const ClientTabs: React.FC = React.memo(() => {
 });
 
 // Navigation Vendeur
-import { NewOrderAlert } from '../components/NewOrderAlert';
-
 const SellerTabs: React.FC = React.memo(() => {
   const { getColor } = useTheme();
   const { tabBarHeight, bottomPadding, iconSize, labelSize, showLabels, isLandscape } = useResponsiveTabBar();
@@ -428,8 +428,6 @@ const SellerTabs: React.FC = React.memo(() => {
   const isLandscapeIOS = isLandscape && Platform.OS === 'ios';
 
   return (
-    <>
-      <NewOrderAlert />
       <SellerTab.Navigator
       screenOptions={({ route }: { route: { name: string } }) => ({
         tabBarIcon: ({ focused, color }: { focused: boolean; color: string }) => (
@@ -480,7 +478,6 @@ const SellerTabs: React.FC = React.memo(() => {
       <SellerTab.Screen name="SellerClients" component={SellerClientsScreen} options={{ title: 'Clients' }} />
       <SellerTab.Screen name="SellerStore" component={SellerStoreScreen} options={{ title: 'Boutique' }} />
     </SellerTab.Navigator>
-    </>
   );
 });
 
@@ -901,6 +898,7 @@ export const AppNavigator: React.FC = () => {
         translucent={Platform.OS === 'android' || initialRoute === 'Landing'}
       />
       <ClientAuthModal />
+      <NewOrderAlert />
       <Stack.Navigator
         initialRouteName={initialRoute}
         screenOptions={{
