@@ -161,9 +161,30 @@ export const BarLiveScreen: React.FC = () => {
 
     setCheckoutLoading(true);
     try {
+      // --- DIAGNOSTIC LOG ---
+      const currentSession = await supabase.auth.getSession();
+      console.log('[BarLive] Session avant commande:', JSON.stringify(currentSession.data.session?.user?.id), 'role:', currentSession.data.session?.user?.role);
+      console.log('[BarLive] user depuis store:', user?.id);
+
+      let activeUserId = user?.id || null;
+      if (!user?.id) {
+        console.log('[BarLive] Pas de user → signInAnonymously...');
+        const { data: anonSession, error: anonError } = await supabase.auth.signInAnonymously();
+        console.log('[BarLive] signInAnonymously result:', anonSession?.user?.id, 'error:', anonError?.message);
+        if (!anonError && anonSession?.user?.id) {
+          activeUserId = anonSession.user.id;
+        } else {
+          console.error('[BarLive] Échec signInAnonymously:', anonError);
+        }
+      }
+
+      // Vérification de la session après sign-in anonyme
+      const sessionAfter = await supabase.auth.getSession();
+      console.log('[BarLive] Session APRÈS signIn:', sessionAfter.data.session?.user?.id, 'activeUserId:', activeUserId);
+
       // Create the order
       const order = await orderService.create({
-        user_id: user?.id || null,
+        user_id: activeUserId,
         store_id: storeId,
         total_amount: cartTotal,
         status: 'pending',
