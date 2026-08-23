@@ -188,7 +188,7 @@ export const BarLiveScreen: React.FC = () => {
         store_id: storeId,
         total_amount: cartTotal,
         status: 'pending',
-        payment_method: 'cash',
+        payment_method: 'cash_on_delivery',
         payment_status: 'pending',
         shipping_address: tableNumber ? `Table ${tableNumber}` : 'Comptoir',
         customer_phone: user?.phone || '',
