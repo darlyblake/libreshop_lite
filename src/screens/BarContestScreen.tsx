@@ -19,7 +19,9 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { storeService } from '../services/storeService';
-import { barService, BarEvent, BarEventPhoto } from '../services/barService';
+import { barService, BarEvent } from '../services/barService';
+import { BarEventPhoto } from '../services/barContestService';
+import { barContestService } from '../services/barContestService';
 
 type ContestTab = 'ranking' | 'moderate';
 
@@ -50,7 +52,7 @@ export const BarContestScreen: React.FC = () => {
         setActiveEvent(current);
 
         if (current) {
-          const photos = await barService.getContestPhotosPending(current.id);
+          const photos = await barContestService.getPendingContestPhotos(current.id);
           setAllPhotos(photos);
         } else {
           setAllPhotos([]);
@@ -85,7 +87,7 @@ export const BarContestScreen: React.FC = () => {
           text: '🚀 Lancer', onPress: async () => {
             try {
               setActionLoading('start');
-              await barService.startContest(activeEvent.id);
+              await barContestService.startContest(activeEvent.id);
               await loadData(false);
               Alert.alert('Succès', 'Le concours est maintenant ouvert aux participations !');
             } catch {
@@ -111,7 +113,7 @@ export const BarContestScreen: React.FC = () => {
           text: '🗳 Lancer les votes', onPress: async () => {
             try {
               setActionLoading('voting');
-              await barService.startContestVotingPhase(activeEvent.id);
+              await barContestService.startVoting(activeEvent.id);
               await loadData(false);
               Alert.alert('Succès', 'La phase de vote est maintenant ouverte !');
             } catch {
@@ -142,7 +144,7 @@ export const BarContestScreen: React.FC = () => {
           text: '🏆 Clôturer', style: 'destructive', onPress: async () => {
             try {
               setActionLoading('end');
-              await barService.endContest(activeEvent.id);
+              await barContestService.endContest(activeEvent.id);
               if (winner) await barService.setPhotoFeatured(winner.id, true);
               await loadData(false);
               Alert.alert('Concours terminé !', winner ? 'Le gagnant a été déclaré et mis en avant sur les écrans.' : 'Le concours est terminé.');
@@ -160,7 +162,7 @@ export const BarContestScreen: React.FC = () => {
   const handleModerate = async (photo: BarEventPhoto, newStatus: 'approved' | 'rejected') => {
     try {
       setActionLoading(photo.id);
-      await barService.moderateContestPhoto(photo.id, newStatus);
+      await barContestService.moderateContestPhoto(photo.id, newStatus);
       setAllPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, status: newStatus } : p));
     } catch {
       Alert.alert('Erreur', 'Impossible de modérer cette photo.');

@@ -25,6 +25,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZE } from '../config/theme';
 import { useResponsive } from '../utils/useResponsive';
 import { useAuthStore } from '../store';
 import { barService, BarPhoto } from '../services/barService';
+import { barContestService } from '../services/barContestService';
 import { storeService } from '../services/storeService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { productService } from '../services/productService';
@@ -94,8 +95,9 @@ export const BarLiveScreen: React.FC = () => {
   // Contest states
   const [activeEvent, setActiveEvent] = useState<any>(null);
   const [contestPhotos, setContestPhotos] = useState<any[]>([]);
-  const [userVoted, setUserVoted] = useState(false);
+  const [votedPhotoIds, setVotedPhotoIds] = useState<Set<string>>(new Set());
   const [userParticipated, setUserParticipated] = useState(false);
+  const [participantCount, setParticipantCount] = useState<number>(0);
   const [timeRemainingLabel, setTimeRemainingLabel] = useState<string | null>(null);
   const timerRef = useRef<any>(null);
 
@@ -202,20 +204,29 @@ export const BarLiveScreen: React.FC = () => {
         const pts = await barService.getPhotosByStore(storeId, 'approved', user?.id);
         setPhotos(pts);
       } else if (activeTab === 'contest' && currentEvent) {
-        const pts = await barService.getContestPhotos(currentEvent.id, user?.id);
+        const pts = await barContestService.getContestPhotos(currentEvent.id);
         setContestPhotos(pts);
         
         if (user) {
-          const hasVoted = await barService.checkIfUserVoted(currentEvent.id, user.id);
-          const hasParticipated = await barService.checkIfUserParticipated(currentEvent.id, user.id);
-          setUserVoted(hasVoted);
+          const hasParticipated = await barContestService.hasParticipated(currentEvent.id);
           setUserParticipated(hasParticipated);
+          
+          const pCount = await barContestService.getParticipantCount(currentEvent.id);
+          setParticipantCount(pCount);
+
+          const votedIds = new Set<string>();
+          for (const photo of pts) {
+            if (await barContestService.hasVoted(photo.id)) {
+              votedIds.add(photo.id);
+            }
+          }
+          setVotedPhotoIds(votedIds);
         }
 
-        // Auto-switch to voting phase if participant limit reached
+        // Auto-switch logic (frontend only for display if needed, but db should enforce limit)
         if (currentEvent.contest_phase === 'participation' && currentEvent.contest_participant_limit) {
-          if (pts.length >= currentEvent.contest_participant_limit) {
-            // Update to voting
+          const currentCount = await barContestService.getParticipantCount(currentEvent.id);
+          if (currentCount >= currentEvent.contest_participant_limit) {
             await barService.updateEvent(currentEvent.id, { contest_phase: 'voting' });
             setActiveEvent({ ...currentEvent, contest_phase: 'voting' });
           }
@@ -407,7 +418,7 @@ export const BarLiveScreen: React.FC = () => {
           clearInterval(timerRef.current);
           setTimeRemainingLabel(null);
           try {
-            await barService.startContestVotingPhase(evt.id);
+            await barContestService.startVoting(evt.id);
             setActiveEvent((prev: any) => prev ? { ...prev, contest_phase: 'voting', contest_voting_started_at: new Date().toISOString() } : prev);
           } catch (e) { console.error('Auto-advance to voting failed', e); }
         } else {
@@ -424,7 +435,7 @@ export const BarLiveScreen: React.FC = () => {
           clearInterval(timerRef.current);
           setTimeRemainingLabel('Vote terminé');
           try {
-            await barService.endContest(evt.id);
+            await barContestService.endContest(evt.id);
             setActiveEvent((prev: any) => prev ? { ...prev, contest_phase: 'ended' } : prev);
           } catch (e) { console.error('Auto-end contest failed', e); }
         } else {
@@ -471,6 +482,24 @@ export const BarLiveScreen: React.FC = () => {
     };
   };
 
+  
+  const handleParticipate = async () => {
+    if (!user) {
+      navigation.navigate('ClientAuth', { pendingAction: 'participate' });
+      return;
+    }
+    if (!activeEvent) return;
+    try {
+      await barContestService.participateInEvent(activeEvent.id);
+      setUserParticipated(true);
+      setParticipantCount(prev => prev + 1);
+      Alert.alert('Succès', 'Vous participez maintenant au concours ! Vous pouvez envoyer une photo.');
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Erreur', error.message || 'Impossible de participer.');
+    }
+  };
+
   const handleUploadPhoto = async () => {
     if (!user) {
       navigation.navigate('ClientAuth', { pendingAction: 'upload' });
@@ -495,13 +524,12 @@ export const BarLiveScreen: React.FC = () => {
 
         if (activeTab === 'contest' && activeEvent) {
           // Contest specific upload
-          if (userParticipated) {
-            Alert.alert('Oups', 'Vous avez déjà participé à ce concours !');
+          if (!userParticipated) {
+            Alert.alert('Oups', 'Vous devez d\"abord participer au concours.');
             return;
           }
-          await barService.uploadContestPhoto(activeEvent.id, user.id, photoUrl);
-          setUserParticipated(true);
-          Alert.alert('Succès', 'Votre participation est enregistrée !');
+          await barContestService.uploadContestPhoto(activeEvent.id, photoUrl);
+          Alert.alert('Succès', 'Votre photo a été soumise au concours !');
           loadData(); // refresh to check limit
         } else {
           // Wall specific upload
@@ -530,12 +558,17 @@ export const BarLiveScreen: React.FC = () => {
     
     try {
       if (isContest && activeEvent) {
-        if (userVoted) {
-          Alert.alert('Info', 'Vous avez déjà voté pour ce concours !');
+        if (votedPhotoIds.has(photo.id)) {
+          Alert.alert('Info', 'Vous avez déjà voté pour cette photo !');
           return;
         }
-        await barService.voteForContestPhoto(activeEvent.id, photo.id, user.id);
-        setUserVoted(true);
+        await barContestService.voteForPhoto(photo.id);
+        setVotedPhotoIds(prev => {
+          const next = new Set(prev);
+          next.add(photo.id);
+          return next;
+        });
+        
         // Optimistic update
         setContestPhotos(contestPhotos.map(p => 
           p.id === photo.id ? { ...p, votes_count: (p.votes_count || 0) + 1 } : p
@@ -683,7 +716,7 @@ export const BarLiveScreen: React.FC = () => {
                     <View style={styles.photoActions}>
                       <Text style={styles.likesText}>{photo.votes_count || 0} votes</Text>
                       <TouchableOpacity style={styles.likeBtn} onPress={() => handleLike(photo, true)}>
-                        <Ionicons name={userVoted ? "checkmark-circle" : "heart"} size={24} color={userVoted ? COLORS.success : COLORS.danger} />
+                        <Ionicons name={votedPhotoIds.has(photo.id) ? "checkmark-circle" : "heart"} size={24} color={votedPhotoIds.has(photo.id) ? COLORS.success : COLORS.danger} />
                       </TouchableOpacity>
                     </View>
                   )}
@@ -754,22 +787,42 @@ export const BarLiveScreen: React.FC = () => {
             </ScrollView>
           )}
 
-          <TouchableOpacity 
-            style={styles.cameraBtn}
-            onPress={handleUploadPhoto}
-            disabled={uploading || (activeTab === 'contest' && userParticipated)}
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <>
-                <Ionicons name="camera" size={24} color="#FFF" />
-                <Text style={styles.cameraBtnText}>
-                  {activeTab === 'contest' && userParticipated ? "Vous avez participé !" : "Participer avec une photo"}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+
+          {activeTab === 'contest' && activeEvent?.contest_phase === 'participation' && (
+            <Text style={{ textAlign: 'center', marginBottom: 10, color: '#FFF' }}>
+              Participants : {participantCount} {activeEvent.contest_participant_limit ? `/ ${activeEvent.contest_participant_limit}` : ''}
+            </Text>
+          )}
+
+          {activeTab === 'contest' && activeEvent?.contest_phase === 'participation' && !userParticipated && (
+            <TouchableOpacity 
+              style={[styles.cameraBtn, { backgroundColor: COLORS.primary }]}
+              onPress={handleParticipate}
+              disabled={activeEvent?.contest_participant_limit && participantCount >= activeEvent.contest_participant_limit}
+            >
+              <Text style={styles.cameraBtnText}>Participer</Text>
+            </TouchableOpacity>
+          )}
+
+          {(!activeTab || activeTab === 'wall' || (activeTab === 'contest' && userParticipated && activeEvent?.contest_phase === 'participation')) && (
+            <TouchableOpacity 
+              style={styles.cameraBtn}
+              onPress={handleUploadPhoto}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="camera" size={24} color="#FFF" />
+                  <Text style={styles.cameraBtnText}>
+                    {activeTab === 'contest' ? "Envoyer ma photo" : "Ajouter une photo"}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
         </View>
       ) : null}
 
