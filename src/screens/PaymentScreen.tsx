@@ -126,6 +126,16 @@ export const PaymentScreen: React.FC = () => {
 
   const confirmPayment = async () => {
     setShowConfirmModal(false);
+    
+    // Bloquer les paiements en ligne pour le prototype
+    if (selectedMethod === 'mobile_money' || selectedMethod === 'card') {
+      Alert.alert(
+        'Bientôt disponible', 
+        "L'intégration du paiement n'est pas encore finalisée. Veuillez choisir le paiement à la livraison pour le moment."
+      );
+      return;
+    }
+
     setProcessing(true);
     setErrorMessage(null);
 
@@ -166,44 +176,13 @@ export const PaymentScreen: React.FC = () => {
       const isExisting = !!route.params?.existingOrder;
 
       if (isExisting) {
-        // Pay an existing order: mark as paid, insert order_items if needed, run post-processing RPC and notify seller
+        // Un paiement depuis PaymentScreen sur une commande existante n'est plus autorisé côté client.
+        // Le statut de paiement doit être géré par le backend (webhook FedaPay) ou par le vendeur.
         const existingOrderId = routeOrderId;
         if (!existingOrderId) throw new Error('orderId manquant pour paiement existant');
 
         try {
-          // update order payment status
-          const paymentMethodDb =
-            selectedMethod === 'cash'
-              ? 'cash_on_delivery'
-              : selectedMethod === 'card'
-              ? 'card'
-              : 'mobile_money';
-
-          await orderService.update(existingOrderId, { payment_status: 'paid', payment_method: paymentMethodDb, status: 'paid' });
-
-          // insert order_items if provided (best-effort)
-          try {
-            if (Array.isArray(items) && items.length > 0) {
-              const rows = items.map((it: { product: Product; quantity: number }) => ({
-                order_id: existingOrderId,
-                product_id: it.product.id,
-                quantity: it.quantity,
-                price: it.product.price,
-              }));
-              await orderService.createItems(rows);
-            }
-          } catch (e: any) {
-            console.warn('order_items insert skipped for existing order', e);
-          }
-
-          // run RPC to decrement stock + notify seller
-          try {
-            await orderService.processPayment(existingOrderId);
-          } catch (e: any) {
-            console.warn('process_order_after_payment skipped for existing order', e);
-          }
-
-          // client-side notification (best-effort)
+          // On se contente d'afficher le succès et d'ajouter une notification client-side (best-effort)
           try {
             const { storeService } = await import('../services/storeService');
             const { notificationService } = await import('../services/notificationService');
@@ -264,13 +243,8 @@ export const PaymentScreen: React.FC = () => {
         });
 
         // Decrement stock + notify seller (best effort)
-        try {
-          if (created?.order_id) {
-            await orderService.processPayment(created.order_id);
-          }
-        } catch (e: any) {
-          errorHandler.handle(e, 'process_order_after_payment skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-        }
+        // Le frontend n'appelle plus processPayment. La commande reste pending.
+        // Le webhook serveur ou le vendeur s'occupera de la suite.
 
         // Notification créée par le RPC process_order_after_payment, mais on en ajoute une côté client 
         // pour garantir une réception instantanée et fiable même si le RPC a un délai ou échoue.

@@ -275,23 +275,7 @@ export const orderService = {
    * Traite le paiement d'une commande via RPC
    */
   async processPayment(orderId: string): Promise<Order> {
-    const client = useSupabase();
-    return rpcUtils.executeWithFallback(
-      'process_order_after_payment',
-      { p_order_id: orderId },
-      async () => {
-        // Fallback: mettre à jour directement
-        const { data, error } = await client
-          .from('orders')
-          .update({ payment_status: 'paid', status: 'paid' })
-          .eq('id', orderId)
-          .select('*')
-          .single();
-        if (error) throw error;
-        return data as Order;
-      },
-      { rpcName: 'process_order_after_payment' }
-    );
+    throw new Error("L'intégration du paiement serveur n'est pas encore finalisée. Le frontend ne peut plus simuler le paiement.");
   },
 
   /**
@@ -609,19 +593,23 @@ export const orderService = {
    */
   async updateStatus(id: string, status: OrderStatus): Promise<Order> {
     const client = useSupabase();
-    const updatePayload: any = { status, status_changed_at: new Date().toISOString() };
-    if (status === 'delivered') {
-      updatePayload.payment_status = 'paid';
-    }
-
-    const { data: order, error } = await client
-      .from('orders')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('id, user_id, status, store_id, customer_name, total_amount, stores(name, user_id)')
-      .single();
+    
+    // Call the secure RPC to transition the status
+    const { data, error } = await client.rpc('update_order_status_atomic', {
+      p_order_id: id,
+      p_status: status
+    });
 
     if (error) throw error;
+    
+    // The RPC might not return the full order object, so we fetch it back to update the UI
+    const { data: order, error: fetchError } = await client
+      .from('orders')
+      .select('id, user_id, status, store_id, customer_name, total_amount, stores(name, user_id)')
+      .eq('id', id)
+      .single();
+      
+    if (fetchError) throw fetchError;
 
     // Invalider le cache
     await cacheService.remove(`order:${id}`);
@@ -674,9 +662,8 @@ export const orderService = {
     });
 
     if (error) {
-      // Si la RPC n'existe pas ou échoue, updateStatus enverra la notif lui-même
-      console.warn('RPC accept_order failed, falling back to direct update', error);
-      return this.updateStatus(orderId, 'accepted');
+      console.warn('RPC accept_order failed:', error);
+      throw error;
     }
 
     if (data && data.success === false) {
@@ -916,34 +903,23 @@ export const orderService = {
     const order = await this.getById(orderId);
     if (!order) throw new Error('Commande non trouvée');
 
-    return rpcUtils.executeWithFallback(
-      'confirm_order_payment',
-      { p_order_id: orderId },
-      async () => {
-        // Fallback: mise à jour directe
-        const client = useSupabase();
-        const { data: updated, error } = await client
-          .from('orders')
-          .update({
-            status: 'paid',
-            payment_status: 'paid',
-            status_changed_at: new Date().toISOString(),
-          })
-          .eq('id', orderId)
-          .select('*')
-          .single();
-
-        if (error) throw error;
-
-        await cacheService.remove(`order:${orderId}`);
-        await this.sendCustomerNotification(updated as Order, 'paid').catch(() => {
-          /* ignore */
-        });
-
-        return updated as Order;
-      },
-      { rpcName: 'confirm_order_payment' }
-    );
+    const client = useSupabase();
+    // Utilise la nouvelle méthode backend (soit confirm_order_payment, soit la nouvelle RPC d'update de statut)
+    const { data, error } = await client.rpc('confirm_order_payment', { p_order_id: orderId });
+    if (error) {
+       console.warn('RPC confirm_order_payment failed:', error);
+       throw error;
+    }
+    
+    // Refresh the order to get the latest status
+    const { data: updated, error: fetchError } = await client
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    return updated as Order;
   },
 
   /**

@@ -145,14 +145,15 @@ export const SellerOrderDetailScreen: React.FC = () => {
     setUpdating(true);
     try {
       if (!orderId) throw new Error('orderId manquant');
+      let updatedOrder: any;
       if (newStatus === 'accepted') {
-        await orderService.acceptOrder(orderId);
+        updatedOrder = await orderService.acceptOrder(orderId);
       } else if (newStatus === 'paid') {
-        await orderService.confirmOrderPayment(orderId);
+        updatedOrder = await orderService.confirmOrderPayment(orderId);
       } else {
-        await orderService.updateStatus(orderId, newStatus);
+        updatedOrder = await orderService.updateStatus(orderId, newStatus);
       }
-      setOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+      setOrder((prev) => (prev && updatedOrder ? { ...prev, status: updatedOrder.status, payment_status: updatedOrder.payment_status } : prev));
     } catch (error: any) {
       if (error.message === 'INSUFFICIENT_STOCK') {
         Alert.alert(

@@ -732,10 +732,12 @@ const SellerOrdersScreenContent: React.FC = () => {
           setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: 'accepted' } : order));
         } else if (newStatus === 'paid') {
           res = await orderService.confirmOrderPayment(orderId);
-          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: 'paid', paymentStatus: 'paid' } : order));
+          // Utiliser les données réelles retournées par le serveur
+          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: res.status, paymentStatus: res.payment_status } : order));
         } else {
           res = await orderService.updateStatus(orderId, newStatus);
-          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
+          // Utiliser l'état renvoyé par la BDD
+          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: res.status, paymentStatus: res.payment_status || order.paymentStatus } : order));
         }
 
         // 🚀 Pas de rechargement complet - juste une mise à jour locale optimisée
