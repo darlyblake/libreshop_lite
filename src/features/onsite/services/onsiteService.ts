@@ -49,7 +49,7 @@ export const onsiteService = {
       storeName: result.store_name || '',
       tableId: result.table_id,
       tableNumber: result.table_number,
-      isActive: result.is_active,
+      active: result.active,
     };
   },
 
@@ -96,7 +96,7 @@ export const onsiteService = {
 
     const { error } = await supabase
       .from('pos_tables')
-      .update({ is_active: isActive })
+      .update({ active: isActive })
       .eq('id', tableId);
 
     if (error) {

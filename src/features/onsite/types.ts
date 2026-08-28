@@ -9,7 +9,7 @@ export interface OnsiteTableContext {
   storeName: string;
   tableId: string;
   tableNumber: string;
-  isActive: boolean;
+  active: boolean;
 }
 
 export type OrderContext =
@@ -29,6 +29,6 @@ export interface QrTokenValidationResult {
   store_name: string | null;
   table_id: string | null;
   table_number: string | null;
-  is_active: boolean;
+  active: boolean;
   error?: 'invalid_token' | 'table_disabled' | 'store_disabled';
 }
