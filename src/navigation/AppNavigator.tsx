@@ -31,6 +31,7 @@ import { ClientEditScreen } from '../screens/ClientEditScreen';
 import { ClientAllStoresScreen } from '../screens/ClientAllStoresScreen';
 import { ClientAllProductsScreen } from '../screens/ClientAllProductsScreen';
 import { StoreDetailScreen } from '../screens/StoreDetailScreen';
+import { StoreDetailRouterScreen } from '../screens/StoreDetailRouterScreen';
 import { ProductDetailScreen } from '../screens/ProductDetailScreen';
 import { CartScreen } from '../screens/CartScreen';
 import { CheckoutScreen } from '../screens/CheckoutScreen';
@@ -930,7 +931,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="ClientAllStores" component={ClientAllStoresScreen} />
         <Stack.Screen name="ClientAllProducts" component={ClientAllProductsScreen} />
         <Stack.Screen name="ClientMap" component={ClientMapScreen} />
-        <Stack.Screen name="StoreDetail" component={StoreDetailScreen} />
+        <Stack.Screen name="StoreDetail" component={StoreDetailRouterScreen} />
         <Stack.Screen name="BarDetail" component={BarDetailScreen} />
         <Stack.Screen name="BarLive" component={BarLiveScreen} />
         <Stack.Screen name="BarTV" component={BarTVScreen} />
