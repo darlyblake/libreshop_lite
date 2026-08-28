@@ -66,7 +66,15 @@ export const useStoreStore = create<StoreState>()(
   persist(
     (set) => ({
       store: null,
-      setStore: (store) => set({ store }),
+      setStore: (store) => {
+        set({ store });
+        try {
+          const { useNotificationStore } = require('./notificationStore');
+          if (useNotificationStore.getState) {
+            useNotificationStore.getState().setActiveStoreId(store ? store.id : null);
+          }
+        } catch (e) {}
+      },
     }),
     {
       name: '@libreshop_selected_store',

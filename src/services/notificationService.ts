@@ -180,6 +180,7 @@ class NotificationService {
     data?: Record<string, any>;
     type?: string;
     targetRole?: 'client' | 'seller' | 'admin';
+    store_id?: string;
   }) {
     try {
       if (!supabase) {
@@ -187,7 +188,6 @@ class NotificationService {
         return null;
       }
 
-      // Normalize type to match DB CHECK constraint: ('order', 'payment', 'promo', 'system')
       const validTypes = ['order', 'payment', 'promo', 'system'];
       const rawType = notification.type || 'system';
       const dbType = validTypes.includes(rawType) ? rawType : 'system';
@@ -195,7 +195,7 @@ class NotificationService {
       const finalData = {
         ...(notification.data || {}),
         targetRole: notification.targetRole || 'client',
-        originalType: rawType, // Preserve original type in data for display purposes
+        originalType: rawType,
       };
 
       const { data, error } = await supabase.rpc('create_system_notification', {
@@ -204,34 +204,17 @@ class NotificationService {
         p_body: notification.body,
         p_type: dbType,
         p_target_role: notification.targetRole || 'client',
-        p_data: finalData
+        p_data: finalData,
+        p_store_id: notification.store_id || null
       });
 
       if (error) {
-        // Fallback for local development if RPC doesn't exist yet
-        console.warn('RPC create_system_notification failed, falling back to direct insert', error);
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('notifications')
-          .insert({
-            user_id: notification.user_id,
-            title: notification.title,
-            body: notification.body,
-            data: finalData,
-            type: dbType,
-            read: false,
-            created_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (fallbackError) throw fallbackError;
+        throw error;
       }
 
-
-
       return data;
-    } catch (e) {
-      errorHandler.handle(e, 'Failed to create notification', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+    } catch (error: any) {
+      errorHandler.handle(error, 'Failed to create notification', ErrorCategory.DATABASE, ErrorSeverity.HIGH);
       return null;
     }
   }
@@ -382,7 +365,7 @@ class NotificationService {
     throw new Error('Email not implemented yet');
   }
 
-  async getByUser(userId: string, role?: 'client' | 'seller' | 'admin', limit: number = 50) {
+  async getByUser(userId: string, role?: 'client' | 'seller' | 'admin', storeId?: string | null, limit: number = 50) {
     if (!supabase) return [];
     try {
       let query = supabase
@@ -400,6 +383,10 @@ class NotificationService {
         }
       }
 
+      if (storeId) {
+        query = query.eq('store_id', storeId);
+      }
+
       const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -412,7 +399,7 @@ class NotificationService {
     }
   }
 
-  async getUnreadCount(userId: string, role?: 'client' | 'seller' | 'admin'): Promise<number> {
+  async getUnreadCount(userId: string, role?: 'client' | 'seller' | 'admin', storeId?: string | null): Promise<number> {
     if (!supabase) return 0;
     try {
       let query = supabase
@@ -427,6 +414,10 @@ class NotificationService {
         } else {
           query = query.eq('data->>targetRole', role);
         }
+      }
+
+      if (storeId) {
+        query = query.eq('store_id', storeId);
       }
 
       const { count, error } = await query;
@@ -450,7 +441,7 @@ class NotificationService {
     }
   }
 
-  async markAllAsRead(userId: string, role?: 'client' | 'seller' | 'admin') {
+  async markAllAsRead(userId: string, role?: 'client' | 'seller' | 'admin', storeId?: string | null) {
     if (!supabase) return;
     try {
       let query = supabase
@@ -467,6 +458,10 @@ class NotificationService {
         }
       }
 
+      if (storeId) {
+        query = query.eq('store_id', storeId);
+      }
+
       const { error } = await query;
       if (error) throw error;
     } catch (e) {
@@ -474,7 +469,7 @@ class NotificationService {
     }
   }
 
-  async deleteAllByUser(userId: string, role?: 'client' | 'seller' | 'admin') {
+  async deleteAllByUser(userId: string, role?: 'client' | 'seller' | 'admin', storeId?: string | null) {
     if (!supabase) return;
     try {
       let query = supabase
@@ -488,6 +483,10 @@ class NotificationService {
         } else {
           query = query.eq('data->>targetRole', role);
         }
+      }
+
+      if (storeId) {
+        query = query.eq('store_id', storeId);
       }
 
       const { error } = await query;

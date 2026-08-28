@@ -8,6 +8,7 @@ export interface Notification {
   read: boolean;
   created_at: string;
   data?: Record<string, any>;
+  store_id?: string;
 }
 
 export const isClientNotification = (n: Notification) => {
@@ -47,7 +48,10 @@ interface NotificationState {
   unreadCount: number;
   clientUnreadCount: number;
   sellerUnreadCount: number;
+  activeStoreId: string | null;
+  setActiveStoreId: (storeId: string | null) => void;
   setNotifications: (notifications: Notification[]) => void;
+  loadNotifications: (userId: string, role?: 'client' | 'seller' | 'admin', storeId?: string | null) => Promise<void>;
   addNotification: (notification: Notification) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: (context?: 'client' | 'seller') => void;
@@ -60,13 +64,35 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   unreadCount: 0,
   clientUnreadCount: 0,
   sellerUnreadCount: 0,
-  setNotifications: (notifications) => 
-    set({ 
+  activeStoreId: null,
+  setActiveStoreId: (storeId) => set((state) => ({ 
+    activeStoreId: storeId,
+    sellerUnreadCount: state.notifications.filter(n => 
+      !n.read && 
+      isSellerNotification(n) && 
+      (!storeId || n.store_id === storeId)
+    ).length
+  })),
+  setNotifications: (notifications) =>
+    set((state) => ({ 
       notifications, 
       unreadCount: notifications.filter(n => !n.read).length,
       clientUnreadCount: notifications.filter(n => !n.read && isClientNotification(n)).length,
-      sellerUnreadCount: notifications.filter(n => !n.read && isSellerNotification(n)).length,
-    }),
+      sellerUnreadCount: notifications.filter(n => 
+        !n.read && 
+        isSellerNotification(n) && 
+        (!state.activeStoreId || n.store_id === state.activeStoreId)
+      ).length,
+    })),
+  loadNotifications: async (userId, role, storeId) => {
+    try {
+      const { notificationService } = await import('../services/notificationService');
+      const data = await notificationService.getByUser(userId, role, storeId);
+      get().setNotifications(data);
+    } catch (e) {
+      console.error('Failed to load notifications in store', e);
+    }
+  },
   addNotification: (notification) => 
     set((state) => {
       const isClient = isClientNotification(notification);

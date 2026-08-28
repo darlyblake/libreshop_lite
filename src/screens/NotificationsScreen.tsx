@@ -56,9 +56,8 @@ export const NotificationsScreen: React.FC = () => {
       if (context === 'client') return isClientNotification(n);
       if (context === 'seller') {
         if (!isSellerNotification(n)) return false;
-        // Filter by the active store if we are in seller context and have a store id
-        if (store?.id && n.data?.storeId) {
-          return String(n.data.storeId) === String(store.id);
+        if (store?.id && n.store_id) {
+          return String(n.store_id) === String(store.id);
         }
         return true;
       }
@@ -74,7 +73,8 @@ export const NotificationsScreen: React.FC = () => {
   const loadNotifications = useCallback(async () => {
     if (!user) return;
     try {
-      const data = await notificationService.getByUser(user.id, context);
+      const storeId = context === 'seller' ? store?.id : null;
+      const data = await notificationService.getByUser(user.id, context, storeId);
       setNotifications(data);
     } catch (error) {
       errorHandler.handleDatabaseError(error as Error, 'Error loading notifications:');
@@ -98,7 +98,7 @@ export const NotificationsScreen: React.FC = () => {
     const data = (notification.data || {}) as Record<string, any>;
     const orderId = data.orderId ? String(data.orderId) : null;
     const productId = data.productId ? String(data.productId) : null;
-    const storeId = data.storeId ? String(data.storeId) : null;
+    const storeId = (data.storeId || notification.store_id) ? String(data.storeId || notification.store_id) : null;
     const action = data.action ? String(data.action) : null;
 
     const isSellerContext = Boolean(user?.id && store?.user_id && String(store.user_id) === String(user.id));
@@ -134,7 +134,7 @@ export const NotificationsScreen: React.FC = () => {
   const handleMarkAllRead = useCallback(async () => {
     if (!user) return;
     try {
-      await notificationService.markAllAsRead(user.id);
+      await notificationService.markAllAsRead(user.id, context, context === 'seller' ? store?.id : null);
       markAllAsRead(context);
     } catch (e) {
       errorHandler.handleDatabaseError(e as Error, 'mark all as read');
@@ -148,7 +148,7 @@ export const NotificationsScreen: React.FC = () => {
     if (Platform.OS === 'web') {
       if (window.confirm('Supprimer toutes les notifications ?')) {
         try {
-          await notificationService.deleteAllByUser(user.id);
+          await notificationService.deleteAllByUser(user.id, context, context === 'seller' ? store?.id : null);
           clearAll(context);
         } catch (e) {
           errorHandler.handleDatabaseError(e as Error, 'clear notifications');
@@ -165,7 +165,7 @@ export const NotificationsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-                await notificationService.deleteAllByUser(user.id);
+                await notificationService.deleteAllByUser(user.id, context, context === 'seller' ? store?.id : null);
                 clearAll(context);
               } catch (e) {
                 errorHandler.handleDatabaseError(e as Error, 'clear notifications');
