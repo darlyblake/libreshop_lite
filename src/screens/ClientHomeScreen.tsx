@@ -1,27 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  TextInput,
-  Image,
-  Platform,
-  ActivityIndicator,
-  InteractionManager,
-  ScrollView,
-  Dimensions,
-  Alert,
-  RefreshControl
-} from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Platform, ActivityIndicator, ScrollView, Alert, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../hooks/useTheme';
 import { useCartStore, useAuthStore } from '../store';
 import { useClientHomeState } from '../hooks/useClientHomeState';
-import { ProductCard, ProductCardSkeleton, StoreCard, StoreCardSkeleton } from '../components';
+import { StoreCardSkeleton } from '../components';
 import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import OptimizedImage from '../components/OptimizedImage';
 import { useResponsive } from '../utils/responsive';
@@ -39,27 +24,96 @@ const CATEGORIES = [
   { name: 'Bars', emoji: '🍻', bg: '#ffedd5' },
 ];
 
+const DISCOVERY_SECTIONS = [
+  { key: 'bar', title: 'Coins chauds', subtitle: 'Bars populaires', icon: '🍻' },
+  { key: 'restaurant', title: 'Restaurants populaires', subtitle: 'Les mieux classés', icon: '🍽️' },
+  { key: 'general', title: 'Boutiques populaires', subtitle: 'Les plus appréciées', icon: '🛍️' },
+  { key: 'other', title: 'À découvrir', subtitle: 'Autres activités populaires', icon: '⭐' },
+] as const;
+
+const SkeletonBlock = ({ style }: { style?: any }) => (
+  <View style={[{ backgroundColor: '#e9edf3', borderRadius: 8 }, style]} />
+);
+
+const HomeDiscoverySkeleton = ({ width, palette, SPACING, RADIUS }: any) => {
+  const columns = width >= 1400 ? 6 : width >= 1200 ? 5 : width >= 900 ? 4 : width >= 768 ? 3 : 2;
+  const cardWidth = Math.max(0, (width - SPACING.md * 2 - SPACING.md * (columns - 1)) / columns);
+
+  return (
+    <ScrollView
+      style={{ flex: 1, backgroundColor: palette.bg }}
+      contentContainerStyle={{ paddingTop: SPACING.md, paddingHorizontal: SPACING.md, paddingBottom: SPACING.xl }}
+      scrollEnabled={false}
+    >
+      {/* Header */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
+        <SkeletonBlock style={{ width: 118, height: 25, borderRadius: 7 }} />
+        <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+          {[1, 2, 3, 4, 5].map((i) => <SkeletonBlock key={i} style={{ width: 28, height: 28, borderRadius: 14 }} />)}
+        </View>
+      </View>
+
+      {/* Search */}
+      <SkeletonBlock style={{ width: '100%', height: 48, borderRadius: RADIUS.md, marginBottom: SPACING.lg }} />
+
+      {/* Categories */}
+      <View style={{ flexDirection: 'row', marginBottom: SPACING.lg }}>
+        {CATEGORIES.map((cat) => (
+          <View key={cat.name} style={{ width: 54, marginRight: SPACING.md, alignItems: 'center' }}>
+            <SkeletonBlock style={{ width: 54, height: 54, borderRadius: 27, marginBottom: SPACING.xs }} />
+            <SkeletonBlock style={{ width: 42, height: 9, borderRadius: 5 }} />
+          </View>
+        ))}
+      </View>
+
+      {/* Location line */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+        <SkeletonBlock style={{ width: 16, height: 16, borderRadius: 8, marginRight: 6 }} />
+        <SkeletonBlock style={{ width: 175, height: 10, borderRadius: 5 }} />
+      </View>
+
+      {/* Same structure as the real Top 20: 4 groups x up to 5 cards */}
+      {DISCOVERY_SECTIONS.map((section) => (
+        <View key={section.key} style={{ marginBottom: SPACING.xl }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+            <SkeletonBlock style={{ width: 22, height: 22, borderRadius: 11, marginRight: 8 }} />
+            <View>
+              <SkeletonBlock style={{ width: Math.min(width * 0.55, 210), height: 16, borderRadius: 6, marginBottom: 6 }} />
+              <SkeletonBlock style={{ width: 125, height: 9, borderRadius: 5 }} />
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <View key={index} style={{ width: cardWidth, backgroundColor: palette.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: palette.border, overflow: 'hidden' }}>
+                <SkeletonBlock style={{ width: '100%', height: 90, borderRadius: 0 }} />
+                <View style={{ paddingHorizontal: SPACING.md, paddingTop: 28, paddingBottom: SPACING.md }}>
+                  <SkeletonBlock style={{ width: '78%', height: 13, borderRadius: 5, marginBottom: 8 }} />
+                  <SkeletonBlock style={{ width: '52%', height: 9, borderRadius: 5, marginBottom: 9 }} />
+                  <SkeletonBlock style={{ width: '92%', height: 9, borderRadius: 5, marginBottom: 5 }} />
+                  <SkeletonBlock style={{ width: '65%', height: 9, borderRadius: 5, marginBottom: 12 }} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <SkeletonBlock style={{ width: 62, height: 10, borderRadius: 5, marginRight: 7 }} />
+                    <SkeletonBlock style={{ width: 25, height: 10, borderRadius: 5 }} />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+};
+
 const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, FONT_SIZE }: any) => {
   const stats = Array.isArray(store.store_stats) ? store.store_stats[0] : store.store_stats;
   const ratingAvg = stats?.rating_avg ?? store.rating_avg ?? 0;
   const ratingCount = stats?.rating_count ?? store.rating_count ?? 0;
   const logoUrl = store.logo_url || store.logo;
   const bannerUrl = store.banner_url || store.banner;
-
-  const renderStars = (avg: number) => {
-    const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
-    const full = Math.floor(safe);
-    const half = safe - full >= 0.5;
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-        {[...Array(5)].map((_, i) => {
-          if (i < full) return <Ionicons key={i} name="star" size={12} color="#f59e0b" />;
-          if (i === full && half) return <Ionicons key={i} name="star-half" size={12} color="#f59e0b" />;
-          return <Ionicons key={i} name="star-outline" size={12} color={palette.textMuted} />;
-        })}
-      </View>
-    );
-  };
+  const safeRating = Number.isFinite(Number(ratingAvg)) ? Math.max(0, Math.min(5, Number(ratingAvg))) : 0;
+  const full = Math.floor(safeRating);
+  const half = safeRating - full >= 0.5;
 
   return (
     <TouchableOpacity
@@ -80,20 +134,17 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
         <Text numberOfLines={1} style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: palette.text, marginBottom: 2 }}>{store.name || 'Boutique'}</Text>
         <Text numberOfLines={1} style={{ fontSize: FONT_SIZE.xs, color: palette.accent, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SPACING.xs }}>{store.category || 'Général'}</Text>
         <Text numberOfLines={2} style={{ fontSize: FONT_SIZE.xs, color: palette.textSoft, lineHeight: 16, marginBottom: SPACING.sm, height: 32 }}>{store.description || ' '}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.xs }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>{renderStars(Number(ratingAvg))}<Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '700', color: palette.text, marginLeft: 2 }}>{ratingAvg ? Number(ratingAvg).toFixed(1) : '0.0'}</Text><Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>({ratingCount})</Text></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: SPACING.xs }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
+            {[...Array(5)].map((_, i) => i < full ? <Ionicons key={i} name="star" size={12} color="#f59e0b" /> : (i === full && half ? <Ionicons key={i} name="star-half" size={12} color="#f59e0b" /> : <Ionicons key={i} name="star-outline" size={12} color={palette.textMuted} />))}
+          </View>
+          <Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '700', color: palette.text, marginLeft: 4 }}>{safeRating ? safeRating.toFixed(1) : '0.0'}</Text>
+          <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted, marginLeft: 3 }}>({ratingCount})</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
-
-const DISCOVERY_SECTIONS = [
-  { key: 'bar', title: 'Coins chauds', subtitle: 'Bars populaires', icon: '🍻' },
-  { key: 'restaurant', title: 'Restaurants populaires', subtitle: 'Les mieux classés', icon: '🍽️' },
-  { key: 'general', title: 'Boutiques populaires', subtitle: 'Les plus appréciées', icon: '🛍️' },
-  { key: 'other', title: 'À découvrir', subtitle: 'Autres activités populaires', icon: '⭐' },
-] as const;
 
 export const ClientHomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -131,11 +182,10 @@ export const ClientHomeScreen: React.FC = () => {
       setDiscoveryLocation({ cityName: result.location.cityName, countryName: result.location.countryName });
     } catch (e) {
       console.warn('Failed to load location-aware top stores', e);
-      // Keep the home page functional if discovery/location fails.
       try {
         const fallback = await storeService.getPopularStores(20);
         setTopStores(fallback || []);
-        setDiscoveryGroups({ bar: (fallback || []).filter((s: any) => s.discovery_group === 'bar'), restaurant: (fallback || []).filter((s: any) => s.discovery_group === 'restaurant'), general: (fallback || []).filter((s: any) => s.discovery_group === 'general'), other: (fallback || []).filter((s: any) => !['bar', 'restaurant', 'general'].includes(s.discovery_group)) });
+        setDiscoveryGroups({ bar: (fallback || []).filter((s: any) => s.discovery_group === 'bar').slice(0, 5), restaurant: (fallback || []).filter((s: any) => s.discovery_group === 'restaurant').slice(0, 5), general: (fallback || []).filter((s: any) => s.discovery_group === 'general').slice(0, 5), other: (fallback || []).filter((s: any) => !['bar', 'restaurant', 'general'].includes(s.discovery_group)).slice(0, 5) });
       } catch (fallbackError) {
         console.warn('Fallback store discovery failed', fallbackError);
       }
@@ -207,8 +257,9 @@ export const ClientHomeScreen: React.FC = () => {
     if (!stores.length) return null;
     return (
       <View key={section.key} style={{ marginBottom: SPACING.xl }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}><Text style={{ fontSize: 20, marginRight: 7 }}>{section.icon}</Text><View><Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '800', color: palette.text }}>{section.title}</Text><Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>{section.subtitle} · {stores.length}</Text></View></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}>
+          <Text style={{ fontSize: 20, marginRight: 7 }}>{section.icon}</Text>
+          <View><Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '800', color: palette.text }}>{section.title}</Text><Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>{section.subtitle} · {stores.length}</Text></View>
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
           {stores.slice(0, 5).map((store: any) => <BeautifulStoreCard key={store.id} store={{ ...store, isNavigating: navigatingState === `store_${store.id}` }} width={cardWidth} palette={palette} RADIUS={RADIUS} SPACING={SPACING} FONT_SIZE={FONT_SIZE} onPress={() => handleNavigate('StoreDetail', { storeId: store.id }, `store_${store.id}`)} />)}
@@ -217,7 +268,9 @@ export const ClientHomeScreen: React.FC = () => {
     );
   };
 
-  if (!isReady || loadingStores) return <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md }}><StoreCardSkeleton /></View>;
+  if (!isReady || loadingStores) {
+    return <HomeDiscoverySkeleton width={width} palette={palette} SPACING={SPACING} RADIUS={RADIUS} />;
+  }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + SPACING.xl }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />} scrollEventThrottle={400}>
