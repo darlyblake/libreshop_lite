@@ -74,7 +74,7 @@ export const storeDiscoveryService = {
     const location = await resolveCurrentLocation();
     const client = useSupabase();
 
-    const { data, error } = await client.rpc('get_popular_stores', {
+    const { data, error } = await client.rpc('get_home_top_stores', {
       p_limit: 20,
       p_city_id: location.cityId,
       p_country_id: location.countryId,
@@ -82,22 +82,21 @@ export const storeDiscoveryService = {
 
     if (error) throw error;
 
-    // The backend is responsible for selecting, ranking and grouping the home Tops.
-    // The client only normalizes the response shape and never calculates groups.
+    // The backend returns the final groups. The client only consumes them.
     const payload = (data || {}) as {
       stores?: any[];
       groups?: Partial<StoreDiscoveryGroups>;
     };
 
-    const groups: StoreDiscoveryGroups = {
-      bar: Array.isArray(payload.groups?.bar) ? payload.groups!.bar : [],
-      restaurant: Array.isArray(payload.groups?.restaurant) ? payload.groups!.restaurant : [],
-      general: Array.isArray(payload.groups?.general) ? payload.groups!.general : [],
-      other: Array.isArray(payload.groups?.other) ? payload.groups!.other : [],
+    return {
+      stores: Array.isArray(payload.stores) ? payload.stores : [],
+      groups: {
+        bar: Array.isArray(payload.groups?.bar) ? payload.groups!.bar : [],
+        restaurant: Array.isArray(payload.groups?.restaurant) ? payload.groups!.restaurant : [],
+        general: Array.isArray(payload.groups?.general) ? payload.groups!.general : [],
+        other: Array.isArray(payload.groups?.other) ? payload.groups!.other : [],
+      },
+      location,
     };
-
-    const stores = Array.isArray(payload.stores) ? payload.stores : [];
-
-    return { stores, groups, location };
   },
 };
