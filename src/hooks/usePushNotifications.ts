@@ -94,7 +94,7 @@ export const usePushNotifications = (userId: string | undefined): PushNotificati
 
   const saveToken = async (uid: string, token: string) => {
     try {
-      const { error } = await supabase!.from('push_tokens').upsert({ user_id: uid, token }, { onConflict: 'user_id,token' });
+      const { error } = await supabase!.from('device_tokens').upsert({ user_id: uid, token, platform: Platform.OS, last_used_at: new Date().toISOString() }, { onConflict: 'user_id,token' });
       if (error) throw error;
     } catch (error) {
       errorHandler.handleDatabaseError(error as Error, 'save_push_token');

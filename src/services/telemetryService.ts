@@ -33,9 +33,13 @@ export interface TelemetryData {
 
 export const telemetryService = {
   /**
-   * Log a page view
+   * Log a page view — échantillonnage à 20% pour éviter de saturer la table.
+   * Seuls les crashes/erreurs sont toujours enregistrés.
    */
   async logPageView(path: string, durationMs?: number) {
+    // Sampling : enregistre seulement 1 page view sur 5
+    if (Math.random() > 0.2) return;
+    if (!supabase) return;
     try {
       await supabase.from('telemetry_events').insert({
         event_type: 'page_view',
@@ -54,6 +58,7 @@ export const telemetryService = {
    * Log a crash or handled error
    */
   async logCrash(error: Error) {
+    if (!supabase) return;
     try {
       await supabase.from('telemetry_events').insert({
         event_type: 'crash',
@@ -72,6 +77,7 @@ export const telemetryService = {
    */
   async getAggregatedTelemetry(): Promise<TelemetryData> {
     try {
+      if (!supabase) return this.getMockTelemetry();
       // In a real production setup, we would use an RPC function or a Supabase View
       // to aggregate this data efficiently. For this prototype, we'll fetch recent
       // events and aggregate them in memory, with a fallback to mock data if the table is empty or missing.
@@ -84,6 +90,7 @@ export const telemetryService = {
 
       if (error || !data || data.length === 0) {
         return this.getMockTelemetry();
+
       }
 
       // Aggregate Crashes

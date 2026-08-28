@@ -75,7 +75,7 @@ class NotificationService {
       if (!supabase) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { error } = await supabase.from('push_tokens').upsert({ user_id: user.id, token });
+        const { error } = await supabase.from('device_tokens').upsert({ user_id: user.id, token, platform: Platform.OS, last_used_at: new Date().toISOString() }, { onConflict: 'user_id,token' });
         if (error) throw error;
         console.log('Push token prêt pour l\'utilisateur:', user.id, token);
       }
@@ -243,23 +243,7 @@ class NotificationService {
         if (fallbackError) throw fallbackError;
       }
 
-      // Appel à l'Edge Function pour envoyer la notification Push réelle via Expo
-      try {
-        const { error: pushError } = await supabase.functions.invoke('send-push-notification', {
-          body: {
-            user_id: notification.user_id,
-            title: notification.title,
-            body: notification.body,
-            data: finalData,
-            type: notification.type || 'info',
-          }
-        });
-        if (pushError) {
-          console.warn('[NotificationService] Erreur lors de l\'invocation de l\'Edge Function', pushError);
-        }
-      } catch (invokeError) {
-        console.warn('[NotificationService] Échec de l\'invocation de send-push-notification', invokeError);
-      }
+
 
       return data;
     } catch (e) {
