@@ -35,25 +35,17 @@ BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501';
   END IF;
-
   IF lower(coalesce(p_order_payload->>'order_source','')) <> 'online' THEN
     RAISE EXCEPTION 'Invalid order source' USING ERRCODE='22023';
   END IF;
-
   v_store_id := NULLIF(trim(p_order_payload->>'store_id'),'')::uuid;
   IF v_store_id IS NULL THEN
     RAISE EXCEPTION 'store_id required' USING ERRCODE='22023';
   END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM public.stores s
-    WHERE s.id = v_store_id
-      AND coalesce(s.status,'active') = 'active'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM public.stores s WHERE s.id=v_store_id AND coalesce(s.status,'active')='active') THEN
     RAISE EXCEPTION 'Store unavailable' USING ERRCODE='22023';
   END IF;
-
-  IF p_items_payload IS NULL OR jsonb_typeof(p_items_payload) <> 'array' OR jsonb_array_length(p_items_payload)=0 THEN
+  IF p_items_payload IS NULL OR jsonb_typeof(p_items_payload)<>'array' OR jsonb_array_length(p_items_payload)=0 THEN
     RAISE EXCEPTION 'Items required' USING ERRCODE='22023';
   END IF;
 
@@ -85,58 +77,28 @@ BEGIN
     EXCEPTION WHEN others THEN
       RAISE EXCEPTION 'Invalid item' USING ERRCODE='22023';
     END;
-
-    IF v_qty IS NULL OR v_qty < 1 OR v_qty > 999 THEN
+    IF v_qty IS NULL OR v_qty<1 OR v_qty>999 THEN
       RAISE EXCEPTION 'Invalid quantity' USING ERRCODE='22023';
     END IF;
-
-    SELECT p.price, p.stock_quantity
-      INTO v_unit_price, v_stock
+    SELECT p.price,p.stock_quantity INTO v_unit_price,v_stock
     FROM public.products p
-    WHERE p.id = v_product_id
-      AND p.store_id = v_store_id
-      AND coalesce(p.is_active,true) = true
+    WHERE p.id=v_product_id AND p.store_id=v_store_id AND coalesce(p.is_active,true)=true
     FOR UPDATE;
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Product unavailable' USING ERRCODE='22023';
-    END IF;
-
-    IF coalesce(v_stock,0) < v_qty THEN
-      RAISE EXCEPTION 'Insufficient stock' USING ERRCODE='22023';
-    END IF;
-
-    INSERT INTO public.order_items(order_id, product_id, quantity, price)
-    VALUES(v_order_id, v_product_id, v_qty, v_unit_price);
-
-    UPDATE public.products
-    SET stock_quantity = stock_quantity - v_qty,
-        updated_at = now()
-    WHERE id = v_product_id;
-
-    v_total := v_total + (v_unit_price * v_qty);
+    IF NOT FOUND THEN RAISE EXCEPTION 'Product unavailable' USING ERRCODE='22023'; END IF;
+    IF coalesce(v_stock,0)<v_qty THEN RAISE EXCEPTION 'Insufficient stock' USING ERRCODE='22023'; END IF;
+    INSERT INTO public.order_items(order_id,product_id,quantity,price) VALUES(v_order_id,v_product_id,v_qty,v_unit_price);
+    UPDATE public.products SET stock_quantity=stock_quantity-v_qty,updated_at=now() WHERE id=v_product_id;
+    v_total := v_total + (v_unit_price*v_qty);
   END LOOP;
-
   UPDATE public.orders SET total_amount=v_total WHERE id=v_order_id;
-
-  RETURN jsonb_build_object(
-    'success',true,
-    'order_id',v_order_id,
-    'total',v_total,
-    'total_amount',v_total,
-    'order_source','online'
-  );
+  RETURN jsonb_build_object('success',true,'order_id',v_order_id,'total',v_total,'total_amount',v_total,'order_source','online');
 END;
 $$;
-
-REVOKE ALL ON FUNCTION public.create_order_atomic(jsonb,jsonb) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.create_order_atomic(jsonb,jsonb) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.create_order_atomic(jsonb,jsonb) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.create_onsite_order_atomic(
-  p_qr_token text,
-  p_customer jsonb,
-  p_payment_method text,
-  p_items jsonb
+  p_qr_token text,p_customer jsonb,p_payment_method text,p_items jsonb
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -147,7 +109,7 @@ DECLARE
   v_table public.pos_tables%ROWTYPE;
   v_store public.stores%ROWTYPE;
   v_order_id uuid;
-  v_subtotal numeric := 0;
+  v_total numeric := 0;
   v_item jsonb;
   v_product_id uuid;
   v_qty integer;
@@ -157,113 +119,40 @@ DECLARE
   v_phone text := nullif(trim(coalesce(p_customer->>'phone','')), '');
   v_notes text := nullif(trim(coalesce(p_customer->>'notes','')), '');
 BEGIN
-  IF p_qr_token IS NULL OR length(trim(p_qr_token)) < 16 OR length(trim(p_qr_token)) > 128 THEN
+  IF p_qr_token IS NULL OR length(trim(p_qr_token))<16 OR length(trim(p_qr_token))>128 THEN
     RAISE EXCEPTION 'QR token invalide' USING ERRCODE='22023';
   END IF;
-
-  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items)=0 THEN
+  IF p_items IS NULL OR jsonb_typeof(p_items)<>'array' OR jsonb_array_length(p_items)=0 THEN
     RAISE EXCEPTION 'Le panier est vide' USING ERRCODE='22023';
   END IF;
+  SELECT * INTO v_table FROM public.pos_tables
+  WHERE qr_token_hash=encode(digest(trim(p_qr_token),'sha256'),'hex') AND active=true LIMIT 1;
+  IF NOT FOUND THEN RAISE EXCEPTION 'QR token invalide ou table inactive' USING ERRCODE='42501'; END IF;
+  SELECT * INTO v_store FROM public.stores
+  WHERE id=v_table.store_id AND status='active' AND lower(coalesce(type,'')) IN ('bar','restaurant') LIMIT 1;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Boutique onsite invalide' USING ERRCODE='42501'; END IF;
 
-  SELECT * INTO v_table
-  FROM public.pos_tables
-  WHERE qr_token_hash = encode(digest(trim(p_qr_token), 'sha256'), 'hex')
-    AND active = true
-  LIMIT 1;
+  INSERT INTO public.orders(user_id,store_id,total_amount,status,payment_status,customer_name,customer_phone,shipping_address,delivery_fee,tax_amount,payment_method,notes,table_id,order_source)
+  VALUES(NULL,v_store.id,0,'pending','pending',v_name,v_phone,NULL,0,0,p_payment_method,v_notes,v_table.id,'onsite')
+  RETURNING id INTO v_order_id;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'QR token invalide ou table inactive' USING ERRCODE='42501';
-  END IF;
-
-  SELECT * INTO v_store
-  FROM public.stores
-  WHERE id = v_table.store_id
-    AND status = 'active'
-    AND lower(coalesce(type,'')) IN ('bar','restaurant')
-  LIMIT 1;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Boutique onsite invalide' USING ERRCODE='42501';
-  END IF;
-
-  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items)
-  LOOP
+  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items) LOOP
     BEGIN
       v_product_id := (v_item->>'product_id')::uuid;
       v_qty := (v_item->>'quantity')::integer;
-    EXCEPTION WHEN others THEN
-      RAISE EXCEPTION 'Article invalide' USING ERRCODE='22023';
-    END;
-
-    IF v_qty IS NULL OR v_qty < 1 OR v_qty > 999 THEN
-      RAISE EXCEPTION 'Quantité invalide' USING ERRCODE='22023';
-    END IF;
-
-    SELECT p.price, p.stock_quantity
-      INTO v_unit_price, v_stock
-    FROM public.products p
-    WHERE p.id = v_product_id
-      AND p.store_id = v_store.id
-      AND coalesce(p.is_active,true) = true
-    FOR UPDATE;
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Produit invalide ou absent de la boutique' USING ERRCODE='22023';
-    END IF;
-
-    IF coalesce(v_stock,0) < v_qty THEN
-      RAISE EXCEPTION 'Stock insuffisant' USING ERRCODE='23514';
-    END IF;
-
-    INSERT INTO public.order_items(order_id, product_id, quantity, price)
-    VALUES(v_order_id, v_product_id, v_qty, v_unit_price);
-
-    v_subtotal := v_subtotal + (v_unit_price * v_qty);
+    EXCEPTION WHEN others THEN RAISE EXCEPTION 'Article invalide' USING ERRCODE='22023'; END;
+    IF v_qty IS NULL OR v_qty<1 OR v_qty>999 THEN RAISE EXCEPTION 'Quantité invalide' USING ERRCODE='22023'; END IF;
+    SELECT p.price,p.stock_quantity INTO v_unit_price,v_stock FROM public.products p
+    WHERE p.id=v_product_id AND p.store_id=v_store.id AND coalesce(p.is_active,true)=true FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Produit indisponible' USING ERRCODE='22023'; END IF;
+    IF coalesce(v_stock,0)<v_qty THEN RAISE EXCEPTION 'Stock insuffisant' USING ERRCODE='23514'; END IF;
+    INSERT INTO public.order_items(order_id,product_id,quantity,price) VALUES(v_order_id,v_product_id,v_qty,v_unit_price);
+    UPDATE public.products SET stock_quantity=stock_quantity-v_qty,updated_at=now() WHERE id=v_product_id;
+    v_total := v_total + (v_unit_price*v_qty);
   END LOOP;
-
-  INSERT INTO public.orders (
-    user_id, store_id, total_amount, status, payment_status,
-    customer_name, customer_phone, shipping_address,
-    delivery_fee, tax_amount, payment_method, notes,
-    table_id, order_source
-  ) VALUES (
-    NULL, v_store.id, v_subtotal, 'pending', 'pending',
-    v_name, v_phone, NULL, 0, 0, p_payment_method, v_notes,
-    v_table.id, 'onsite'
-  ) RETURNING id INTO v_order_id;
-
-  FOR v_item IN SELECT value FROM jsonb_array_elements(p_items)
-  LOOP
-    v_product_id := (v_item->>'product_id')::uuid;
-    v_qty := (v_item->>'quantity')::integer;
-
-    SELECT p.price INTO v_unit_price
-    FROM public.products p
-    WHERE p.id = v_product_id
-      AND p.store_id = v_store.id
-    FOR UPDATE;
-
-    INSERT INTO public.order_items(order_id, product_id, quantity, price)
-    VALUES(v_order_id, v_product_id, v_qty, v_unit_price);
-
-    UPDATE public.products
-    SET stock_quantity = stock_quantity - v_qty,
-        updated_at = now()
-    WHERE id = v_product_id;
-  END LOOP;
-
-  RETURN jsonb_build_object(
-    'success',true,
-    'order_id',v_order_id,
-    'store_id',v_store.id,
-    'table_id',v_table.id,
-    'table_number',v_table.table_number,
-    'subtotal',v_subtotal,
-    'total',v_subtotal,
-    'order_source','onsite'
-  );
+  UPDATE public.orders SET total_amount=v_total WHERE id=v_order_id;
+  RETURN jsonb_build_object('success',true,'order_id',v_order_id,'store_id',v_store.id,'table_id',v_table.id,'table_number',v_table.table_number,'total',v_total,'order_source','onsite');
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.create_onsite_order_atomic(text,jsonb,text,jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.create_onsite_order_atomic(text,jsonb,text,jsonb) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_onsite_order_atomic(text,jsonb,text,jsonb) TO anon,authenticated;
