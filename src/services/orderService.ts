@@ -81,22 +81,38 @@ async function restoreOrderStock(order: Order): Promise<void> {
 
 export const orderService = {
   /**
-   * Crée une nouvelle commande avec retry logic
+   * Commande POS (Caisse / Vendeur).
+   * Appelle create_pos_order_atomic côté Supabase.
    */
-  async create(order: Partial<OrderPayload>): Promise<Order> {
+  async createPosOrder(params: {
+    store_id: string;
+    customer_name?: string | null;
+    customer_phone?: string | null;
+    payment_method: string;
+    notes?: string | null;
+    items: Array<{ product_id: string; quantity: number }>;
+  }): Promise<{ order_id: string; total: number; success: boolean }> {
     const client = useSupabase();
-    return withRetry(
-      async () => {
-        const { data, error } = await client
-          .from('orders')
-          .insert(order)
-          .select('*')
-          .single();
-        if (error) throw error;
-        return data as Order;
+    const { data, error } = await client.rpc('create_pos_order_atomic', {
+      p_order_payload: {
+        order_source: 'pos',
+        store_id: params.store_id,
+        customer_name: params.customer_name ?? null,
+        customer_phone: params.customer_phone ?? null,
+        payment_method: params.payment_method,
+        notes: params.notes ?? null,
       },
-      { maxRetries: 2, backoffMs: 500 }
-    );
+      p_items_payload: params.items.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+      })),
+    });
+
+    if (error) throw orderService._translateRpcError(error);
+    if (!data?.success || !data?.order_id) {
+      throw new Error('Commande POS non confirmée par le serveur.');
+    }
+    return data as { order_id: string; total: number; success: boolean };
   },
 
   /**

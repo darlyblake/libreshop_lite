@@ -363,15 +363,17 @@ class OfflineSyncManager {
         const remainingOrders: PendingOfflineOrder[] = [];
         for (const item of pendingOrders) {
           try {
-            const realOrder = await orderService.create(item.orderPayload);
-            const formattedItems = item.itemsPayload.map((it) => ({
-              order_id: realOrder.id,
-              product_id: it.product_id,
-              quantity: it.quantity,
-              price: it.price,
-              cost_price: it.cost_price,
-            }));
-            await orderService.createItems(formattedItems);
+            const realOrder = await orderService.createPosOrder({
+              store_id: item.orderPayload.store_id || item.storeId,
+              customer_name: item.orderPayload.customer_name,
+              customer_phone: item.orderPayload.customer_phone,
+              payment_method: item.orderPayload.payment_method || 'cash_on_delivery',
+              notes: item.orderPayload.notes,
+              items: item.itemsPayload.map((it) => ({
+                product_id: it.product_id,
+                quantity: it.quantity,
+              })),
+            });
 
             for (const it of item.itemsPayload) {
               try {
@@ -388,7 +390,7 @@ class OfflineSyncManager {
               }
             }
 
-            await orderService.processPayment(realOrder.id);
+            await orderService.processPayment(realOrder.order_id);
             syncedOrders++;
           } catch (err) {
             console.error(`Erreur sync commande ${item.id}:`, err);

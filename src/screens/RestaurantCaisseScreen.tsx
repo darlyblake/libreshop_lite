@@ -303,16 +303,18 @@ export const RestaurantCaisseScreen = () => {
         const offline = await offlineSyncManager.queueOfflineOrder(storeId, orderPayload, itemsPayload);
         orderId = offline.id;
       } else {
-        const order = await orderService.create(orderPayload);
-        orderId = order.id;
-        const formattedItems = itemsPayload.map(i => ({
-          order_id: orderId,
-          product_id: i.product_id,
-          quantity: i.quantity,
-          price: i.price,
-          cost_price: i.cost_price,
-        }));
-        await orderService.createItems(formattedItems);
+        const order = await orderService.createPosOrder({
+          store_id: storeId,
+          customer_name: customerName.trim() || undefined,
+          customer_phone: customerPhone.trim() || undefined,
+          payment_method: method === 'cash' ? 'cash_on_delivery' : method === 'card' ? 'card' : 'mobile_money',
+          notes: `Vente caisse Restaurant - Table ${selectedTable.number} - ${method}`,
+          items: cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity
+          }))
+        });
+        orderId = order.order_id;
 
         // Mouvement de stock
         for (const item of cart) {

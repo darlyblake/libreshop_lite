@@ -243,63 +243,30 @@ export const PaymentScreen: React.FC = () => {
         }
       } else {
         // existing flow: create order then process
-        const baseOrderPayload = {
-          user_id: userId,
-          store_id: String(storeId),
-          total_amount: Number(amount),
-          status: 'pending' as const,
-          payment_method:
-            (selectedMethod === 'cash'
-              ? 'cash_on_delivery'
-              : selectedMethod === 'card'
-                ? 'card'
-                : 'mobile_money') as any,
-          payment_status: 'paid' as const,
-          shipping_address: customer?.address,
-          customer_phone: phoneNumber,
-          notes: customer?.notes,
-        };
-
         let created: any;
-        try {
-          created = await orderService.create({
-            ...baseOrderPayload,
-            customer_name: customer?.name,
-          });
-        } catch (e: any) {
-          const msg = typeof e?.message === 'string' ? e.message : '';
-          const isSchemaCacheIssue =
-            msg.toLowerCase().includes('schema') &&
-            msg.toLowerCase().includes('cache') &&
-            msg.toLowerCase().includes('customer_name');
-          const isMissingColumnIssue =
-            msg.toLowerCase().includes('column') &&
-            msg.toLowerCase().includes('customer_name');
+        const paymentMethodString = selectedMethod === 'cash'
+          ? 'cash_on_delivery'
+          : selectedMethod === 'card'
+            ? 'card'
+            : 'mobile_money';
 
-          if (isSchemaCacheIssue || isMissingColumnIssue) {
-            created = await orderService.create(baseOrderPayload);
-          } else {
-            throw e;
-          }
-        }
-
-        // Insert order items (best effort). If the table differs, we still continue to confirmation.
-        try {
-          const rows = items.map((it: { product: Product; quantity: number }) => ({
-            order_id: created.id,
+        created = await orderService.createOnlineOrder({
+          store_id: String(storeId),
+          customer_name: customer?.name || user?.full_name || 'Client',
+          customer_phone: phoneNumber,
+          shipping_address: customer?.address,
+          payment_method: paymentMethodString,
+          notes: customer?.notes,
+          items: items.map((it: { product: Product; quantity: number }) => ({
             product_id: it.product.id,
             quantity: it.quantity,
-            price: it.product.price,
-          }));
-          await orderService.createItems(rows);
-        } catch (e: any) {
-          errorHandler.handle(e, 'order_items insert skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-        }
+          })),
+        });
 
         // Decrement stock + notify seller (best effort)
         try {
-          if (created?.id) {
-            await orderService.processPayment(created.id);
+          if (created?.order_id) {
+            await orderService.processPayment(created.order_id);
           }
         } catch (e: any) {
           errorHandler.handle(e, 'process_order_after_payment skipped', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
@@ -320,16 +287,19 @@ export const PaymentScreen: React.FC = () => {
                 body: `Vous avez reçu une nouvelle commande de ${customer?.name || 'un client'} pour un montant de ${(amount / 1000).toFixed(0)} KCFA.`,
                 type: 'order',
                 data: {
-                  orderId: created?.id,
+                  orderId: created?.order_id,
                   storeId: storeId,
                 }
               });
             }
           }
         } catch (e: any) {
-          errorHandler.handle(e instanceof Error ? e : new Error(String(e)), 'notification creation failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
+          console.warn('client side notification creation failed', e);
         }
 
+        setCreatedOrderId(created.order_id);
+        setOrderSuccessModalVisible(true);
+        
         clearCart();
 
         // block further submissions immediately

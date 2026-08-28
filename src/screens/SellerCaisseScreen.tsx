@@ -633,17 +633,18 @@ export const SellerCaisseScreen = () => {
         }
       } else {
         // MODE EN LIGNE : Envoi Supabase direct
-        const order = await orderService.create(orderPayload);
-        orderId = order.id;
-
-        const formattedItems = itemsPayload.map(i => ({
-          order_id: orderId,
-          product_id: i.product_id,
-          quantity: i.quantity,
-          price: i.price,
-          cost_price: i.cost_price,
-        }));
-        await orderService.createItems(formattedItems);
+        const order = await orderService.createPosOrder({
+          store_id: storeId,
+          customer_name: customerName.trim() || undefined,
+          customer_phone: customerPhone.trim() || undefined,
+          payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod === 'card' ? 'card' : 'mobile_money',
+          notes: `Vente caisse - ${paymentMethod}`,
+          items: cart.map(item => ({
+            product_id: item.id,
+            quantity: item.quantity
+          }))
+        });
+        orderId = order.order_id;
 
         const client = useSupabase();
         for (const item of cart) {
