@@ -462,24 +462,28 @@ onPress={() => {
             
             // Check if it's a libreshop link
             if (url.hostname.includes('libreshop') || url.hostname === 'localhost') {
-              const path = url.pathname; // e.g. /store/bar-test/live
-              
-              if (path.includes('/live')) {
-                // Table QR code: /store/:slug/live?table=...
-                const slugMatch = path.match(/\/store\/([^\/]+)\/live/);
-                const table = url.searchParams.get('table');
-                if (slugMatch) {
-                  const slug = slugMatch[1];
-                  // If we need the storeId, we might need to fetch it first, but BarLive can handle slug only if modified, 
-                  // or we can redirect to web route if on web:
-                  if (Platform.OS === 'web') {
-                    window.location.href = data;
-                  } else {
-                    // Mobile navigation
-                    navigation.navigate('BarLive', { slug, table });
-                  }
+              const path = url.pathname;
+
+              // ✅ Nouveau parcours QR : /onsite/<token opaque>
+              if (path.startsWith('/onsite/')) {
+                const token = path.split('/onsite/')[1];
+                if (token) {
+                  navigation.navigate('OnsiteMenu', { token });
                   return;
                 }
+              }
+
+              // ⚠️ Parcours legacy /store/:slug/live?table=... (anciens QR imprimés)
+              // Redirige vers OnsiteMenu uniquement si un token est présent dans l'URL, sinon rejette.
+              if (path.includes('/live')) {
+                const onsiteToken = url.searchParams.get('token');
+                if (onsiteToken) {
+                  navigation.navigate('OnsiteMenu', { token: onsiteToken });
+                  return;
+                }
+                // ❌ Ancien format ?table=X sans token → refusé
+                Alert.alert('QR périmé', 'Ce QR code est ancien. Demandez au responsable de générer un nouveau QR sécurisé.');
+                return;
               }
             }
             

@@ -28,6 +28,7 @@ class TableService {
         number: t.table_number,
         capacity: t.capacity,
         status: t.status || 'free',
+        qr_token: t.qr_token ?? '',
       })) as PosTable[];
 
       // Mettre en cache
@@ -73,6 +74,7 @@ class TableService {
       number: data.table_number,
       capacity: data.capacity,
       status: data.status || 'free',
+      qr_token: data.qr_token ?? '',
     };
   }
 

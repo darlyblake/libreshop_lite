@@ -32,6 +32,8 @@ export type PosTable = {
   number: number | string;
   capacity: number;
   status: TableStatus;
+  /** Token opaque pour le QR onsite */
+  qr_token: string;
   /** Nombre de personnes actuellement à la table */
   guestCount?: number;
   /** Montant en cours sur cette table */
@@ -351,7 +353,7 @@ export const PosTableManager = ({
               {qrTable && storeSlug ? (
                 <>
                   <Image
-                    source={{ uri: qrCodeService.getQrImageUrl(qrCodeService.getTableLiveUrl(storeSlug, qrTable.number), 280) }}
+                    source={{ uri: qrCodeService.getQrImageUrl(qrCodeService.getOnsiteUrl(qrTable.qr_token), 280) }}
                     style={{ width: 220, height: 220 }}
                     resizeMode="contain"
                   />
@@ -378,7 +380,7 @@ export const PosTableManager = ({
                     setIsPrinting(true);
                     try {
                       const qrUrl = qrCodeService.getQrImageUrl(
-                        qrCodeService.getTableLiveUrl(storeSlug, qrTable.number), 280
+                        qrCodeService.getOnsiteUrl(qrTable.qr_token), 280
                       );
                       const html = generateTableQrHtml({
                         tableNumber: qrTable.number,

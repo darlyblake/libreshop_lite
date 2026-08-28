@@ -1271,62 +1271,37 @@ export const orderService = {
       const shipping = items[0]?.delivery_fee || 0;
       const total = subtotal + tax + shipping;
 
-      const orderPayload: OrderPayload = {
-        user_id: userId,
-        store_id: storeIdForOrder,
-        total_amount: total,
-        status: 'pending',
-        payment_method: 'cash_on_delivery',
-        payment_status: 'pending',
-        shipping_address: userMetadata?.address || null,
-        customer_phone: userMetadata?.phone || null,
-        customer_name: userMetadata?.full_name || 'Client',
-        delivery_fee: shipping,
-        tax_amount: tax,
-      };
-
-      const itemsPayload: OrderItemPayload[] = items.map((item: any) => ({
+      const itemsForRpc = items.map((item: any) => ({
         product_id: item.product.id,
         quantity: item.quantity,
-        price: item.product.price,
       }));
 
-      let created: Order | null = null;
+      let created: any = null;
 
       try {
-        // Essayer RPC atomique
-        created = await rpcUtils.executeWithFallback(
-          'create_order_atomic',
-          {
-            p_order_payload: orderPayload,
-            p_items_payload: itemsPayload,
-          },
-          async () => {
-            // Fallback: créer manuellement
-            const order = await this.create(orderPayload);
-            const orderItems = await this.createItems(
-              itemsPayload.map(item => ({
-                ...item,
-                order_id: order.id,
-              }))
-            );
-            return order;
-          },
-          { rpcName: 'create_order_atomic' }
-        );
+        if (!storeIdForOrder) throw new Error('store_id required for online order');
+        created = await this.createOnlineOrder({
+          store_id: storeIdForOrder,
+          customer_name: userMetadata?.full_name || 'Client',
+          customer_phone: userMetadata?.phone || null,
+          shipping_address: userMetadata?.address || null,
+          payment_method: 'cash_on_delivery',
+          items: itemsForRpc,
+        });
       } catch (e: any) {
         console.error('Failed to create order', e);
         continue;
       }
 
-      if (created?.id) {
-        createdOrders.push(created);
+      if (created?.order_id) {
+        const orderRes = { id: created.order_id, ...created } as any;
+        createdOrders.push(orderRes);
 
         // Queue notifications (asynchrone)
-        this.sendSellerNotification(created, 'new').catch(() => {
+        this.sendSellerNotification(orderRes, 'new').catch(() => {
           /* ignore */
         });
-        this.sendCustomerNotification(created, 'pending').catch(() => {
+        this.sendCustomerNotification(orderRes, 'pending').catch(() => {
           /* ignore */
         });
       }
