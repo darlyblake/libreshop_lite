@@ -121,36 +121,39 @@ class NotificationService {
   // NOTIFICATIONS VENDEUR
   // ==========================================
 
-  async notifyNewOrder(sellerId: string, orderId: string, amount: string) {
+  async notifyNewOrder(sellerId: string, orderId: string, amount: string, storeId: string) {
     await this.create({
       user_id: sellerId,
       title: "💸 Nouvelle commande !",
       body: `Vous avez reçu une nouvelle commande (ID: ${orderId}) d'un montant de ${amount}. Préparez-la vite !`,
-      data: { screen: 'SellerOrders' },
+      data: { screen: 'SellerOrders', orderId },
       type: 'order',
-      targetRole: 'seller'
+      targetRole: 'seller',
+      store_id: storeId,
     });
   }
 
-  async notifyLowStock(sellerId: string, productName: string) {
+  async notifyLowStock(sellerId: string, productName: string, storeId: string) {
     await this.create({
       user_id: sellerId,
       title: "⚠️ Rupture de stock imminente",
       body: `Le produit "${productName}" est presque épuisé. Pensez à réapprovisionner !`,
       data: { screen: 'SellerProducts' },
-      type: 'alert',
-      targetRole: 'seller'
+      type: 'system',
+      targetRole: 'seller',
+      store_id: storeId,
     });
   }
 
-  async notifyNewInteraction(sellerId: string, type: 'like' | 'comment', productName: string) {
+  async notifyNewInteraction(sellerId: string, type: 'like' | 'comment', productName: string, storeId: string) {
     const actionText = type === 'like' ? 'a aimé' : 'a commenté';
     await this.create({
       user_id: sellerId,
       title: "Nouvelle interaction ❤️",
       body: `Quelqu'un ${actionText} votre produit "${productName}".`,
-      type: 'interaction',
-      targetRole: 'seller'
+      type: 'system',
+      targetRole: 'seller',
+      store_id: storeId,
     });
   }
 

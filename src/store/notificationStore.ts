@@ -43,6 +43,16 @@ export const isSellerNotification = (n: Notification) => {
   return !isClientNotification(n);
 };
 
+/** Count unread seller notifications scoped to the currently active store.
+ *  If activeStoreId is null, counts ALL unread seller notifications. */
+const countSellerUnread = (notifs: Notification[], activeStoreId: string | null) =>
+  notifs.filter(
+    n =>
+      !n.read &&
+      isSellerNotification(n) &&
+      (!activeStoreId || n.store_id === activeStoreId),
+  ).length;
+
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
@@ -93,28 +103,33 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       console.error('Failed to load notifications in store', e);
     }
   },
-  addNotification: (notification) => 
+  addNotification: (notification) =>
     set((state) => {
       const isClient = isClientNotification(notification);
       const isSeller = isSellerNotification(notification);
-      return { 
+      // For seller badge: only count if it belongs to the active store (or no store filter)
+      const countsSeller =
+        isSeller &&
+        !notification.read &&
+        (!state.activeStoreId || notification.store_id === state.activeStoreId);
+      return {
         notifications: [notification, ...state.notifications],
         unreadCount: state.unreadCount + (notification.read ? 0 : 1),
         clientUnreadCount: state.clientUnreadCount + (notification.read || !isClient ? 0 : 1),
-        sellerUnreadCount: state.sellerUnreadCount + (notification.read || !isSeller ? 0 : 1),
+        sellerUnreadCount: state.sellerUnreadCount + (countsSeller ? 1 : 0),
       };
     }),
-  markAsRead: (id) => 
+  markAsRead: (id) =>
     set((state) => {
-      const nextNotifs = state.notifications.map(n => n.id === id ? { ...n, read: true } : n);
+      const nextNotifs = state.notifications.map(n => (n.id === id ? { ...n, read: true } : n));
       return {
         notifications: nextNotifs,
         unreadCount: nextNotifs.filter(n => !n.read).length,
         clientUnreadCount: nextNotifs.filter(n => !n.read && isClientNotification(n)).length,
-        sellerUnreadCount: nextNotifs.filter(n => !n.read && isSellerNotification(n)).length,
+        sellerUnreadCount: countSellerUnread(nextNotifs, state.activeStoreId),
       };
     }),
-  markAllAsRead: (context) => 
+  markAllAsRead: (context) =>
     set((state) => {
       const nextNotifs = state.notifications.map(n => {
         if (!context) return { ...n, read: true };
@@ -126,34 +141,35 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: nextNotifs,
         unreadCount: nextNotifs.filter(n => !n.read).length,
         clientUnreadCount: nextNotifs.filter(n => !n.read && isClientNotification(n)).length,
-        sellerUnreadCount: nextNotifs.filter(n => !n.read && isSellerNotification(n)).length,
+        sellerUnreadCount: countSellerUnread(nextNotifs, state.activeStoreId),
       };
     }),
   clearRead: () =>
     set((state) => {
-      const next = state.notifications.filter((n) => !n.read);
+      const next = state.notifications.filter(n => !n.read);
       return {
         notifications: next,
         unreadCount: next.length,
         clientUnreadCount: next.filter(n => isClientNotification(n)).length,
-        sellerUnreadCount: next.filter(n => isSellerNotification(n)).length,
+        sellerUnreadCount: countSellerUnread(next, state.activeStoreId),
       };
     }),
-  clearAll: (context) => set((state) => {
-    let nextNotifs: Notification[] = [];
-    if (!context) {
-      nextNotifs = [];
-    } else if (context === 'client') {
-      nextNotifs = state.notifications.filter(n => !isClientNotification(n));
-    } else if (context === 'seller') {
-      nextNotifs = state.notifications.filter(n => !isSellerNotification(n));
-    }
-    return { 
-      notifications: nextNotifs, 
-      unreadCount: nextNotifs.filter(n => !n.read).length,
-      clientUnreadCount: nextNotifs.filter(n => !n.read && isClientNotification(n)).length,
-      sellerUnreadCount: nextNotifs.filter(n => !n.read && isSellerNotification(n)).length,
-    };
-  }),
+  clearAll: (context) =>
+    set((state) => {
+      let nextNotifs: Notification[];
+      if (!context) {
+        nextNotifs = [];
+      } else if (context === 'client') {
+        nextNotifs = state.notifications.filter(n => !isClientNotification(n));
+      } else {
+        nextNotifs = state.notifications.filter(n => !isSellerNotification(n));
+      }
+      return {
+        notifications: nextNotifs,
+        unreadCount: nextNotifs.filter(n => !n.read).length,
+        clientUnreadCount: nextNotifs.filter(n => !n.read && isClientNotification(n)).length,
+        sellerUnreadCount: countSellerUnread(nextNotifs, state.activeStoreId),
+      };
+    }),
 }));
 
