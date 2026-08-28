@@ -13,7 +13,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ActivityIndicator,
+  View, Text, StyleSheet, SafeAreaView, ActivityIndicator,
   TouchableOpacity, ScrollView, TextInput, Alert, Modal,
   Image, FlatList, StatusBar,
 } from 'react-native';
@@ -180,9 +180,13 @@ function CartSheet({ context, cart, products, visible, onClose, onOrderSuccess }
     try {
       if (!supabase) throw new Error('Connexion impossible.');
 
-      // ⚠️ Prix non envoyés — le backend les recalcule depuis products.price
+      // ⚠️ Contrat backend : create_order_atomic
+      // - user_id     : NON envoyé → backend le met à NULL pour onsite
+      // - prix/total  : NON envoyés → backend recalcule depuis products.price
+      // - store_id    : NON envoyé → backend le résout depuis qr_token
+      // - status/payment_status : NON envoyés → backend les fixe
       const { data, error } = await supabase.rpc('create_order_atomic', {
-        p_store_id: context.storeId,
+        p_order_source: 'onsite',
         p_qr_token: context.token,
         p_customer_name: name.trim(),
         p_customer_phone: phone.trim() || null,
@@ -191,8 +195,8 @@ function CartSheet({ context, cart, products, visible, onClose, onOrderSuccess }
         p_items: cartItems.map(i => ({
           product_id: i.product.id,
           quantity: i.quantity,
+          // price: NON envoyé — backend le lit depuis products.price
         })),
-        // user_id non envoyé → NULL côté backend
       });
 
       if (error) throw error;

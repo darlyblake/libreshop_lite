@@ -332,40 +332,40 @@ export const BarLiveScreen: React.FC = () => {
 
     setCheckoutLoading(true);
     try {
-      // En mode QR sur place, l'utilisateur n'a pas besoin d'être connecté.
-      // Le backend détermine l'identité : auth.uid() si connecté, NULL sinon.
-      // Ne jamais appeler signInAnonymously().
-      const activeUserId = user?.id || null;
+      // Parcours onsite (bar/restaurant sur place).
+      // Contrat : create_order_atomic (⏳ nouvelle RPC — en attente d'installation backend)
+      // Pour l'instant on utilise orderService.create() en mode dégradé connecté.
+      //
+      // ⚠️ Champs intentionnellement OMIS — le backend les calculera :
+      //   - user_id        → auth.uid() côté serveur (ou NULL si anonyme)
+      //   - total_amount   → recalculé depuis products.price
+      //   - price par item → recalculé depuis products.price
+      //   - status         → forcé à 'pending' par backend
+      //   - payment_status → forcé à 'pending' par backend
+      //   - delivery_fee   → 0 pour onsite
+      //   - tax_amount     → calculé backend
 
-      // Create the order — total_amount est indicatif, le backend recalcule à partir des prix produits
-      const order = await orderService.create({
-        user_id: activeUserId,
-        store_id: storeId,
-        total_amount: cartTotal, // affiché côté UX, recalculé côté backend
-        status: 'pending',
-        payment_method: 'cash_on_delivery',
-        payment_status: 'pending',
-        shipping_address: tableNumber ? `Table ${tableNumber}` : 'Comptoir',
-        customer_phone: user?.phone || '',
-        customer_name: user?.full_name || guestName.trim(),
-        delivery_fee: 0,
-        tax_amount: 0,
+      if (!supabase) throw new Error('Connexion impossible.');
+
+      const { data: order, error: orderErr } = await supabase.rpc('create_order_atomic', {
+        p_order_source: 'onsite',
+        p_store_id: storeId,
+        p_customer_name: user?.full_name || guestName.trim(),
+        p_customer_phone: user?.phone || '',
+        p_payment_method: 'cash_on_delivery',
+        p_notes: tableNumber ? `Table ${tableNumber}` : null,
+        p_items: Object.entries(cart).map(([product_id, quantity]) => ({
+          product_id,
+          quantity,
+          // price: NON envoyé — backend le lit depuis products.price
+        })),
+        // qr_token: non disponible sur ce parcours legacy
+        // user_id: NON envoyé → backend utilise auth.uid()
       });
 
-      // Create the order items
-      const orderItems = Object.entries(cart).map(([productId, qty]) => {
-        const p = products.find(prod => prod.id === productId);
-        return {
-          order_id: order.id,
-          product_id: productId,
-          quantity: qty,
-          price: p?.price || 0,
-        };
-      });
+      if (orderErr) throw orderErr;
 
-      await orderService.createItems(orderItems as any); // using as any since order_id isn't in OrderItemPayload but works via RPC
-
-      // Send push notification to seller (works even if seller is not in app)
+      // Notification vendeur best-effort
       try {
         await orderService.sendSellerNotification(order as any, 'new');
       } catch (e) {

@@ -516,14 +516,37 @@ export const CheckoutScreen: React.FC = () => {
         useAuthStore.getState().setUser(updateResult as any);
       }
 
+      // ⚠️ Contrat futur : create_order_atomic (⏳ nouvelle RPC — en attente installation backend)
+      // Quand la RPC sera disponible, remplacer par :
+      // supabase.rpc('create_order_atomic', {
+      //   p_order_source: 'online',
+      //   p_store_id: activeStoreId,
+      //   p_customer_name: formData.name,
+      //   p_customer_phone: formData.phone,
+      //   p_shipping_address: formData.address,
+      //   p_city: formData.city,
+      //   p_latitude: userLocation?.latitude,
+      //   p_longitude: userLocation?.longitude,
+      //   p_payment_method: ...,
+      //   p_notes: formData.notes,
+      //   p_coupon_code: couponApplied ? couponCode : null,
+      //   p_items: items.map(it => ({ product_id: it.product.id, quantity: it.quantity })),
+      //   // user_id, total_amount, tax, delivery_fee, status, payment_status, price → NON envoyés
+      // })
+      //
+      // En attendant : mode dégradé via orderService.create() (ancienne API directe)
       const payload = {
+        // À retirer quand backend prend le relais via auth.uid() :
         user_id: userId,
+        order_source: 'online',
         store_id: String(activeStoreId),
+        // À retirer quand backend recalcule :
         total_amount: Number(total),
         tax_amount: Number(taxAmount),
         delivery_fee: Number(deliveryFeeCalculated),
         discount_amount: Number(discountAmount),
         coupon_code: couponApplied ? couponCode : null,
+        // À retirer quand backend force ces valeurs :
         status: 'pending',
         payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod,
         payment_status: 'pending',
@@ -538,12 +561,13 @@ export const CheckoutScreen: React.FC = () => {
 
       const created = await orderService.create(payload);
 
-      // insert items
+      // Insertion des items — price/cost_price à retirer quand la nouvelle RPC est en ligne
       try {
         const rows = (paramItems ?? items).map((it: any) => ({
           order_id: created.id,
           product_id: it.product.id,
           quantity: it.quantity,
+          // price sera recalculé backend — laissé temporairement pour compatibilité
           price: it.product.price,
           cost_price: it.product.cost_price,
         }));
