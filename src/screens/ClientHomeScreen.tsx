@@ -145,10 +145,7 @@ export const ClientHomeScreen: React.FC = () => {
 
   const [isReady, setIsReady] = useState(false);
   const [topStores, setTopStores] = useState<any[]>([]);
-  const [allPopularStores, setAllPopularStores] = useState<any[]>([]);
-  const [storesPage, setStoresPage] = useState(0);
   const [loadingStores, setLoadingStores] = useState(true);
-  const [loadingMoreStores, setLoadingMoreStores] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [navigatingState, setNavigatingState] = useState<string | null>(null);
   
@@ -164,55 +161,29 @@ export const ClientHomeScreen: React.FC = () => {
   
   const clientUnreadCount = useNotificationStore((state) => state.clientUnreadCount);
 
-  const [hasMoreStores, setHasMoreStores] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [switchingToSeller, setSwitchingToSeller] = useState(false);
 
-  const fetchStores = async (pageToLoad: number, isRefresh = false) => {
+  const fetchStores = async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
-      else if (pageToLoad === 0) setLoadingStores(true);
-      else setLoadingMoreStores(true);
+      else setLoadingStores(true);
 
-      let sourceList = allPopularStores;
-      
-      // Load from server on first page or refresh
-      if (pageToLoad === 0 || isRefresh || sourceList.length === 0) {
-        const data = await storeService.getPopularStores(100);
-        sourceList = data || [];
-        setAllPopularStores(sourceList);
-      }
-
-      // Paginate locally by chunks of 20
-      const startIndex = pageToLoad * 20;
-      const pageData = sourceList.slice(startIndex, startIndex + 20);
-
-      if (pageToLoad === 0 || isRefresh) {
-        setTopStores(pageData);
-      } else {
-        setTopStores(prev => {
-          // Prevent duplicates just in case
-          const existingIds = new Set(prev.map(s => s.id));
-          const newItems = pageData.filter(s => !existingIds.has(s.id));
-          return [...prev, ...newItems];
-        });
-      }
-      
-      setHasMoreStores(startIndex + 20 < sourceList.length);
+      // The home page displays exactly the Top 20 stores.
+      const data = await storeService.getPopularStores(20);
+      setTopStores(data || []);
     } catch (e) {
       console.warn('Failed to load top stores', e);
     } finally {
       setLoadingStores(false);
-      setLoadingMoreStores(false);
       setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    // Diffère légèrement le rendu pour la fluidité (InteractionManager bug parfois sur Web)
     const timer = setTimeout(() => {
       setIsReady(true);
-      fetchStores(0);
+      fetchStores();
     }, 50);
     return () => clearTimeout(timer);
   }, []);
@@ -233,17 +204,8 @@ export const ClientHomeScreen: React.FC = () => {
   }, [contentWidth, numColumns, SPACING]);
 
   const handleRefresh = useCallback(() => {
-    setStoresPage(0);
-    fetchStores(0, true);
+    fetchStores(true);
   }, []);
-
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMoreStores && hasMoreStores) {
-      const nextPage = storesPage + 1;
-      setStoresPage(nextPage);
-      fetchStores(nextPage);
-    }
-  }, [loadingMoreStores, hasMoreStores, storesPage]);
 
   const handleSwitchToSeller = async () => {
     if (switchingToSeller) return;
@@ -257,10 +219,8 @@ export const ClientHomeScreen: React.FC = () => {
     try {
       const stores = await storeService.getStoresByUser(user.id);
       if (stores && stores.length > 0) {
-        // If they have a store, go to Hub
         navigation.navigate('SellerTabs');
       } else {
-        // Connected but no store: direct them to Auth / Add Store
         navigation.navigate('SellerAuth');
       }
     } catch (error) {
@@ -328,106 +288,34 @@ export const ClientHomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Hero Banner */}
-        <View style={{ height: 180, borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SPACING.xl, justifyContent: 'center', alignItems: 'center', backgroundColor: palette.card }}>
-          <OptimizedImage source={{ uri: 'https://picsum.photos/id/1015/800/400' }} style={{ position: 'absolute', width: '100%', height: '100%' }} />
-          <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: palette.accent, opacity: 0.7 }} />
-          <Text style={{ color: 'white', fontSize: FONT_SIZE.xxl, fontWeight: 'bold', textAlign: 'center', marginBottom: SPACING.xs }}>Tout le Gabon, au même endroit</Text>
-          <Text style={{ color: 'white', fontSize: FONT_SIZE.md, textAlign: 'center', opacity: 0.9 }}>Boutiques • Restaurants • Hôtels • Logements</Text>
-        </View>
-
-        {/* Categories Chips */}
-        <View style={{ marginBottom: SPACING.xl }}>
-          <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', color: palette.text, marginBottom: SPACING.md, textAlign: 'center' }}>Explorer</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={{ 
-              flexGrow: 1, 
-              justifyContent: width >= 768 ? 'center' : 'space-between', 
-              gap: width >= 768 ? 48 : SPACING.md, 
-              paddingHorizontal: SPACING.md 
-            }}
-          >
-            {CATEGORIES.map((cat, i) => (
-              <TouchableOpacity 
-                key={i} 
-                disabled={!!navigatingState}
-                style={{ alignItems: 'center', gap: 8 }}
-onPress={() => {
-                  if (cat.name === 'Boutiques') {
-                    handleNavigate('ClientAllStores', undefined, cat.name);
-                  } else if (cat.name === 'Produits') {
-                    handleNavigate('ClientAllProducts', undefined, cat.name);
-                  } else if (cat.name === 'Restaurants') {
-                    handleNavigate('ClientAllStores', { storeType: 'restaurant' }, cat.name);
-                  } else if (cat.name === 'Bars') {
-                    handleNavigate('ClientAllStores', { storeType: 'bar' }, cat.name);
-                  } else {
-                    Alert.alert('Bientôt disponible', `La catégorie ${cat.name} sera bientôt disponible !`);
-                  }
-                }}
-              >
-                <View style={{ width: 72, height: 72, backgroundColor: cat.bg, borderRadius: 20, justifyContent: 'center', alignItems: 'center' }}>
-                  {navigatingState === cat.name ? (
-                    <ActivityIndicator color={palette.text} />
-                  ) : (
-                    <Text style={{ fontSize: 32 }}>{cat.emoji}</Text>
-                  )}
-                </View>
-                <Text style={{ color: palette.text, fontWeight: '600', fontSize: FONT_SIZE.sm }}>{cat.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
-          <Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '700', color: palette.text }}>Top 20 Boutiques</Text>
-          <TouchableOpacity disabled={!!navigatingState} onPress={() => handleNavigate('ClientAllStores', undefined, 'voir_plus_boutiques')}>
-            {navigatingState === 'voir_plus_boutiques' ? (
-               <ActivityIndicator size="small" color={palette.accent} />
-            ) : (
-               <Text style={{ fontSize: FONT_SIZE.sm, fontWeight: '600', color: palette.accent }}>Voir plus</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Categories */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.lg }}>
+          {CATEGORIES.map((cat) => (
+            <TouchableOpacity key={cat.name} onPress={() => navigation.navigate('ClientSearch', { category: cat.name })} style={{ alignItems: 'center', marginRight: SPACING.md }}>
+              <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: cat.bg, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs }}>
+                <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
+              </View>
+              <Text style={{ fontSize: FONT_SIZE.xs, color: palette.text, fontWeight: '600' }}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
     );
-  }, [navigation, items.length, palette, SPACING, FONT_SIZE, RADIUS, navigatingState, handleNavigate, clientUnreadCount, user, switchingToSeller, handleSwitchToSeller]);
+  }, [SPACING, FONT_SIZE, palette, handleSwitchToSeller, switchingToSeller, user, clientUnreadCount, items.length, navigation]);
 
-  // Si l'écran vient de s'ouvrir ou que les données initiales chargent, on affiche un skeleton
-  if (!isReady || (loadingStores && topStores.length === 0)) {
+  if (!isReady || loadingStores) {
     return (
-      <ScrollView 
-        style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top }}
-        contentContainerStyle={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: 100, alignSelf: 'center', width: '100%' }}
-        showsVerticalScrollIndicator={false}
-      >
-        {renderHeader()}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
-          {Array.from({ length: numColumns * 2 }).map((_, i) => (
-            <View key={i} style={{ width: cardWidth, marginBottom: SPACING.md }}>
-              <StoreCardSkeleton />
-            </View>
-          ))}
-        </View>
-      </ScrollView>
+      <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md }}>
+        <StoreCardSkeleton />
+      </View>
     );
   }
 
   return (
-    <ScrollView 
-      style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top }}
-      contentContainerStyle={{ padding: SPACING.md, paddingBottom: 100, alignSelf: 'center', width: '100%' }}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={palette.accent} />}
-      onScroll={({ nativeEvent }) => {
-        // Load more when scrolling near bottom
-        const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-        if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 400) {
-          handleLoadMore();
-        }
-      }}
+    <ScrollView
+      style={{ flex: 1, backgroundColor: palette.bg }}
+      contentContainerStyle={{ paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + SPACING.xl }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       scrollEventThrottle={400}
     >
       {renderHeader()}
@@ -447,10 +335,6 @@ onPress={() => {
         ))}
       </View>
 
-      {loadingMoreStores && (
-        <ActivityIndicator size="large" color={palette.accent} style={{ marginVertical: SPACING.lg }} />
-      )}
-
       <BarcodeScannerModal
         visible={showScanner}
         onClose={() => setShowScanner(false)}
@@ -459,12 +343,8 @@ onPress={() => {
           setShowScanner(false);
           try {
             const url = new URL(data);
-            
-            // Check if it's a libreshop link
             if (url.hostname.includes('libreshop') || url.hostname === 'localhost') {
               const path = url.pathname;
-
-              // ✅ Nouveau parcours QR : /onsite/<token opaque>
               if (path.startsWith('/onsite/')) {
                 const token = path.split('/onsite/')[1];
                 if (token) {
@@ -472,33 +352,24 @@ onPress={() => {
                   return;
                 }
               }
-
-              // ⚠️ Parcours legacy /store/:slug/live?table=... (anciens QR imprimés)
-              // Redirige vers OnsiteMenu uniquement si un token est présent dans l'URL, sinon rejette.
               if (path.includes('/live')) {
                 const onsiteToken = url.searchParams.get('token');
                 if (onsiteToken) {
                   navigation.navigate('OnsiteMenu', { token: onsiteToken });
                   return;
                 }
-                // ❌ Ancien format ?table=X sans token → refusé
                 Alert.alert('QR périmé', 'Ce QR code est ancien. Demandez au responsable de générer un nouveau QR sécurisé.');
                 return;
               }
             }
-            
-            // Fallback for web
             if (Platform.OS === 'web') {
               window.location.href = data;
             } else {
               import('react-native').then(({ Linking }) => {
-                Linking.openURL(data).catch(() => {
-                  Alert.alert("Erreur", "Lien non supporté.");
-                });
+                Linking.openURL(data).catch(() => Alert.alert("Erreur", "Lien non supporté."));
               });
             }
           } catch (e) {
-            // Not a URL, do nothing or show error
             Alert.alert("Erreur", "Code invalide.");
           }
         }}
