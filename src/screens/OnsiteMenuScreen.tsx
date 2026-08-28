@@ -24,7 +24,7 @@ import { RootStackParamList } from '../navigation/types';
 import { useOnsiteTable } from '../features/onsite/hooks/useOnsiteTable';
 import { OnsiteTableContext } from '../features/onsite/types';
 import { productService } from '../services/productService';
-import { supabase } from '../lib/supabase';
+import { orderService } from '../services/orderService';
 import { Product } from '../types/product';
 
 type OnsiteMenuRouteProp = RouteProp<RootStackParamList, 'OnsiteMenu'>;
@@ -178,37 +178,29 @@ function CartSheet({ context, cart, products, visible, onClose, onOrderSuccess }
 
     setLoading(true);
     try {
-      if (!supabase) throw new Error('Connexion impossible.');
-
-      // ⚠️ Contrat backend : create_order_atomic
-      // - user_id     : NON envoyé → backend le met à NULL pour onsite
-      // - prix/total  : NON envoyés → backend recalcule depuis products.price
-      // - store_id    : NON envoyé → backend le résout depuis qr_token
-      // - status/payment_status : NON envoyés → backend les fixe
-      const { data, error } = await supabase.rpc('create_order_atomic', {
-        p_order_source: 'onsite',
-        p_qr_token: context.token,
-        p_customer_name: name.trim(),
-        p_customer_phone: phone.trim() || null,
-        p_payment_method: 'cash_on_delivery',
-        p_notes: notes.trim() || null,
-        p_items: cartItems.map(i => ({
+      const result = await orderService.createOnsiteOrder({
+        qr_token: context.token,
+        customer_name: name.trim(),
+        customer_phone: phone.trim() || null,
+        notes: notes.trim() || null,
+        payment_method: 'cash_on_delivery',
+        items: cartItems.map(i => ({
           product_id: i.product.id,
           quantity: i.quantity,
-          // price: NON envoyé — backend le lit depuis products.price
         })),
       });
 
-      if (error) throw error;
+      // Utiliser le total retourné par le serveur (pas celui du panier local)
+      const confirmedTotal = result.total?.toFixed(2) ?? total.toFixed(2);
 
       Alert.alert(
         '✅ Commande envoyée !',
-        `Votre commande à la table ${context.tableNumber} a bien été reçue.`,
+        `Votre commande à la table ${context.tableNumber} a bien été reçue.\nTotal : ${confirmedTotal} €`,
         [{ text: 'Super !', onPress: onOrderSuccess }]
       );
     } catch (err: any) {
-      console.error('[OnsiteCheckout] Error:', err);
-      Alert.alert('Erreur', err?.message || 'Impossible de passer la commande.');
+      // Erreurs déjà traduites par _translateRpcError — message utilisateur propre
+      Alert.alert('Commande impossible', err?.message || 'Une erreur est survenue. Veuillez réessayer.');
     } finally {
       setLoading(false);
     }

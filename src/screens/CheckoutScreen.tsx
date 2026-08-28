@@ -516,82 +516,39 @@ export const CheckoutScreen: React.FC = () => {
         useAuthStore.getState().setUser(updateResult as any);
       }
 
-      // ⚠️ Contrat futur : create_order_atomic (⏳ nouvelle RPC — en attente installation backend)
-      // Quand la RPC sera disponible, remplacer par :
-      // supabase.rpc('create_order_atomic', {
-      //   p_order_source: 'online',
-      //   p_store_id: activeStoreId,
-      //   p_customer_name: formData.name,
-      //   p_customer_phone: formData.phone,
-      //   p_shipping_address: formData.address,
-      //   p_city: formData.city,
-      //   p_latitude: userLocation?.latitude,
-      //   p_longitude: userLocation?.longitude,
-      //   p_payment_method: ...,
-      //   p_notes: formData.notes,
-      //   p_coupon_code: couponApplied ? couponCode : null,
-      //   p_items: items.map(it => ({ product_id: it.product.id, quantity: it.quantity })),
-      //   // user_id, total_amount, tax, delivery_fee, status, payment_status, price → NON envoyés
-      // })
-      //
-      // En attendant : mode dégradé via orderService.create() (ancienne API directe)
-      const payload = {
-        // À retirer quand backend prend le relais via auth.uid() :
-        user_id: userId,
-        order_source: 'online',
+      const created = await orderService.createOnlineOrder({
         store_id: String(activeStoreId),
-        // À retirer quand backend recalcule :
-        total_amount: Number(total),
-        tax_amount: Number(taxAmount),
-        delivery_fee: Number(deliveryFeeCalculated),
-        discount_amount: Number(discountAmount),
-        coupon_code: couponApplied ? couponCode : null,
-        // À retirer quand backend force ces valeurs :
-        status: 'pending',
-        payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod,
-        payment_status: 'pending',
+        customer_name: formData.name,
+        customer_phone: formData.phone,
         shipping_address: formData.address,
         city: formData.city,
         latitude: userLocation?.latitude,
         longitude: userLocation?.longitude,
-        customer_phone: formData.phone,
+        payment_method: paymentMethod === 'cash' ? 'cash_on_delivery' : paymentMethod,
         notes: formData.notes,
-        customer_name: formData.name,
-      } as any;
-
-      const created = await orderService.create(payload);
-
-      // Insertion des items — price/cost_price à retirer quand la nouvelle RPC est en ligne
-      try {
-        const rows = (paramItems ?? items).map((it: any) => ({
-          order_id: created.id,
+        coupon_code: couponApplied ? couponCode : null,
+        items: (paramItems ?? items).map((it: any) => ({
           product_id: it.product.id,
           quantity: it.quantity,
-          // price sera recalculé backend — laissé temporairement pour compatibilité
-          price: it.product.price,
-          cost_price: it.product.cost_price,
-        }));
-        await orderService.createItems(rows);
-        // Envoi best-effort d'une notification vendeur côté client
-        try {
-          await orderService.sendSellerNotification(created, 'new');
-        } catch (nErr) {
-          console.warn('sendSellerNotification failed', nErr);
-        }
-      } catch (e: any) {
-        // best-effort
-        console.warn('order_items insert failed', e);
+        })),
+      });
+
+      // Envoi best-effort d'une notification vendeur côté client
+      try {
+        await orderService.sendSellerNotification({ id: created.order_id } as any, 'new');
+      } catch (nErr) {
+        console.warn('sendSellerNotification failed', nErr);
       }
 
       // process order (decrement stock, notify) if online payment
       if (paymentMethod !== 'cash') {
-        try { await orderService.processPayment(created.id); } catch (e) { /* ignore */ }
+        try { await orderService.processPayment(created.order_id); } catch (e) { /* ignore */ }
       }
       // clear cart when success
       clearCart();
       setCompleted(true);
 
-      setCreatedOrderId(created.id);
+      setCreatedOrderId(created.order_id);
       setOrderSuccessModalVisible(true);
     } catch (e: any) {
       errorHandler.handle(e, 'place order failed', ErrorCategory.SYSTEM, ErrorSeverity.LOW);

@@ -330,44 +330,37 @@ export const BarLiveScreen: React.FC = () => {
       return;
     }
 
+    // ⚠️ Parcours legacy (accès direct par slug, sans QR token).
+    // Le nouveau parcours recommandé est : scanner le QR → /onsite/:token → OnsiteMenuScreen.
+    // Ce parcours legacy reste actif pour la rétrocompatibilité avec les QR de l'ancienne génération.
+    // Il utilise create_onsite_order_atomic avec le token de la table si disponible.
+    const onsiteToken = route.params?.token ?? null;
+    if (!onsiteToken) {
+      Alert.alert(
+        'QR requis',
+        'Veuillez scanner le QR code de votre table pour commander.',
+      );
+      return;
+    }
+
     setCheckoutLoading(true);
     try {
-      // Parcours onsite (bar/restaurant sur place).
-      // Contrat : create_order_atomic (⏳ nouvelle RPC — en attente d'installation backend)
-      // Pour l'instant on utilise orderService.create() en mode dégradé connecté.
-      //
-      // ⚠️ Champs intentionnellement OMIS — le backend les calculera :
-      //   - user_id        → auth.uid() côté serveur (ou NULL si anonyme)
-      //   - total_amount   → recalculé depuis products.price
-      //   - price par item → recalculé depuis products.price
-      //   - status         → forcé à 'pending' par backend
-      //   - payment_status → forcé à 'pending' par backend
-      //   - delivery_fee   → 0 pour onsite
-      //   - tax_amount     → calculé backend
-
-      if (!supabase) throw new Error('Connexion impossible.');
-
-      const { data: order, error: orderErr } = await supabase.rpc('create_order_atomic', {
-        p_order_source: 'onsite',
-        p_store_id: storeId,
-        p_customer_name: user?.full_name || guestName.trim(),
-        p_customer_phone: user?.phone || '',
-        p_payment_method: 'cash_on_delivery',
-        p_notes: tableNumber ? `Table ${tableNumber}` : null,
-        p_items: Object.entries(cart).map(([product_id, quantity]) => ({
+      const result = await orderService.createOnsiteOrder({
+        qr_token: onsiteToken,
+        customer_name: user?.full_name || guestName.trim(),
+        customer_phone: user?.phone || null,
+        notes: tableNumber ? `Table ${tableNumber}` : null,
+        payment_method: 'cash_on_delivery',
+        items: Object.entries(cart).map(([product_id, quantity]) => ({
           product_id,
           quantity,
-          // price: NON envoyé — backend le lit depuis products.price
         })),
-        // qr_token: non disponible sur ce parcours legacy
-        // user_id: NON envoyé → backend utilise auth.uid()
+        // user_id, store_id, table_id, price → NON envoyés, gérés par backend via qr_token
       });
-
-      if (orderErr) throw orderErr;
 
       // Notification vendeur best-effort
       try {
-        await orderService.sendSellerNotification(order as any, 'new');
+        await orderService.sendSellerNotification({ id: result.order_id } as any, 'new');
       } catch (e) {
         console.warn('[BarLive] sendSellerNotification failed:', e);
       }
@@ -375,9 +368,9 @@ export const BarLiveScreen: React.FC = () => {
       setCart({});
       fetchMyOrders();
       Alert.alert('Commande envoyée !', 'Le bar a bien reçu votre commande.');
-    } catch (error) {
-      console.error('Error placing order:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la commande.');
+    } catch (error: any) {
+      // Erreurs déjà traduites par _translateRpcError — message propre sans détail SQL
+      Alert.alert('Commande impossible', error?.message || 'Une erreur est survenue.');
     } finally {
       setCheckoutLoading(false);
     }

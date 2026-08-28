@@ -23,6 +23,7 @@ import * as Haptics from "expo-haptics";
 import { COLORS, FONT_SIZE, RADIUS, SPACING } from "../config/theme";
 import { useResponsive } from "../utils/responsive";
 import { useCartStore, useAuthStore } from "../store";
+import { useCanAddToCart } from "../hooks/useCanAddToCart";
 import { useTheme } from "../hooks/useTheme";
 import { LikeButton, SkeletonLoader } from "../components";
 import OptimizedImage from "../components/OptimizedImage";
@@ -1064,7 +1065,8 @@ export const ProductDetailScreen: React.FC = () => {
               Alert.alert("Erreur", "Produit indisponible");
               return;
             }
-            if (!user?.id) {
+            const { canAdd, reason } = useCanAddToCart();
+            if (!canAdd) {
               showAuthModal({ type: 'BUY_NOW', payload: { product, quantity } });
               return;
             }
@@ -1094,7 +1096,8 @@ export const ProductDetailScreen: React.FC = () => {
               Alert.alert("Erreur", "Produit indisponible");
               return;
             }
-            if (!user?.id) {
+            const { canAdd, reason } = useCanAddToCart();
+            if (!canAdd) {
               showAuthModal({ type: 'ADD_TO_CART', payload: { product, quantity } });
               return;
             }

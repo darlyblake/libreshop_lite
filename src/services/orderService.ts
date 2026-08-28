@@ -100,6 +100,116 @@ export const orderService = {
   },
 
   /**
+   * Commande normale (utilisateur connecté).
+   * Appelle create_order_atomic côté Supabase.
+   * Le backend force : user_id=auth.uid(), prix, total, statuts.
+   */
+  async createOnlineOrder(params: {
+    store_id: string;
+    customer_name: string;
+    customer_phone?: string | null;
+    shipping_address?: string | null;
+    city?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    payment_method: string;
+    notes?: string | null;
+    coupon_code?: string | null;
+    items: Array<{ product_id: string; quantity: number }>;
+  }): Promise<{ order_id: string; total: number; success: boolean }> {
+    const client = useSupabase();
+    const { data, error } = await client.rpc('create_order_atomic', {
+      p_store_id: params.store_id,
+      p_customer_name: params.customer_name,
+      p_customer_phone: params.customer_phone ?? null,
+      p_shipping_address: params.shipping_address ?? null,
+      p_city: params.city ?? null,
+      p_latitude: params.latitude ?? null,
+      p_longitude: params.longitude ?? null,
+      p_payment_method: params.payment_method,
+      p_notes: params.notes ?? null,
+      p_coupon_code: params.coupon_code ?? null,
+      p_items: params.items,
+      // NON envoyés — le backend les calcule / force :
+      // user_id, total_amount, status, payment_status, price par item
+    });
+    if (error) throw orderService._translateRpcError(error);
+    if (!data?.success || !data?.order_id) {
+      throw new Error('Commande non confirmée par le serveur.');
+    }
+    return data as { order_id: string; total: number; success: boolean };
+  },
+
+  /**
+   * Commande onsite anonyme via QR.
+   * Appelle create_onsite_order_atomic côté Supabase.
+   * Le backend force : user_id=NULL, store/table via qr_token, prix, total, statuts.
+   */
+  async createOnsiteOrder(params: {
+    qr_token: string;
+    customer_name: string;
+    customer_phone?: string | null;
+    notes?: string | null;
+    payment_method: string;
+    items: Array<{ product_id: string; quantity: number }>;
+  }): Promise<{ order_id: string; total: number; success: boolean }> {
+    const client = useSupabase();
+    const { data, error } = await client.rpc('create_onsite_order_atomic', {
+      p_qr_token: params.qr_token,
+      p_customer: {
+        name: params.customer_name,
+        phone: params.customer_phone ?? null,
+        notes: params.notes ?? null,
+      },
+      p_payment_method: params.payment_method,
+      p_items: params.items,
+      // NON envoyés — le backend les résout / force :
+      // user_id (NULL), store_id, table_id, price, total, status, payment_status
+    });
+    if (error) throw orderService._translateRpcError(error);
+    if (!data?.success || !data?.order_id) {
+      throw new Error('Commande non confirmée par le serveur.');
+    }
+    return data as { order_id: string; total: number; success: boolean };
+  },
+
+  /**
+   * Traduit les erreurs RPC Postgres en messages utilisateur lisibles.
+   * Ne jamais exposer les détails SQL au client.
+   */
+  _translateRpcError(error: any): Error {
+    const msg: string = error?.message || error?.details || '';
+    if (msg.includes('invalid_token') || msg.includes('QR')) {
+      return new Error('QR invalide ou expiré. Veuillez rescanner le code.');
+    }
+    if (msg.includes('table_disabled') || msg.includes('table inactive')) {
+      return new Error('Cette table n\'est plus disponible.');
+    }
+    if (msg.includes('store_disabled') || msg.includes('store inactive')) {
+      return new Error('Cet établissement n\'accepte plus de commandes pour le moment.');
+    }
+    if (msg.includes('not_restaurant_or_bar') || msg.includes('wrong_store_type')) {
+      return new Error('Le service de commande QR n\'est disponible que dans les bars et restaurants.');
+    }
+    if (msg.includes('product_not_found') || msg.includes('wrong_store')) {
+      return new Error('Un produit de votre panier n\'est plus disponible dans cet établissement.');
+    }
+    if (msg.includes('insufficient_stock') || msg.includes('stock')) {
+      return new Error('Stock insuffisant pour l\'un des produits. Veuillez modifier votre panier.');
+    }
+    if (msg.includes('empty_cart') || msg.includes('no items')) {
+      return new Error('Votre panier est vide.');
+    }
+    if (msg.includes('42501') || msg.includes('permission denied')) {
+      return new Error('Action non autorisée.');
+    }
+    // Erreur générique — ne pas exposer le détail SQL
+    console.error('[orderService] RPC error (non-exposé):', error);
+    return new Error('Une erreur est survenue. Veuillez réessayer.');
+  },
+
+
+  /**
    * Met à jour une commande avec optimistic locking (version)
    */
   async update(id: string, updates: Partial<Order>): Promise<Order> {
