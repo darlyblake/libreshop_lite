@@ -26,10 +26,9 @@ import { BarcodeScannerModal } from '../components/BarcodeScannerModal';
 import OptimizedImage from '../components/OptimizedImage';
 import { useResponsive } from '../utils/responsive';
 import { storeService } from '../services/storeService';
+import { storeDiscoveryService } from '../services/storeDiscoveryService';
 import { cloudinaryService } from '../services/cloudinaryService';
 import { useNotificationStore } from '../store/notificationStore';
-
-// No MAX_CONTENT_WIDTH anymore
 
 const CATEGORIES = [
   { name: 'Produits', emoji: '🛍️', bg: '#f4e8ff' },
@@ -42,8 +41,8 @@ const CATEGORIES = [
 
 const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, FONT_SIZE }: any) => {
   const stats = Array.isArray(store.store_stats) ? store.store_stats[0] : store.store_stats;
-  const ratingAvg = stats?.rating_avg ?? 0;
-  const ratingCount = stats?.rating_count ?? 0;
+  const ratingAvg = stats?.rating_avg ?? store.rating_avg ?? 0;
+  const ratingCount = stats?.rating_count ?? store.rating_count ?? 0;
   const logoUrl = store.logo_url || store.logo;
   const bannerUrl = store.banner_url || store.banner;
 
@@ -51,7 +50,6 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
     const safe = Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : 0;
     const full = Math.floor(safe);
     const half = safe - full >= 0.5;
-    
     return (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
         {[...Array(5)].map((_, i) => {
@@ -67,71 +65,35 @@ const BeautifulStoreCard = ({ store, onPress, width, palette, RADIUS, SPACING, F
     <TouchableOpacity
       activeOpacity={0.85}
       disabled={store.isNavigating}
-      style={{
-        width,
-        backgroundColor: palette.card,
-        borderRadius: RADIUS.lg,
-        borderWidth: 1,
-        borderColor: palette.border,
-        overflow: 'hidden',
-        ...(Platform.OS === 'web' ? { boxShadow: '0px 2px 4px rgba(0,0,0,0.05)' } : { elevation: 2 })
-      }}
+      style={{ width, backgroundColor: palette.card, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: palette.border, overflow: 'hidden', ...(Platform.OS === 'web' ? { boxShadow: '0px 2px 4px rgba(0,0,0,0.05)' } : { elevation: 2 }) }}
       onPress={onPress}
     >
       <View style={{ height: 90, width: '100%', position: 'relative' }}>
-        {bannerUrl ? (
-          <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={{ width: '100%', height: '100%' }} />
-        ) : (
-          <View style={{ width: '100%', height: '100%', backgroundColor: palette.accent + '20' }} />
-        )}
-
-        {store.isNavigating && (
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}>
-            <ActivityIndicator size="large" color={palette.accent} />
-          </View>
-        )}
-
-        <View style={{
-          position: 'absolute', left: SPACING.md, bottom: -20, width: 48, height: 48, borderRadius: 24,
-          borderWidth: 3, borderColor: palette.card, backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden'
-        }}>
-          {logoUrl ? (
-            <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={{ width: '100%', height: '100%' }} />
-          ) : (
-            <Ionicons name="storefront" size={20} color={palette.accent} />
-          )}
+        {bannerUrl ? <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(bannerUrl, 600) }} style={{ width: '100%', height: '100%' }} /> : <View style={{ width: '100%', height: '100%', backgroundColor: palette.accent + '20' }} />}
+        {store.isNavigating && <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 10 }}><ActivityIndicator size="large" color={palette.accent} /></View>}
+        <View style={{ position: 'absolute', left: SPACING.md, bottom: -20, width: 48, height: 48, borderRadius: 24, borderWidth: 3, borderColor: palette.card, backgroundColor: palette.card, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {logoUrl ? <OptimizedImage source={{ uri: cloudinaryService.getOptimizedUrl(logoUrl, 150) }} style={{ width: '100%', height: '100%' }} /> : <Ionicons name="storefront" size={20} color={palette.accent} />}
         </View>
-
-        {store.verified && (
-          <View style={{ position: 'absolute', top: SPACING.sm, right: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, padding: 2 }}>
-            <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
-          </View>
-        )}
+        {store.verified && <View style={{ position: 'absolute', top: SPACING.sm, right: SPACING.sm, backgroundColor: palette.card, borderRadius: 12, padding: 2 }}><Ionicons name="checkmark-circle" size={16} color="#3b82f6" /></View>}
       </View>
-
       <View style={{ paddingHorizontal: SPACING.md, paddingTop: 28, paddingBottom: SPACING.md }}>
-        <Text numberOfLines={1} style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: palette.text, marginBottom: 2 }}>
-          {store.name || 'Boutique'}
-        </Text>
-        <Text numberOfLines={1} style={{ fontSize: FONT_SIZE.xs, color: palette.accent, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SPACING.xs }}>
-          {store.category || 'Général'}
-        </Text>
-        <Text numberOfLines={2} style={{ fontSize: FONT_SIZE.xs, color: palette.textSoft, lineHeight: 16, marginBottom: SPACING.sm, height: 32 }}>
-          {store.description || ' '}
-        </Text>
+        <Text numberOfLines={1} style={{ fontSize: FONT_SIZE.md, fontWeight: '700', color: palette.text, marginBottom: 2 }}>{store.name || 'Boutique'}</Text>
+        <Text numberOfLines={1} style={{ fontSize: FONT_SIZE.xs, color: palette.accent, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SPACING.xs }}>{store.category || 'Général'}</Text>
+        <Text numberOfLines={2} style={{ fontSize: FONT_SIZE.xs, color: palette.textSoft, lineHeight: 16, marginBottom: SPACING.sm, height: 32 }}>{store.description || ' '}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.xs }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {renderStars(ratingAvg)}
-            <Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '700', color: palette.text, marginLeft: 2 }}>
-              {ratingAvg ? ratingAvg.toFixed(1) : '0.0'}
-            </Text>
-            <Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>({ratingCount})</Text>
-          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>{renderStars(Number(ratingAvg))}<Text style={{ fontSize: FONT_SIZE.xs, fontWeight: '700', color: palette.text, marginLeft: 2 }}>{ratingAvg ? Number(ratingAvg).toFixed(1) : '0.0'}</Text><Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>({ratingCount})</Text></View>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
+
+const DISCOVERY_SECTIONS = [
+  { key: 'bar', title: 'Coins chauds', subtitle: 'Bars populaires', icon: '🍻' },
+  { key: 'restaurant', title: 'Restaurants populaires', subtitle: 'Les mieux classés', icon: '🍽️' },
+  { key: 'general', title: 'Boutiques populaires', subtitle: 'Les plus appréciées', icon: '🛍️' },
+  { key: 'other', title: 'À découvrir', subtitle: 'Autres activités populaires', icon: '⭐' },
+] as const;
 
 export const ClientHomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -140,40 +102,43 @@ export const ClientHomeScreen: React.FC = () => {
   const { items } = useCartStore();
   const { user } = useAuthStore();
   const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE, getColor: palette } = useTheme();
-  
   const { state, dispatch } = useClientHomeState();
-
   const [isReady, setIsReady] = useState(false);
   const [topStores, setTopStores] = useState<any[]>([]);
+  const [discoveryGroups, setDiscoveryGroups] = useState<Record<string, any[]>>({ bar: [], restaurant: [], general: [], other: [] });
+  const [discoveryLocation, setDiscoveryLocation] = useState<{ cityName: string | null; countryName: string | null }>({ cityName: null, countryName: null });
   const [loadingStores, setLoadingStores] = useState(true);
   const [showScanner, setShowScanner] = useState(false);
   const [navigatingState, setNavigatingState] = useState<string | null>(null);
-  
+  const [refreshing, setRefreshing] = useState(false);
+  const [switchingToSeller, setSwitchingToSeller] = useState(false);
+  const clientUnreadCount = useNotificationStore((state) => state.clientUnreadCount);
+
   const handleNavigate = useCallback((screen: string, params?: any, id?: string) => {
     const navId = id || screen;
     if (navigatingState) return;
     setNavigatingState(navId);
     navigation.navigate(screen, params);
-    setTimeout(() => {
-      setNavigatingState(null);
-    }, 800);
+    setTimeout(() => setNavigatingState(null), 800);
   }, [navigation, navigatingState]);
-  
-  const clientUnreadCount = useNotificationStore((state) => state.clientUnreadCount);
-
-  const [refreshing, setRefreshing] = useState(false);
-  const [switchingToSeller, setSwitchingToSeller] = useState(false);
 
   const fetchStores = async (isRefresh = false) => {
     try {
-      if (isRefresh) setRefreshing(true);
-      else setLoadingStores(true);
-
-      // The home page displays exactly the Top 20 stores.
-      const data = await storeService.getPopularStores(20);
-      setTopStores(data || []);
+      if (isRefresh) setRefreshing(true); else setLoadingStores(true);
+      const result = await storeDiscoveryService.getHomeTopStores();
+      setTopStores(result.stores.slice(0, 20));
+      setDiscoveryGroups(result.groups);
+      setDiscoveryLocation({ cityName: result.location.cityName, countryName: result.location.countryName });
     } catch (e) {
-      console.warn('Failed to load top stores', e);
+      console.warn('Failed to load location-aware top stores', e);
+      // Keep the home page functional if discovery/location fails.
+      try {
+        const fallback = await storeService.getPopularStores(20);
+        setTopStores(fallback || []);
+        setDiscoveryGroups({ bar: (fallback || []).filter((s: any) => s.discovery_group === 'bar'), restaurant: (fallback || []).filter((s: any) => s.discovery_group === 'restaurant'), general: (fallback || []).filter((s: any) => s.discovery_group === 'general'), other: (fallback || []).filter((s: any) => !['bar', 'restaurant', 'general'].includes(s.discovery_group)) });
+      } catch (fallbackError) {
+        console.warn('Fallback store discovery failed', fallbackError);
+      }
     } finally {
       setLoadingStores(false);
       setRefreshing(false);
@@ -181,10 +146,7 @@ export const ClientHomeScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-      fetchStores();
-    }, 50);
+    const timer = setTimeout(() => { setIsReady(true); fetchStores(); }, 50);
     return () => clearTimeout(timer);
   }, []);
 
@@ -203,177 +165,76 @@ export const ClientHomeScreen: React.FC = () => {
     return Math.max(0, (contentWidth - totalPadding - totalGap) / numColumns);
   }, [contentWidth, numColumns, SPACING]);
 
-  const handleRefresh = useCallback(() => {
-    fetchStores(true);
-  }, []);
+  const handleRefresh = useCallback(() => { fetchStores(true); }, []);
 
   const handleSwitchToSeller = async () => {
     if (switchingToSeller) return;
-    
-    if (!user) {
-      navigation.navigate('SellerAuth');
-      return;
-    }
-
+    if (!user) { navigation.navigate('SellerAuth'); return; }
     setSwitchingToSeller(true);
     try {
       const stores = await storeService.getStoresByUser(user.id);
-      if (stores && stores.length > 0) {
-        navigation.navigate('SellerTabs');
-      } else {
-        navigation.navigate('SellerAuth');
-      }
-    } catch (error) {
-      navigation.navigate('SellerAuth');
-    } finally {
-      setSwitchingToSeller(false);
-    }
+      if (stores && stores.length > 0) navigation.navigate('SellerTabs'); else navigation.navigate('SellerAuth');
+    } catch (error) { navigation.navigate('SellerAuth'); } finally { setSwitchingToSeller(false); }
   };
 
-  const renderHeader = useCallback(() => {
+  const renderHeader = useCallback(() => (
+    <View style={{ width: '100%' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
+        <Text style={{ fontSize: FONT_SIZE.xl, fontWeight: '900', color: palette.accent }}>LibreShop</Text>
+        <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+          <TouchableOpacity style={{ padding: SPACING.xs }} onPress={handleSwitchToSeller} disabled={switchingToSeller}>{switchingToSeller ? <ActivityIndicator size={24} color={palette.textMuted} /> : <Ionicons name="briefcase-outline" size={24} color={palette.textMuted} />}</TouchableOpacity>
+          <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => setShowScanner(true)}><Ionicons name="qr-code-outline" size={24} color={palette.textMuted} /></TouchableOpacity>
+          <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => navigation.navigate('ClientMap')}><Ionicons name="location-outline" size={24} color={palette.textMuted} /></TouchableOpacity>
+          {user && <TouchableOpacity style={{ padding: SPACING.xs, position: 'relative' }} onPress={() => navigation.navigate('Notifications', { context: 'client' })}><Ionicons name="notifications-outline" size={24} color={palette.textMuted} />{clientUnreadCount > 0 && <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: palette.accent, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: palette.bg, paddingHorizontal: 2 }}><Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{clientUnreadCount > 99 ? '99+' : clientUnreadCount}</Text></View>}</TouchableOpacity>}
+          <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => navigation.navigate('ClientProfile')}><Ionicons name={user ? 'person-circle-outline' : 'person-outline'} size={user ? 28 : 24} color={palette.textMuted} /></TouchableOpacity>
+          <TouchableOpacity style={{ padding: SPACING.xs, position: 'relative' }} onPress={() => navigation.navigate('Cart')}><Ionicons name="cart-outline" size={24} color={palette.textMuted} />{items.length > 0 && <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: palette.accent, borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: palette.bg }}><Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{items.length}</Text></View>}</TouchableOpacity>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.card, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, height: 48, marginBottom: SPACING.lg, borderWidth: 1, borderColor: palette.border }}>
+        <Ionicons name="search-outline" size={20} color={palette.textMuted} />
+        <TextInput placeholder="Rechercher une boutique, un produit..." placeholderTextColor={palette.textMuted} style={{ flex: 1, marginLeft: SPACING.sm, color: palette.text, fontSize: FONT_SIZE.md, outlineStyle: 'none' } as any} onFocus={() => navigation.navigate('ClientSearch')} />
+        <TouchableOpacity onPress={() => navigation.navigate('ClientSearch', { startVoice: true })}><Ionicons name="mic-outline" size={22} color={palette.accent} /></TouchableOpacity>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.lg }}>
+        {CATEGORIES.map((cat) => <TouchableOpacity key={cat.name} onPress={() => navigation.navigate('ClientSearch', { category: cat.name })} style={{ alignItems: 'center', marginRight: SPACING.md }}><View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: cat.bg, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs }}><Text style={{ fontSize: 24 }}>{cat.emoji}</Text></View><Text style={{ fontSize: FONT_SIZE.xs, color: palette.text, fontWeight: '600' }}>{cat.name}</Text></TouchableOpacity>)}
+      </ScrollView>
+      {discoveryLocation.cityName && <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md }}><Ionicons name="location" size={15} color={palette.accent} /><Text style={{ marginLeft: 5, fontSize: FONT_SIZE.xs, color: palette.textSoft, fontWeight: '600' }}>Populaire près de {discoveryLocation.cityName}{discoveryLocation.countryName ? `, ${discoveryLocation.countryName}` : ''}</Text></View>}
+    </View>
+  ), [SPACING, FONT_SIZE, palette, handleSwitchToSeller, switchingToSeller, user, clientUnreadCount, items.length, navigation, discoveryLocation]);
+
+  const renderSection = (section: typeof DISCOVERY_SECTIONS[number]) => {
+    const stores = discoveryGroups[section.key] || [];
+    if (!stores.length) return null;
     return (
-      <View style={{ width: '100%' }}>
-        {/* Header Actions */}
+      <View key={section.key} style={{ marginBottom: SPACING.xl }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.md }}>
-          <Text style={{ fontSize: FONT_SIZE.xl, fontWeight: '900', color: palette.accent }}>LibreShop</Text>
-          <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
-            <TouchableOpacity style={{ padding: SPACING.xs }} onPress={handleSwitchToSeller} disabled={switchingToSeller}>
-              {switchingToSeller ? (
-                <ActivityIndicator size={24} color={palette.textMuted} />
-              ) : (
-                <Ionicons name="briefcase-outline" size={24} color={palette.textMuted} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => setShowScanner(true)}>
-              <Ionicons name="qr-code-outline" size={24} color={palette.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => navigation.navigate('ClientMap')}>
-              <Ionicons name="location-outline" size={24} color={palette.textMuted} />
-            </TouchableOpacity>
-            {user && (
-              <TouchableOpacity style={{ padding: SPACING.xs, position: 'relative' }} onPress={() => navigation.navigate('Notifications', { context: 'client' })}>
-                <Ionicons name="notifications-outline" size={24} color={palette.textMuted} />
-                {clientUnreadCount > 0 && (
-                  <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: palette.accent, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: palette.bg, paddingHorizontal: 2 }}>
-                    <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{clientUnreadCount > 99 ? '99+' : clientUnreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={{ padding: SPACING.xs }} onPress={() => navigation.navigate('ClientProfile')}>
-              <Ionicons name={user ? "person-circle-outline" : "person-outline"} size={user ? 28 : 24} color={palette.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={{ padding: SPACING.xs, position: 'relative' }} onPress={() => navigation.navigate('Cart')}>
-              <Ionicons name="cart-outline" size={24} color={palette.textMuted} />
-              {items.length > 0 && (
-                <View style={{ position: 'absolute', top: 0, right: 0, backgroundColor: palette.accent, borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: palette.bg }}>
-                  <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{items.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}><Text style={{ fontSize: 20, marginRight: 7 }}>{section.icon}</Text><View><Text style={{ fontSize: FONT_SIZE.lg, fontWeight: '800', color: palette.text }}>{section.title}</Text><Text style={{ fontSize: FONT_SIZE.xs, color: palette.textMuted }}>{section.subtitle} · {stores.length}</Text></View></View>
         </View>
-
-        {/* Search Bar */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: palette.card, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, height: 48, marginBottom: SPACING.lg, borderWidth: 1, borderColor: palette.border }}>
-          <Ionicons name="search-outline" size={20} color={palette.textMuted} />
-          <TextInput
-            placeholder="Rechercher une boutique, un produit..."
-            placeholderTextColor={palette.textMuted}
-            style={{ flex: 1, marginLeft: SPACING.sm, color: palette.text, fontSize: FONT_SIZE.md, outlineStyle: 'none' } as any}
-            onFocus={() => navigation.navigate('ClientSearch')}
-          />
-          <TouchableOpacity onPress={() => navigation.navigate('ClientSearch', { startVoice: true })}>
-            <Ionicons name="mic-outline" size={22} color={palette.accent} />
-          </TouchableOpacity>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md }}>
+          {stores.slice(0, 5).map((store: any) => <BeautifulStoreCard key={store.id} store={{ ...store, isNavigating: navigatingState === `store_${store.id}` }} width={cardWidth} palette={palette} RADIUS={RADIUS} SPACING={SPACING} FONT_SIZE={FONT_SIZE} onPress={() => handleNavigate('StoreDetail', { storeId: store.id }, `store_${store.id}`)} />)}
         </View>
-
-        {/* Categories */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: SPACING.lg }}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity key={cat.name} onPress={() => navigation.navigate('ClientSearch', { category: cat.name })} style={{ alignItems: 'center', marginRight: SPACING.md }}>
-              <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: cat.bg, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs }}>
-                <Text style={{ fontSize: 24 }}>{cat.emoji}</Text>
-              </View>
-              <Text style={{ fontSize: FONT_SIZE.xs, color: palette.text, fontWeight: '600' }}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
       </View>
     );
-  }, [SPACING, FONT_SIZE, palette, handleSwitchToSeller, switchingToSeller, user, clientUnreadCount, items.length, navigation]);
+  };
 
-  if (!isReady || loadingStores) {
-    return (
-      <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md }}>
-        <StoreCardSkeleton />
-      </View>
-    );
-  }
+  if (!isReady || loadingStores) return <View style={{ flex: 1, backgroundColor: palette.bg, paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md }}><StoreCardSkeleton /></View>;
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: palette.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + SPACING.xl }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      scrollEventThrottle={400}
-    >
+    <ScrollView style={{ flex: 1, backgroundColor: palette.bg }} contentContainerStyle={{ paddingTop: insets.top + SPACING.md, paddingHorizontal: SPACING.md, paddingBottom: insets.bottom + SPACING.xl }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />} scrollEventThrottle={400}>
       {renderHeader()}
-      
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md, marginBottom: SPACING.lg }}>
-        {topStores.map((store: any) => (
-          <BeautifulStoreCard
-            key={store.id}
-            store={{...store, isNavigating: navigatingState === `store_${store.id}`}}
-            width={cardWidth}
-            palette={palette}
-            RADIUS={RADIUS}
-            SPACING={SPACING}
-            FONT_SIZE={FONT_SIZE}
-            onPress={() => handleNavigate('StoreDetail', { storeId: store.id }, `store_${store.id}`)}
-          />
-        ))}
-      </View>
-
-      <BarcodeScannerModal
-        visible={showScanner}
-        onClose={() => setShowScanner(false)}
-        hintText="Scannez le QR code de la table ou de la boutique"
-        onScan={(data) => {
-          setShowScanner(false);
-          try {
-            const url = new URL(data);
-            if (url.hostname.includes('libreshop') || url.hostname === 'localhost') {
-              const path = url.pathname;
-              if (path.startsWith('/onsite/')) {
-                const token = path.split('/onsite/')[1];
-                if (token) {
-                  navigation.navigate('OnsiteMenu', { token });
-                  return;
-                }
-              }
-              if (path.includes('/live')) {
-                const onsiteToken = url.searchParams.get('token');
-                if (onsiteToken) {
-                  navigation.navigate('OnsiteMenu', { token: onsiteToken });
-                  return;
-                }
-                Alert.alert('QR périmé', 'Ce QR code est ancien. Demandez au responsable de générer un nouveau QR sécurisé.');
-                return;
-              }
-            }
-            if (Platform.OS === 'web') {
-              window.location.href = data;
-            } else {
-              import('react-native').then(({ Linking }) => {
-                Linking.openURL(data).catch(() => Alert.alert("Erreur", "Lien non supporté."));
-              });
-            }
-          } catch (e) {
-            Alert.alert("Erreur", "Code invalide.");
+      {DISCOVERY_SECTIONS.map(renderSection)}
+      <BarcodeScannerModal visible={showScanner} onClose={() => setShowScanner(false)} hintText="Scannez le QR code de la table ou de la boutique" onScan={(data) => {
+        setShowScanner(false);
+        try {
+          const url = new URL(data);
+          if (url.hostname.includes('libreshop') || url.hostname === 'localhost') {
+            const path = url.pathname;
+            if (path.startsWith('/onsite/')) { const token = path.split('/onsite/')[1]; if (token) { navigation.navigate('OnsiteMenu', { token }); return; } }
+            if (path.includes('/live')) { const onsiteToken = url.searchParams.get('token'); if (onsiteToken) { navigation.navigate('OnsiteMenu', { token: onsiteToken }); return; } Alert.alert('QR périmé', 'Ce QR code est ancien. Demandez au responsable de générer un nouveau QR sécurisé.'); return; }
           }
-        }}
-      />
+          if (Platform.OS === 'web') window.location.href = data; else import('react-native').then(({ Linking }) => Linking.openURL(data).catch(() => Alert.alert('Erreur', 'Lien non supporté.')));
+        } catch (e) { Alert.alert('Erreur', 'Code invalide.'); }
+      }} />
     </ScrollView>
   );
 };
