@@ -119,19 +119,23 @@ export const orderService = {
   }): Promise<{ order_id: string; total: number; success: boolean }> {
     const client = useSupabase();
     const { data, error } = await client.rpc('create_order_atomic', {
-      p_store_id: params.store_id,
-      p_customer_name: params.customer_name,
-      p_customer_phone: params.customer_phone ?? null,
-      p_shipping_address: params.shipping_address ?? null,
-      p_city: params.city ?? null,
-      p_latitude: params.latitude ?? null,
-      p_longitude: params.longitude ?? null,
-      p_payment_method: params.payment_method,
-      p_notes: params.notes ?? null,
-      p_coupon_code: params.coupon_code ?? null,
-      p_items: params.items,
-      // NON envoyés — le backend les calcule / force :
-      // user_id, total_amount, status, payment_status, price par item
+      p_order_payload: {
+        order_source: 'online',
+        store_id: params.store_id,
+        customer_name: params.customer_name,
+        customer_phone: params.customer_phone ?? null,
+        shipping_address: params.shipping_address ?? null,
+        city: params.city ?? null,
+        latitude: params.latitude ?? null,
+        longitude: params.longitude ?? null,
+        payment_method: params.payment_method,
+        notes: params.notes ?? null,
+        coupon_code: params.coupon_code ?? null,
+      },
+      p_items_payload: params.items.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+      })),
     });
     if (error) throw orderService._translateRpcError(error);
     if (!data?.success || !data?.order_id) {
