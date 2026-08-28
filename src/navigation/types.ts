@@ -104,6 +104,9 @@ export type RootStackParamList = {
   BarPhotos: { eventId?: string };
   BarContest: { eventId?: string };
   BarScreensControl: undefined;
+
+  // Commande sur place via QR (client anonyme)
+  OnsiteMenu: { token: string };
 };
 
 export type ClientTabParamList = {

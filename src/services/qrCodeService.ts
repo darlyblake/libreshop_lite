@@ -48,6 +48,20 @@ export const qrCodeService = {
   },
 
   /**
+   * URL du menu sur place via QR — contient uniquement le token opaque.
+   * Ex: https://libreshop.shop/onsite/abc123xyz
+   * Le backend résout token → store/table.
+   */
+  getOnsiteUrl(token: string): string {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      return `${window.location.origin.replace(/\/+$/, '')}/onsite/${token}`;
+    }
+    const envBase = String(process.env.EXPO_PUBLIC_WEB_BASE_URL || '').replace(/\/+$/, '');
+    if (envBase) return `${envBase}/onsite/${token}`;
+    return `libreshop://onsite/${token}`;
+  },
+
+  /**
    * URL de l'image QR code (via api.qrserver.com).
    * @param data  La donnée à encoder (URL, texte, etc.)
    * @param size  Taille en pixels (défaut: 200)

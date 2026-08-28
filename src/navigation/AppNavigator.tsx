@@ -113,6 +113,7 @@ const BarScreensControlScreen = lazyLoad(() => import('../screens/BarScreensCont
 const BarDetailScreen = lazyLoad(() => import('../screens/BarDetailScreen'), 'BarDetailScreen');
 const BarLiveScreen = lazyLoad(() => import('../screens/BarLiveScreen'), 'BarLiveScreen');
 const BarTVScreen = lazyLoad(() => import('../screens/BarTVScreen'), 'BarTVScreen');
+const OnsiteMenuScreen = lazyLoad(() => import('../screens/OnsiteMenuScreen'), 'default');
 
 
 // Lazy loaded Admin screens
@@ -933,6 +934,7 @@ export const AppNavigator: React.FC = () => {
         <Stack.Screen name="BarDetail" component={BarDetailScreen} />
         <Stack.Screen name="BarLive" component={BarLiveScreen} />
         <Stack.Screen name="BarTV" component={BarTVScreen} />
+        <Stack.Screen name="OnsiteMenu" component={OnsiteMenuScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="Cart" component={CartScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />

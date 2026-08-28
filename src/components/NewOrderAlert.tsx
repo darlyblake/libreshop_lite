@@ -161,10 +161,10 @@ export const NewOrderAlert: React.FC = () => {
             const call = payload.new;
             if (!call?.id) return;
 
-            // Mark table as occupied in the local POS state
+            // Mark table as occupied in the backend
             if (call.table_number) {
               const tableId = `table_${sId}_${call.table_number}`;
-              tableService.openTable(sId, tableId, 1);
+              tableService.openTable(sId, tableId, 1).catch(e => console.error(e));
             }
 
             // Show alert

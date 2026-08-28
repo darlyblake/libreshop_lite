@@ -189,7 +189,7 @@ export const RestaurantCaisseScreen = () => {
         })));
 
         // Charger les tables
-        const savedTables = tableService.getTables(currentStore.id, 'restaurant');
+        const savedTables = await tableService.getTables(currentStore.id);
         setTables(savedTables);
       } catch (e) {
         console.warn('Erreur chargement restaurant caisse:', e);
@@ -223,8 +223,7 @@ export const RestaurantCaisseScreen = () => {
 
     // Mettre à jour le montant de la table
     if (storeId) {
-      const updated = tableService.updateTableAmount(storeId, selectedTable.id, total + product.price);
-      setTables(updated);
+      setTables(prev => tableService.optimisticAmount(prev, selectedTable.id, total + product.price));
     }
   }, [selectedTable, updateCart, storeId, total]);
 
@@ -253,11 +252,19 @@ export const RestaurantCaisseScreen = () => {
   }, [selectedTable, updateCart]);
 
   // ── Sélection de table ───────────────────────────────────────────────────────
-  const handleSelectTable = useCallback((table: PosTable) => {
+  const handleSelectTable = useCallback(async (table: PosTable) => {
     setSelectedTable(table);
     if (table.status === 'free' && storeId) {
-      const updated = tableService.openTable(storeId, table.id, 1);
-      setTables(updated);
+      // Optimistic UI
+      setTables(prev => tableService.optimisticOpen(prev, table.id, 1));
+      try {
+        await tableService.openTable(storeId, table.id, 1);
+      } catch (error) {
+        console.error('Erreur ouverture table:', error);
+        // Rollback on refresh
+        const refreshed = await tableService.getTables(storeId);
+        setTables(refreshed);
+      }
     }
     setShowTableView(false);
     setCustomerName('');
@@ -353,8 +360,9 @@ export const RestaurantCaisseScreen = () => {
 
       // Fermer la table et vider le panier
       if (storeId) {
-        const updated = tableService.closeTable(storeId, selectedTable.id);
-        setTables(updated);
+        setTables(prev => tableService.optimisticClose(prev, selectedTable.id));
+        // Async update
+        tableService.closeTable(storeId, selectedTable.id).catch(e => console.error(e));
       }
       clearCart();
       setShowCheckout(false);
@@ -397,8 +405,9 @@ export const RestaurantCaisseScreen = () => {
           text: 'Libérer',
           style: 'destructive',
           onPress: () => {
-            const updated = tableService.closeTable(storeId, selectedTable.id);
-            setTables(updated);
+            setTables(prev => tableService.optimisticClose(prev, selectedTable.id));
+            tableService.closeTable(storeId, selectedTable.id).catch(e => console.error(e));
+            
             if (hasItems) clearCart();
             setSelectedTable(null);
             setShowTableView(true);
@@ -468,11 +477,17 @@ export const RestaurantCaisseScreen = () => {
     }
   }, [tables, products, setTablesCarts, handleSelectTable]);
 
-  const handleAddTable = useCallback((number: string, capacity: number) => {
+  const handleAddTable = useCallback(async (number: string, capacity: number) => {
     if (storeId) {
-      const updated = tableService.addTable(storeId, number, capacity);
-      setTables(updated);
-      setAddTableModalVisible(false);
+      try {
+        await tableService.addTable(storeId, number, capacity);
+        // Rafraîchir
+        const refreshed = await tableService.getTables(storeId);
+        setTables(refreshed);
+        setAddTableModalVisible(false);
+      } catch (error) {
+        console.error('Erreur addTable:', error);
+      }
     }
   }, [storeId]);
 
