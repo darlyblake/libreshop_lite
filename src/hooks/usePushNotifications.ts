@@ -85,6 +85,7 @@ export const usePushNotifications = (userId: string | undefined): PushNotificati
         endpoint: subJSON.endpoint,
         p256dh: subJSON.keys.p256dh,
         auth: subJSON.keys.auth,
+        last_used_at: new Date().toISOString(),
       }, { onConflict: 'user_id, endpoint' });
       if (error) console.error('[WebPush] Erreur sauvegarde abonnement:', error);
     } catch (error) {

@@ -58,8 +58,6 @@ class NotificationService {
         token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
         this.expoPushToken = token;
         
-        // Enregistrer le token dans Supabase si l'utilisateur est connecté
-        this.saveTokenToDatabase(token);
       } catch (error: any) {
         errorHandler.handle(error, 'Notification token error', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
       }
@@ -68,20 +66,6 @@ class NotificationService {
     }
 
     return token;
-  }
-
-  private async saveTokenToDatabase(token: string) {
-    try {
-      if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { error } = await supabase.from('device_tokens').upsert({ user_id: user.id, token, platform: Platform.OS, last_used_at: new Date().toISOString() }, { onConflict: 'user_id,token' });
-        if (error) throw error;
-        console.log('Push token prêt pour l\'utilisateur:', user.id, token);
-      }
-    } catch (e) {
-      errorHandler.handle(e, 'Could not save push token to db', ErrorCategory.SYSTEM, ErrorSeverity.LOW);
-    }
   }
 
   // ==========================================
