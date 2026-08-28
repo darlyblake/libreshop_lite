@@ -25,6 +25,16 @@ export interface DeviceDistribution {
   color: string;
 }
 
+export interface TelemetrySummary {
+  totalEvents: number;
+  crashes: number;
+  errors: number;
+  pageViews: number;
+  performanceIssues: number;
+  eventsByType: { type: string; count: number }[];
+  eventsByDay: { date: string; count: number }[];
+}
+
 export interface TelemetryData {
   crashes: CrashEvent[];
   pages: PageViewEvent[];
@@ -73,93 +83,65 @@ export const telemetryService = {
   },
 
   /**
-   * Get aggregated telemetry data for the admin dashboard
+   * Appelle la RPC PostgreSQL get_telemetry_summary() et mappe le résultat
+   * au format TelemetryData attendu par le dashboard.
    */
-  async getAggregatedTelemetry(): Promise<TelemetryData> {
+  async getAggregatedTelemetry(
+    since?: Date,
+    until: Date = new Date()
+  ): Promise<TelemetryData> {
     try {
       if (!supabase) return this.getMockTelemetry();
-      // In a real production setup, we would use an RPC function or a Supabase View
-      // to aggregate this data efficiently. For this prototype, we'll fetch recent
-      // events and aggregate them in memory, with a fallback to mock data if the table is empty or missing.
 
-      const { data, error } = await supabase
-        .from('telemetry_events')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1000);
+      const sinceDate = since ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-      if (error || !data || data.length === 0) {
-        return this.getMockTelemetry();
-
-      }
-
-      // Aggregate Crashes
-      const crashesMap: Record<string, CrashEvent> = {};
-      const pagesMap: Record<string, { views: number; totalTime: number }> = {};
-      const devicesCount: Record<string, number> = { iOS: 0, Android: 0, Web: 0 };
-      let totalDevices = 0;
-
-      data.forEach(event => {
-        // Device Distribution
-        let osCategory = 'Web';
-        if (event.os_name?.toLowerCase().includes('ios')) osCategory = 'iOS';
-        else if (event.os_name?.toLowerCase().includes('android')) osCategory = 'Android';
-        
-        devicesCount[osCategory] = (devicesCount[osCategory] || 0) + 1;
-        totalDevices++;
-
-        if (event.event_type === 'crash' && event.error_message) {
-          const key = event.error_message;
-          if (!crashesMap[key]) {
-            const timeDiff = Math.floor((Date.now() - new Date(event.created_at).getTime()) / 60000);
-            crashesMap[key] = {
-              id: event.id,
-              error: key,
-              device: event.device_model || 'Unknown',
-              os: `${osCategory} ${event.os_version || ''}`,
-              time: timeDiff < 60 ? `Il y a ${timeDiff} min` : `Il y a ${Math.floor(timeDiff/60)} h`,
-              count: 1
-            };
-          } else {
-            crashesMap[key].count++;
-          }
-        } else if (event.event_type === 'page_view' && event.path) {
-          if (!pagesMap[event.path]) {
-            pagesMap[event.path] = { views: 1, totalTime: event.session_time_ms || 0 };
-          } else {
-            pagesMap[event.path].views++;
-            pagesMap[event.path].totalTime += (event.session_time_ms || 0);
-          }
-        }
+      const { data, error } = await supabase.rpc('get_telemetry_summary', {
+        p_since: sinceDate.toISOString(),
+        p_until: until.toISOString(),
       });
 
-      const crashes = Object.values(crashesMap).sort((a, b) => b.count - a.count).slice(0, 5);
-      
-      const pages = Object.entries(pagesMap).map(([path, stats], index) => {
-        const avgMs = stats.views > 0 ? stats.totalTime / stats.views : 0;
-        const avgMin = Math.floor(avgMs / 60000);
-        const avgSec = Math.floor((avgMs % 60000) / 1000);
-        return {
-          id: `p${index}`,
-          path,
-          views: stats.views,
-          avgTime: avgMs > 0 ? `${avgMin}m ${avgSec}s` : 'N/A'
-        };
-      }).sort((a, b) => b.views - a.views).slice(0, 5);
+      if (error || !data) {
+        console.warn('[Telemetry] RPC error, using mock data:', error);
+        return this.getMockTelemetry();
+      }
 
-      const devices = [
-        { os: 'Android', percentage: totalDevices ? Math.round((devicesCount.Android / totalDevices) * 100) : 0, icon: 'logo-android', color: '#3DDC84' },
-        { os: 'iOS', percentage: totalDevices ? Math.round((devicesCount.iOS / totalDevices) * 100) : 0, icon: 'logo-apple', color: '#A2AAAD' },
-        { os: 'Web', percentage: totalDevices ? Math.round((devicesCount.Web / totalDevices) * 100) : 0, icon: 'globe-outline', color: '#4285F4' },
+      const summary = data as TelemetrySummary;
+
+      // --- Crashes : construire un CrashEvent générique depuis le compteur ---
+      const crashes: CrashEvent[] = summary.crashes > 0 ? [{
+        id: 'rpc-crash',
+        error: `${summary.crashes} crash(es) enregistré(s)`,
+        device: 'Voir Supabase',
+        os: 'Mixte',
+        time: 'Sur la période',
+        count: summary.crashes,
+      }] : [];
+
+      // --- Pages : construire depuis eventsByDay (top pages non disponible sans table brute) ---
+      const pages: PageViewEvent[] = summary.eventsByDay
+        .slice(0, 5)
+        .map((d, i) => ({
+          id: `p${i}`,
+          path: d.date,
+          views: d.count,
+          avgTime: 'N/A',
+        }));
+
+      // --- Devices : non fourni par la RPC, on affiche une distribution neutre ---
+      const devices: DeviceDistribution[] = [
+        { os: 'Android', percentage: 0, icon: 'logo-android', color: '#3DDC84' },
+        { os: 'iOS', percentage: 0, icon: 'logo-apple', color: '#A2AAAD' },
+        { os: 'Web', percentage: 0, icon: 'globe-outline', color: '#4285F4' },
       ];
 
       return { crashes, pages, devices };
 
     } catch (e) {
-      console.log('Using mock telemetry due to error:', e);
+      console.warn('[Telemetry] Unexpected error, using mock data:', e);
       return this.getMockTelemetry();
     }
   },
+
 
   getMockTelemetry(): TelemetryData {
     return {
