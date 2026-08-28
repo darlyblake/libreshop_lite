@@ -7,25 +7,43 @@ import { supabase } from '../lib/supabase';
 import { type PosTable, type TableStatus } from '../components/pos/PosTableManager';
 
 class TableService {
+  private getCacheKey(storeId: string) {
+    return `libreshop_tables_cache_${storeId}`;
+  }
+
   async getTables(storeId: string): Promise<PosTable[]> {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('pos_tables')
-      .select('*')
-      .eq('store_id', storeId)
-      .order('table_number', { ascending: true });
+    
+    try {
+      const { data, error } = await supabase
+        .from('pos_tables')
+        .select('*')
+        .eq('store_id', storeId)
+        .order('table_number', { ascending: true });
+        
+      if (error) throw error;
       
-    if (error) {
-      console.error('Erreur getTables:', error);
+      const tables = data.map((t: any) => ({
+        id: t.id,
+        number: t.table_number,
+        capacity: t.capacity,
+        status: t.status || 'free',
+      })) as PosTable[];
+
+      // Mettre en cache
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(this.getCacheKey(storeId), JSON.stringify(tables));
+      }
+
+      return tables;
+    } catch (error) {
+      console.warn('Erreur getTables (fetch réseau), tentative de lecture du cache:', error);
+      if (typeof localStorage !== 'undefined') {
+        const cached = localStorage.getItem(this.getCacheKey(storeId));
+        if (cached) return JSON.parse(cached);
+      }
       throw error;
     }
-    
-    return data.map((t: any) => ({
-      id: t.id,
-      number: t.table_number,
-      capacity: t.capacity,
-      status: t.status || 'free',
-    })) as PosTable[];
   }
 
   // --- Actions asynchrones (Supabase) ---
