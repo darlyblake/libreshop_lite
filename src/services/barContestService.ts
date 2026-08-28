@@ -118,6 +118,19 @@ class BarContestService {
       );
     }
 
+    // UX check: ensure the event is in the 'participation' phase
+    const { data: event, error: eventError } = await supabase
+      .from('bar_events')
+      .select('contest_phase')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError) throw eventError;
+
+    if (event.contest_phase !== 'participation') {
+      throw new Error('La période de participation est terminée.');
+    }
+
     const { data, error } = await supabase
       .from('bar_event_photos')
       .insert({
@@ -165,7 +178,12 @@ class BarContestService {
       .update({ status })
       .eq('id', photoId);
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42501') {
+        throw new Error('Vous n’avez pas l’autorisation de modérer cette photo.');
+      }
+      throw error;
+    }
   }
 
   async voteForPhoto(photoId: string): Promise<void> {
@@ -238,28 +256,25 @@ class BarContestService {
   }
 
   async startContest(eventId: string): Promise<void> {
-    const { error } = await supabase
-      .from('bar_events')
-      .update({ contest_phase: 'participation' })
-      .eq('id', eventId);
+    const { error } = await supabase.rpc('start_bar_event', {
+      p_event_id: eventId,
+    });
 
     if (error) throw error;
   }
 
   async startVoting(eventId: string): Promise<void> {
-    const { error } = await supabase
-      .from('bar_events')
-      .update({ contest_phase: 'voting' })
-      .eq('id', eventId);
+    const { error } = await supabase.rpc('start_bar_voting', {
+      p_event_id: eventId,
+    });
 
     if (error) throw error;
   }
 
   async endContest(eventId: string): Promise<void> {
-    const { error } = await supabase
-      .from('bar_events')
-      .update({ contest_phase: 'ended' })
-      .eq('id', eventId);
+    const { error } = await supabase.rpc('end_bar_event', {
+      p_event_id: eventId,
+    });
 
     if (error) throw error;
   }
