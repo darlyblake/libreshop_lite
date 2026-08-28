@@ -723,7 +723,7 @@ const SellerOrdersScreenContent: React.FC = () => {
       try {
         setUpdatingOrderId(orderId);
 
-        let res;
+        let res: Order | undefined;
         if (newStatus === 'cancelled') {
           res = await orderService.cancelOrderRobust(orderId);
           setOrders(prev => prev.filter(order => order.id !== orderId));
@@ -733,11 +733,11 @@ const SellerOrdersScreenContent: React.FC = () => {
         } else if (newStatus === 'paid') {
           res = await orderService.confirmOrderPayment(orderId);
           // Utiliser les données réelles retournées par le serveur
-          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: res.status, paymentStatus: res.payment_status } : order));
+          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: res?.status ?? order.status, paymentStatus: res?.payment_status ?? order.paymentStatus } : order));
         } else {
           res = await orderService.updateStatus(orderId, newStatus);
           // Utiliser l'état renvoyé par la BDD
-          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: res.status, paymentStatus: res.payment_status || order.paymentStatus } : order));
+          setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: res?.status ?? order.status, paymentStatus: res?.payment_status ?? order.paymentStatus } : order));
         }
 
         // 🚀 Pas de rechargement complet - juste une mise à jour locale optimisée
