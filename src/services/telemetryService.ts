@@ -33,6 +33,24 @@ export interface TelemetrySummary {
   performanceIssues: number;
   eventsByType: { type: string; count: number }[];
   eventsByDay: { date: string; count: number }[];
+  topCrashes: {
+    id: string;
+    error: string;
+    device: string;
+    os: string;
+    time: string;
+    count: number;
+  }[];
+  topPages: {
+    id: string;
+    path: string;
+    views: number;
+    avgTimeMs: number;
+  }[];
+  deviceDistribution: {
+    os: string;
+    percentage: number;
+  }[];
 }
 
 export interface TelemetryData {
@@ -107,32 +125,48 @@ export const telemetryService = {
 
       const summary = data as TelemetrySummary;
 
-      // --- Crashes : construire un CrashEvent générique depuis le compteur ---
-      const crashes: CrashEvent[] = summary.crashes > 0 ? [{
-        id: 'rpc-crash',
-        error: `${summary.crashes} crash(es) enregistré(s)`,
-        device: 'Voir Supabase',
-        os: 'Mixte',
-        time: 'Sur la période',
-        count: summary.crashes,
-      }] : [];
+      const formatTelemetryTime = (timeStr: string) => {
+        // Fallback or just return the string if the RPC formats it, otherwise we leave it.
+        // Assuming the RPC provides a formatted string or ISO date string
+        // Actually, the RPC seems to provide a formatted time string based on the user's prompt.
+        return timeStr;
+      };
 
-      // --- Pages : construire depuis eventsByDay (top pages non disponible sans table brute) ---
-      const pages: PageViewEvent[] = summary.eventsByDay
-        .slice(0, 5)
-        .map((d, i) => ({
-          id: `p${i}`,
-          path: d.date,
-          views: d.count,
-          avgTime: 'N/A',
-        }));
+      const formatDuration = (ms: number) => {
+        if (!ms) return 'N/A';
+        const avgMin = Math.floor(ms / 60000);
+        const avgSec = Math.floor((ms % 60000) / 1000);
+        return ms > 0 ? `${avgMin}m ${avgSec}s` : 'N/A';
+      };
 
-      // --- Devices : non fourni par la RPC, on affiche une distribution neutre ---
-      const devices: DeviceDistribution[] = [
-        { os: 'Android', percentage: 0, icon: 'logo-android', color: '#3DDC84' },
-        { os: 'iOS', percentage: 0, icon: 'logo-apple', color: '#A2AAAD' },
-        { os: 'Web', percentage: 0, icon: 'globe-outline', color: '#4285F4' },
-      ];
+      const getDeviceColor = (os: string) => {
+        if (os === 'Android') return '#3DDC84';
+        if (os === 'iOS') return '#A2AAAD';
+        return '#4285F4';
+      };
+
+      const crashes: CrashEvent[] = (summary.topCrashes || []).map(crash => ({
+        id: crash.id,
+        error: crash.error,
+        device: crash.device,
+        os: crash.os,
+        time: formatTelemetryTime(crash.time),
+        count: crash.count,
+      }));
+
+      const pages: PageViewEvent[] = (summary.topPages || []).map(page => ({
+        id: page.id,
+        path: page.path,
+        views: page.views,
+        avgTime: formatDuration(page.avgTimeMs),
+      }));
+
+      const devices: DeviceDistribution[] = (summary.deviceDistribution || []).map(device => ({
+        os: device.os,
+        percentage: device.percentage,
+        icon: device.os === 'Android' ? 'logo-android' : device.os === 'iOS' ? 'logo-apple' : 'globe-outline',
+        color: getDeviceColor(device.os),
+      }));
 
       return { crashes, pages, devices };
 
