@@ -3,6 +3,8 @@ import { locationService } from './locationService';
 
 export type DiscoveryGroup = 'bar' | 'restaurant' | 'general' | 'other';
 
+export type StoreDiscoveryGroups = Record<DiscoveryGroup, any[]>;
+
 export interface StoreDiscoveryLocation {
   cityId: string | null;
   countryId: string | null;
@@ -11,12 +13,16 @@ export interface StoreDiscoveryLocation {
 }
 
 export interface StoreDiscoveryResult {
-  stores: any[];
-  groups: Record<DiscoveryGroup, any[]>;
+  groups: StoreDiscoveryGroups;
   location: StoreDiscoveryLocation;
 }
 
-const EMPTY_LOCATION: StoreDiscoveryLocation = { cityId: null, countryId: null, cityName: null, countryName: null };
+const EMPTY_LOCATION: StoreDiscoveryLocation = {
+  cityId: null,
+  countryId: null,
+  cityName: null,
+  countryName: null,
+};
 
 async function resolveCurrentLocation(): Promise<StoreDiscoveryLocation> {
   try {
@@ -32,13 +38,20 @@ async function resolveCurrentLocation(): Promise<StoreDiscoveryLocation> {
     let cityName = address.city || null;
 
     if (countryName) {
-      const { data: country } = await client.from('countries').select('id, name').ilike('name', countryName).maybeSingle();
+      const { data: country } = await client
+        .from('countries')
+        .select('id, name')
+        .ilike('name', countryName)
+        .maybeSingle();
       countryId = country?.id || null;
       countryName = country?.name || countryName;
     }
 
     if (cityName) {
-      let cityQuery = client.from('cities').select('id, name, country_id').ilike('name', cityName);
+      let cityQuery = client
+        .from('cities')
+        .select('id, name, country_id')
+        .ilike('name', cityName);
       if (countryId) cityQuery = cityQuery.eq('country_id', countryId);
       const { data: city } = await cityQuery.maybeSingle();
       cityId = city?.id || null;
@@ -52,26 +65,33 @@ async function resolveCurrentLocation(): Promise<StoreDiscoveryLocation> {
   }
 }
 
-function groupStores(stores: any[]): Record<DiscoveryGroup, any[]> {
-  const groups: Record<DiscoveryGroup, any[]> = { bar: [], restaurant: [], general: [], other: [] };
-  for (const store of stores) {
-    const group = (store.discovery_group || 'other') as DiscoveryGroup;
-    if (groups[group]) groups[group].push(store);
-  }
-  return groups;
-}
-
+/**
+ * Appelle get_home_top_stores (Supabase).
+ * Le backend calcule et classe les groupes. Le frontend affiche uniquement.
+ * groupStores() côté frontend est intentionnellement absent.
+ */
 export const storeDiscoveryService = {
   async getHomeTopStores(): Promise<StoreDiscoveryResult> {
     const location = await resolveCurrentLocation();
     const client = useSupabase();
-    const { data, error } = await client.rpc('get_popular_stores', {
-      p_limit: 20,
+
+    const { data, error } = await client.rpc('get_home_top_stores', {
       p_city_id: location.cityId,
       p_country_id: location.countryId,
     });
+
     if (error) throw error;
-    const stores = (data || []).slice(0, 20);
-    return { stores, groups: groupStores(stores), location };
+
+    const result = data ?? {};
+
+    return {
+      groups: {
+        bar: result.groups?.bar ?? [],
+        restaurant: result.groups?.restaurant ?? [],
+        general: result.groups?.general ?? [],
+        other: result.groups?.other ?? [],
+      },
+      location,
+    };
   },
 };

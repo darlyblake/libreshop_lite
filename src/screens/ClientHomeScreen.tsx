@@ -155,7 +155,6 @@ export const ClientHomeScreen: React.FC = () => {
   const { spacing: SPACING, radius: RADIUS, fontSize: FONT_SIZE, getColor: palette } = useTheme();
   const { state, dispatch } = useClientHomeState();
   const [isReady, setIsReady] = useState(false);
-  const [topStores, setTopStores] = useState<any[]>([]);
   const [discoveryGroups, setDiscoveryGroups] = useState<Record<string, any[]>>({ bar: [], restaurant: [], general: [], other: [] });
   const [discoveryLocation, setDiscoveryLocation] = useState<{ cityName: string | null; countryName: string | null }>({ cityName: null, countryName: null });
   const [loadingStores, setLoadingStores] = useState(true);
@@ -177,18 +176,12 @@ export const ClientHomeScreen: React.FC = () => {
     try {
       if (isRefresh) setRefreshing(true); else setLoadingStores(true);
       const result = await storeDiscoveryService.getHomeTopStores();
-      setTopStores(result.stores.slice(0, 20));
       setDiscoveryGroups(result.groups);
       setDiscoveryLocation({ cityName: result.location.cityName, countryName: result.location.countryName });
     } catch (e) {
-      console.warn('Failed to load location-aware top stores', e);
-      try {
-        const fallback = await storeService.getPopularStores(20);
-        setTopStores(fallback || []);
-        setDiscoveryGroups({ bar: (fallback || []).filter((s: any) => s.discovery_group === 'bar').slice(0, 5), restaurant: (fallback || []).filter((s: any) => s.discovery_group === 'restaurant').slice(0, 5), general: (fallback || []).filter((s: any) => s.discovery_group === 'general').slice(0, 5), other: (fallback || []).filter((s: any) => !['bar', 'restaurant', 'general'].includes(s.discovery_group)).slice(0, 5) });
-      } catch (fallbackError) {
-        console.warn('Fallback store discovery failed', fallbackError);
-      }
+      console.warn('[ClientHome] Erreur chargement Tops:', e);
+      // Le backend est la seule source de vérité. On ne regroupe pas côté frontend.
+      setDiscoveryGroups({ bar: [], restaurant: [], general: [], other: [] });
     } finally {
       setLoadingStores(false);
       setRefreshing(false);
