@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
-import { supabase } from '../lib/supabase';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { COLORS, SPACING } from '../config/theme';
+import { authService } from '../services/authService';
 
 export function ResetPasswordScreen() {
   const route = useRoute<any>();
@@ -13,65 +13,176 @@ export function ResetPasswordScreen() {
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [step, setStep] = useState<'request' | 'verify' | 'set'>('request');
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    // If app opened via deep link, Supabase may include token in URL; handle externally if needed
-  }, []);
-
-  const resetPassword = async () => {
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
+  const requestCode = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!/\S+@\S+\.\S+/.test(normalizedEmail)) {
+      setError('Veuillez saisir une adresse e-mail valide.');
       return;
     }
 
     setLoading(true);
+    setError('');
     try {
-      // Verify OTP (recovery)
-      if (!supabase) { Alert.alert('Erreur', 'Service non disponible'); setLoading(false); return; }
-      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' } as any);
-      if (verifyError) {
-        Alert.alert('Erreur', verifyError.message || 'Code invalide');
-        setLoading(false);
-        return;
-      }
-
-      // Update password
-      const { error: updateError } = await supabase!.auth.updateUser({ password: newPassword } as any);
-      if (updateError) {
-        Alert.alert('Erreur', updateError.message || 'Impossible de mettre à jour le mot de passe');
-        setLoading(false);
-        return;
-      }
-
-      Alert.alert('Succès', 'Votre mot de passe a été mis à jour.');
-      navigation.navigate('Login' as never);
+      await authService.resetPassword(normalizedEmail);
+      setEmail(normalizedEmail);
+      setStep('verify');
     } catch (e: any) {
-      Alert.alert('Erreur', e?.message || 'Erreur inconnue');
+      setError(e?.message || "Impossible d'envoyer le code.");
     } finally {
       setLoading(false);
     }
   };
 
+  const verifyCode = async () => {
+    if (!/^\d{6}$/.test(code)) {
+      setError('Le code doit contenir exactement 6 chiffres.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await authService.verifyPasswordResetOtp(email, code);
+      setStep('set');
+    } catch (e: any) {
+      setError(e?.message || 'Code invalide ou expiré.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePassword = async () => {
+    if (newPassword.length < 6) {
+      setError('Le mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await authService.updatePasswordAfterRecovery(newPassword);
+      Alert.alert(
+        'Mot de passe modifié',
+        'Votre mot de passe a été réinitialisé avec succès.',
+        [{ text: 'Se connecter', onPress: () => navigation.replace('SellerAuth') }]
+      );
+    } catch (e: any) {
+      setError(e?.message || 'Impossible de mettre à jour le mot de passe.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+
+    setResending(true);
+    setError('');
+    try {
+      await authService.resendPasswordReset(normalizedEmail);
+      setCode('');
+      Alert.alert('Code envoyé', 'Un nouveau code de réinitialisation a été envoyé à votre adresse e-mail.');
+    } catch (e: any) {
+      setError(e?.message || "Impossible de renvoyer le code.");
+    } finally {
+      setResending(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Entrer le code</Text>
-      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Code à 6 chiffres" value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={6} />
-      <TextInput style={styles.input} placeholder="Nouveau mot de passe" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
-      <TextInput style={styles.input} placeholder="Confirmer mot de passe" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry />
-      <TouchableOpacity style={[styles.button, loading && styles.disabled]} onPress={resetPassword} disabled={loading}>
-        <Text style={styles.buttonText}>{loading ? 'En cours...' : 'Changer le mot de passe'}</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Réinitialiser le mot de passe</Text>
+
+      {step === 'request' && (
+        <>
+          <Text style={styles.description}>Saisissez votre adresse e-mail. Nous vous enverrons un code de validation à 6 chiffres.</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+          />
+          <TouchableOpacity style={styles.button} onPress={requestCode} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Envoyer le code</Text>}
+          </TouchableOpacity>
+        </>
+      )}
+
+      {step === 'verify' && (
+        <>
+          <Text style={styles.description}>Entrez le code à 6 chiffres reçu par e-mail pour vérifier votre identité.</Text>
+          <Text style={styles.email}>{email}</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="123456"
+            value={code}
+            onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            maxLength={6}
+            textContentType="oneTimeCode"
+            autoComplete="one-time-code"
+          />
+          <TouchableOpacity style={styles.button} onPress={verifyCode} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Vérifier le code</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.linkButton} onPress={resendCode} disabled={resending || loading}>
+            <Text style={styles.linkText}>{resending ? 'Envoi...' : 'Renvoyer le code'}</Text>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {step === 'set' && (
+        <>
+          <Text style={styles.description}>Choisissez maintenant votre nouveau mot de passe.</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Nouveau mot de passe"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry
+            autoComplete="new-password"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirmer le mot de passe"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            autoComplete="new-password"
+          />
+          <TouchableOpacity style={styles.button} onPress={updatePassword} disabled={loading}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Réinitialiser le mot de passe</Text>}
+          </TouchableOpacity>
+        </>
+      )}
+
+      {!!error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: SPACING.lg, backgroundColor: '#fff', justifyContent: 'center' },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#ddd', padding: 12, borderRadius: 8, marginBottom: 12 },
-  button: { backgroundColor: COLORS.primary || '#0b69ff', padding: 12, borderRadius: 8, alignItems: 'center' },
-  disabled: { opacity: 0.6 },
+  title: { fontSize: 22, fontWeight: '700', marginBottom: 12, color: COLORS.text },
+  description: { fontSize: 15, lineHeight: 22, marginBottom: 14, color: COLORS.textMuted },
+  email: { fontSize: 14, fontWeight: '600', marginBottom: 12, color: COLORS.text },
+  input: { borderWidth: 1, borderColor: '#ddd', padding: 13, borderRadius: 8, marginBottom: 12, fontSize: 16 },
+  button: { backgroundColor: COLORS.primary || '#0b69ff', padding: 13, borderRadius: 8, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   buttonText: { color: '#fff', fontWeight: '700' },
+  linkButton: { alignItems: 'center', padding: 14 },
+  linkText: { color: '#0b69ff', fontWeight: '600' },
+  error: { color: '#c62828', marginTop: 14, textAlign: 'center' },
 });
